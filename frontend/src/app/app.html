@@ -1,0 +1,12 @@
+<main class="app-shell">
+  <h1>{{ title() }}</h1>
+  <p class="backend-status" [class]="'status-' + backendStatus()">
+    Backend:
+    @switch (backendStatus()) {
+      @case ('checking') { checking… }
+      @case ('up') { UP }
+      @case ('down') { unreachable }
+    }
+  </p>
+  <router-outlet />
+</main>

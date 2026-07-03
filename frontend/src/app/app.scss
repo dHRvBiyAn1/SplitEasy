@@ -1,0 +1,22 @@
+.app-shell {
+  font-family: system-ui, sans-serif;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.backend-status {
+  font-weight: 600;
+
+  &.status-up {
+    color: #1a7f37;
+  }
+
+  &.status-down {
+    color: #cf222e;
+  }
+
+  &.status-checking {
+    color: #6e7781;
+  }
+}
