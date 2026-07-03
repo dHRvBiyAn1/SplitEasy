@@ -37,6 +37,8 @@
         </mat-list-item>
       }
     </mat-list>
+
+    <app-expense-panel [group]="g" />
   } @else {
     <p class="groups-error">{{ error() ?? 'Group not found.' }}</p>
   }
