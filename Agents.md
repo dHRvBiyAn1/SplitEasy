@@ -118,6 +118,18 @@ line here so it's not relitigated next time.)*
   (by email). Room for roles later via `GroupMembership` (explicit join entity).
 - **Avoid N+1 on collections**: fetch members with `join fetch m.user`; compute
   group member counts with one aggregate query (see `GroupMembershipRepository`).
+  Expense lists use one query too: payer joined + participant count as an inlined
+  correlated subquery (`ExpenseRepository.findSummariesByGroupId`); expense detail
+  uses `join fetch` for payer, group, and participants+users.
+- **Money is integer cents end-to-end** (`long` / Postgres `BIGINT`), never float.
+  Frontend converts dollars→cents with `Math.round(x*100)` (`dollarsToCents`) and
+  never sends decimals over the wire (requests carry `amountCents`).
+- **Equal-split rounding**: `ExpenseSplitCalculator` (pure, unit-tested separately)
+  gives each participant `floor(total/n)`; the leftover `total mod n` cents are
+  absorbed by the **payer** when the payer is a participant, else by the first
+  participant in id-sorted order. Shares always sum back to the total exactly.
+  This matches the AGENTS.md default ("payer absorbs the cent"); the only addition
+  is the payer-not-a-participant fallback.
 - Frontend: Angular Material (v21, CSS-based animations — `@angular/animations`
   is NOT a dependency, so don't add `provideAnimations*`). Auth token is attached
   and 401s handled by `authInterceptor`; authenticated routes use `authGuard`.
@@ -136,9 +148,21 @@ Migration `V2__users_and_groups.sql`. All PKs are `uuid`.
   `user_id` → `users.id`, `joined_at`. Unique `(group_id, user_id)`.
   Indexed on both `user_id` and `group_id`.
 
+Migration `V3__expenses.sql`:
+
+- **expenses** — `id`, `group_id` → `groups.id` (ON DELETE CASCADE),
+  `description` (not null), `amount_cents` BIGINT (not null, CHECK > 0),
+  `paid_by` → `users.id` (not null), `created_at`. Indexed on `group_id`.
+- **expense_participants** — `id`, `expense_id` → `expenses.id` (ON DELETE
+  CASCADE), `user_id` → `users.id`, `share_cents` BIGINT (not null, CHECK >= 0).
+  Unique `(expense_id, user_id)`. Indexed on `expense_id` and `user_id`.
+
 Relationships: User ↔ Group is many-to-many **through group_memberships**;
 Group → User (created_by) is many-to-one. Creating a group auto-inserts a
 membership for the creator (so the creator is a member, not a special case).
+An Expense belongs to one Group, has one payer (User), and splits across a
+subset of the group's members via expense_participants; the participant
+`share_cents` always sum exactly to the expense `amount_cents`.
 
 ## Domain Rules to Remember
 
@@ -182,3 +206,13 @@ track what's built so future planning doesn't duplicate or conflict.)*
   Verified end-to-end (curl: register/login/create/add/list/details incl. 401/403/404;
   browser: registered Dave, created "Weekend Cabin", added Alice → 2 members).
   Backend 19/19, frontend 16/16 tests passing.
+- [x] Add expense with equal split — done (branch `feat/expense-equal-split`):
+  Expense + ExpenseParticipant entities (UUID PKs, migration V3), pure
+  `ExpenseSplitCalculator` (payer absorbs remainder cents, integer cents only),
+  endpoints to create / list / get expenses under `/api/groups/{id}/expenses`
+  (member-only; 403 for non-members, 400 for bad amount/payer/participant).
+  Angular expense panel (add form with payer select + participant checkboxes,
+  expense list) embedded in the group detail page. Verified end-to-end (curl:
+  $10.00/3 → 334/333/333; browser: $10.01/2 → Alice 501 / Dave 500, summing to
+  1001) and confirmed the list endpoint issues a single SQL query (no N+1).
+  Backend 41/41, frontend 21/21 tests passing.
