@@ -1,0 +1,35 @@
+.groups-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.create-card,
+.add-card {
+  margin-bottom: 1.5rem;
+}
+
+.create-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+}
+
+.create-form .grow {
+  flex: 1;
+}
+
+.groups-error {
+  color: var(--mat-sys-error);
+}
+
+.empty,
+.subtle {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
