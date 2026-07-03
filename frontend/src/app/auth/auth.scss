@@ -1,0 +1,33 @@
+.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 3rem 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  overflow: hidden;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.auth-error {
+  color: var(--mat-sys-error);
+  margin: 0 0 0.5rem;
+}
+
+.auth-footer {
+  padding: 1rem;
+  text-align: center;
+}

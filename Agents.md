@@ -15,9 +15,11 @@ number of transactions needed to settle up).
 ## Stack
 
 - **Backend**: Java 21, Spring Boot 4.x, Maven
-- **Database**: PostgreSQL (via Spring Data JPA + Flyway/Liquibase for migrations)
-- **Frontend**: Angular 18+, standalone components, Angular Material (or TBD)
-- **Auth**: TBD — decide during planning (likely Spring Security + JWT)
+- **Database**: PostgreSQL (via Spring Data JPA + Flyway for migrations)
+- **Frontend**: Angular 21, standalone components, Angular Material
+- **Auth**: Spring Security + JWT (HS256, symmetric secret) via
+  `spring-boot-starter-oauth2-resource-server`. Access tokens only — no refresh
+  tokens yet (see TODO under Domain Rules).
 - **API style**: REST, JSON
 
 ## Architecture
@@ -42,8 +44,21 @@ the dev database AND for backend tests, which use Testcontainers).
    so the app calls relative `/api/...` URLs with no CORS in dev.
 
 Health check: `curl http://localhost:8080/api/health` →
-`{"status":"UP","service":"spliteasy-backend",...}`. The frontend root page
-shows "Backend: UP" when the full chain works.
+`{"status":"UP","service":"spliteasy-backend",...}`. The frontend toolbar
+shows "● UP" when the full chain works.
+
+Auth/JWT config: the backend signs HS256 tokens with `app.jwt.secret`
+(dev default in `application.properties`). **Override `APP_JWT_SECRET`
+(>= 32 chars) in any non-dev environment.** Token lifetime is
+`app.jwt.expiration-seconds` (default 3600).
+
+Quick API smoke test (backend running):
+```
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/register -H 'Content-Type: application/json' \
+  -d '{"email":"a@b.com","password":"password123","displayName":"A"}' | jq -r .accessToken)
+curl -s -X POST localhost:8080/api/groups -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"name":"Trip"}'
+```
 
 Tests:
 - Backend: `cd backend && ./mvnw test` (spins up a throwaway Postgres via
@@ -86,13 +101,44 @@ line here so it's not relitigated next time.)*
 - Frontend HTTP goes through the shared `ApiService`
   (`frontend/src/app/core/api/api.service.ts`) with base path `/api`; one
   resource service per backend resource (see `health.service.ts` as the pattern).
-- Backend CORS allows `http://localhost:4200` (`WebConfig`), though dev traffic
-  normally uses the ng-serve proxy instead.
+- Backend CORS allows `http://localhost:4200`, exposed as a `CorsConfigurationSource`
+  bean (`WebConfig`) and wired into the Spring Security chain via `http.cors()` —
+  MVC-level CORS mappings run too late once Security is on the classpath.
+- **Jackson 3** ships with Spring Boot 4: JSON classes live under `tools.jackson.*`
+  (e.g. `tools.jackson.databind.ObjectMapper`), NOT `com.fasterxml.jackson.*`
+  (annotations remain `com.fasterxml.jackson.annotation`).
+- **UUID primary keys** for all entities (Hibernate `@UuidGenerator`, generated
+  app-side so it works under `ddl-auto=validate`). Postgres column type `uuid`.
+- **Auth**: JWT is HS256 via oauth2-resource-server. Tokens are issued in
+  `JwtService` (claims: `sub`=user UUID, `email`, `displayName`) and validated by
+  the auto-configured resource-server filter (`NimbusJwtDecoder` bean in
+  `SecurityConfig`). Controllers read the caller via `@AuthenticationPrincipal Jwt`.
+  Passwords hashed with BCrypt; entities are NEVER serialized — DTOs only.
+- **Group authorization is flat**: any member can view a group and add members
+  (by email). Room for roles later via `GroupMembership` (explicit join entity).
+- **Avoid N+1 on collections**: fetch members with `join fetch m.user`; compute
+  group member counts with one aggregate query (see `GroupMembershipRepository`).
+- Frontend: Angular Material (v21, CSS-based animations — `@angular/animations`
+  is NOT a dependency, so don't add `provideAnimations*`). Auth token is attached
+  and 401s handled by `authInterceptor`; authenticated routes use `authGuard`.
+  Vitest is the test runner — use `vi.spyOn(...).mockReturnValue(...)`, not
+  Jasmine's `spyOn(...).and.returnValue(...)`.
 
 ## Data Model (evolving)
 
-*(To be filled in once the initial plan is finalized — entities, relationships,
-key constraints.)*
+Migration `V2__users_and_groups.sql`. All PKs are `uuid`.
+
+- **users** — `id`, `email` (unique, not null), `password_hash` (not null),
+  `display_name` (not null), `created_at`.
+- **groups** — `id`, `name` (not null), `created_by` → `users.id` (not null),
+  `created_at`.
+- **group_memberships** — `id`, `group_id` → `groups.id` (ON DELETE CASCADE),
+  `user_id` → `users.id`, `joined_at`. Unique `(group_id, user_id)`.
+  Indexed on both `user_id` and `group_id`.
+
+Relationships: User ↔ Group is many-to-many **through group_memberships**;
+Group → User (created_by) is many-to-one. Creating a group auto-inserts a
+membership for the creator (so the creator is a member, not a special case).
 
 ## Domain Rules to Remember
 
@@ -100,6 +146,13 @@ key constraints.)*
   scale) — never floating point.
 - Every expense split must sum exactly to the total expense amount (handle
   rounding remainders deterministically, e.g., first payer absorbs the cent).
+
+## TODOs / Known Gaps
+
+- **Refresh tokens**: not implemented. Access tokens (1h) only; when they expire
+  the user must log in again. Add a refresh-token flow before any real deployment.
+- **Register reveals email existence** (409 on duplicate). Fine for now; revisit
+  if enumeration becomes a concern.
 
 ## Git Workflow
 
@@ -120,3 +173,12 @@ track what's built so future planning doesn't duplicate or conflict.)*
   standalone frontend with shared ApiService, `/api/health` endpoint verified
   end-to-end (browser → proxy → backend → 200, page shows "Backend: UP");
   backend 2/2 and frontend 4/4 tests passing.
+- [x] User & group management — done (branch `feat/user-group-management`):
+  User/Group/GroupMembership entities (UUID PKs, migration V2), Spring Security +
+  JWT (HS256 via oauth2-resource-server), register/login issuing access tokens,
+  group create / add-member-by-email / list-my-groups / get-details with member
+  authorization (403 for non-members). Angular Material UI: login/register,
+  group list+create, group detail+add-member, auth interceptor + route guard.
+  Verified end-to-end (curl: register/login/create/add/list/details incl. 401/403/404;
+  browser: registered Dave, created "Weekend Cabin", added Alice → 2 members).
+  Backend 19/19, frontend 16/16 tests passing.
