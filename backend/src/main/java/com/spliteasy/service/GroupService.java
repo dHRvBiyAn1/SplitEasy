@@ -1,0 +1,100 @@
+package com.spliteasy.service;
+
+import com.spliteasy.dto.CreateGroupRequest;
+import com.spliteasy.dto.GroupResponse;
+import com.spliteasy.dto.GroupSummary;
+import com.spliteasy.dto.UserSummary;
+import com.spliteasy.entity.Group;
+import com.spliteasy.entity.GroupMembership;
+import com.spliteasy.entity.User;
+import com.spliteasy.exception.ConflictException;
+import com.spliteasy.exception.ForbiddenException;
+import com.spliteasy.exception.NotFoundException;
+import com.spliteasy.repository.GroupMembershipRepository;
+import com.spliteasy.repository.GroupRepository;
+import com.spliteasy.repository.UserRepository;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class GroupService {
+
+    private final GroupRepository groupRepository;
+    private final GroupMembershipRepository membershipRepository;
+    private final UserRepository userRepository;
+
+    public GroupService(
+            GroupRepository groupRepository,
+            GroupMembershipRepository membershipRepository,
+            UserRepository userRepository) {
+        this.groupRepository = groupRepository;
+        this.membershipRepository = membershipRepository;
+        this.userRepository = userRepository;
+    }
+
+    @Transactional
+    public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
+        User creator = userRepository.findById(requesterId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        Group group = groupRepository.save(new Group(request.name().trim(), creator));
+        membershipRepository.save(new GroupMembership(group, creator));
+        // The creator is the only member at creation time.
+        return new GroupResponse(
+                group.getId(),
+                group.getName(),
+                UserSummary.from(creator),
+                List.of(UserSummary.from(creator)),
+                group.getCreatedAt());
+    }
+
+    @Transactional
+    public GroupResponse addMember(UUID requesterId, UUID groupId, String email) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new NotFoundException("Group not found"));
+        requireMember(groupId, requesterId);
+
+        User invitee = userRepository.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new NotFoundException("No user found with that email"));
+        if (membershipRepository.existsByGroupIdAndUserId(groupId, invitee.getId())) {
+            throw new ConflictException("User is already a member of this group");
+        }
+        membershipRepository.save(new GroupMembership(group, invitee));
+        return toGroupResponse(group);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GroupSummary> listMyGroups(UUID requesterId) {
+        return membershipRepository.findGroupSummariesForUser(requesterId).stream()
+                .map(v -> new GroupSummary(v.getId(), v.getName(), v.getMemberCount()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public GroupResponse getGroup(UUID requesterId, UUID groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new NotFoundException("Group not found"));
+        requireMember(groupId, requesterId);
+        return toGroupResponse(group);
+    }
+
+    private void requireMember(UUID groupId, UUID userId) {
+        if (!membershipRepository.existsByGroupIdAndUserId(groupId, userId)) {
+            throw new ForbiddenException("You are not a member of this group");
+        }
+    }
+
+    /** Builds the full response, fetching members with their users in a single query. */
+    private GroupResponse toGroupResponse(Group group) {
+        List<UserSummary> members = membershipRepository.findByGroupIdFetchUser(group.getId()).stream()
+                .map(m -> UserSummary.from(m.getUser()))
+                .toList();
+        return new GroupResponse(
+                group.getId(),
+                group.getName(),
+                UserSummary.from(group.getCreatedBy()),
+                members,
+                group.getCreatedAt());
+    }
+}
