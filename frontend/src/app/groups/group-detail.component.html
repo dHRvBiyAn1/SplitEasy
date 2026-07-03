@@ -1,0 +1,43 @@
+<div class="groups-page">
+  <a routerLink="/groups" class="back-link">← All groups</a>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  } @else if (group(); as g) {
+    <h1>{{ g.name }}</h1>
+    <p class="subtle">Created by {{ g.createdBy.displayName }}</p>
+
+    <mat-card class="add-card">
+      <mat-card-header>
+        <mat-card-title>Add a member</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <form [formGroup]="form" (ngSubmit)="addMember()" class="create-form">
+          <mat-form-field appearance="outline" class="grow">
+            <mat-label>Member email</mat-label>
+            <input matInput type="email" formControlName="email" placeholder="friend@example.com" />
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" [disabled]="adding()">
+            Add
+          </button>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    @if (error()) {
+      <p class="groups-error">{{ error() }}</p>
+    }
+
+    <h2>Members ({{ g.members.length }})</h2>
+    <mat-list>
+      @for (member of g.members; track member.id) {
+        <mat-list-item>
+          <span matListItemTitle>{{ member.displayName }}</span>
+          <span matListItemLine>{{ member.email }}</span>
+        </mat-list-item>
+      }
+    </mat-list>
+  } @else {
+    <p class="groups-error">{{ error() ?? 'Group not found.' }}</p>
+  }
+</div>
