@@ -1,0 +1,17 @@
+<h2>Balances</h2>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+} @else if (error()) {
+  <p class="balance-error">{{ error() }}</p>
+} @else {
+  <mat-list>
+    @for (b of balances(); track b.user.id) {
+      <mat-list-item>
+        <span matListItemTitle>
+          {{ b.user.displayName }}
+          <span class="net" [class]="balanceClass(b.netCents)">{{ describe(b.netCents) }}</span>
+        </span>
+      </mat-list-item>
+    }
+  </mat-list>
+}

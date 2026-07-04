@@ -10,6 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 import { ExpensePanelComponent } from '../expenses/expense-panel.component';
+import { BalancePanelComponent } from '../balances/balance-panel.component';
 
 @Component({
   selector: 'app-group-detail',
@@ -23,6 +24,7 @@ import { ExpensePanelComponent } from '../expenses/expense-panel.component';
     MatListModule,
     MatProgressBarModule,
     ExpensePanelComponent,
+    BalancePanelComponent,
   ],
   templateUrl: './group-detail.component.html',
   styleUrl: './groups.scss',
@@ -36,6 +38,8 @@ export class GroupDetailComponent implements OnInit {
   protected readonly adding = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
+  /** Bumped whenever an expense is added, to trigger a balances reload. */
+  protected readonly balanceRefresh = signal(0);
 
   protected readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -79,5 +83,9 @@ export class GroupDetailComponent implements OnInit {
         this.adding.set(false);
       },
     });
+  }
+
+  onExpenseAdded(): void {
+    this.balanceRefresh.update((n) => n + 1);
   }
 }

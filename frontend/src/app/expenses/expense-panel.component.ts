@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -30,6 +30,8 @@ import { ExpenseService, centsToDisplay, dollarsToCents } from './expense.servic
 })
 export class ExpensePanelComponent implements OnInit {
   readonly group = input.required<GroupResponse>();
+  /** Emitted after an expense is successfully created, so parents can refresh balances. */
+  readonly expenseAdded = output<void>();
 
   private readonly fb = inject(FormBuilder);
   private readonly expenses = inject(ExpenseService);
@@ -121,6 +123,7 @@ export class ExpensePanelComponent implements OnInit {
           this.form.reset({ description: '', amount: null, paidByUserId: members[0]?.id ?? '' });
           this.selected.set(new Set(members.map((m) => m.id)));
           this.saving.set(false);
+          this.expenseAdded.emit();
         },
         error: (err) => {
           this.error.set(err?.error?.message ?? 'Could not add the expense.');
