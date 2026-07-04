@@ -1,0 +1,51 @@
+.add-expense-card {
+  margin: 1.5rem 0;
+}
+
+.expense-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.expense-form mat-form-field {
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.row .amount {
+  flex: 1;
+}
+
+.row .payer {
+  flex: 1.4;
+}
+
+.participants {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  padding: 0.5rem 1rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.participants legend {
+  padding: 0 0.25rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.expense-error {
+  color: var(--mat-sys-error);
+  margin: 0.25rem 0;
+}
+
+.subtle {
+  color: var(--mat-sys-on-surface-variant);
+}
