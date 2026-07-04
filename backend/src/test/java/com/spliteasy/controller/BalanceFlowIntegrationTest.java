@@ -8,6 +8,8 @@ import com.spliteasy.dto.AddMemberRequest;
 import com.spliteasy.dto.AuthResponse;
 import com.spliteasy.dto.CreateExpenseRequest;
 import com.spliteasy.dto.CreateGroupRequest;
+import com.spliteasy.dto.SplitInput;
+import com.spliteasy.entity.SplitType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -172,5 +174,35 @@ class BalanceFlowIntegrationTest extends AbstractIntegrationTest {
         String g = createGroup(alice.accessToken(), "Auth");
         mockMvc.perform(get("/api/groups/" + g + "/balances"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void balancesNetToZeroAcrossMixedSplitTypes() throws Exception {
+        AuthResponse a = register("bal-mix-a@example.com", "password123", "Alice");
+        AuthResponse b = register("bal-mix-b@example.com", "password123", "Bob");
+        AuthResponse c = register("bal-mix-c@example.com", "password123", "Carol");
+        String g = createGroup(a.accessToken(), "Mixed");
+        addMember(a.accessToken(), g, "bal-mix-b@example.com");
+        addMember(a.accessToken(), g, "bal-mix-c@example.com");
+
+        // EQUAL: Alice pays 900, all three.
+        addExpense(a.accessToken(), g, "Hotel", 900, a.user().id(), null);
+        // UNEQUAL: Bob pays 1000, split 700/300 between Bob and Carol.
+        post(b.accessToken(), g, new CreateExpenseRequest("Gear", 1000L, b.user().id(), null, SplitType.UNEQUAL,
+                List.of(new SplitInput(b.user().id(), 700L), new SplitInput(c.user().id(), 300L))));
+        // PERCENTAGE: Carol pays 1000, 33.33/33.33/33.34 across all three (remainder-prone).
+        post(c.accessToken(), g, new CreateExpenseRequest("Food", 1000L, c.user().id(), null, SplitType.PERCENTAGE,
+                List.of(new SplitInput(a.user().id(), 3333L), new SplitInput(b.user().id(), 3333L),
+                        new SplitInput(c.user().id(), 3334L))));
+
+        Map<String, Long> bal = balances(a.accessToken(), g);
+        assertThat(bal).hasSize(3);
+        assertThat(sum(bal)).isZero(); // zero-sum invariant holds across all three split types
+    }
+
+    private void post(String token, String groupId, CreateExpenseRequest body) throws Exception {
+        mockMvc.perform(jsonPost("/api/groups/" + groupId + "/expenses", body)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isCreated());
     }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.spliteasy.service.ExpenseSplitCalculator.Share;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -118,5 +119,50 @@ class ExpenseSplitCalculatorTest {
     void emptyParticipantsIsRejected() {
         assertThatThrownBy(() -> ExpenseSplitCalculator.splitEqually(500, List.of(), A))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // --- Percentage (basis points) ---
+
+    @Test
+    void percentageEvenSplit() {
+        // 50% / 50% of 1000 → 500 / 500.
+        List<Share> shares = ExpenseSplitCalculator.splitByBasisPoints(1000, Map.of(A, 5000L, B, 5000L), A);
+        assertThat(shareOf(shares, A)).isEqualTo(500);
+        assertThat(shareOf(shares, B)).isEqualTo(500);
+        assertThat(sum(shares)).isEqualTo(1000);
+    }
+
+    @Test
+    void percentageWithRoundingRemainderGoesToPayer() {
+        // 33.33 / 33.33 / 33.34 of 1000 → 333 / 333 / 333 floor = 999, payer (A) absorbs the 1c.
+        List<Share> shares = ExpenseSplitCalculator.splitByBasisPoints(
+                1000, Map.of(A, 3333L, B, 3333L, C, 3334L), A);
+        assertThat(shareOf(shares, A)).isEqualTo(334);
+        assertThat(shareOf(shares, B)).isEqualTo(333);
+        assertThat(shareOf(shares, C)).isEqualTo(333);
+        assertThat(sum(shares)).isEqualTo(1000);
+    }
+
+    @Test
+    void percentageRemainderFollowsPayerNotFirstId() {
+        List<Share> shares = ExpenseSplitCalculator.splitByBasisPoints(
+                1000, Map.of(A, 3333L, B, 3333L, C, 3334L), C);
+        assertThat(shareOf(shares, C)).isEqualTo(334);
+        assertThat(sum(shares)).isEqualTo(1000);
+    }
+
+    @Test
+    void percentageNotSummingTo100IsRejected() {
+        assertThatThrownBy(() -> ExpenseSplitCalculator.splitByBasisPoints(1000, Map.of(A, 5000L, B, 4000L), A))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void percentageUnevenWeightsStillSumExactly() {
+        // 10% / 90% of 999 → 99 / 899 floor = 998, payer absorbs 1c → 100 / 899.
+        List<Share> shares = ExpenseSplitCalculator.splitByBasisPoints(999, Map.of(A, 1000L, B, 9000L), A);
+        assertThat(sum(shares)).isEqualTo(999);
+        assertThat(shareOf(shares, A)).isEqualTo(100);
+        assertThat(shareOf(shares, B)).isEqualTo(899);
     }
 }

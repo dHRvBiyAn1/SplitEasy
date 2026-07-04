@@ -11,8 +11,11 @@ import com.spliteasy.dto.AddMemberRequest;
 import com.spliteasy.dto.AuthResponse;
 import com.spliteasy.dto.CreateExpenseRequest;
 import com.spliteasy.dto.CreateGroupRequest;
+import com.spliteasy.dto.SplitInput;
+import com.spliteasy.entity.SplitType;
 import java.util.List;
 import java.util.UUID;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
@@ -214,5 +217,119 @@ class ExpenseFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.amountCents").value(huge))
                 .andExpect(jsonPath("$.participants[0].shareCents").value(huge));
+    }
+
+    // --- UNEQUAL split ---
+
+    @Test
+    void unequalSplitThatSumsCorrectlyIsStored() throws Exception {
+        AuthResponse owner = register("uneq-o1@example.com", "password123", "Owner");
+        AuthResponse bob = register("uneq-b1@example.com", "password123", "Bob");
+        String g = createGroup(owner.accessToken(), "Uneq");
+        addMember(owner.accessToken(), g, "uneq-b1@example.com");
+
+        // 1000c split 600/400.
+        var body = new CreateExpenseRequest("Dinner", 1000L, userId(owner), null, SplitType.UNEQUAL,
+                List.of(new SplitInput(userId(owner), 600L), new SplitInput(userId(bob), 400L)));
+        MvcResult r = mockMvc.perform(jsonPost("/api/groups/" + g + "/expenses", body)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splitType").value("UNEQUAL"))
+                .andReturn();
+        JsonNode json = objectMapper.readTree(r.getResponse().getContentAsString());
+        long total = 0;
+        for (JsonNode p : json.get("participants")) {
+            total += p.get("shareCents").asLong();
+        }
+        assertThat(total).isEqualTo(1000L);
+    }
+
+    @Test
+    void unequalSplitThatDoesNotSumIsRejected() throws Exception {
+        AuthResponse owner = register("uneq-o2@example.com", "password123", "Owner");
+        AuthResponse bob = register("uneq-b2@example.com", "password123", "Bob");
+        String g = createGroup(owner.accessToken(), "Uneq2");
+        addMember(owner.accessToken(), g, "uneq-b2@example.com");
+
+        // 600 + 300 = 900 != 1000 → 400.
+        var body = new CreateExpenseRequest("Dinner", 1000L, userId(owner), null, SplitType.UNEQUAL,
+                List.of(new SplitInput(userId(owner), 600L), new SplitInput(userId(bob), 300L)));
+        mockMvc.perform(jsonPost("/api/groups/" + g + "/expenses", body)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Entered amounts (900c) must add up to the expense total (1000c)")));
+    }
+
+    @Test
+    void unequalSplitWithNonMemberParticipantIsRejected() throws Exception {
+        AuthResponse owner = register("uneq-o3@example.com", "password123", "Owner");
+        AuthResponse outsider = register("uneq-out3@example.com", "password123", "Out");
+        String g = createGroup(owner.accessToken(), "Uneq3");
+        var body = new CreateExpenseRequest("Dinner", 1000L, userId(owner), null, SplitType.UNEQUAL,
+                List.of(new SplitInput(userId(owner), 500L), new SplitInput(userId(outsider), 500L)));
+        mockMvc.perform(jsonPost("/api/groups/" + g + "/expenses", body)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isBadRequest());
+    }
+
+    // --- PERCENTAGE split ---
+
+    @Test
+    void percentageSplitTo100IsStoredWithRounding() throws Exception {
+        AuthResponse owner = register("pct-o1@example.com", "password123", "Owner");
+        register("pct-b1@example.com", "password123", "Bob");
+        register("pct-c1@example.com", "password123", "Carol");
+        String g = createGroup(owner.accessToken(), "Pct");
+        addMember(owner.accessToken(), g, "pct-b1@example.com");
+        addMember(owner.accessToken(), g, "pct-c1@example.com");
+        String bobId = memberId(owner.accessToken(), g, "pct-b1@example.com");
+        String carolId = memberId(owner.accessToken(), g, "pct-c1@example.com");
+
+        // 33.33/33.33/33.34% of 1000 → 333/333/334, payer absorbs.
+        var body = new CreateExpenseRequest("Rent", 1000L, userId(owner), null, SplitType.PERCENTAGE,
+                List.of(new SplitInput(userId(owner), 3333L),
+                        new SplitInput(UUID.fromString(bobId), 3333L),
+                        new SplitInput(UUID.fromString(carolId), 3334L)));
+        MvcResult r = mockMvc.perform(jsonPost("/api/groups/" + g + "/expenses", body)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splitType").value("PERCENTAGE"))
+                .andReturn();
+        JsonNode json = objectMapper.readTree(r.getResponse().getContentAsString());
+        long total = 0;
+        for (JsonNode p : json.get("participants")) {
+            total += p.get("shareCents").asLong();
+        }
+        assertThat(total).isEqualTo(1000L); // no cent lost to rounding
+    }
+
+    @Test
+    void percentageSplitNotSummingTo100IsRejected() throws Exception {
+        AuthResponse owner = register("pct-o2@example.com", "password123", "Owner");
+        AuthResponse bob = register("pct-b2@example.com", "password123", "Bob");
+        String g = createGroup(owner.accessToken(), "Pct2");
+        addMember(owner.accessToken(), g, "pct-b2@example.com");
+
+        // 50% + 40% = 90% → 400.
+        var body = new CreateExpenseRequest("Rent", 1000L, userId(owner), null, SplitType.PERCENTAGE,
+                List.of(new SplitInput(userId(owner), 5000L), new SplitInput(userId(bob), 4000L)));
+        mockMvc.perform(jsonPost("/api/groups/" + g + "/expenses", body)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Percentages must add up to 100% (got 90.00%)")));
+    }
+
+    /** Looks up a member's user id from the group detail response (members carry id+email). */
+    private String memberId(String token, String groupId, String email) throws Exception {
+        MvcResult r = mockMvc.perform(get("/api/groups/" + groupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn();
+        for (JsonNode m : objectMapper.readTree(r.getResponse().getContentAsString()).get("members")) {
+            if (m.get("email").asText().equals(email)) {
+                return m.get("id").asText();
+            }
+        }
+        throw new AssertionError("member not found: " + email);
     }
 }

@@ -3,6 +3,8 @@ package com.spliteasy.entity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -39,6 +41,10 @@ public class Expense {
     @JoinColumn(name = "paid_by", nullable = false)
     private User paidBy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "split_type", nullable = false)
+    private SplitType splitType;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -49,11 +55,12 @@ public class Expense {
         // JPA
     }
 
-    public Expense(Group group, String description, long amountCents, User paidBy) {
+    public Expense(Group group, String description, long amountCents, User paidBy, SplitType splitType) {
         this.group = group;
         this.description = description;
         this.amountCents = amountCents;
         this.paidBy = paidBy;
+        this.splitType = splitType;
         this.createdAt = Instant.now();
     }
 
@@ -82,6 +89,10 @@ public class Expense {
 
     public User getPaidBy() {
         return paidBy;
+    }
+
+    public SplitType getSplitType() {
+        return splitType;
     }
 
     public Instant getCreatedAt() {

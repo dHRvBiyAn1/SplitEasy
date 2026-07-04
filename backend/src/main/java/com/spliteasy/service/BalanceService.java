@@ -3,7 +3,6 @@ package com.spliteasy.service;
 import com.spliteasy.dto.GroupBalancesResponse;
 import com.spliteasy.dto.MemberBalance;
 import com.spliteasy.dto.UserSummary;
-import com.spliteasy.entity.User;
 import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
