@@ -44,6 +44,18 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             """)
     Optional<Expense> findByIdFetchAll(@Param("expenseId") UUID expenseId);
 
+    /**
+     * Total amount paid per payer across all expenses in a group — one aggregate
+     * query, not a per-expense loop.
+     */
+    @Query("""
+            select e.paidBy.id as userId, sum(e.amountCents) as totalCents
+            from Expense e
+            where e.group.id = :groupId
+            group by e.paidBy.id
+            """)
+    List<UserAmount> sumPaidByGroup(@Param("groupId") UUID groupId);
+
     /** Projection backing {@link #findSummariesByGroupId(UUID)}. */
     interface ExpenseSummaryView {
         UUID getId();
