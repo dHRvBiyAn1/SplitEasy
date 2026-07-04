@@ -41,6 +41,44 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
+.split-toggle {
+  margin-bottom: 0.5rem;
+}
+
+.value-rows {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .value-name {
+    flex: 1;
+  }
+
+  input {
+    width: 6rem;
+    text-align: right;
+    padding: 0.25rem 0.4rem;
+  }
+}
+
+.running-total {
+  width: 100%;
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+  color: var(--mat-sys-error);
+
+  &.ok {
+    color: #1a7f37;
+  }
+}
+
 .expense-error {
   color: var(--mat-sys-error);
   margin: 0.25rem 0;

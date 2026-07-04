@@ -26,18 +26,49 @@
         </mat-form-field>
       </div>
 
+      <mat-button-toggle-group
+        [value]="splitType()"
+        (change)="setSplitType($event.value)"
+        aria-label="Split type"
+        class="split-toggle"
+      >
+        <mat-button-toggle value="EQUAL">Equal</mat-button-toggle>
+        <mat-button-toggle value="UNEQUAL">Unequal</mat-button-toggle>
+        <mat-button-toggle value="PERCENTAGE">Percentage</mat-button-toggle>
+      </mat-button-toggle-group>
+
       <fieldset class="participants">
         <legend>Split between</legend>
-        @for (member of group().members; track member.id) {
-          <mat-checkbox
-            [checked]="isSelected(member.id)"
-            (change)="toggle(member.id, $event.checked)"
-          >
-            {{ member.displayName }}
-          </mat-checkbox>
-        }
-        @if (!hasParticipants()) {
-          <p class="expense-error">Select at least one participant.</p>
+
+        @if (splitType() === 'EQUAL') {
+          @for (member of group().members; track member.id) {
+            <mat-checkbox
+              [checked]="isSelected(member.id)"
+              (change)="toggle(member.id, $event.checked)"
+            >
+              {{ member.displayName }}
+            </mat-checkbox>
+          }
+          @if (!hasParticipants()) {
+            <p class="expense-error">Select at least one participant.</p>
+          }
+        } @else {
+          <div class="value-rows">
+            @for (member of group().members; track member.id) {
+              <label class="value-row">
+                <span class="value-name">{{ member.displayName }}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [value]="valueOf(member.id) ?? ''"
+                  (input)="setValue(member.id, $any($event.target).value)"
+                />
+                <span class="value-unit">{{ splitType() === 'PERCENTAGE' ? '%' : '$' }}</span>
+              </label>
+            }
+          </div>
+          <p class="running-total" [class.ok]="splitValid()">{{ runningLabel() }}</p>
         }
       </fieldset>
 
@@ -45,7 +76,7 @@
         <p class="expense-error">{{ error() }}</p>
       }
 
-      <button mat-flat-button color="primary" type="submit" [disabled]="saving() || !hasParticipants()">
+      <button mat-flat-button color="primary" type="submit" [disabled]="saving() || !splitValid()">
         Add expense
       </button>
     </form>
