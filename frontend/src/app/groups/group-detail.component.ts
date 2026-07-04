@@ -9,6 +9,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
+import { ExpensePanelComponent } from '../expenses/expense-panel.component';
 
 @Component({
   selector: 'app-group-detail',
@@ -21,6 +22,7 @@ import { GroupResponse } from './group.models';
     MatButtonModule,
     MatListModule,
     MatProgressBarModule,
+    ExpensePanelComponent,
   ],
   templateUrl: './group-detail.component.html',
   styleUrl: './groups.scss',

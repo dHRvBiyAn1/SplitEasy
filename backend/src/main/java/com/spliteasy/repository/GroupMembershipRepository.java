@@ -11,6 +11,10 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
 
     boolean existsByGroupIdAndUserId(UUID groupId, UUID userId);
 
+    /** Ids of every member of a group — used to default an expense's participants to all members. */
+    @Query("select m.user.id from GroupMembership m where m.group.id = :groupId")
+    List<UUID> findUserIdsByGroupId(@Param("groupId") UUID groupId);
+
     /**
      * All members of a group with their {@link com.spliteasy.entity.User} eagerly
      * fetched in a single query — avoids an N+1 when building the member list DTO.

@@ -1,6 +1,7 @@
 package com.spliteasy.web;
 
 import com.spliteasy.dto.ErrorResponse;
+import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.exception.NotFoundException;
@@ -28,6 +29,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
         // Deliberately generic — never reveal whether the email or the password was wrong.
         return build(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+    }
+
+    @ExceptionHandler({BadRequestException.class, IllegalArgumentException.class})
+    public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException ex) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
