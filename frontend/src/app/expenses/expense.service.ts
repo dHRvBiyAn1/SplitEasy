@@ -26,6 +26,11 @@ export function dollarsToCents(dollars: number): number {
   return Math.round(dollars * 100);
 }
 
+/** Percent (as typed, e.g. 33.33) → integer basis points (3333). Sum must be 10000 for a valid split. */
+export function percentToBasisPoints(percent: number): number {
+  return Math.round(percent * 100);
+}
+
 /** Integer cents → a display string like "12.34". */
 export function centsToDisplay(cents: number): string {
   const sign = cents < 0 ? '-' : '';
