@@ -164,6 +164,15 @@ An Expense belongs to one Group, has one payer (User), and splits across a
 subset of the group's members via expense_participants; the participant
 `share_cents` always sum exactly to the expense `amount_cents`.
 
+**Balances are derived, not stored.** A member's net balance for a group is
+computed on read as `sum(amount_cents they paid) − sum(share_cents they owe)`
+(positive = owed, negative = owes). `BalanceService` reads the already-persisted
+expense/participant rows via two aggregate `GROUP BY` queries
+(`ExpenseRepository.sumPaidByGroup`, `ExpenseParticipantRepository.sumOwedByGroup`)
+— a fixed number of queries regardless of expense count, never a per-expense loop.
+Because each expense's shares sum to its amount, a group's balances always sum to
+zero (enforced as a test invariant). No new table; nothing recomputes the split.
+
 ## Domain Rules to Remember
 
 - All monetary amounts stored as integer cents (or BigDecimal with fixed
@@ -216,3 +225,11 @@ track what's built so future planning doesn't duplicate or conflict.)*
   $10.00/3 → 334/333/333; browser: $10.01/2 → Alice 501 / Dave 500, summing to
   1001) and confirmed the list endpoint issues a single SQL query (no N+1).
   Backend 41/41, frontend 21/21 tests passing.
+- [x] Group balances view — done (branch `feat/group-balances`): `BalanceService`
+  derives each member's net position from stored expenses via two aggregate GROUP
+  BY queries (no per-expense loop, no new table); `GET /api/groups/{id}/balances`
+  (member-only, 403 otherwise). Angular balance panel in the group view
+  ("is owed $X" / "owes $X" / "settled up"), auto-refreshing when an expense is
+  added. Verified end-to-end (3 expenses across 3 payers → Alice +$12 / Bob −$3 /
+  Carol −$9, sum 0; live-refresh to +$16 / −$5 / −$11 after a 4th). Zero-sum
+  invariant asserted in tests. Backend 48/48, frontend 26/26 tests passing.
