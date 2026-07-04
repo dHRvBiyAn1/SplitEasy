@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ExpenseService, centsToDisplay, dollarsToCents } from './expense.service';
+import { ExpenseService, centsToDisplay, dollarsToCents, percentToBasisPoints } from './expense.service';
 
 describe('ExpenseService', () => {
   let service: ExpenseService;
@@ -31,6 +31,8 @@ describe('ExpenseService', () => {
         amountCents: 1000,
         paidByUserId: 'u1',
         participantUserIds: ['u1', 'u2'],
+        splitType: 'EQUAL',
+        splits: null,
       })
       .subscribe();
     const req = httpTesting.expectOne('/api/groups/g1/expenses');
@@ -62,5 +64,13 @@ describe('money helpers', () => {
     expect(centsToDisplay(1001)).toBe('10.01');
     expect(centsToDisplay(5)).toBe('0.05');
     expect(centsToDisplay(334)).toBe('3.34');
+  });
+
+  it('percentToBasisPoints converts percent to integer basis points', () => {
+    expect(percentToBasisPoints(50)).toBe(5000);
+    expect(percentToBasisPoints(33.33)).toBe(3333);
+    expect(percentToBasisPoints(33.34)).toBe(3334);
+    // 3333 + 3333 + 3334 must land exactly on 10000
+    expect(percentToBasisPoints(33.33) * 2 + percentToBasisPoints(33.34)).toBe(10000);
   });
 });
