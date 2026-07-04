@@ -38,7 +38,9 @@
       }
     </mat-list>
 
-    <app-expense-panel [group]="g" />
+    <app-balance-panel [groupId]="g.id" [refreshKey]="balanceRefresh()" />
+
+    <app-expense-panel [group]="g" (expenseAdded)="onExpenseAdded()" />
   } @else {
     <p class="groups-error">{{ error() ?? 'Group not found.' }}</p>
   }
