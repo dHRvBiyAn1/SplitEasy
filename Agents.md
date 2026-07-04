@@ -130,6 +130,15 @@ line here so it's not relitigated next time.)*
   participant in id-sorted order. Shares always sum back to the total exactly.
   This matches the AGENTS.md default ("payer absorbs the cent"); the only addition
   is the payer-not-a-participant fallback.
+- **Split types** (`CreateExpenseRequest.splitType`, default EQUAL for back-compat):
+  UNEQUAL carries a `splits` list of per-participant **cents** — service rejects (400,
+  `BadRequestException`) if they don't sum to `amountCents`. PERCENTAGE carries a
+  `splits` list of **basis points** (hundredths of a percent, so 2-decimal %) — must
+  sum to 10000, converted to cents via `splitByBasisPoints` using the **same
+  payer-absorbs-remainder rounding** as equal split. Values are sent on the wire as
+  integers (cents / basis points); the frontend converts with `dollarsToCents` /
+  `percentToBasisPoints` and shows a live running total to gate submit before the API
+  call. Validation errors return clear messages, never 500s.
 - Frontend: Angular Material (v21, CSS-based animations — `@angular/animations`
   is NOT a dependency, so don't add `provideAnimations*`). Auth token is attached
   and 401s handled by `authInterceptor`; authenticated routes use `authGuard`.
@@ -152,7 +161,9 @@ Migration `V3__expenses.sql`:
 
 - **expenses** — `id`, `group_id` → `groups.id` (ON DELETE CASCADE),
   `description` (not null), `amount_cents` BIGINT (not null, CHECK > 0),
-  `paid_by` → `users.id` (not null), `created_at`. Indexed on `group_id`.
+  `paid_by` → `users.id` (not null), `split_type` TEXT (not null, default
+  `'EQUAL'` — enum `EQUAL`/`UNEQUAL`/`PERCENTAGE`, migration V4), `created_at`.
+  Indexed on `group_id`.
 - **expense_participants** — `id`, `expense_id` → `expenses.id` (ON DELETE
   CASCADE), `user_id` → `users.id`, `share_cents` BIGINT (not null, CHECK >= 0).
   Unique `(expense_id, user_id)`. Indexed on `expense_id` and `user_id`.
@@ -162,7 +173,10 @@ Group → User (created_by) is many-to-one. Creating a group auto-inserts a
 membership for the creator (so the creator is a member, not a special case).
 An Expense belongs to one Group, has one payer (User), and splits across a
 subset of the group's members via expense_participants; the participant
-`share_cents` always sum exactly to the expense `amount_cents`.
+`share_cents` always sum exactly to the expense `amount_cents`. **All three
+split types (EQUAL/UNEQUAL/PERCENTAGE) store their result in the same
+`share_cents` column** — there is no per-type storage — so balances (which read
+only `share_cents`) work identically regardless of split type.
 
 **Balances are derived, not stored.** A member's net balance for a group is
 computed on read as `sum(amount_cents they paid) − sum(share_cents they owe)`
@@ -233,3 +247,14 @@ track what's built so future planning doesn't duplicate or conflict.)*
   added. Verified end-to-end (3 expenses across 3 payers → Alice +$12 / Bob −$3 /
   Carol −$9, sum 0; live-refresh to +$16 / −$5 / −$11 after a 4th). Zero-sum
   invariant asserted in tests. Backend 48/48, frontend 26/26 tests passing.
+- [x] Unequal & percentage splits — done (branch `feat/exact-percentage-splits`):
+  `split_type` enum on Expense (migration V4, default EQUAL); UNEQUAL/PERCENTAGE add
+  a `splits` list to `CreateExpenseRequest` (cents / basis points) while the equal
+  path and its tests are untouched (added a delegating 4-arg constructor). Service
+  rejects (400) sums that don't match the total / 100%; PERCENTAGE reuses the
+  payer-absorbs-remainder rounding. All types store `share_cents`, so balances are
+  unchanged. Frontend adds an Equal/Unequal/Percentage toggle with per-participant
+  value inputs and a live running-total gate. Verified end-to-end (UNEQUAL $20 →
+  1200/500/300; PERCENTAGE 33.33/33.33/33.34% of $10 → 333/334/333 payer-absorbs;
+  bad sums → 400; mixed-split balances still net to zero). Backend 59/59, frontend
+  27/27 tests passing.
