@@ -124,21 +124,25 @@ line here so it's not relitigated next time.)*
 - **Money is integer cents end-to-end** (`long` / Postgres `BIGINT`), never float.
   Frontend converts dollars→cents with `Math.round(x*100)` (`dollarsToCents`) and
   never sends decimals over the wire (requests carry `amountCents`).
-- **Equal-split rounding**: `ExpenseSplitCalculator` (pure, unit-tested separately)
-  gives each participant `floor(total/n)`; the leftover `total mod n` cents are
-  absorbed by the **payer** when the payer is a participant, else by the first
-  participant in id-sorted order. Shares always sum back to the total exactly.
-  This matches the AGENTS.md default ("payer absorbs the cent"); the only addition
-  is the payer-not-a-participant fallback.
-- **Split types** (`CreateExpenseRequest.splitType`, default EQUAL for back-compat):
-  UNEQUAL carries a `splits` list of per-participant **cents** — service rejects (400,
-  `BadRequestException`) if they don't sum to `amountCents`. PERCENTAGE carries a
-  `splits` list of **basis points** (hundredths of a percent, so 2-decimal %) — must
-  sum to 10000, converted to cents via `splitByBasisPoints` using the **same
-  payer-absorbs-remainder rounding** as equal split. Values are sent on the wire as
-  integers (cents / basis points); the frontend converts with `dollarsToCents` /
-  `percentToBasisPoints` and shows a live running total to gate submit before the API
-  call. Validation errors return clear messages, never 500s.
+- **Split calculation uses the Strategy pattern** via the `SplitStrategy` interface
+  (`com.spliteasy.service.split`): `EqualSplitStrategy`, `UnequalSplitStrategy`,
+  `PercentageSplitStrategy`, each a `@Component` returning its `SplitType`.
+  `ExpenseService` selects one via a `Map<SplitType, SplitStrategy>` built from the
+  injected strategy beans — **no if/else or switch on split type in the service**.
+  **New split types must implement this interface, not add branching to the service.**
+  Each strategy owns its own validation and is unit-testable with `new XStrategy().split(ctx)`
+  (no Spring/DB). The service still resolves group membership before calling the strategy.
+- **Rounding** (shared by EQUAL and PERCENTAGE via `SplitStrategy.absorbRemainder`):
+  each participant gets the integer floor of their share; the leftover cents are absorbed
+  by the **payer** when the payer is a participant, else the first participant in id-sorted
+  order. Shares always sum back to the total exactly.
+- **Split-type semantics** (`CreateExpenseRequest.splitType`, default EQUAL for back-compat):
+  UNEQUAL carries a `splits` list of per-participant **cents** — rejected (400,
+  `BadRequestException`) if they don't sum to `amountCents`. PERCENTAGE carries a `splits`
+  list of **basis points** (hundredths of a percent, so 2-decimal %) — must sum to 10000.
+  Values go on the wire as integers (cents / basis points); the frontend converts with
+  `dollarsToCents` / `percentToBasisPoints` and shows a live running total to gate submit.
+  Validation errors return clear messages, never 500s.
 - Frontend: Angular Material (v21, CSS-based animations — `@angular/animations`
   is NOT a dependency, so don't add `provideAnimations*`). Auth token is attached
   and 401s handled by `authInterceptor`; authenticated routes use `authGuard`.
@@ -258,3 +262,11 @@ track what's built so future planning doesn't duplicate or conflict.)*
   1200/500/300; PERCENTAGE 33.33/33.33/33.34% of $10 → 333/334/333 payer-absorbs;
   bad sums → 400; mixed-split balances still net to zero). Backend 59/59, frontend
   27/27 tests passing.
+- [x] Split-strategy refactor — done (branch `refactor/split-strategy-interface`):
+  replaced the `ExpenseSplitCalculator` static util + service `switch` with a
+  `SplitStrategy` interface and `Equal`/`Unequal`/`PercentageSplitStrategy` beans,
+  selected via a `Map<SplitType, SplitStrategy>` in `ExpenseService`. Behavior
+  unchanged — the higher-level expense/balance integration tests pass **unmodified**;
+  the calculator's unit tests were relocated to per-strategy tests with identical
+  assertions (+ new UNEQUAL strategy tests). Verified via real API that all three
+  types produce identical shares/messages as before. Backend 62/62 passing.
