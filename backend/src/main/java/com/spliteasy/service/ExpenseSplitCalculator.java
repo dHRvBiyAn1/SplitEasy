@@ -2,17 +2,17 @@ package com.spliteasy.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Pure, dependency-free equal-split math. Kept separate from {@link ExpenseService}
- * so the rounding behaviour can be unit-tested exhaustively without a database.
+ * Pure, dependency-free split math. Kept separate from {@link ExpenseService} so the
+ * rounding behaviour can be unit-tested exhaustively without a database.
  *
- * <p>Rounding convention (matches AGENTS.md): every participant owes the integer
- * floor of {@code total / n}; the leftover cents ({@code total mod n}) are absorbed
- * by the payer when the payer is a participant, otherwise by the first participant
- * in a deterministic (id-sorted) order. The returned shares therefore always sum
- * back to exactly {@code totalCents} — no cent is ever lost or invented.
+ * <p>Rounding convention (AGENTS.md): every participant gets the integer floor of their
+ * share; the leftover cents are absorbed by the payer when the payer is a participant,
+ * otherwise by the first participant in id-sorted order. Returned shares always sum back
+ * to exactly {@code totalCents} — no cent lost or invented.
  */
 public final class ExpenseSplitCalculator {
 
@@ -22,35 +22,63 @@ public final class ExpenseSplitCalculator {
     public record Share(UUID userId, long shareCents) {
     }
 
-    /**
-     * @param totalCents     positive total to divide
-     * @param participantIds who shares the cost (duplicates ignored); must be non-empty
-     * @param payerId        who paid; absorbs remainder cents if among the participants
-     * @return one share per distinct participant, summing exactly to {@code totalCents}
-     * @throws IllegalArgumentException if the total is not positive or there are no participants
-     */
+    /** Equal split: {@code total / n} each, payer absorbs the remainder. */
     public static List<Share> splitEqually(long totalCents, List<UUID> participantIds, UUID payerId) {
-        if (totalCents <= 0) {
-            throw new IllegalArgumentException("Expense amount must be a positive number of cents");
-        }
+        requirePositive(totalCents);
         if (participantIds == null || participantIds.isEmpty()) {
             throw new IllegalArgumentException("An expense needs at least one participant");
         }
-
-        // Deterministic order so the remainder always lands in the same place.
         List<UUID> ids = participantIds.stream().distinct().sorted().toList();
-        int n = ids.size();
-
-        long base = totalCents / n;
-        long remainder = totalCents - base * n; // in [0, n-1]
-
-        UUID absorber = ids.contains(payerId) ? payerId : ids.get(0);
-
-        List<Share> shares = new ArrayList<>(n);
+        long base = totalCents / ids.size();
+        java.util.LinkedHashMap<UUID, Long> shares = new java.util.LinkedHashMap<>();
+        long allocated = 0;
         for (UUID id : ids) {
-            long share = id.equals(absorber) ? base + remainder : base;
-            shares.add(new Share(id, share));
+            shares.put(id, base);
+            allocated += base;
         }
-        return shares;
+        return absorbRemainder(shares, ids, payerId, totalCents - allocated);
+    }
+
+    /**
+     * Percentage split. {@code basisPointsByUser} maps each participant to their share in
+     * basis points (hundredths of a percent); they must sum to 10000. Each share is
+     * {@code floor(total * bp / 10000)}; the payer absorbs the rounding remainder.
+     */
+    public static List<Share> splitByBasisPoints(long totalCents, Map<UUID, Long> basisPointsByUser, UUID payerId) {
+        requirePositive(totalCents);
+        if (basisPointsByUser == null || basisPointsByUser.isEmpty()) {
+            throw new IllegalArgumentException("An expense needs at least one participant");
+        }
+        long totalBp = basisPointsByUser.values().stream().mapToLong(Long::longValue).sum();
+        if (totalBp != 10_000) {
+            throw new IllegalArgumentException(
+                    "Percentages must add up to 100%% (got %.2f%%)".formatted(totalBp / 100.0));
+        }
+        List<UUID> ids = basisPointsByUser.keySet().stream().sorted().toList();
+        java.util.LinkedHashMap<UUID, Long> shares = new java.util.LinkedHashMap<>();
+        long allocated = 0;
+        for (UUID id : ids) {
+            long share = totalCents * basisPointsByUser.get(id) / 10_000; // floor; all non-negative
+            shares.put(id, share);
+            allocated += share;
+        }
+        return absorbRemainder(shares, ids, payerId, totalCents - allocated);
+    }
+
+    private static List<Share> absorbRemainder(
+            Map<UUID, Long> shares, List<UUID> sortedIds, UUID payerId, long remainder) {
+        UUID absorber = sortedIds.contains(payerId) ? payerId : sortedIds.get(0);
+        shares.merge(absorber, remainder, Long::sum);
+        List<Share> result = new ArrayList<>(sortedIds.size());
+        for (UUID id : sortedIds) {
+            result.add(new Share(id, shares.get(id)));
+        }
+        return result;
+    }
+
+    private static void requirePositive(long totalCents) {
+        if (totalCents <= 0) {
+            throw new IllegalArgumentException("Expense amount must be a positive number of cents");
+        }
     }
 }
