@@ -11,11 +11,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,6 +51,24 @@ public class ExpenseController {
             @PathVariable UUID groupId,
             @PathVariable UUID expenseId) {
         return expenseService.getExpense(currentUserId(jwt), groupId, expenseId);
+    }
+
+    @PutMapping("/{expenseId}")
+    public ExpenseResponse updateExpense(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID groupId,
+            @PathVariable UUID expenseId,
+            @Valid @RequestBody CreateExpenseRequest request) {
+        return expenseService.updateExpense(currentUserId(jwt), groupId, expenseId, request);
+    }
+
+    @DeleteMapping("/{expenseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteExpense(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID groupId,
+            @PathVariable UUID expenseId) {
+        expenseService.deleteExpense(currentUserId(jwt), groupId, expenseId);
     }
 
     private static UUID currentUserId(Jwt jwt) {

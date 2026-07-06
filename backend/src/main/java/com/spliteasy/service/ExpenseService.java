@@ -62,13 +62,61 @@ public class ExpenseService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
-        Set<UUID> memberIds = new LinkedHashSet<>(membershipRepository.findUserIdsByGroupId(groupId));
+        ComputedSplit split = computeSplit(groupId, request);
+        Expense expense = new Expense(
+                group, request.description().trim(), request.amountCents(),
+                split.usersById().get(split.payerId()), split.splitType());
+        addShares(expense, split);
+        expenseRepository.save(expense);
+        return toResponse(expense);
+    }
 
+    @Transactional
+    public ExpenseResponse updateExpense(
+            UUID requesterId, UUID groupId, UUID expenseId, CreateExpenseRequest request) {
+        requireMember(groupId, requesterId);
+        Expense expense = expenseRepository.findByIdFetchAll(expenseId)
+                .orElseThrow(() -> new NotFoundException("Expense not found"));
+        if (!expense.getGroup().getId().equals(groupId)) {
+            throw new NotFoundException("Expense not found in this group");
+        }
+
+        // Full replace: recompute shares from the new state via the same strategy path — never stale.
+        ComputedSplit split = computeSplit(groupId, request);
+        expense.setDescription(request.description().trim());
+        expense.setAmountCents(request.amountCents());
+        expense.setPaidBy(split.usersById().get(split.payerId()));
+        expense.setSplitType(split.splitType());
+        // Flush the orphan-removal deletes before re-inserting, or the new rows collide with the
+        // old ones on the (expense_id, user_id) unique constraint within one flush.
+        expense.clearParticipants();
+        expenseRepository.flush();
+        addShares(expense, split);
+        expenseRepository.save(expense);
+        return toResponse(expense);
+    }
+
+    @Transactional
+    public void deleteExpense(UUID requesterId, UUID groupId, UUID expenseId) {
+        requireMember(groupId, requesterId);
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new NotFoundException("Expense not found"));
+        if (!expense.getGroup().getId().equals(groupId)) {
+            throw new NotFoundException("Expense not found in this group");
+        }
+        expenseRepository.delete(expense); // cascade/orphanRemoval deletes expense_participants
+    }
+
+    /** Everything needed to write an expense's split — computed once, reused by create and update. */
+    private record ComputedSplit(SplitType splitType, UUID payerId, List<Share> shares, Map<UUID, User> usersById) {}
+
+    /** Validates payer/participants (membership) and computes shares via the split strategy. */
+    private ComputedSplit computeSplit(UUID groupId, CreateExpenseRequest request) {
+        Set<UUID> memberIds = new LinkedHashSet<>(membershipRepository.findUserIdsByGroupId(groupId));
         UUID payerId = request.paidByUserId();
         if (!memberIds.contains(payerId)) {
             throw new BadRequestException("The payer must be a member of this group");
         }
-
         SplitType splitType = request.splitType() == null ? SplitType.EQUAL : request.splitType();
         // Service resolves group membership; the strategy owns the split math + its validation.
         SplitContext ctx = new SplitContext(
@@ -77,16 +125,14 @@ public class ExpenseService {
                 splitType == SplitType.EQUAL ? resolveParticipants(request.participantUserIds(), memberIds) : null,
                 splitType == SplitType.EQUAL ? null : requireSplits(request.splits(), memberIds));
         List<Share> shares = strategies.get(splitType).split(ctx);
+        Map<UUID, User> usersById = loadUsers(shares.stream().map(Share::userId).toList(), payerId);
+        return new ComputedSplit(splitType, payerId, shares, usersById);
+    }
 
-        List<UUID> participantIds = shares.stream().map(Share::userId).toList();
-        Map<UUID, User> usersById = loadUsers(participantIds, payerId);
-        Expense expense = new Expense(
-                group, request.description().trim(), request.amountCents(), usersById.get(payerId), splitType);
-        for (Share share : shares) {
-            expense.addParticipant(usersById.get(share.userId()), share.shareCents());
+    private void addShares(Expense expense, ComputedSplit split) {
+        for (Share share : split.shares()) {
+            expense.addParticipant(split.usersById().get(share.userId()), share.shareCents());
         }
-        expenseRepository.save(expense);
-        return toResponse(expense);
     }
 
     /** A non-empty, duplicate-free split list where every user is a group member. */
