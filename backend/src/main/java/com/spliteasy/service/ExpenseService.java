@@ -17,9 +17,11 @@ import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.UserRepository;
+import com.spliteasy.service.split.Share;
+import com.spliteasy.service.split.SplitContext;
+import com.spliteasy.service.split.SplitStrategy;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,16 +39,21 @@ public class ExpenseService {
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
+    /** Split-type → strategy, built from the strategy beans. No if/else on split type here. */
+    private final Map<SplitType, SplitStrategy> strategies;
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
             GroupRepository groupRepository,
             GroupMembershipRepository membershipRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            List<SplitStrategy> splitStrategies) {
         this.expenseRepository = expenseRepository;
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
+        this.strategies = splitStrategies.stream()
+                .collect(Collectors.toMap(SplitStrategy::type, Function.identity()));
     }
 
     @Transactional
@@ -63,53 +70,23 @@ public class ExpenseService {
         }
 
         SplitType splitType = request.splitType() == null ? SplitType.EQUAL : request.splitType();
-        // Split math (pure, unit-tested separately). Whatever the type, we end up with a list
-        // of per-participant share_cents that sum to amountCents — everything downstream is shared.
-        List<ExpenseSplitCalculator.Share> shares = computeShares(request, splitType, memberIds, payerId);
+        // Service resolves group membership; the strategy owns the split math + its validation.
+        SplitContext ctx = new SplitContext(
+                request.amountCents(),
+                payerId,
+                splitType == SplitType.EQUAL ? resolveParticipants(request.participantUserIds(), memberIds) : null,
+                splitType == SplitType.EQUAL ? null : requireSplits(request.splits(), memberIds));
+        List<Share> shares = strategies.get(splitType).split(ctx);
 
-        List<UUID> participantIds = shares.stream().map(ExpenseSplitCalculator.Share::userId).toList();
+        List<UUID> participantIds = shares.stream().map(Share::userId).toList();
         Map<UUID, User> usersById = loadUsers(participantIds, payerId);
         Expense expense = new Expense(
                 group, request.description().trim(), request.amountCents(), usersById.get(payerId), splitType);
-        for (ExpenseSplitCalculator.Share share : shares) {
+        for (Share share : shares) {
             expense.addParticipant(usersById.get(share.userId()), share.shareCents());
         }
         expenseRepository.save(expense);
         return toResponse(expense);
-    }
-
-    private List<ExpenseSplitCalculator.Share> computeShares(
-            CreateExpenseRequest request, SplitType type, Set<UUID> memberIds, UUID payerId) {
-        return switch (type) {
-            case EQUAL -> ExpenseSplitCalculator.splitEqually(
-                    request.amountCents(), resolveParticipants(request.participantUserIds(), memberIds), payerId);
-            case UNEQUAL -> unequalShares(request, memberIds);
-            case PERCENTAGE -> ExpenseSplitCalculator.splitByBasisPoints(
-                    request.amountCents(), basisPointsByUser(request, memberIds), payerId);
-        };
-    }
-
-    private List<ExpenseSplitCalculator.Share> unequalShares(CreateExpenseRequest request, Set<UUID> memberIds) {
-        List<SplitInput> splits = requireSplits(request.splits(), memberIds);
-        long sum = splits.stream().mapToLong(SplitInput::value).sum();
-        if (sum != request.amountCents()) {
-            throw new BadRequestException(
-                    "Entered amounts (%dc) must add up to the expense total (%dc)"
-                            .formatted(sum, request.amountCents()));
-        }
-        return splits.stream()
-                .map(s -> new ExpenseSplitCalculator.Share(s.userId(), s.value()))
-                .toList();
-    }
-
-    private Map<UUID, Long> basisPointsByUser(CreateExpenseRequest request, Set<UUID> memberIds) {
-        List<SplitInput> splits = requireSplits(request.splits(), memberIds);
-        // Sum-to-10000 is validated inside splitByBasisPoints.
-        Map<UUID, Long> bp = new LinkedHashMap<>();
-        for (SplitInput s : splits) {
-            bp.put(s.userId(), s.value());
-        }
-        return bp;
     }
 
     /** A non-empty, duplicate-free split list where every user is a group member. */
