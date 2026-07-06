@@ -40,7 +40,7 @@
 
     <app-balance-panel [groupId]="g.id" [refreshKey]="balanceRefresh()" />
 
-    <app-expense-panel [group]="g" (expenseAdded)="onExpenseAdded()" />
+    <app-expense-panel [group]="g" (expensesChanged)="onExpenseAdded()" />
   } @else {
     <p class="groups-error">{{ error() ?? 'Group not found.' }}</p>
   }
