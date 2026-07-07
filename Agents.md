@@ -121,6 +121,16 @@ line here so it's not relitigated next time.)*
 - **Group authorization is flat**: any member can view a group, add members
   (by email), and **edit or delete any expense** in the group (matches Splitwise;
   no creator/payer-only check). Room for roles later via `GroupMembership`.
+- **Membership check before existence check, uniformly across all services**: every
+  group-scoped operation calls `requireMember(groupId, userId)` (→ 403) *before*
+  loading the group by id (→ 404). A non-member therefore gets **403 for a
+  nonexistent group id too**, so the API never reveals whether a group exists to
+  someone who isn't in it. `GroupService`, `ExpenseService`, `BalanceService`, and
+  `PaymentService` all follow this order.
+- **Dependency injection uses manual constructors over final fields, not Lombok.**
+  This is a deliberate choice — Java 21 records already eliminate most DTO
+  boilerplate, and the codebase is small enough that Lombok wouldn't earn its keep.
+  New services should follow this pattern.
 - **Expense edit = full-replace `PUT`** (`/api/groups/{g}/expenses/{id}`, reuses
   `CreateExpenseRequest`): shares are **always recomputed** via the same `SplitStrategy`
   path as create (`ExpenseService.computeSplit`) — never left stale. On update the

@@ -90,6 +90,28 @@ class GroupFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void viewingNonexistentGroupReturnsForbiddenNotFound() throws Exception {
+        // Membership is checked before existence, so a nonexistent group id yields
+        // 403 (not 404) — it doesn't reveal whether the group exists.
+        AuthResponse user = register("ne-view@example.com", "password123", "Viewer");
+        String missing = java.util.UUID.randomUUID().toString();
+        mockMvc.perform(get("/api/groups/" + missing)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user.accessToken())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void addingMemberToNonexistentGroupReturnsForbiddenNotFound() throws Exception {
+        AuthResponse user = register("ne-add@example.com", "password123", "Adder");
+        register("ne-invitee@example.com", "password123", "Invitee");
+        String missing = java.util.UUID.randomUUID().toString();
+        mockMvc.perform(jsonPost("/api/groups/" + missing + "/members",
+                        new AddMemberRequest("ne-invitee@example.com"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user.accessToken())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void nonMemberCannotAddMembers() throws Exception {
         AuthResponse owner = register("owner6@example.com", "password123", "Owner Six");
         AuthResponse outsider = register("outsider2@example.com", "password123", "Outsider Two");
