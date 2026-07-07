@@ -79,6 +79,24 @@
   }
 }
 
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.expense-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.confirm-delete {
+  margin-right: 0.25rem;
+  color: var(--mat-sys-error);
+  font-weight: 600;
+}
+
 .expense-error {
   color: var(--mat-sys-error);
   margin: 0.25rem 0;

@@ -19,6 +19,18 @@ export class ExpenseService {
   createExpense(groupId: string, request: CreateExpenseRequest): Observable<ExpenseResponse> {
     return this.api.post<ExpenseResponse>(`/groups/${groupId}/expenses`, request);
   }
+
+  updateExpense(
+    groupId: string,
+    expenseId: string,
+    request: CreateExpenseRequest,
+  ): Observable<ExpenseResponse> {
+    return this.api.put<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}`, request);
+  }
+
+  deleteExpense(groupId: string, expenseId: string): Observable<void> {
+    return this.api.delete<void>(`/groups/${groupId}/expenses/${expenseId}`);
+  }
 }
 
 /** Dollars (as typed by the user) → integer cents, avoiding binary-float drift. */

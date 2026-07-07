@@ -1,6 +1,6 @@
 <mat-card class="add-expense-card">
   <mat-card-header>
-    <mat-card-title>Add an expense</mat-card-title>
+    <mat-card-title>{{ editingId() ? 'Edit expense' : 'Add an expense' }}</mat-card-title>
   </mat-card-header>
   <mat-card-content>
     <form [formGroup]="form" (ngSubmit)="submit()" class="expense-form">
@@ -76,9 +76,14 @@
         <p class="expense-error">{{ error() }}</p>
       }
 
-      <button mat-flat-button color="primary" type="submit" [disabled]="saving() || !splitValid()">
-        Add expense
-      </button>
+      <div class="form-actions">
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving() || !splitValid()">
+          {{ editingId() ? 'Save changes' : 'Add expense' }}
+        </button>
+        @if (editingId()) {
+          <button mat-button type="button" (click)="cancelEdit()">Cancel</button>
+        }
+      </div>
     </form>
   </mat-card-content>
 </mat-card>
@@ -95,6 +100,16 @@
         <span matListItemTitle>{{ expense.description }} — ${{ display(expense.amountCents) }}</span>
         <span matListItemLine>
           paid by {{ expense.paidBy.displayName }} · split {{ expense.participantCount }} way{{ expense.participantCount === 1 ? '' : 's' }}
+        </span>
+        <span matListItemMeta class="expense-actions">
+          @if (confirmingDeleteId() === expense.id) {
+            <span class="confirm-delete">Delete?</span>
+            <button mat-button color="warn" type="button" (click)="confirmDelete(expense.id)">Yes</button>
+            <button mat-button type="button" (click)="cancelDelete()">No</button>
+          } @else {
+            <button mat-button type="button" (click)="startEdit(expense)">Edit</button>
+            <button mat-button color="warn" type="button" (click)="askDelete(expense.id)">Delete</button>
+          }
         </span>
       </mat-list-item>
     }
