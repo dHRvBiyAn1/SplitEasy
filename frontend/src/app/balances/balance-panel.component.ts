@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnInit, inject, input, output, signal } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MemberBalance } from './balance.models';
@@ -6,17 +7,19 @@ import { BalanceService, describeBalance } from './balance.service';
 
 /**
  * Shows each member's net position for a group. Reloads whenever `refreshKey`
- * changes (the parent bumps it after an expense is added) so balances stay live.
+ * changes (the parent bumps it after an expense or payment changes) so balances stay live.
  */
 @Component({
   selector: 'app-balance-panel',
-  imports: [MatListModule, MatProgressBarModule],
+  imports: [MatListModule, MatProgressBarModule, MatButtonModule],
   templateUrl: './balance-panel.component.html',
   styleUrl: './balance-panel.component.scss',
 })
 export class BalancePanelComponent implements OnInit {
   readonly groupId = input.required<string>();
   readonly refreshKey = input<number>(0);
+  /** Emitted when a member's "Settle up" is clicked; the parent prefills the settle-up form. */
+  readonly settleWith = output<{ userId: string; netCents: number }>();
 
   private readonly balanceService = inject(BalanceService);
 
@@ -51,6 +54,10 @@ export class BalancePanelComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  settle(balance: MemberBalance): void {
+    this.settleWith.emit({ userId: balance.user.id, netCents: balance.netCents });
   }
 
   balanceClass(netCents: number): string {

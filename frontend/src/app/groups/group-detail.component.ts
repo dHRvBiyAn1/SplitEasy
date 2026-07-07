@@ -11,6 +11,7 @@ import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 import { ExpensePanelComponent } from '../expenses/expense-panel.component';
 import { BalancePanelComponent } from '../balances/balance-panel.component';
+import { SettleUpPanelComponent, SettlePrefill } from '../payments/settle-up-panel.component';
 
 @Component({
   selector: 'app-group-detail',
@@ -25,6 +26,7 @@ import { BalancePanelComponent } from '../balances/balance-panel.component';
     MatProgressBarModule,
     ExpensePanelComponent,
     BalancePanelComponent,
+    SettleUpPanelComponent,
   ],
   templateUrl: './group-detail.component.html',
   styleUrl: './groups.scss',
@@ -38,8 +40,10 @@ export class GroupDetailComponent implements OnInit {
   protected readonly adding = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
-  /** Bumped whenever an expense is added, to trigger a balances reload. */
+  /** Bumped whenever an expense or payment changes, to trigger a balances reload. */
   protected readonly balanceRefresh = signal(0);
+  /** Set when a balance row's "Settle up" is clicked; prefills the settle-up form. */
+  protected readonly settlePrefill = signal<SettlePrefill | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -87,5 +91,9 @@ export class GroupDetailComponent implements OnInit {
 
   onExpenseAdded(): void {
     this.balanceRefresh.update((n) => n + 1);
+  }
+
+  onSettleWith(prefill: SettlePrefill): void {
+    this.settlePrefill.set(prefill);
   }
 }

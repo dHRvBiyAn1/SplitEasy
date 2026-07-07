@@ -182,6 +182,15 @@ Migration `V3__expenses.sql`:
   CASCADE), `user_id` → `users.id`, `share_cents` BIGINT (not null, CHECK >= 0).
   Unique `(expense_id, user_id)`. Indexed on `expense_id` and `user_id`.
 
+Migration `V5__payments.sql`:
+
+- **payments** — `id`, `group_id` → `groups.id` (ON DELETE CASCADE),
+  `payer_id`/`payee_id` → `users.id` (not null), `amount_cents` BIGINT
+  (not null, CHECK > 0), `created_at`. `CHECK (payer_id <> payee_id)`.
+  Indexed on `group_id`, `payer_id`, `payee_id`. A **settle-up payment** is a
+  direct transfer between two members — a *separate* entity from Expense (no
+  participants/shares), not a special expense type.
+
 Relationships: User ↔ Group is many-to-many **through group_memberships**;
 Group → User (created_by) is many-to-one. Creating a group auto-inserts a
 membership for the creator (so the creator is a member, not a special case).
@@ -200,6 +209,17 @@ expense/participant rows via two aggregate `GROUP BY` queries
 — a fixed number of queries regardless of expense count, never a per-expense loop.
 Because each expense's shares sum to its amount, a group's balances always sum to
 zero (enforced as a test invariant). No new table; nothing recomputes the split.
+
+**Payments (settle-up) net into balances through the same path**, not as a special
+case. The formula is `net = expensePaid − expenseOwed + paymentsMade − paymentsReceived`;
+a payment `payer → payee` of X does `payer.net += X` (payer now owes less) and
+`payee.net −= X` (payee is owed less), via two more aggregate `GROUP BY` queries
+(`PaymentRepository.sumPaidByGroup` / `sumReceivedByGroup`). Each payment contributes
+`+X` and `−X`, so the **zero-sum invariant still holds** with expenses and payments
+mixed. **Overpayment is allowed** (people prepay/overpay/round; the model is net-per-
+person, not pairwise, so a "can't exceed what you owe" rule is ill-defined) — it simply
+flips balances past zero. Validation: `amount_cents > 0`, `payer ≠ payee`, both members,
+requester is a member.
 
 ## Domain Rules to Remember
 
@@ -291,3 +311,14 @@ track what's built so future planning doesn't duplicate or conflict.)*
   re-aggregate, so edits/deletes reflect automatically (zero-sum verified after both).
   Verified end-to-end (create → edit $9 equal → $30 percentage recompute → delete →
   gone from list + balances). Backend 69/69, frontend 29/29 tests passing.
+- [x] Settle up (record a payment) — done (branch `feat/settle-up`): separate
+  `Payment` entity (migration V5) + `POST`/`GET /api/groups/{g}/payments`, member-only.
+  Payments net into balances through the same aggregate path as expenses
+  (`BalanceService` gains two GROUP BY terms: `payer.net += X`, `payee.net −= X`) — no
+  special-casing; zero-sum holds with expenses + payments mixed. Overpayment allowed
+  (flips the sign). Frontend: per-row "Settle up" on the balances view prefills the
+  payment form (direction by sign), a confirm step ("Record that Bob paid Alice $8?"),
+  and a payment history list; balances refresh via the shared refresh key. Verified
+  end-to-end (Bob settles $10 → pair hits exactly 0; Carol overpays $15 → sign flips;
+  zero-sum throughout; UI prefill → confirm → balances "settled up" + history row).
+  Backend 78/78, frontend 31/31 tests passing.
