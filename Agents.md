@@ -47,10 +47,14 @@ Health check: `curl http://localhost:8080/api/health` →
 `{"status":"UP","service":"spliteasy-backend",...}`. The frontend toolbar
 shows "● UP" when the full chain works.
 
-Auth/JWT config: the backend signs HS256 tokens with `app.jwt.secret`
-(dev default in `application.properties`). **Override `APP_JWT_SECRET`
-(>= 32 chars) in any non-dev environment.** Token lifetime is
-`app.jwt.expiration-seconds` (default 3600).
+Auth/JWT config: the backend signs HS256 tokens with `app.jwt.secret`.
+There is **no fallback default** — the dev secret lives in
+`application-dev.properties` (active via the default `dev` profile), so
+local runs work out of the box, but **any non-dev environment MUST set
+`APP_JWT_SECRET` (>= 32 chars)** or the app fails to boot. Tokens carry
+`iss` = `app.jwt.issuer` (default `spliteasy`), and the resource-server
+decoder validates that issuer, so signing and validation can't drift.
+Token lifetime is `app.jwt.expiration-seconds` (default 3600).
 
 Quick API smoke test (backend running):
 ```
@@ -133,7 +137,10 @@ line here so it's not relitigated next time.)*
   uses `join fetch` for payer, group, and participants+users.
 - **Money is integer cents end-to-end** (`long` / Postgres `BIGINT`), never float.
   Frontend converts dollars→cents with `Math.round(x*100)` (`dollarsToCents`) and
-  never sends decimals over the wire (requests carry `amountCents`).
+  never sends decimals over the wire (requests carry `amountCents`). Incoming
+  `amountCents` is bounded `@Positive @Max(1_000_000_000_000L)` (≤ $10B) on
+  `CreateExpenseRequest` and `RecordPaymentRequest` — over-cap values → 400,
+  guarding against griefing and `sum(...)` aggregate overflow.
 - **Split calculation uses the Strategy pattern** via the `SplitStrategy` interface
   (`com.spliteasy.service.split`): `EqualSplitStrategy`, `UnequalSplitStrategy`,
   `PercentageSplitStrategy`, each a `@Component` returning its `SplitType`.
