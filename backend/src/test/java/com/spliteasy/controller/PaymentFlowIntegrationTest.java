@@ -161,6 +161,19 @@ class PaymentFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void amountAboveTheCapIsRejected() throws Exception {
+        AuthResponse alice = register("pay-a10@example.com", "password123", "Alice");
+        AuthResponse bob = register("pay-b10@example.com", "password123", "Bob");
+        String g = createGroup(alice.accessToken(), "Trip10");
+        addMember(alice.accessToken(), g, "pay-b10@example.com");
+        // One cent over the $10B cap → 400 from @Max validation.
+        mockMvc.perform(jsonPost("/api/groups/" + g + "/payments",
+                        new RecordPaymentRequest(bob.user().id(), alice.user().id(), 1_000_000_000_001L))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void payeeMustBeAGroupMember() throws Exception {
         AuthResponse alice = register("pay-a7@example.com", "password123", "Alice");
         AuthResponse outsider = register("pay-out7@example.com", "password123", "Outsider");

@@ -207,10 +207,10 @@ class ExpenseFlowIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void amountIsIntegerCentsNotFloatingPoint() throws Exception {
-        // Guard: a huge amount stays exact (no float precision loss).
+        // Guard: a large amount stays exact (no float precision loss).
         AuthResponse owner = register("exp-owner11@example.com", "password123", "Owner");
         String groupId = createGroup(owner.accessToken(), "BigMoney");
-        long huge = 9_007_199_254_740_993L; // > 2^53, would lose precision as a double
+        long huge = 1_000_000_000_000L; // the @Max cap ($10B in cents); values above it are now rejected
         var body = new CreateExpenseRequest("Yacht", huge, userId(owner), null);
         mockMvc.perform(jsonPost("/api/groups/" + groupId + "/expenses", body)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))

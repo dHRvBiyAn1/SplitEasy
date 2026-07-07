@@ -2,6 +2,7 @@ package com.spliteasy.dto;
 
 import com.spliteasy.entity.SplitType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -16,7 +17,7 @@ import java.util.UUID;
  */
 public record CreateExpenseRequest(
         @NotBlank @Size(max = 200) String description,
-        @Positive long amountCents,
+        @Positive @Max(1_000_000_000_000L) long amountCents,
         @NotNull UUID paidByUserId,
         List<UUID> participantUserIds,
         SplitType splitType,
