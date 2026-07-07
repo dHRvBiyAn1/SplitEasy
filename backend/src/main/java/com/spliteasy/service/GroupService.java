@@ -51,9 +51,11 @@ public class GroupService {
 
     @Transactional
     public GroupResponse addMember(UUID requesterId, UUID groupId, String email) {
+        // Membership check first (matches ExpenseService/BalanceService/PaymentService):
+        // a non-member gets 403 without learning whether the group exists.
+        requireMember(groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
-        requireMember(groupId, requesterId);
 
         User invitee = userRepository.findByEmail(email.trim().toLowerCase())
                 .orElseThrow(() -> new NotFoundException("No user found with that email"));
@@ -73,9 +75,11 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public GroupResponse getGroup(UUID requesterId, UUID groupId) {
+        // Membership check first: a non-member gets 403 without learning whether
+        // the group exists (consistent with the other group-scoped services).
+        requireMember(groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
-        requireMember(groupId, requesterId);
         return toGroupResponse(group);
     }
 
