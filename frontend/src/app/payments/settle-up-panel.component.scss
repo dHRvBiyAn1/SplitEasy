@@ -1,0 +1,45 @@
+.settle-card {
+  margin: 1.5rem 0;
+}
+
+.settle-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.row .who {
+  flex: 1;
+  min-width: 8rem;
+}
+
+.row .amount {
+  flex: 0.8;
+  min-width: 7rem;
+}
+
+.confirm-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+}
+
+.settle-error {
+  color: var(--mat-sys-error);
+  margin: 0.25rem 0;
+}
+
+.subtle {
+  color: var(--mat-sys-on-surface-variant);
+}
