@@ -38,7 +38,13 @@
       }
     </mat-list>
 
-    <app-balance-panel [groupId]="g.id" [refreshKey]="balanceRefresh()" />
+    <app-balance-panel
+      [groupId]="g.id"
+      [refreshKey]="balanceRefresh()"
+      (settleWith)="onSettleWith($event)"
+    />
+
+    <app-settle-up-panel [group]="g" [prefill]="settlePrefill()" (paymentRecorded)="onExpenseAdded()" />
 
     <app-expense-panel [group]="g" (expensesChanged)="onExpenseAdded()" />
   } @else {

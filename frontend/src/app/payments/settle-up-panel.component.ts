@@ -1,0 +1,162 @@
+import { Component, OnInit, effect, inject, input, output, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatListModule } from '@angular/material/list';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSelectModule } from '@angular/material/select';
+import { AuthService } from '../core/auth/auth.service';
+import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
+import { GroupResponse } from '../groups/group.models';
+import { PaymentResponse } from './payment.models';
+import { PaymentService } from './payment.service';
+
+/** Prefill emitted when a member is clicked in the balances view. */
+export interface SettlePrefill {
+  userId: string;
+  netCents: number;
+}
+
+@Component({
+  selector: 'app-settle-up-panel',
+  imports: [
+    ReactiveFormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatButtonModule,
+    MatListModule,
+    MatProgressBarModule,
+  ],
+  templateUrl: './settle-up-panel.component.html',
+  styleUrl: './settle-up-panel.component.scss',
+})
+export class SettleUpPanelComponent implements OnInit {
+  readonly group = input.required<GroupResponse>();
+  /** Set by the parent when a balance row is clicked; prefills the form. */
+  readonly prefill = input<SettlePrefill | null>(null);
+  /** Emitted after a payment is recorded, so the parent refreshes balances. */
+  readonly paymentRecorded = output<void>();
+
+  private readonly fb = inject(FormBuilder);
+  private readonly payments = inject(PaymentService);
+  private readonly auth = inject(AuthService);
+
+  protected readonly loading = signal(true);
+  protected readonly saving = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly history = signal<PaymentResponse[]>([]);
+  /** True once the form is valid and the user asked to record — shows the confirm step. */
+  protected readonly confirming = signal(false);
+
+  protected readonly form = this.fb.nonNullable.group({
+    payerUserId: ['', [Validators.required]],
+    payeeUserId: ['', [Validators.required]],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+  });
+
+  protected readonly display = centsToDisplay;
+
+  protected readonly nameOf = (id: string) =>
+    this.group().members.find((m) => m.id === id)?.displayName ?? '';
+
+  /** Plain method (not a computed): reactive-form state isn't a signal, so this must
+   *  re-evaluate each change-detection cycle. */
+  valid(): boolean {
+    return this.formValid();
+  }
+
+  constructor() {
+    // React to a balance-row click: pay toward reducing the imbalance.
+    effect(() => {
+      const p = this.prefill();
+      if (!p) {
+        return;
+      }
+      const me = this.auth.user()?.id ?? '';
+      if (!me || p.userId === me) {
+        // Can't settle with yourself from a row; just focus the form as-is.
+        return;
+      }
+      // Negative net = they owe → they pay me. Positive = they're owed → I pay them.
+      const [payer, payee] = p.netCents < 0 ? [p.userId, me] : [me, p.userId];
+      this.form.setValue({
+        payerUserId: payer,
+        payeeUserId: payee,
+        amount: Math.abs(p.netCents) / 100,
+      });
+      this.confirming.set(false);
+    });
+  }
+
+  ngOnInit(): void {
+    this.form.patchValue({ payerUserId: this.auth.user()?.id ?? '' });
+    this.load();
+  }
+
+  private load(): void {
+    this.loading.set(true);
+    this.payments.listPayments(this.group().id).subscribe({
+      next: (rows) => {
+        this.history.set(rows);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set('Could not load payments.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  amountCentsPreview(): number {
+    return dollarsToCents(this.form.getRawValue().amount ?? 0);
+  }
+
+  private formValid(): boolean {
+    const v = this.form.getRawValue();
+    return this.form.valid && v.payerUserId !== v.payeeUserId;
+  }
+
+  review(): void {
+    if (!this.formValid()) {
+      return;
+    }
+    this.error.set(null);
+    this.confirming.set(true);
+  }
+
+  cancel(): void {
+    this.confirming.set(false);
+  }
+
+  confirm(): void {
+    if (!this.formValid() || this.saving()) {
+      return;
+    }
+    this.saving.set(true);
+    const v = this.form.getRawValue();
+    this.payments
+      .recordPayment(this.group().id, {
+        payerUserId: v.payerUserId,
+        payeeUserId: v.payeeUserId,
+        amountCents: dollarsToCents(v.amount ?? 0),
+      })
+      .subscribe({
+        next: (saved) => {
+          this.history.update((rows) => [saved, ...rows]);
+          this.form.reset({ payerUserId: this.auth.user()?.id ?? '', payeeUserId: '', amount: null });
+          this.confirming.set(false);
+          this.saving.set(false);
+          this.paymentRecorded.emit();
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? 'Could not record the payment.');
+          this.confirming.set(false);
+          this.saving.set(false);
+        },
+      });
+  }
+}

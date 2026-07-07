@@ -1,0 +1,73 @@
+<mat-card class="settle-card">
+  <mat-card-header>
+    <mat-card-title>Settle up</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <form [formGroup]="form" class="settle-form">
+      <div class="row">
+        <mat-form-field appearance="outline" class="who">
+          <mat-label>Payer</mat-label>
+          <mat-select formControlName="payerUserId">
+            @for (member of group().members; track member.id) {
+              <mat-option [value]="member.id">{{ member.displayName }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="who">
+          <mat-label>Payee</mat-label>
+          <mat-select formControlName="payeeUserId">
+            @for (member of group().members; track member.id) {
+              <mat-option [value]="member.id">{{ member.displayName }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="amount">
+          <mat-label>Amount</mat-label>
+          <span matTextPrefix>$&nbsp;</span>
+          <input matInput type="number" step="0.01" min="0.01" formControlName="amount" />
+        </mat-form-field>
+      </div>
+
+      @if (error()) {
+        <p class="settle-error">{{ error() }}</p>
+      }
+
+      @if (confirming()) {
+        <div class="confirm-box">
+          <span>
+            Record that <strong>{{ nameOf(form.getRawValue().payerUserId) }}</strong> paid
+            <strong>{{ nameOf(form.getRawValue().payeeUserId) }}</strong>
+            ${{ display(amountCentsPreview()) }}?
+          </span>
+          <button mat-flat-button color="primary" type="button" [disabled]="saving()" (click)="confirm()">
+            Confirm
+          </button>
+          <button mat-button type="button" [disabled]="saving()" (click)="cancel()">Cancel</button>
+        </div>
+      } @else {
+        <button mat-flat-button color="primary" type="button" [disabled]="!valid()" (click)="review()">
+          Record payment
+        </button>
+      }
+    </form>
+  </mat-card-content>
+</mat-card>
+
+<h2>Payments</h2>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+} @else if (history().length === 0) {
+  <p class="subtle">No payments yet.</p>
+} @else {
+  <mat-list>
+    @for (payment of history(); track payment.id) {
+      <mat-list-item>
+        <span matListItemTitle>
+          {{ payment.payer.displayName }} paid {{ payment.payee.displayName }} — ${{ display(payment.amountCents) }}
+        </span>
+      </mat-list-item>
+    }
+  </mat-list>
+}
