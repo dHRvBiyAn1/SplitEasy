@@ -48,6 +48,30 @@ describe('ExpenseService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({});
   });
+
+  it('updates an expense via PUT', () => {
+    service
+      .updateExpense('g1', 'e1', {
+        description: 'Dinner',
+        amountCents: 2000,
+        paidByUserId: 'u1',
+        participantUserIds: ['u1', 'u2'],
+        splitType: 'EQUAL',
+        splits: null,
+      })
+      .subscribe();
+    const req = httpTesting.expectOne('/api/groups/g1/expenses/e1');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body.amountCents).toBe(2000);
+    req.flush({});
+  });
+
+  it('deletes an expense via DELETE', () => {
+    service.deleteExpense('g1', 'e1').subscribe();
+    const req = httpTesting.expectOne('/api/groups/g1/expenses/e1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
 });
 
 describe('money helpers', () => {

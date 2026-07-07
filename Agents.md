@@ -114,8 +114,18 @@ line here so it's not relitigated next time.)*
   the auto-configured resource-server filter (`NimbusJwtDecoder` bean in
   `SecurityConfig`). Controllers read the caller via `@AuthenticationPrincipal Jwt`.
   Passwords hashed with BCrypt; entities are NEVER serialized — DTOs only.
-- **Group authorization is flat**: any member can view a group and add members
-  (by email). Room for roles later via `GroupMembership` (explicit join entity).
+- **Group authorization is flat**: any member can view a group, add members
+  (by email), and **edit or delete any expense** in the group (matches Splitwise;
+  no creator/payer-only check). Room for roles later via `GroupMembership`.
+- **Expense edit = full-replace `PUT`** (`/api/groups/{g}/expenses/{id}`, reuses
+  `CreateExpenseRequest`): shares are **always recomputed** via the same `SplitStrategy`
+  path as create (`ExpenseService.computeSplit`) — never left stale. On update the
+  participants are cleared and the orphan deletes are **flushed before re-inserting**
+  (else the new rows collide with the old on the `(expense_id, user_id)` unique key).
+- **Expense delete is a hard delete** (`DELETE` → 204); `orphanRemoval`/FK-cascade
+  removes `expense_participants`. No soft-delete/`deleted_at` — nothing references a
+  removed expense yet (no settle-up/history). Balances need **no special-casing**:
+  they re-aggregate current rows, so edits/deletes are reflected automatically.
 - **Avoid N+1 on collections**: fetch members with `join fetch m.user`; compute
   group member counts with one aggregate query (see `GroupMembershipRepository`).
   Expense lists use one query too: payer joined + participant count as an inlined
@@ -270,3 +280,14 @@ track what's built so future planning doesn't duplicate or conflict.)*
   the calculator's unit tests were relocated to per-strategy tests with identical
   assertions (+ new UNEQUAL strategy tests). Verified via real API that all three
   types produce identical shares/messages as before. Backend 62/62 passing.
+- [x] Edit & delete expenses — done (branch `feat/edit-delete-expense`): `PUT`
+  (full-replace, recomputes shares via the shared `SplitStrategy` path — no parallel
+  math) and `DELETE` (hard delete → 204) under `/api/groups/{g}/expenses/{id}`,
+  member-only (403 for non-members, 404 wrong-group). On edit the participants are
+  cleared + flushed before re-insert (orphan-removal ordering). Frontend reuses the
+  add-expense form for edit (prefilled; UNEQUAL exact, PERCENTAGE best-effort from
+  cents) and deletes behind an inline "Delete? Yes/No" confirm; balances refresh via
+  the renamed `expensesChanged` output. `BalanceService` unchanged — balances
+  re-aggregate, so edits/deletes reflect automatically (zero-sum verified after both).
+  Verified end-to-end (create → edit $9 equal → $30 percentage recompute → delete →
+  gone from list + balances). Backend 69/69, frontend 29/29 tests passing.

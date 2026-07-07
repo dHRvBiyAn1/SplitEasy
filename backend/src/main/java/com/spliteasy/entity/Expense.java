@@ -71,6 +71,27 @@ public class Expense {
         return participant;
     }
 
+    /** Removes all participant shares (orphanRemoval deletes the rows) — used when re-splitting on edit. */
+    public void clearParticipants() {
+        participants.clear();
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setAmountCents(long amountCents) {
+        this.amountCents = amountCents;
+    }
+
+    public void setPaidBy(User paidBy) {
+        this.paidBy = paidBy;
+    }
+
+    public void setSplitType(SplitType splitType) {
+        this.splitType = splitType;
+    }
+
     public UUID getId() {
         return id;
     }
