@@ -14,8 +14,13 @@ export interface RecordPaymentRequest {
   amountCents: number;
 }
 
-/** Prefill emitted when a balance row's "Settle up" is clicked, seeding the settle-up form. */
-export interface SettlePrefill {
-  userId: string;
-  netCents: number;
-}
+/**
+ * Seeds the settle-up form. Two sources:
+ * - `balance`: a balance row was clicked; direction is inferred relative to the current user
+ *   from the sign of `netCents` (used by BalancePanelComponent).
+ * - `transaction`: an explicit suggested transfer between two members (from debt simplification);
+ *   payer/payee/amount are set directly, no current-user inference.
+ */
+export type SettlePrefill =
+  | { kind: 'balance'; userId: string; netCents: number }
+  | { kind: 'transaction'; payerUserId: string; payeeUserId: string; amountCents: number };
