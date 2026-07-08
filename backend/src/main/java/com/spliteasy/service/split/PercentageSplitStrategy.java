@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class PercentageSplitStrategy implements SplitStrategy {
 
+    /** 100% expressed in basis points (hundredths of a percent) — the wire contract for splits. */
+    private static final long TOTAL_BASIS_POINTS = 10_000;
+
     @Override
     public SplitType type() {
         return SplitType.PERCENTAGE;
@@ -28,7 +31,7 @@ public class PercentageSplitStrategy implements SplitStrategy {
         SplitStrategy.requirePositive(ctx.totalCents());
         List<SplitInput> splits = ctx.splits();
         long totalBp = splits.stream().mapToLong(SplitInput::value).sum();
-        if (totalBp != 10_000) {
+        if (totalBp != TOTAL_BASIS_POINTS) {
             throw new BadRequestException(
                     "Percentages must add up to 100%% (got %.2f%%)".formatted(totalBp / 100.0));
         }
@@ -37,7 +40,7 @@ public class PercentageSplitStrategy implements SplitStrategy {
         LinkedHashMap<UUID, Long> shares = new LinkedHashMap<>();
         long allocated = 0;
         for (UUID id : ids) {
-            long share = ctx.totalCents() * bpByUser.get(id) / 10_000; // floor; all non-negative
+            long share = ctx.totalCents() * bpByUser.get(id) / TOTAL_BASIS_POINTS; // floor; all non-negative
             shares.put(id, share);
             allocated += share;
         }

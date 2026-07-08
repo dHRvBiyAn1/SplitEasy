@@ -38,7 +38,10 @@ export function dollarsToCents(dollars: number): number {
   return Math.round(dollars * 100);
 }
 
-/** Percent (as typed, e.g. 33.33) → integer basis points (3333). Sum must be 10000 for a valid split. */
+/** 100% expressed in basis points (hundredths of a percent) — the wire contract for splits. */
+export const TOTAL_BASIS_POINTS = 10_000;
+
+/** Percent (as typed, e.g. 33.33) → integer basis points (3333). Sum must be TOTAL_BASIS_POINTS. */
 export function percentToBasisPoints(percent: number): number {
   return Math.round(percent * 100);
 }
