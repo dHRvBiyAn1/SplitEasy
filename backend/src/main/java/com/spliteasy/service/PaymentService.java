@@ -6,7 +6,6 @@ import com.spliteasy.entity.Group;
 import com.spliteasy.entity.Payment;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
-import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
@@ -24,21 +23,24 @@ public class PaymentService {
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
+    private final MembershipGuard membershipGuard;
 
     public PaymentService(
             PaymentRepository paymentRepository,
             GroupRepository groupRepository,
             GroupMembershipRepository membershipRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            MembershipGuard membershipGuard) {
         this.paymentRepository = paymentRepository;
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
+        this.membershipGuard = membershipGuard;
     }
 
     @Transactional
     public PaymentResponse recordPayment(UUID requesterId, UUID groupId, RecordPaymentRequest request) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
@@ -64,15 +66,9 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponse> listPayments(UUID requesterId, UUID groupId) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         return paymentRepository.findByGroupIdFetchUsers(groupId).stream()
                 .map(PaymentResponse::from)
                 .toList();
-    }
-
-    private void requireMember(UUID groupId, UUID userId) {
-        if (!membershipRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw new ForbiddenException("You are not a member of this group");
-        }
     }
 }

@@ -11,7 +11,6 @@ import com.spliteasy.entity.Group;
 import com.spliteasy.entity.SplitType;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
-import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
@@ -39,6 +38,7 @@ public class ExpenseService {
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
+    private final MembershipGuard membershipGuard;
     /** Split-type → strategy, built from the strategy beans. No if/else on split type here. */
     private final Map<SplitType, SplitStrategy> strategies;
 
@@ -47,18 +47,20 @@ public class ExpenseService {
             GroupRepository groupRepository,
             GroupMembershipRepository membershipRepository,
             UserRepository userRepository,
+            MembershipGuard membershipGuard,
             List<SplitStrategy> splitStrategies) {
         this.expenseRepository = expenseRepository;
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
+        this.membershipGuard = membershipGuard;
         this.strategies = splitStrategies.stream()
                 .collect(Collectors.toMap(SplitStrategy::type, Function.identity()));
     }
 
     @Transactional
     public ExpenseResponse createExpense(UUID requesterId, UUID groupId, CreateExpenseRequest request) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
@@ -74,7 +76,7 @@ public class ExpenseService {
     @Transactional
     public ExpenseResponse updateExpense(
             UUID requesterId, UUID groupId, UUID expenseId, CreateExpenseRequest request) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Expense expense = expenseRepository.findByIdFetchAll(expenseId)
                 .orElseThrow(() -> new NotFoundException("Expense not found"));
         if (!expense.getGroup().getId().equals(groupId)) {
@@ -98,7 +100,7 @@ public class ExpenseService {
 
     @Transactional
     public void deleteExpense(UUID requesterId, UUID groupId, UUID expenseId) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Expense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new NotFoundException("Expense not found"));
         if (!expense.getGroup().getId().equals(groupId)) {
@@ -154,7 +156,7 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<ExpenseSummary> listExpenses(UUID requesterId, UUID groupId) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         return expenseRepository.findSummariesByGroupId(groupId).stream()
                 .map(v -> new ExpenseSummary(
                         v.getId(),
@@ -168,7 +170,7 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public ExpenseResponse getExpense(UUID requesterId, UUID groupId, UUID expenseId) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Expense expense = expenseRepository.findByIdFetchAll(expenseId)
                 .orElseThrow(() -> new NotFoundException("Expense not found"));
         if (!expense.getGroup().getId().equals(groupId)) {
@@ -196,12 +198,6 @@ public class ExpenseService {
         ids.add(payerId);
         return userRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
-    }
-
-    private void requireMember(UUID groupId, UUID userId) {
-        if (!membershipRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw new ForbiddenException("You are not a member of this group");
-        }
     }
 
     private ExpenseResponse toResponse(Expense expense) {

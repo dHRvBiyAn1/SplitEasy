@@ -8,11 +8,11 @@ import com.spliteasy.entity.Group;
 import com.spliteasy.entity.GroupMembership;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.ConflictException;
-import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.UserRepository;
+import com.spliteasy.util.Emails;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -24,14 +24,17 @@ public class GroupService {
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
+    private final MembershipGuard membershipGuard;
 
     public GroupService(
             GroupRepository groupRepository,
             GroupMembershipRepository membershipRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            MembershipGuard membershipGuard) {
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
+        this.membershipGuard = membershipGuard;
     }
 
     @Transactional
@@ -53,11 +56,11 @@ public class GroupService {
     public GroupResponse addMember(UUID requesterId, UUID groupId, String email) {
         // Membership check first (matches ExpenseService/BalanceService/PaymentService):
         // a non-member gets 403 without learning whether the group exists.
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
-        User invitee = userRepository.findByEmail(email.trim().toLowerCase())
+        User invitee = userRepository.findByEmail(Emails.normalize(email))
                 .orElseThrow(() -> new NotFoundException("No user found with that email"));
         if (membershipRepository.existsByGroupIdAndUserId(groupId, invitee.getId())) {
             throw new ConflictException("User is already a member of this group");
@@ -77,16 +80,10 @@ public class GroupService {
     public GroupResponse getGroup(UUID requesterId, UUID groupId) {
         // Membership check first: a non-member gets 403 without learning whether
         // the group exists (consistent with the other group-scoped services).
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
         return toGroupResponse(group);
-    }
-
-    private void requireMember(UUID groupId, UUID userId) {
-        if (!membershipRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw new ForbiddenException("You are not a member of this group");
-        }
     }
 
     /** Builds the full response, fetching members with their users in a single query. */
