@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.spliteasy.dto.SplitInput;
+import com.spliteasy.exception.BadRequestException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,7 @@ class PercentageSplitStrategyTest {
     @Test
     void percentageNotSummingTo100IsRejected() {
         assertThatThrownBy(() -> split(1000, A, new SplitInput(A, 5000L), new SplitInput(B, 4000L)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test

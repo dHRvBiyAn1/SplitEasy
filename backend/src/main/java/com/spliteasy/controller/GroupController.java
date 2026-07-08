@@ -1,5 +1,6 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.config.CurrentUserId;
 import com.spliteasy.dto.AddMemberRequest;
 import com.spliteasy.dto.CreateGroupRequest;
 import com.spliteasy.dto.GroupResponse;
@@ -10,8 +11,6 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,31 +30,27 @@ public class GroupController {
 
     @PostMapping
     public ResponseEntity<GroupResponse> createGroup(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentUserId UUID userId,
             @Valid @RequestBody CreateGroupRequest request) {
-        GroupResponse response = groupService.createGroup(currentUserId(jwt), request);
+        GroupResponse response = groupService.createGroup(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/{groupId}/members")
     public GroupResponse addMember(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentUserId UUID userId,
             @PathVariable UUID groupId,
             @Valid @RequestBody AddMemberRequest request) {
-        return groupService.addMember(currentUserId(jwt), groupId, request.email());
+        return groupService.addMember(userId, groupId, request.email());
     }
 
     @GetMapping
-    public List<GroupSummary> listMyGroups(@AuthenticationPrincipal Jwt jwt) {
-        return groupService.listMyGroups(currentUserId(jwt));
+    public List<GroupSummary> listMyGroups(@CurrentUserId UUID userId) {
+        return groupService.listMyGroups(userId);
     }
 
     @GetMapping("/{groupId}")
-    public GroupResponse getGroup(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID groupId) {
-        return groupService.getGroup(currentUserId(jwt), groupId);
-    }
-
-    private static UUID currentUserId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    public GroupResponse getGroup(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
+        return groupService.getGroup(userId, groupId);
     }
 }

@@ -139,6 +139,35 @@ class GroupFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void currentUserIdResolverBindsTheAuthenticatedCaller() throws Exception {
+        // The @CurrentUserId resolver must extract the caller's id from the JWT sub claim:
+        // the created group's createdBy is exactly the token owner, not anyone else.
+        AuthResponse owner = register("resolver@example.com", "password123", "Resolver");
+        String groupId = createGroupReturningId(owner.accessToken(), "Bound");
+
+        mockMvc.perform(get("/api/groups/" + groupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdBy.email").value("resolver@example.com"))
+                .andExpect(jsonPath("$.createdBy.id").value(owner.user().id().toString()));
+    }
+
+    @Test
+    void emailNormalizationIsConsistentBetweenRegisterAndAddMember() throws Exception {
+        // Registered with a mixed-case email; added by a differently-cased email.
+        // Both paths go through Emails.normalize, so they resolve the same stored user.
+        AuthResponse owner = register("norm-owner@example.com", "password123", "Owner");
+        register("Mixed.Case@Example.COM", "password123", "Mixed");
+        String groupId = createGroupReturningId(owner.accessToken(), "Normalized");
+
+        mockMvc.perform(jsonPost("/api/groups/" + groupId + "/members",
+                        new AddMemberRequest("MIXED.CASE@example.com"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members", hasSize(2)));
+    }
+
+    @Test
     void getGroupDetailsReturnsMembers() throws Exception {
         AuthResponse owner = register("owner7@example.com", "password123", "Owner Seven");
         register("member2@example.com", "password123", "Member Two");

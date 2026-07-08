@@ -3,7 +3,6 @@ package com.spliteasy.service;
 import com.spliteasy.dto.GroupBalancesResponse;
 import com.spliteasy.dto.MemberBalance;
 import com.spliteasy.dto.UserSummary;
-import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
@@ -37,21 +36,24 @@ public class BalanceService {
     private final ExpenseParticipantRepository participantRepository;
     private final GroupMembershipRepository membershipRepository;
     private final PaymentRepository paymentRepository;
+    private final MembershipGuard membershipGuard;
 
     public BalanceService(
             ExpenseRepository expenseRepository,
             ExpenseParticipantRepository participantRepository,
             GroupMembershipRepository membershipRepository,
-            PaymentRepository paymentRepository) {
+            PaymentRepository paymentRepository,
+            MembershipGuard membershipGuard) {
         this.expenseRepository = expenseRepository;
         this.participantRepository = participantRepository;
         this.membershipRepository = membershipRepository;
         this.paymentRepository = paymentRepository;
+        this.membershipGuard = membershipGuard;
     }
 
     @Transactional(readOnly = true)
     public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
-        requireMember(groupId, requesterId);
+        membershipGuard.requireMember(groupId, requesterId);
 
         Map<UUID, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
         Map<UUID, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
@@ -79,11 +81,5 @@ public class BalanceService {
             map.put(row.getUserId(), row.getTotalCents());
         }
         return map;
-    }
-
-    private void requireMember(UUID groupId, UUID userId) {
-        if (!membershipRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw new ForbiddenException("You are not a member of this group");
-        }
     }
 }

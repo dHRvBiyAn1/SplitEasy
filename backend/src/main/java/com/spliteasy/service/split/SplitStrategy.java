@@ -1,6 +1,7 @@
 package com.spliteasy.service.split;
 
 import com.spliteasy.entity.SplitType;
+import com.spliteasy.exception.BadRequestException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ public interface SplitStrategy {
 
     static void requirePositive(long totalCents) {
         if (totalCents <= 0) {
-            throw new IllegalArgumentException("Expense amount must be a positive number of cents");
+            throw new BadRequestException("Expense amount must be a positive number of cents");
         }
     }
 

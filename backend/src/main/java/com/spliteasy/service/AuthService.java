@@ -7,6 +7,7 @@ import com.spliteasy.dto.UserSummary;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.repository.UserRepository;
+import com.spliteasy.util.Emails;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String email = normalizeEmail(request.email());
+        String email = Emails.normalize(request.email());
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("Email is already registered");
         }
@@ -38,7 +39,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        String email = normalizeEmail(request.email());
+        String email = Emails.normalize(request.email());
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -50,9 +51,5 @@ public class AuthService {
     private AuthResponse toAuthResponse(User user) {
         String token = jwtService.issueToken(user);
         return AuthResponse.bearer(token, jwtService.getExpirationSeconds(), UserSummary.from(user));
-    }
-
-    private static String normalizeEmail(String email) {
-        return email.trim().toLowerCase();
     }
 }
