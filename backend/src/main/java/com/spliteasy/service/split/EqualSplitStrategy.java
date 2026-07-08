@@ -1,6 +1,7 @@
 package com.spliteasy.service.split;
 
 import com.spliteasy.entity.SplitType;
+import com.spliteasy.exception.BadRequestException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +21,7 @@ public class EqualSplitStrategy implements SplitStrategy {
         SplitStrategy.requirePositive(ctx.totalCents());
         List<UUID> ids = ctx.participantIds().stream().distinct().sorted().toList();
         if (ids.isEmpty()) {
-            throw new IllegalArgumentException("An expense needs at least one participant");
+            throw new BadRequestException("An expense needs at least one participant");
         }
         long base = ctx.totalCents() / ids.size();
         LinkedHashMap<UUID, Long> shares = new LinkedHashMap<>();

@@ -1,5 +1,6 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.config.CurrentUserId;
 import com.spliteasy.dto.CreateExpenseRequest;
 import com.spliteasy.dto.ExpenseResponse;
 import com.spliteasy.dto.ExpenseSummary;
@@ -9,8 +10,6 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,45 +32,41 @@ public class ExpenseController {
 
     @PostMapping
     public ResponseEntity<ExpenseResponse> createExpense(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentUserId UUID userId,
             @PathVariable UUID groupId,
             @Valid @RequestBody CreateExpenseRequest request) {
-        ExpenseResponse response = expenseService.createExpense(currentUserId(jwt), groupId, request);
+        ExpenseResponse response = expenseService.createExpense(userId, groupId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
-    public List<ExpenseSummary> listExpenses(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID groupId) {
-        return expenseService.listExpenses(currentUserId(jwt), groupId);
+    public List<ExpenseSummary> listExpenses(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
+        return expenseService.listExpenses(userId, groupId);
     }
 
     @GetMapping("/{expenseId}")
     public ExpenseResponse getExpense(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentUserId UUID userId,
             @PathVariable UUID groupId,
             @PathVariable UUID expenseId) {
-        return expenseService.getExpense(currentUserId(jwt), groupId, expenseId);
+        return expenseService.getExpense(userId, groupId, expenseId);
     }
 
     @PutMapping("/{expenseId}")
     public ExpenseResponse updateExpense(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentUserId UUID userId,
             @PathVariable UUID groupId,
             @PathVariable UUID expenseId,
             @Valid @RequestBody CreateExpenseRequest request) {
-        return expenseService.updateExpense(currentUserId(jwt), groupId, expenseId, request);
+        return expenseService.updateExpense(userId, groupId, expenseId, request);
     }
 
     @DeleteMapping("/{expenseId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteExpense(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentUserId UUID userId,
             @PathVariable UUID groupId,
             @PathVariable UUID expenseId) {
-        expenseService.deleteExpense(currentUserId(jwt), groupId, expenseId);
-    }
-
-    private static UUID currentUserId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+        expenseService.deleteExpense(userId, groupId, expenseId);
     }
 }

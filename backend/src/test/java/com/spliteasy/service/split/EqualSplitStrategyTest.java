@@ -3,6 +3,7 @@ package com.spliteasy.service.split;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.spliteasy.exception.BadRequestException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -100,16 +101,16 @@ class EqualSplitStrategyTest {
 
     @Test
     void zeroAmountIsRejected() {
-        assertThatThrownBy(() -> split(0, List.of(A), A)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> split(0, List.of(A), A)).isInstanceOf(BadRequestException.class);
     }
 
     @Test
     void negativeAmountIsRejected() {
-        assertThatThrownBy(() -> split(-500, List.of(A, B), A)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> split(-500, List.of(A, B), A)).isInstanceOf(BadRequestException.class);
     }
 
     @Test
     void emptyParticipantsIsRejected() {
-        assertThatThrownBy(() -> split(500, List.of(), A)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> split(500, List.of(), A)).isInstanceOf(BadRequestException.class);
     }
 }
