@@ -43,13 +43,8 @@ public class GroupService {
                 .orElseThrow(() -> new NotFoundException("User not found"));
         Group group = groupRepository.save(new Group(request.name().trim(), creator));
         membershipRepository.save(new GroupMembership(group, creator));
-        // The creator is the only member at creation time.
-        return new GroupResponse(
-                group.getId(),
-                group.getName(),
-                UserSummary.from(creator),
-                List.of(UserSummary.from(creator)),
-                group.getCreatedAt());
+        // One code path for the DTO: toGroupResponse re-reads members (just the creator here).
+        return toGroupResponse(group);
     }
 
     @Transactional
