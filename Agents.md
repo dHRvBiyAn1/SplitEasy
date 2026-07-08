@@ -261,6 +261,21 @@ person, not pairwise, so a "can't exceed what you owe" rule is ill-defined) — 
 flips balances past zero. Validation: `amount_cents > 0`, `payer ≠ payee`, both members,
 requester is a member.
 
+**Debt simplification is a derived, read-only computation over balances** — it does NOT
+re-aggregate anything. `DebtSimplificationService` reads `BalanceService.computeBalances(...)`
+(so membership auth is inherited → 403 for non-members) and runs a **greedy
+max-creditor/max-debtor** match: repeatedly settle `min(largest creditor, largest debtor)`
+as one `debtor → creditor` transfer until everyone is zero. It's a near-optimal heuristic
+(exact minimum-transaction is NP-hard), yields ≤ N−1 transfers, excludes zero-balance members
+(no `$0` transactions), and — because balances are zero-sum integer cents — settles everyone to
+exactly zero with **no leftover cents**. `GET /api/groups/{id}/debt-simplification` →
+`SimplifiedDebtsResponse { groupId, transactions: [{ from, to, amountCents }] }`. Nothing is
+persisted (acting on a suggestion records a normal `Payment`). Frontend: a "Simplify debts"
+panel whose per-row "Settle up" reuses the settle-up form via the **`SettlePrefill` discriminated
+union** (`{ kind: 'balance', … }` from a balance row vs `{ kind: 'transaction', payerUserId,
+payeeUserId, amountCents }` from a suggestion — the latter seeds payer/payee/amount directly, no
+current-user inference).
+
 ## Domain Rules to Remember
 
 - All monetary amounts stored as integer cents (or BigDecimal with fixed
@@ -362,3 +377,13 @@ track what's built so future planning doesn't duplicate or conflict.)*
   end-to-end (Bob settles $10 → pair hits exactly 0; Carol overpays $15 → sign flips;
   zero-sum throughout; UI prefill → confirm → balances "settled up" + history row).
   Backend 78/78, frontend 31/31 tests passing.
+- [x] Debt simplification — done (branch `feat/debt-simplification`): read-only
+  `GET /api/groups/{g}/debt-simplification` → minimal `{ from, to, amountCents }` transfers.
+  `DebtSimplificationService` reuses `BalanceService.computeBalances` (no duplicated
+  aggregation; membership auth inherited → 403) and runs a **greedy max-creditor/max-debtor**
+  match (near-optimal heuristic, ≤ N−1 transfers, zero-balance members excluded, no leftover
+  cents). Frontend: a "Simplify debts" panel; each suggestion's "Settle up" seeds the existing
+  settle-up form via the new `SettlePrefill` union (`kind: 'transaction'`). Verified end-to-end
+  (3 non-zero balances → 2 transfers summing to the total debt; UI: clicked "Carol pays Alice
+  $4.00" → form prefilled Carol→Alice→$4 → recorded → Carol settled, suggestion recomputed to
+  just "Bob pays Alice $1.00"). Backend 93/93, frontend 33/33 tests passing.

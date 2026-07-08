@@ -13,6 +13,7 @@ import { ExpensePanelComponent } from '../expenses/expense-panel.component';
 import { BalancePanelComponent } from '../balances/balance-panel.component';
 import { SettleUpPanelComponent } from '../payments/settle-up-panel.component';
 import { SettlePrefill } from '../payments/payment.models';
+import { SimplifyDebtsPanelComponent } from '../debts/simplify-debts-panel.component';
 
 @Component({
   selector: 'app-group-detail',
@@ -27,6 +28,7 @@ import { SettlePrefill } from '../payments/payment.models';
     MatProgressBarModule,
     ExpensePanelComponent,
     BalancePanelComponent,
+    SimplifyDebtsPanelComponent,
     SettleUpPanelComponent,
   ],
   templateUrl: './group-detail.component.html',

@@ -64,6 +64,17 @@ export class SettleUpPanelComponent implements OnInit {
       if (!p) {
         return;
       }
+      if (p.kind === 'transaction') {
+        // Explicit suggested transfer (debt simplification): seed payer/payee/amount directly.
+        this.form.setValue({
+          payerUserId: p.payerUserId,
+          payeeUserId: p.payeeUserId,
+          amount: p.amountCents / 100,
+        });
+        this.confirming.set(false);
+        return;
+      }
+      // kind === 'balance': infer direction relative to the current user.
       const me = this.auth.user()?.id ?? '';
       if (!me || p.userId === me) {
         // Can't settle with yourself from a row; just focus the form as-is.
