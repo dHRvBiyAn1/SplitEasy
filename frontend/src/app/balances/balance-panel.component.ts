@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, output, signal } from '@angular/core';
+import { Component, effect, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -15,7 +15,7 @@ import { BalanceService, describeBalance } from './balance.service';
   templateUrl: './balance-panel.component.html',
   styleUrl: './balance-panel.component.scss',
 })
-export class BalancePanelComponent implements OnInit {
+export class BalancePanelComponent {
   readonly groupId = input.required<string>();
   readonly refreshKey = input<number>(0);
   /** Emitted when a member's "Settle up" is clicked; the parent prefills the settle-up form. */
@@ -28,21 +28,15 @@ export class BalancePanelComponent implements OnInit {
   protected readonly balances = signal<MemberBalance[]>([]);
   protected readonly describe = describeBalance;
 
-  private lastLoadedKey = -1;
-
-  ngOnInit(): void {
-    this.load();
-  }
-
-  ngDoCheck(): void {
-    // input() signals can change after init; reload when the parent bumps the key.
-    if (this.refreshKey() !== this.lastLoadedKey) {
+  constructor() {
+    // Load on init and whenever groupId or the parent's refreshKey changes.
+    effect(() => {
+      this.refreshKey(); // tracked so a bump triggers a reload
       this.load();
-    }
+    });
   }
 
   private load(): void {
-    this.lastLoadedKey = this.refreshKey();
     this.loading.set(true);
     this.balanceService.getBalances(this.groupId()).subscribe({
       next: (res) => {

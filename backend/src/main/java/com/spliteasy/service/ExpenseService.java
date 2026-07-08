@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -119,13 +120,16 @@ public class ExpenseService {
         if (!memberIds.contains(payerId)) {
             throw new BadRequestException("The payer must be a member of this group");
         }
-        SplitType splitType = request.splitType() == null ? SplitType.EQUAL : request.splitType();
+        SplitType splitType = Objects.requireNonNullElse(request.splitType(), SplitType.EQUAL);
         // Service resolves group membership; the strategy owns the split math + its validation.
-        SplitContext ctx = new SplitContext(
-                request.amountCents(),
-                payerId,
-                splitType == SplitType.EQUAL ? resolveParticipants(request.participantUserIds(), memberIds) : null,
-                splitType == SplitType.EQUAL ? null : requireSplits(request.splits(), memberIds));
+        SplitContext ctx;
+        if (splitType == SplitType.EQUAL) {
+            ctx = SplitContext.forEqual(
+                    request.amountCents(), payerId, resolveParticipants(request.participantUserIds(), memberIds));
+        } else {
+            ctx = SplitContext.forSplits(
+                    request.amountCents(), payerId, requireSplits(request.splits(), memberIds));
+        }
         List<Share> shares = strategies.get(splitType).split(ctx);
         Map<UUID, User> usersById = loadUsers(shares.stream().map(Share::userId).toList(), payerId);
         return new ComputedSplit(splitType, payerId, shares, usersById);
