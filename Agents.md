@@ -44,8 +44,12 @@ the dev database AND for backend tests, which use Testcontainers).
    so the app calls relative `/api/...` URLs with no CORS in dev.
 
 Health check: `curl http://localhost:8080/api/health` →
-`{"status":"UP","service":"spliteasy-backend",...}`. The frontend toolbar
-shows "● UP" when the full chain works.
+`{"status":"UP","service":"spliteasy",...}` (`service` is `spring.application.name`;
+`HealthController` builds this directly — there is no `HealthService`). The frontend
+toolbar shows "● UP" when the full chain works.
+
+CORS allowed origins are configurable via `app.cors.allowed-origins` (comma-separated;
+dev default `http://localhost:4200`) — override with the real frontend origin in non-dev.
 
 Auth/JWT config: the backend signs HS256 tokens with `app.jwt.secret`.
 There is **no fallback default** — the dev secret lives in
@@ -171,6 +175,13 @@ line here so it's not relitigated next time.)*
   **New split types must implement this interface, not add branching to the service.**
   Each strategy owns its own validation and is unit-testable with `new XStrategy().split(ctx)`
   (no Spring/DB). The service still resolves group membership before calling the strategy.
+- **Build a `SplitContext` via its factory methods, not the raw constructor**:
+  `SplitContext.forEqual(total, payer, participantIds)` for EQUAL, and
+  `SplitContext.forSplits(total, payer, splits)` for UNEQUAL/PERCENTAGE. Each nulls the
+  field the other kind doesn't use, so callers can't set both (or the wrong one).
+- **`100%` in basis points is the named constant `TOTAL_BASIS_POINTS = 10_000`** — on the
+  backend (`PercentageSplitStrategy`) and frontend (`expenses/expense.service.ts`). Use it
+  instead of the bare `10000` literal; it documents the wire contract on both sides.
 - **Rounding** (shared by EQUAL and PERCENTAGE via `SplitStrategy.absorbRemainder`):
   each participant gets the integer floor of their share; the leftover cents are absorbed
   by the **payer** when the payer is a participant, else the first participant in id-sorted
