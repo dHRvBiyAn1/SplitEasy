@@ -116,17 +116,29 @@ line here so it's not relitigated next time.)*
 - **Auth**: JWT is HS256 via oauth2-resource-server. Tokens are issued in
   `JwtService` (claims: `sub`=user UUID, `email`, `displayName`) and validated by
   the auto-configured resource-server filter (`NimbusJwtDecoder` bean in
-  `SecurityConfig`). Controllers read the caller via `@AuthenticationPrincipal Jwt`.
+  `SecurityConfig`). Controllers read the caller as `@CurrentUserId UUID userId`
+  (a custom argument resolver in `config/`; see below) — not raw `Jwt`.
   Passwords hashed with BCrypt; entities are NEVER serialized — DTOs only.
 - **Group authorization is flat**: any member can view a group, add members
   (by email), and **edit or delete any expense** in the group (matches Splitwise;
   no creator/payer-only check). Room for roles later via `GroupMembership`.
 - **Membership check before existence check, uniformly across all services**: every
-  group-scoped operation calls `requireMember(groupId, userId)` (→ 403) *before*
-  loading the group by id (→ 404). A non-member therefore gets **403 for a
+  group-scoped operation calls `membershipGuard.requireMember(groupId, userId)` (→ 403)
+  *before* loading the group by id (→ 404). A non-member therefore gets **403 for a
   nonexistent group id too**, so the API never reveals whether a group exists to
   someone who isn't in it. `GroupService`, `ExpenseService`, `BalanceService`, and
   `PaymentService` all follow this order.
+- **Shared auth/util components — reuse these, don't re-inline them:**
+  - `MembershipGuard` (`service/`): the single source of truth for the group-membership
+    check. Wraps `GroupMembershipRepository` and throws `ForbiddenException` (→ 403,
+    message "You are not a member of this group"). Inject it into any new group-scoped
+    service instead of copying the `existsByGroupIdAndUserId` check.
+  - `@CurrentUserId UUID` (`config/CurrentUserId` + `CurrentUserIdArgumentResolver`,
+    registered in `WebConfig`): binds a controller `UUID` param to the JWT `sub`. Use it
+    on new endpoints instead of `@AuthenticationPrincipal Jwt` + `UUID.fromString(...)`.
+  - `Emails.normalize(String)` (`util/`): trim + lowercase, the one way emails are
+    canonicalized before lookup/storage. Used by `AuthService` (register/login) and
+    `GroupService.addMember`; reuse it anywhere an email is matched.
 - **Dependency injection uses manual constructors over final fields, not Lombok.**
   This is a deliberate choice — Java 21 records already eliminate most DTO
   boilerplate, and the codebase is small enough that Lombok wouldn't earn its keep.
