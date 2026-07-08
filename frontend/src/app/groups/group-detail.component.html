@@ -44,6 +44,12 @@
       (settleWith)="onSettleWith($event)"
     />
 
+    <app-simplify-debts-panel
+      [groupId]="g.id"
+      [refreshKey]="balanceRefresh()"
+      (settleTransaction)="onSettleWith($event)"
+    />
+
     <app-settle-up-panel [group]="g" [prefill]="settlePrefill()" (paymentRecorded)="refreshBalances()" />
 
     <app-expense-panel [group]="g" (expensesChanged)="refreshBalances()" />

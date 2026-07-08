@@ -1,0 +1,20 @@
+<h2>Simplify debts</h2>
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate" />
+} @else if (error()) {
+  <p class="debts-error">{{ error() }}</p>
+} @else if (transactions().length === 0) {
+  <p class="debts-empty">Everyone's settled up.</p>
+} @else {
+  <mat-list>
+    @for (t of transactions(); track t.from.id + '->' + t.to.id) {
+      <mat-list-item>
+        <span matListItemTitle>
+          {{ t.from.displayName }} pays {{ t.to.displayName }}
+          <span class="amount">${{ display(t.amountCents) }}</span>
+        </span>
+        <button matListItemMeta mat-button type="button" (click)="settle(t)">Settle up</button>
+      </mat-list-item>
+    }
+  </mat-list>
+}

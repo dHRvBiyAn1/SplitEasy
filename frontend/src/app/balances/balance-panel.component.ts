@@ -2,6 +2,7 @@ import { Component, effect, inject, input, output, signal } from '@angular/core'
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { SettlePrefill } from '../payments/payment.models';
 import { MemberBalance } from './balance.models';
 import { BalanceService, describeBalance } from './balance.service';
 
@@ -19,7 +20,7 @@ export class BalancePanelComponent {
   readonly groupId = input.required<string>();
   readonly refreshKey = input<number>(0);
   /** Emitted when a member's "Settle up" is clicked; the parent prefills the settle-up form. */
-  readonly settleWith = output<{ userId: string; netCents: number }>();
+  readonly settleWith = output<SettlePrefill>();
 
   private readonly balanceService = inject(BalanceService);
 
@@ -51,7 +52,7 @@ export class BalancePanelComponent {
   }
 
   settle(balance: MemberBalance): void {
-    this.settleWith.emit({ userId: balance.user.id, netCents: balance.netCents });
+    this.settleWith.emit({ kind: 'balance', userId: balance.user.id, netCents: balance.netCents });
   }
 
   balanceClass(netCents: number): string {
