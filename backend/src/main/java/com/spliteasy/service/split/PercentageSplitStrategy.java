@@ -2,6 +2,7 @@ package com.spliteasy.service.split;
 
 import com.spliteasy.dto.SplitInput;
 import com.spliteasy.entity.SplitType;
+import com.spliteasy.exception.BadRequestException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,7 @@ public class PercentageSplitStrategy implements SplitStrategy {
         List<SplitInput> splits = ctx.splits();
         long totalBp = splits.stream().mapToLong(SplitInput::value).sum();
         if (totalBp != 10_000) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "Percentages must add up to 100%% (got %.2f%%)".formatted(totalBp / 100.0));
         }
         Map<UUID, Long> bpByUser = splits.stream().collect(Collectors.toMap(SplitInput::userId, SplitInput::value));
