@@ -9,10 +9,10 @@ import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,10 +76,6 @@ public class BalanceService {
     }
 
     private Map<UUID, Long> toMap(List<UserAmount> rows) {
-        Map<UUID, Long> map = new HashMap<>();
-        for (UserAmount row : rows) {
-            map.put(row.getUserId(), row.getTotalCents());
-        }
-        return map;
+        return rows.stream().collect(Collectors.toMap(UserAmount::getUserId, UserAmount::getTotalCents));
     }
 }

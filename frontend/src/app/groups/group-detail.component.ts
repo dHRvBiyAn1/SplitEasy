@@ -11,7 +11,8 @@ import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 import { ExpensePanelComponent } from '../expenses/expense-panel.component';
 import { BalancePanelComponent } from '../balances/balance-panel.component';
-import { SettleUpPanelComponent, SettlePrefill } from '../payments/settle-up-panel.component';
+import { SettleUpPanelComponent } from '../payments/settle-up-panel.component';
+import { SettlePrefill } from '../payments/payment.models';
 
 @Component({
   selector: 'app-group-detail',
@@ -89,7 +90,7 @@ export class GroupDetailComponent implements OnInit {
     });
   }
 
-  onExpenseAdded(): void {
+  refreshBalances(): void {
     this.balanceRefresh.update((n) => n + 1);
   }
 

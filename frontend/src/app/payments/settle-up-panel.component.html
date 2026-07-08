@@ -47,7 +47,7 @@
           <button mat-button type="button" [disabled]="saving()" (click)="cancel()">Cancel</button>
         </div>
       } @else {
-        <button mat-flat-button color="primary" type="button" [disabled]="!valid()" (click)="review()">
+        <button mat-flat-button color="primary" type="button" [disabled]="!formValid()" (click)="review()">
           Record payment
         </button>
       }
