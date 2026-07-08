@@ -13,4 +13,15 @@ public record SplitContext(
         long totalCents,
         UUID payerId,
         List<UUID> participantIds,
-        List<SplitInput> splits) {}
+        List<SplitInput> splits) {
+
+    /** EQUAL split over the given participants (no per-participant amounts). */
+    public static SplitContext forEqual(long totalCents, UUID payerId, List<UUID> participantIds) {
+        return new SplitContext(totalCents, payerId, participantIds, null);
+    }
+
+    /** UNEQUAL/PERCENTAGE split with explicit per-participant values (no participant-id list). */
+    public static SplitContext forSplits(long totalCents, UUID payerId, List<SplitInput> splits) {
+        return new SplitContext(totalCents, payerId, null, splits);
+    }
+}

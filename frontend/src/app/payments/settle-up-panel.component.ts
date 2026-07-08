@@ -10,14 +10,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { AuthService } from '../core/auth/auth.service';
 import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
 import { GroupResponse } from '../groups/group.models';
-import { PaymentResponse } from './payment.models';
+import { PaymentResponse, SettlePrefill } from './payment.models';
 import { PaymentService } from './payment.service';
-
-/** Prefill emitted when a member is clicked in the balances view. */
-export interface SettlePrefill {
-  userId: string;
-  netCents: number;
-}
 
 @Component({
   selector: 'app-settle-up-panel',
@@ -62,12 +56,6 @@ export class SettleUpPanelComponent implements OnInit {
 
   protected readonly nameOf = (id: string) =>
     this.group().members.find((m) => m.id === id)?.displayName ?? '';
-
-  /** Plain method (not a computed): reactive-form state isn't a signal, so this must
-   *  re-evaluate each change-detection cycle. */
-  valid(): boolean {
-    return this.formValid();
-  }
 
   constructor() {
     // React to a balance-row click: pay toward reducing the imbalance.
@@ -115,7 +103,9 @@ export class SettleUpPanelComponent implements OnInit {
     return dollarsToCents(this.form.getRawValue().amount ?? 0);
   }
 
-  private formValid(): boolean {
+  /** Plain method (not a computed): reactive-form state isn't a signal, so this must
+   *  re-evaluate each change-detection cycle. Called directly from the template. */
+  protected formValid(): boolean {
     const v = this.form.getRawValue();
     return this.form.valid && v.payerUserId !== v.payeeUserId;
   }

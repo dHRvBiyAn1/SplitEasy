@@ -1,10 +1,6 @@
-package com.spliteasy.web;
+package com.spliteasy.exception;
 
 import com.spliteasy.dto.ErrorResponse;
-import com.spliteasy.exception.BadRequestException;
-import com.spliteasy.exception.ConflictException;
-import com.spliteasy.exception.ForbiddenException;
-import com.spliteasy.exception.NotFoundException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

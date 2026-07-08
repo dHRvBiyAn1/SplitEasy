@@ -11,8 +11,13 @@ import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserRepository;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,16 +56,19 @@ public class PaymentService {
         }
         // Overpayment is intentionally allowed (people prepay/overpay/round). We only require
         // that both parties are members — not that the amount matches any outstanding debt.
-        if (!membershipRepository.existsByGroupIdAndUserId(groupId, payerId)) {
+        // One membership query + one batched user fetch (mirrors ExpenseService.loadUsers).
+        Set<UUID> memberIds = new HashSet<>(membershipRepository.findUserIdsByGroupId(groupId));
+        if (!memberIds.contains(payerId)) {
             throw new BadRequestException("The payer must be a member of this group");
         }
-        if (!membershipRepository.existsByGroupIdAndUserId(groupId, payeeId)) {
+        if (!memberIds.contains(payeeId)) {
             throw new BadRequestException("The payee must be a member of this group");
         }
 
-        User payer = userRepository.findById(payerId).orElseThrow(() -> new NotFoundException("Payer not found"));
-        User payee = userRepository.findById(payeeId).orElseThrow(() -> new NotFoundException("Payee not found"));
-        Payment payment = paymentRepository.save(new Payment(group, payer, payee, request.amountCents()));
+        Map<UUID, User> users = userRepository.findAllById(List.of(payerId, payeeId)).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        Payment payment = paymentRepository.save(
+                new Payment(group, users.get(payerId), users.get(payeeId), request.amountCents()));
         return PaymentResponse.from(payment);
     }
 

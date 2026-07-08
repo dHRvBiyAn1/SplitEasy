@@ -11,7 +11,19 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { GroupResponse } from '../groups/group.models';
 import { CreateExpenseRequest, ExpenseResponse, ExpenseSummary, SplitType } from './expense.models';
-import { ExpenseService, centsToDisplay, dollarsToCents, percentToBasisPoints } from './expense.service';
+import {
+  ExpenseService,
+  TOTAL_BASIS_POINTS,
+  centsToDisplay,
+  dollarsToCents,
+  percentToBasisPoints,
+} from './expense.service';
+
+/** A member who has a finite numeric value entered in an UNEQUAL/PERCENTAGE split. */
+interface EnteredValue {
+  userId: string;
+  value: number;
+}
 
 @Component({
   selector: 'app-expense-panel',
@@ -92,7 +104,14 @@ export class ExpensePanelComponent implements OnInit {
   }
 
   setSplitType(type: SplitType): void {
+    if (type === this.splitType()) {
+      return;
+    }
     this.splitType.set(type);
+    // Clear per-member entries carried over from the previous type — a UNEQUAL dollar
+    // amount is meaningless as a PERCENTAGE (and vice versa), and stale entries were
+    // previously kept and silently filtered. Toggling now starts the split fresh.
+    this.values.set(new Map());
   }
 
   toggle(userId: string, checked: boolean): void {
@@ -129,10 +148,10 @@ export class ExpensePanelComponent implements OnInit {
   }
 
   /** Members with a numeric value entered (for UNEQUAL/PERCENTAGE). */
-  private entered(): { userId: string; value: number }[] {
+  private entered(): EnteredValue[] {
     return this.group()
       .members.map((m) => ({ userId: m.id, value: this.values().get(m.id) }))
-      .filter((e): e is { userId: string; value: number } => e.value != null && Number.isFinite(e.value));
+      .filter((e): e is EnteredValue => e.value != null && Number.isFinite(e.value));
   }
 
   private runningCents(): number {
@@ -161,7 +180,7 @@ export class ExpensePanelComponent implements OnInit {
       case 'UNEQUAL':
         return this.entered().length > 0 && this.runningCents() === this.amountCents();
       case 'PERCENTAGE':
-        return this.entered().length > 0 && this.runningBasisPoints() === 10000;
+        return this.entered().length > 0 && this.runningBasisPoints() === TOTAL_BASIS_POINTS;
     }
   }
 
@@ -193,12 +212,11 @@ export class ExpensePanelComponent implements OnInit {
       for (const p of e.participants) {
         // UNEQUAL: exact dollars. PERCENTAGE: best-effort percent from cents (lossy — the
         // running-total gate blocks an invalid resubmit; the user can adjust).
-        map.set(
-          p.user.id,
+        const prefillValue =
           e.splitType === 'UNEQUAL'
             ? p.shareCents / 100
-            : Number(((p.shareCents / e.amountCents) * 100).toFixed(2)),
-        );
+            : Number(((p.shareCents / e.amountCents) * 100).toFixed(2));
+        map.set(p.user.id, prefillValue);
       }
       this.values.set(map);
     }

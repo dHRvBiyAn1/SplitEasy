@@ -44,9 +44,9 @@
       (settleWith)="onSettleWith($event)"
     />
 
-    <app-settle-up-panel [group]="g" [prefill]="settlePrefill()" (paymentRecorded)="onExpenseAdded()" />
+    <app-settle-up-panel [group]="g" [prefill]="settlePrefill()" (paymentRecorded)="refreshBalances()" />
 
-    <app-expense-panel [group]="g" (expensesChanged)="onExpenseAdded()" />
+    <app-expense-panel [group]="g" (expensesChanged)="refreshBalances()" />
   } @else {
     <p class="groups-error">{{ error() ?? 'Group not found.' }}</p>
   }

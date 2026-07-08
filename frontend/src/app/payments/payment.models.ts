@@ -13,3 +13,9 @@ export interface RecordPaymentRequest {
   payeeUserId: string;
   amountCents: number;
 }
+
+/** Prefill emitted when a balance row's "Settle up" is clicked, seeding the settle-up form. */
+export interface SettlePrefill {
+  userId: string;
+  netCents: number;
+}

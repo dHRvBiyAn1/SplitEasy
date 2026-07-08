@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
+import { centsToDisplay } from '../expenses/expense.service';
 import { GroupBalancesResponse } from './balance.models';
 
 @Injectable({ providedIn: 'root' })
@@ -17,7 +18,6 @@ export function describeBalance(netCents: number): string {
   if (netCents === 0) {
     return 'is settled up';
   }
-  const abs = Math.abs(netCents);
-  const amount = `$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+  const amount = `$${centsToDisplay(Math.abs(netCents))}`;
   return netCents > 0 ? `is owed ${amount}` : `owes ${amount}`;
 }
