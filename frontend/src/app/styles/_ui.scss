@@ -1,0 +1,202 @@
+// ─────────────────────────────────────────────────────────────────────────
+// Shared UI primitives for the Evenly design system. Reusable across the auth
+// and groups screens so no component redefines a button or input from scratch.
+// All values reference tokens from _tokens.scss.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Editorial serif display (headings)
+.dc-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  text-wrap: balance;
+  margin: 0;
+}
+
+// Uppercase tracked label — used sparingly as section/date kickers, matching the design
+.dc-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+
+// Small uppercase field label (form fields)
+.dc-field-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink2); // bumped from ink3 for input-label contrast
+}
+
+// ── Buttons ────────────────────────────────────────────────────────────────
+%dc-btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 10px 16px;
+  border-radius: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    filter 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.dc-btn-accent {
+  @extend %dc-btn-base;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+
+.dc-btn-outline {
+  @extend %dc-btn-base;
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line2);
+
+  &:hover:not(:disabled) {
+    background: var(--surface2);
+  }
+}
+
+.dc-btn-ghost {
+  @extend %dc-btn-base;
+  background: none;
+  color: var(--ink3);
+  padding: 6px 10px;
+
+  &:hover:not(:disabled) {
+    color: var(--ink);
+    background: var(--surface2);
+  }
+}
+
+// Accent text link-button (e.g. "New group")
+.dc-btn-link {
+  @extend %dc-btn-base;
+  background: none;
+  color: var(--accent-text);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 10px;
+
+  &:hover:not(:disabled) {
+    background: var(--accent-soft);
+  }
+}
+
+// ── Inputs ───────────────────────────────────────────────────────────────
+.dc-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 0;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: var(--ink2); // bumped from ink3 for placeholder contrast (≥4.5:1)
+    opacity: 1;
+  }
+
+  &:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+// ── Surfaces ─────────────────────────────────────────────────────────────
+.dc-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+// ── Indeterminate loading bar ────────────────────────────────────────────
+.dc-loading {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  background: var(--line);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: var(--accent);
+    animation: dc-indeterminate 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes dc-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-loading::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
+// ── Balance color helpers (owed = green, owe = pink) ─────────────────────
+.dc-pos {
+  color: var(--pos);
+}
+.dc-neg {
+  color: var(--neg);
+}
+
+// ── Accessible keyboard focus (visible on every interactive element) ─────
+// Inputs get the accent ring above; everything else gets a clear dark outline.
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
