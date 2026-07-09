@@ -1,24 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
 
 @Component({
   selector: 'app-register',
-  imports: [
-    ReactiveFormsModule,
-    RouterLink,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
-    MatProgressBarModule,
-  ],
+  imports: [ReactiveFormsModule, RouterLink, AuthHeroComponent],
   templateUrl: './register.component.html',
   styleUrl: './auth.scss',
 })

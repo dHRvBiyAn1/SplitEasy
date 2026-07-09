@@ -1,18 +1,26 @@
-<mat-toolbar color="primary" class="app-toolbar">
-  <a routerLink="/" class="brand">{{ title() }}</a>
-  <span class="spacer"></span>
-  <span class="backend-status" [class]="'status-' + backendStatus()" title="Backend health">
-    ● {{ backendStatus() }}
-  </span>
-  @if (isAuthenticated()) {
-    <span class="current-user">{{ user()?.displayName }}</span>
-    <button mat-button (click)="logout()">Log out</button>
-  } @else {
-    <a mat-button routerLink="/login">Log in</a>
-    <a mat-button routerLink="/register">Register</a>
-  }
-</mat-toolbar>
+@if (!isAuthRoute()) {
+  <header class="topbar">
+    <a routerLink="/" class="topbar__brand">
+      <span class="topbar__mark" aria-hidden="true">=</span>
+      <span class="topbar__word">{{ title() }}</span>
+    </a>
 
-<main class="app-content">
+    <span class="topbar__spacer"></span>
+
+    <span class="topbar__status" [class]="'is-' + backendStatus()" title="Backend health">
+      <span class="topbar__dot" aria-hidden="true"></span>{{ backendStatus() }}
+    </span>
+
+    @if (isAuthenticated()) {
+      <span class="topbar__user">{{ user()?.displayName }}</span>
+      <button class="dc-btn-outline topbar__btn" type="button" (click)="logout()">Log out</button>
+    } @else {
+      <a class="dc-btn-outline topbar__btn" routerLink="/login">Log in</a>
+      <a class="dc-btn-accent topbar__btn" routerLink="/register">Sign up</a>
+    }
+  </header>
+}
+
+<main class="app-content" [class.app-content--auth]="isAuthRoute()">
   <router-outlet />
 </main>

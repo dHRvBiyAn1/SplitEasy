@@ -1,20 +1,22 @@
 .net {
   margin-left: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
 
+  // Balance semantics: owed to you = green, you owe = pink (design tokens,
+  // text-safe darkened variants for ≥4.5:1 contrast on the page background).
   &.owed {
-    color: #1a7f37;
+    color: var(--pos-strong);
   }
 
   &.owes {
-    color: #cf222e;
+    color: var(--neg-strong);
   }
 
   &.settled {
-    color: var(--mat-sys-on-surface-variant);
+    color: var(--ink3);
   }
 }
 
 .balance-error {
-  color: var(--mat-sys-error);
+  color: var(--neg);
 }

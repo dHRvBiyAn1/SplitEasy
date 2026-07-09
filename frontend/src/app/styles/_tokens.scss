@@ -1,0 +1,65 @@
+// ─────────────────────────────────────────────────────────────────────────
+// SplitEasy design tokens — single source of truth for the "Evenly" visual
+// system (imported from Claude Design). Every screen references these CSS
+// custom properties; never hardcode the hex values in a component.
+//
+// Fonts: Instrument Serif (display, --font-display) + Hanken Grotesk (UI/body)
+// are loaded in src/index.html.
+// ─────────────────────────────────────────────────────────────────────────
+
+:root {
+  // Brand accent (lime) + derived roles
+  --accent-base: #b6f531;
+  --accent: var(--accent-base);
+  --accent-text: color-mix(in oklab, var(--accent-base), black 54%); // accent as readable text/link
+  --accent-soft: color-mix(in oklab, var(--accent-base) 26%, var(--surface));
+  --on-accent: #12160a; // near-black text on accent fills
+
+  // Surfaces & background
+  --bg: #f1f2ed;
+  --surface: #ffffff;
+  --surface2: #f0f1eb;
+  --surface3: #e5e7df;
+
+  // Ink (text) ramp
+  --ink: #14161a; // primary text
+  --ink2: #5c6067; // secondary text
+  --ink3: #8e939b; // meta / eyebrows / decorative labels only
+
+  // Hairlines
+  --line: #e7e8e1;
+  --line2: #d6d8ce;
+
+  // Balance semantics — green = owed to you (positive), pink = you owe (negative)
+  --pos: #0e9a72;
+  --pos-soft: color-mix(in oklab, #0e9a72 12%, var(--surface));
+  --neg: #de3f76;
+  --neg-soft: color-mix(in oklab, #de3f76 10%, var(--surface));
+  // Darkened, text-safe variants (≥4.5:1 on --bg / --surface) for small balance text
+  --pos-strong: color-mix(in oklab, #0e9a72, black 26%);
+  --neg-strong: color-mix(in oklab, #de3f76, black 24%);
+
+  // Elevation
+  --shadow: 0 1px 2px rgba(20, 22, 26, 0.04), 0 10px 30px rgba(20, 22, 26, 0.07);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--shadow);
+
+  // Typography
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-ui: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+
+  // Spacing scale (rhythm)
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 26px;
+  --sp-7: 36px;
+  --sp-8: 44px;
+
+  // Semantic z-index scale
+  --z-sticky: 100;
+  --z-modal-backdrop: 200;
+  --z-modal: 210;
+  --z-toast: 300;
+}

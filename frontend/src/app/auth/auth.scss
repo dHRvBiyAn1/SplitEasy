@@ -1,33 +1,242 @@
-.auth-page {
+// Auth screens (login + register) and the shared editorial hero.
+// Two-column split: editorial hero (left) + form panel (right). Full-bleed —
+// the app toolbar is hidden on auth routes.
+
+.auth {
+  min-height: 100dvh;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 3rem 1rem;
+  flex-wrap: wrap;
+  background: var(--bg);
 }
 
-.auth-card {
-  width: 100%;
-  max-width: 400px;
-  overflow: hidden;
-}
-
-form {
+// ── Left: editorial hero (host element = app-auth-hero) ─────────────────────
+.auth__hero {
+  flex: 1.15;
+  min-width: 420px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 44px 56px;
+  border-right: 1px solid var(--line);
+  box-sizing: border-box;
 }
 
-mat-form-field {
-  width: 100%;
+.auth-hero__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.auth-error {
-  color: var(--mat-sys-error);
-  margin: 0 0 0.5rem;
+.auth-hero__mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1;
 }
 
-.auth-footer {
-  padding: 1rem;
+.auth-hero__wordmark {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.01em;
+}
+
+.auth-hero__body {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  max-width: 640px;
+}
+
+.auth-hero__headline {
+  font-size: clamp(44px, 6vw, 72px);
+  line-height: 1.02;
+
+  em {
+    font-style: italic;
+    color: var(--accent-text);
+  }
+}
+
+.auth-hero__lede {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink2);
+  max-width: 46ch;
+  text-wrap: pretty;
+}
+
+.auth-hero__sample {
+  display: flex;
+  flex-direction: column;
+  max-width: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 0;
+}
+
+.auth-hero__sample-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.auth-hero__sample-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.auth-hero__sample-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+.auth-hero__sample-amount {
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.auth-hero__sample-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 11px 18px;
+  background: var(--pos-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pos);
+}
+
+.auth-hero__sample-back {
+  font-weight: 700;
+}
+
+.auth-hero__foot {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+// ── Right: form panel ───────────────────────────────────────────────────────
+.auth__panel {
+  flex: 1;
+  min-width: 380px;
+  display: grid;
+  place-items: center;
+  padding: 44px;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+
+.auth__form-wrap {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: dc-fade-up 0.5s ease both;
+}
+
+.auth__title {
+  font-size: 32px;
+}
+
+.auth__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+}
+
+.auth__tab {
+  flex: 1;
   text-align: center;
+  padding: 8px 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink2);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+    color: var(--ink);
+  }
+
+  &[aria-current='page'] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth__hint {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--ink2);
+}
+
+.auth__error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--neg);
+}
+
+.auth__submit {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.auth__switch {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink2);
+  text-align: center;
+}
+
+// ── Responsive: stack to a single column, keep the hero above the form ──────
+@media (max-width: 860px) {
+  .auth__hero,
+  .auth__panel {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .auth__hero {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: 32px 24px;
+    gap: 28px;
+  }
+
+  .auth__panel {
+    padding: 32px 24px 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth__loading::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
 }

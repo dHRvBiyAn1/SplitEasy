@@ -1,44 +1,104 @@
-.app-toolbar {
+.topbar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
 
-.brand {
-  color: inherit;
+.topbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
   text-decoration: none;
-  font-weight: 600;
+
+  &:hover {
+    text-decoration: none;
+  }
 }
 
-.spacer {
+.topbar__mark {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.topbar__word {
+  font-family: var(--font-display);
+  font-size: 21px;
+  letter-spacing: 0.01em;
+}
+
+.topbar__spacer {
   flex: 1 1 auto;
 }
 
-.current-user {
-  margin-right: 0.5rem;
-  font-size: 0.9rem;
-  opacity: 0.9;
+.topbar__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink3);
 }
 
-.backend-status {
-  margin-right: 1rem;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.topbar__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
 
-  &.status-up {
-    color: #7cf29c;
-  }
+.topbar__status.is-up {
+  color: var(--pos);
+}
+.topbar__status.is-down {
+  color: var(--neg);
+}
+.topbar__status.is-checking {
+  color: var(--ink3);
+}
 
-  &.status-down {
-    color: #ff9c9c;
-  }
+.topbar__user {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
 
-  &.status-checking {
-    opacity: 0.7;
-  }
+.topbar__btn {
+  padding: 8px 14px;
+  font-size: 13px;
 }
 
 .app-content {
   display: block;
+}
+
+// On the full-bleed auth screens there is no toolbar; let the screen own the viewport.
+.app-content--auth {
+  min-height: 100dvh;
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    padding: 10px 16px;
+    gap: 8px;
+  }
+
+  .topbar__user {
+    display: none;
+  }
 }

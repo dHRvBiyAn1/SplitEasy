@@ -28,6 +28,11 @@ number of transactions needed to settle up).
 - DTOs at the controller boundary; never expose JPA entities directly in API responses
 - Frontend: feature-based module structure, one Angular service per backend resource
 - Shared HTTP interceptor for auth token + error handling
+- **UI design tokens live in one place**: `frontend/src/app/styles/_tokens.scss`
+  (colors, typography, spacing as CSS custom properties) + `_ui.scss` (shared
+  `.dc-*` primitives: buttons, fields, cards, loading bar). Both are `@use`d once
+  in `frontend/src/styles.scss`. Components reference `var(--…)` / the `.dc-*`
+  classes — never hardcode hex values. Design reference: `design/evenly.dc.html`.
 
 ## How to Run
 
@@ -198,6 +203,20 @@ line here so it's not relitigated next time.)*
   and 401s handled by `authInterceptor`; authenticated routes use `authGuard`.
   Vitest is the test runner — use `vi.spyOn(...).mockReturnValue(...)`, not
   Jasmine's `spyOn(...).and.returnValue(...)`.
+- **UI Design ("Evenly")**: the auth + groups screens follow a finished visual
+  design imported from Claude Design (`design/evenly.dc.html`; source project
+  `claude.ai/design/p/c15b1c41-…`). It's an editorial system — **Instrument Serif**
+  display + **Hanken Grotesk** UI, lime accent `--accent` (`#B6F531`) with near-black
+  `--on-accent` text, near-white green-tinted `--bg`, **sharp corners** (`border-radius: 0`)
+  on all controls, 16px cards, circular avatars. Balances use color to signal owed/owing:
+  green `--pos` / pink `--neg` (small balance text uses the darkened `--pos-strong` /
+  `--neg-strong` for ≥4.5:1 contrast). All values live in
+  `frontend/src/app/styles/_tokens.scss` (see Architecture). These screens use plain
+  semantic HTML styled from the tokens rather than Angular Material components, because
+  Material's opinionated inputs/buttons can't match the flat design faithfully; Material's
+  `--mat-sys-*` colors are remapped to the tokens in `styles.scss` so the still-Material
+  expense/balance/settle panels stay coherent. The app toolbar is hidden on `/login`
+  and `/register` (full-bleed auth).
 
 ## Data Model (evolving)
 
