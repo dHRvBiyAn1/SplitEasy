@@ -1,38 +1,61 @@
-<div class="groups-page">
-  <mat-card class="create-card">
-    <mat-card-header>
-      <mat-card-title>New group</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <form [formGroup]="form" (ngSubmit)="create()" class="create-form">
-        <mat-form-field appearance="outline" class="grow">
-          <mat-label>Group name</mat-label>
-          <input matInput formControlName="name" placeholder="e.g. Trip to Goa" />
-        </mat-form-field>
-        <button mat-flat-button color="primary" type="submit" [disabled]="creating()">
-          Create
-        </button>
-      </form>
-    </mat-card-content>
-  </mat-card>
+<div class="dash">
+  <header class="dash__head">
+    <div class="dash__head-text">
+      <p class="dc-eyebrow">Your space</p>
+      <h1 class="dash__title">Your groups</h1>
+    </div>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="create()" class="dash__create dc-card" novalidate>
+    <label class="dc-field-label" for="new-group-name">New group</label>
+    <div class="dash__create-row">
+      <input
+        id="new-group-name"
+        class="dc-field"
+        formControlName="name"
+        placeholder="e.g. Ski weekend, Flat 3B, Lisbon Trip"
+      />
+      <button class="dc-btn-accent dash__create-btn" type="submit" [disabled]="creating()">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 5.5v13M5.5 12h13" />
+        </svg>
+        <span>Create group</span>
+      </button>
+    </div>
+  </form>
 
   @if (error()) {
-    <p class="groups-error">{{ error() }}</p>
+    <p class="dash__error" role="alert">{{ error() }}</p>
   }
 
-  <h2>Your groups</h2>
   @if (loading()) {
-    <mat-progress-bar mode="indeterminate" />
+    <div class="dc-loading" role="status" aria-label="Loading your groups"></div>
   } @else if (myGroups().length === 0) {
-    <p class="empty">You're not in any groups yet. Create one above to get started.</p>
+    <div class="dash__empty dc-card">
+      <div class="dash__empty-mark" aria-hidden="true">=</div>
+      <h2 class="dash__empty-title">No groups yet</h2>
+      <p class="dash__empty-text">
+        Create your first group above — a trip, a flat, a dinner club — and start splitting.
+      </p>
+    </div>
   } @else {
-    <mat-nav-list>
+    <ul class="dash__grid">
       @for (group of myGroups(); track group.id) {
-        <a mat-list-item [routerLink]="['/groups', group.id]">
-          <span matListItemTitle>{{ group.name }}</span>
-          <span matListItemLine>{{ group.memberCount }} member{{ group.memberCount === 1 ? '' : 's' }}</span>
-        </a>
+        <li>
+          <a class="group-card dc-card" [routerLink]="['/groups', group.id]">
+            <span class="group-card__glyph" aria-hidden="true">{{ group.name.charAt(0).toUpperCase() }}</span>
+            <span class="group-card__body">
+              <span class="group-card__name">{{ group.name }}</span>
+              <span class="group-card__meta">
+                {{ group.memberCount }} member{{ group.memberCount === 1 ? '' : 's' }}
+              </span>
+            </span>
+            <svg class="group-card__chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9.5 6l6 6-6 6" />
+            </svg>
+          </a>
+        </li>
       }
-    </mat-nav-list>
+    </ul>
   }
 </div>

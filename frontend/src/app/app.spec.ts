@@ -38,8 +38,8 @@ describe('App', () => {
     req.flush({ status: 'UP', service: 'spliteasy-backend', timestamp: '2026-01-01T00:00:00Z' });
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.brand')?.textContent).toContain('SplitEasy');
-    expect(compiled.querySelector('.backend-status')?.textContent?.toLowerCase()).toContain('up');
+    expect(compiled.querySelector('.topbar__brand')?.textContent).toContain('SplitEasy');
+    expect(compiled.querySelector('.topbar__status')?.textContent?.toLowerCase()).toContain('up');
   });
 
   it('shows login/register links when unauthenticated', () => {
@@ -49,6 +49,6 @@ describe('App', () => {
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Log in');
-    expect(text).toContain('Register');
+    expect(text).toContain('Sign up');
   });
 });
