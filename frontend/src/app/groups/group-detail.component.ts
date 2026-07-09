@@ -1,12 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 import { ExpensePanelComponent } from '../expenses/expense-panel.component';
@@ -20,12 +14,6 @@ import { SimplifyDebtsPanelComponent } from '../debts/simplify-debts-panel.compo
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
-    MatListModule,
-    MatProgressBarModule,
     ExpensePanelComponent,
     BalancePanelComponent,
     SimplifyDebtsPanelComponent,
@@ -98,5 +86,15 @@ export class GroupDetailComponent implements OnInit {
 
   onSettleWith(prefill: SettlePrefill): void {
     this.settlePrefill.set(prefill);
+  }
+
+  /** Up to two initials for a member avatar, e.g. "Ada Lovelace" → "AL". */
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 }
