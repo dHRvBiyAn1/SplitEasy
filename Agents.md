@@ -30,9 +30,16 @@ number of transactions needed to settle up).
 - Shared HTTP interceptor for auth token + error handling
 - **UI design tokens live in one place**: `frontend/src/app/styles/_tokens.scss`
   (colors, typography, spacing as CSS custom properties) + `_ui.scss` (shared
-  `.dc-*` primitives: buttons, fields, cards, loading bar). Both are `@use`d once
-  in `frontend/src/styles.scss`. Components reference `var(--…)` / the `.dc-*`
+  `.dc-*` primitives: buttons, fields, cards, loading bar, `.dc-segment`
+  segmented control, `.dc-avatar`). Both are `@use`d once in
+  `frontend/src/styles.scss`. Components reference `var(--…)` / the `.dc-*`
   classes — never hardcode hex values. Design reference: `design/evenly.dc.html`.
+- **Money amounts use one shared convention** — `.dc-amount` (+ `--owed` green /
+  `--owes` pink / `--settled` muted) in `_ui.scss` is the single source of the
+  owed/owing color meaning. A **net balance** reads the same everywhere it appears
+  (balances view uses the modifiers via `[class.dc-amount--owed]` etc.); a **plain
+  total** (an expense amount, a recorded payment) uses `.dc-amount` with no modifier
+  (neutral bold ink). Reuse these classes rather than re-deriving the color logic.
 
 ## How to Run
 
