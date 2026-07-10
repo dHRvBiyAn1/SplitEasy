@@ -1,12 +1,5 @@
 import { Component, OnInit, effect, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSelectModule } from '@angular/material/select';
 import { AuthService } from '../core/auth/auth.service';
 import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
 import { GroupResponse } from '../groups/group.models';
@@ -15,16 +8,7 @@ import { PaymentService } from './payment.service';
 
 @Component({
   selector: 'app-settle-up-panel',
-  imports: [
-    ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatButtonModule,
-    MatListModule,
-    MatProgressBarModule,
-  ],
+  imports: [ReactiveFormsModule],
   templateUrl: './settle-up-panel.component.html',
   styleUrl: './settle-up-panel.component.scss',
 })
@@ -159,5 +143,15 @@ export class SettleUpPanelComponent implements OnInit {
           this.saving.set(false);
         },
       });
+  }
+
+  /** Up to two initials for a payer avatar, e.g. "Ada Lovelace" → "AL". */
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 }

@@ -1,22 +1,78 @@
-.net {
-  margin-left: 0.5rem;
-  font-weight: 700;
+// Balances view. The owed/owing/settled money-color convention lives in
+// _ui.scss (.dc-amount--owed / --owes / --settled) — reused here so a net
+// balance reads the same green/pink/muted everywhere it appears.
 
-  // Balance semantics: owed to you = green, you owe = pink (design tokens,
-  // text-safe darkened variants for ≥4.5:1 contrast on the page background).
-  &.owed {
-    color: var(--pos-strong);
-  }
+.bal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-  &.owes {
-    color: var(--neg-strong);
-  }
+.bal__title {
+  margin: 0;
+  font-size: 22px;
+}
 
-  &.settled {
-    color: var(--ink3);
+.bal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.bal__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--line);
   }
 }
 
-.balance-error {
+.bal__av {
+  width: 34px;
+  height: 34px;
+  font-size: 11px;
+}
+
+.bal__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.bal__amount {
+  font-size: 13.5px;
+}
+
+.bal__settle {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  font-size: 12.5px;
+}
+
+.bal__error {
+  margin: 0;
+  font-weight: 600;
   color: var(--neg);
+}
+
+@media (max-width: 560px) {
+  .bal__row {
+    flex-wrap: wrap;
+  }
+
+  .bal__amount {
+    order: 3;
+    width: 100%;
+    margin-left: 46px;
+  }
+
+  .bal__settle {
+    order: 2;
+    margin-left: auto;
+  }
 }
