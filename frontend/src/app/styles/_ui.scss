@@ -183,6 +183,72 @@
   color: var(--neg);
 }
 
+// ── Money amount + owed/owing/settled convention ─────────────────────────
+// The single place the balance-color meaning lives. A net balance reads the
+// SAME everywhere: owed to you = green, you owe = pink, settled = muted.
+// Plain totals (an expense amount, a payment) use `.dc-amount` with no modifier
+// (neutral ink). Uses the text-safe darkened variants for ≥4.5:1 contrast.
+.dc-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+
+  &--owed {
+    color: var(--pos-strong);
+  }
+  &--owes {
+    color: var(--neg-strong);
+  }
+  &--settled {
+    color: var(--ink3);
+  }
+}
+
+// ── Segmented control (split-type toggle, tab switchers) ─────────────────
+.dc-segment {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+
+  button {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink2);
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover:not([aria-pressed='true']) {
+      color: var(--ink);
+    }
+
+    &[aria-pressed='true'] {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+    }
+  }
+}
+
+// ── Circular avatar with initials (size set per use) ─────────────────────
+.dc-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
 // ── Accessible keyboard focus (visible on every interactive element) ─────
 // Inputs get the accent ring above; everything else gets a clear dark outline.
 a:focus-visible,
