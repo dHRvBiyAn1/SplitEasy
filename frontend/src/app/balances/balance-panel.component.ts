@@ -1,7 +1,4 @@
 import { Component, effect, inject, input, output, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { SettlePrefill } from '../payments/payment.models';
 import { MemberBalance } from './balance.models';
 import { BalanceService, describeBalance } from './balance.service';
@@ -12,7 +9,7 @@ import { BalanceService, describeBalance } from './balance.service';
  */
 @Component({
   selector: 'app-balance-panel',
-  imports: [MatListModule, MatProgressBarModule, MatButtonModule],
+  imports: [],
   templateUrl: './balance-panel.component.html',
   styleUrl: './balance-panel.component.scss',
 })
@@ -55,13 +52,13 @@ export class BalancePanelComponent {
     this.settleWith.emit({ kind: 'balance', userId: balance.user.id, netCents: balance.netCents });
   }
 
-  balanceClass(netCents: number): string {
-    if (netCents > 0) {
-      return 'owed';
-    }
-    if (netCents < 0) {
-      return 'owes';
-    }
-    return 'settled';
+  /** Up to two initials for a member avatar, e.g. "Ada Lovelace" → "AL". */
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 }

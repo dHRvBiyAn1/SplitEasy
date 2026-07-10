@@ -1,7 +1,4 @@
 import { Component, effect, inject, input, output, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { centsToDisplay } from '../expenses/expense.service';
 import { SettlePrefill } from '../payments/payment.models';
 import { SuggestedTransaction } from './debt.models';
@@ -14,7 +11,7 @@ import { DebtService } from './debt.service';
  */
 @Component({
   selector: 'app-simplify-debts-panel',
-  imports: [MatListModule, MatProgressBarModule, MatButtonModule],
+  imports: [],
   templateUrl: './simplify-debts-panel.component.html',
   styleUrl: './simplify-debts-panel.component.scss',
 })
@@ -60,5 +57,15 @@ export class SimplifyDebtsPanelComponent {
       payeeUserId: t.to.id,
       amountCents: t.amountCents,
     });
+  }
+
+  /** Up to two initials for an avatar, e.g. "Ada Lovelace" → "AL". */
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 }
