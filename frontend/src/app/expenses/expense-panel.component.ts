@@ -1,14 +1,5 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatCardModule } from '@angular/material/card';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSelectModule } from '@angular/material/select';
 import { GroupResponse } from '../groups/group.models';
 import { CreateExpenseRequest, ExpenseResponse, ExpenseSummary, SplitType } from './expense.models';
 import {
@@ -27,18 +18,7 @@ interface EnteredValue {
 
 @Component({
   selector: 'app-expense-panel',
-  imports: [
-    ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatCheckboxModule,
-    MatButtonModule,
-    MatButtonToggleModule,
-    MatListModule,
-    MatProgressBarModule,
-  ],
+  imports: [ReactiveFormsModule],
   templateUrl: './expense-panel.component.html',
   styleUrl: './expense-panel.component.scss',
 })
@@ -309,5 +289,15 @@ export class ExpensePanelComponent implements OnInit {
         this.saving.set(false);
       },
     });
+  }
+
+  /** Up to two initials for a participant avatar, e.g. "Ada Lovelace" → "AL". */
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 }
