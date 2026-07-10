@@ -210,20 +210,24 @@ line here so it's not relitigated next time.)*
   and 401s handled by `authInterceptor`; authenticated routes use `authGuard`.
   Vitest is the test runner — use `vi.spyOn(...).mockReturnValue(...)`, not
   Jasmine's `spyOn(...).and.returnValue(...)`.
-- **UI Design ("Evenly")**: the auth + groups screens follow a finished visual
+- **UI Design ("Evenly") — complete**: **every** screen follows a finished visual
   design imported from Claude Design (`design/evenly.dc.html`; source project
-  `claude.ai/design/p/c15b1c41-…`). It's an editorial system — **Instrument Serif**
-  display + **Hanken Grotesk** UI, lime accent `--accent` (`#B6F531`) with near-black
-  `--on-accent` text, near-white green-tinted `--bg`, **sharp corners** (`border-radius: 0`)
-  on all controls, 16px cards, circular avatars. Balances use color to signal owed/owing:
-  green `--pos` / pink `--neg` (small balance text uses the darkened `--pos-strong` /
-  `--neg-strong` for ≥4.5:1 contrast). All values live in
-  `frontend/src/app/styles/_tokens.scss` (see Architecture). These screens use plain
-  semantic HTML styled from the tokens rather than Angular Material components, because
-  Material's opinionated inputs/buttons can't match the flat design faithfully; Material's
-  `--mat-sys-*` colors are remapped to the tokens in `styles.scss` so the still-Material
-  expense/balance/settle panels stay coherent. The app toolbar is hidden on `/login`
-  and `/register` (full-bleed auth).
+  `claude.ai/design/p/c15b1c41-…`), rolled out over three batches — auth + groups,
+  expenses + balances, and settle-up + simplify-debts. It's an editorial system —
+  **Instrument Serif** display + **Hanken Grotesk** UI, lime accent `--accent`
+  (`#B6F531`) with near-black `--on-accent` text, near-white green-tinted `--bg`,
+  **sharp corners** (`border-radius: 0`) on all controls, 16px cards, circular
+  avatars. Balances use color to signal owed/owing: green `--pos` / pink `--neg`
+  (small balance text uses the darkened `--pos-strong` / `--neg-strong` for ≥4.5:1
+  contrast). All values live in `frontend/src/app/styles/_tokens.scss` (see
+  Architecture). Screens use plain semantic HTML styled from the tokens rather than
+  Angular Material components, because Material's opinionated inputs/buttons can't
+  match the flat design faithfully; Material's `--mat-sys-*` colors are still remapped
+  to the tokens in `styles.scss` as a safety net for any residual Material surface. The
+  app toolbar is hidden on `/login` and `/register` (full-bleed auth).
+  **The token system (`_tokens.scss` + `_ui.scss`) and the `.dc-amount` money-amount
+  convention are the standing conventions: any new screen reuses them — do not
+  reintroduce Material components or hardcode colors, spacing, or the owed/owing logic.**
 
 ## Data Model (evolving)
 
