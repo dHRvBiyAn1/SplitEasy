@@ -47,8 +47,10 @@
       <div class="set-confirm">
         <span class="set-confirm__text">
           Record that <strong>{{ nameOf(form.getRawValue().payerUserId) }}</strong> paid
-          <strong>{{ nameOf(form.getRawValue().payeeUserId) }}</strong>
-          <span class="dc-amount">${{ display(amountCentsPreview()) }}</span>?
+          <strong>{{ nameOf(form.getRawValue().payeeUserId) }}</strong>&ngsp;<span
+            class="dc-amount"
+            >${{ display(amountCentsPreview()) }}</span
+          >?
         </span>
         <div class="set-confirm__actions">
           <button class="dc-btn-outline" type="button" [disabled]="saving()" (click)="cancel()">Cancel</button>
