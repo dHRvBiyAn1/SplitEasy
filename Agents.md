@@ -261,6 +261,17 @@ Migration `V5__payments.sql`:
   direct transfer between two members — a *separate* entity from Expense (no
   participants/shares), not a special expense type.
 
+Migration `V6__group_type_expense_category_date.sql` (additive, safe defaults so the
+existing API keeps working):
+
+- **groups** — add `type` TEXT (not null, default `'OTHER'` — enum `HOME`/`TRIP`/
+  `DINING`/`EVENT`/`OTHER`).
+- **expenses** — add `category` TEXT (not null, default `'OTHER'` — enum `FOOD_DRINK`/
+  `GROCERIES`/`RENT_HOME`/`UTILITIES`/`TRAVEL`/`TRANSPORT`/`FUN`/`OTHER`) and `spent_on`
+  DATE (not null, default today; the user-chosen spend date, distinct from `created_at`;
+  existing rows backfilled from `created_at`). Both are descriptive (drive the UI
+  glyph/icon); no balance math depends on them.
+
 Relationships: User ↔ Group is many-to-many **through group_memberships**;
 Group → User (created_by) is many-to-one. Creating a group auto-inserts a
 membership for the creator (so the creator is a member, not a special case).
@@ -290,6 +301,22 @@ mixed. **Overpayment is allowed** (people prepay/overpay/round; the model is net
 person, not pairwise, so a "can't exceed what you owe" rule is ill-defined) — it simply
 flips balances past zero. Validation: `amount_cents > 0`, `payer ≠ payee`, both members,
 requester is a member.
+
+**Three derived balance views, one source of truth (persisted expense/payment rows).**
+(1) `BalanceService` — aggregate **net per member** in a group. (2) `DebtSimplificationService`
+— minimal netted transfers. (3) `PairwiseBalanceService` — **pairwise "who owes whom, to me"**
+per counterparty (`net(X) = X's share of my expenses − my share of X's expenses + I paid X −
+X paid me`), which is what the dashboard cards, People list, settle-up modal, and group
+balance-pills render. Pairwise is NOT netted across people, so it can show "Dan owes you $50"
+and "you owe Sofia $50" at once; the pairwise nets sum to the member's `BalanceService` net, so
+the views stay consistent. `GET /api/groups/{id}/balances/mine` → `PersonBalance[]` (positive =
+they owe you). **`GET /api/dashboard`** (`DashboardService`) assembles one payload from the
+user's perspective: cross-group totals (`totalNetCents = owedCents − oweCents`), per-group
+`DashboardGroup` cards, aggregated `PersonBalance[]` people, per-group `Settlement[]` (settle-up
+modal), and a merged recent-activity feed (`ActivityItem[]`, expenses + payments, newest first,
+capped at 15) with a per-item `viewerDeltaCents` (+lent / −borrowed; 0 for settlements).
+Expense responses/summaries carry `category` + `spentOn`; the summary also carries
+`viewerDeltaCents` for the group-detail "you lent / you borrowed" line.
 
 **Debt simplification is a derived, read-only computation over balances** — it does NOT
 re-aggregate anything. `DebtSimplificationService` reads `BalanceService.computeBalances(...)`
