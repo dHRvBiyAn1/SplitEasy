@@ -1,26 +1,75 @@
-@if (!isAuthRoute()) {
-  <header class="topbar">
-    <a routerLink="/" class="topbar__brand">
-      <span class="topbar__mark" aria-hidden="true">=</span>
-      <span class="topbar__word">{{ title() }}</span>
-    </a>
+@if (showShell()) {
+  <div class="shell">
+    <aside class="side">
+      <a routerLink="/dashboard" class="side__brand">
+        <span class="side__mark" aria-hidden="true">=</span>
+        <span class="side__word">{{ title() }}</span>
+      </a>
 
-    <span class="topbar__spacer"></span>
+      <nav class="side__nav">
+        <a
+          routerLink="/dashboard"
+          routerLinkActive="is-active"
+          class="side__link"
+        >
+          <span class="side__link-ico" aria-hidden="true">▦</span>
+          Dashboard
+        </a>
+      </nav>
 
-    <span class="topbar__status" [class]="'is-' + backendStatus()" title="Backend health">
-      <span class="topbar__dot" aria-hidden="true"></span>{{ backendStatus() }}
-    </span>
+      <div class="side__section">
+        <span class="side__eyebrow">Groups</span>
+        <a routerLink="/groups" class="side__add" title="New group" aria-label="New group">+</a>
+      </div>
 
-    @if (isAuthenticated()) {
-      <span class="topbar__user">{{ user()?.displayName }}</span>
-      <button class="dc-btn-outline topbar__btn" type="button" (click)="logout()">Log out</button>
-    } @else {
-      <a class="dc-btn-outline topbar__btn" routerLink="/login">Log in</a>
-      <a class="dc-btn-accent topbar__btn" routerLink="/register">Sign up</a>
-    }
-  </header>
+      <ul class="side__groups">
+        @for (g of groups(); track g.id) {
+          <li>
+            <a [routerLink]="['/groups', g.id]" routerLinkActive="is-active" class="side__group">
+              <span
+                class="side__glyph"
+                aria-hidden="true"
+                [style.background]="'hsl(' + glyphHue(g.name) + ' 40% 22%)'"
+                [style.color]="'hsl(' + glyphHue(g.name) + ' 70% 72%)'"
+                >{{ g.name.charAt(0) }}</span
+              >
+              <span class="side__group-text">
+                <span class="side__group-name">{{ g.name }}</span>
+                <span
+                  class="side__group-net dc-amount"
+                  [class.dc-amount--owed]="g.netCents > 0"
+                  [class.dc-amount--owes]="g.netCents < 0"
+                  [class.dc-amount--settled]="g.netCents === 0"
+                >
+                  {{ g.netCents >= 0 ? '+' : '−' }}${{ display(g.netCents < 0 ? -g.netCents : g.netCents) }}
+                </span>
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+
+      <div class="side__foot">
+        <span class="side__theme">
+          <span aria-hidden="true">{{ systemDark() ? '☾' : '☀' }}</span>
+          Theme: {{ systemDark() ? 'Dark' : 'Light' }}
+        </span>
+        <button class="side__user" type="button" (click)="logout()" title="Log out">
+          <span class="side__avatar" aria-hidden="true">{{ initials(user()?.displayName) }}</span>
+          <span class="side__user-text">
+            <span class="side__user-name">{{ user()?.displayName }}</span>
+            <span class="side__user-sub">Log out</span>
+          </span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="shell__main">
+      <router-outlet />
+    </main>
+  </div>
+} @else {
+  <main class="app-content" [class.app-content--auth]="isAuthRoute()">
+    <router-outlet />
+  </main>
 }
-
-<main class="app-content" [class.app-content--auth]="isAuthRoute()">
-  <router-outlet />
-</main>
