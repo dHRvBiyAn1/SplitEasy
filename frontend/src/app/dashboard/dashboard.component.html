@@ -1,0 +1,191 @@
+<div class="dash">
+  <header class="dash__head">
+    <div>
+      <p class="dash__eyebrow">{{ todayLabel() }}</p>
+      <h1 class="dash__title">{{ greeting() }}, {{ firstNameOf() }}.</h1>
+    </div>
+    <div class="dash__actions">
+      <a class="dc-btn-outline" routerLink="/groups">
+        <span aria-hidden="true">+</span> New group
+      </a>
+    </div>
+  </header>
+
+  @if (loading() && !data()) {
+    <div class="dc-loading" role="status" aria-label="Loading dashboard"></div>
+  } @else if (data(); as d) {
+    <!-- Summary band -->
+    <section class="band">
+      <div class="band__total">
+        <p class="band__label">Total balance</p>
+        <p
+          class="band__big dc-amount"
+          [class.dc-amount--owed]="d.totalNetCents > 0"
+          [class.dc-amount--owes]="d.totalNetCents < 0"
+          [class.dc-amount--settled]="d.totalNetCents === 0"
+        >
+          {{ d.totalNetCents >= 0 ? '' : '−' }}${{ money(d.totalNetCents) }}
+        </p>
+        <p class="band__sub">
+          {{ d.totalNetCents >= 0 ? "you're owed overall" : 'you owe overall' }} ·
+          across {{ d.groupCount }} {{ d.groupCount === 1 ? 'group' : 'groups' }}
+        </p>
+      </div>
+      <div class="band__split">
+        <div class="band__cell">
+          <p class="band__label">You are owed</p>
+          <p class="band__mid dc-amount dc-amount--owed">${{ money(d.owedCents) }}</p>
+          <p class="band__sub">from {{ d.owedPeopleCount }} {{ d.owedPeopleCount === 1 ? 'person' : 'people' }}</p>
+        </div>
+        <div class="band__cell">
+          <p class="band__label">You owe</p>
+          <p class="band__mid dc-amount dc-amount--owes">${{ money(d.oweCents) }}</p>
+          <p class="band__sub">to {{ d.owePeopleCount }} {{ d.owePeopleCount === 1 ? 'person' : 'people' }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Groups -->
+    <section class="dash__section">
+      <div class="dash__section-head">
+        <h2 class="dash__h2">Your groups</h2>
+        <a class="dash__more" routerLink="/groups"><span aria-hidden="true">+</span> New group</a>
+      </div>
+
+      @if (d.groups.length === 0) {
+        <p class="dash__empty">No groups yet. Create one to start splitting.</p>
+      } @else {
+        <div class="cards">
+          @for (g of d.groups; track g.id) {
+            <article class="card">
+              <div class="card__head">
+                <span
+                  class="card__glyph"
+                  aria-hidden="true"
+                  [style.background]="'hsl(' + glyphHue(g.name) + ' 40% 20%)'"
+                  [style.color]="'hsl(' + glyphHue(g.name) + ' 70% 72%)'"
+                  >{{ g.name.charAt(0) }}</span
+                >
+                <div class="card__id">
+                  <h3 class="card__name">{{ g.name }}</h3>
+                  <p class="card__meta">{{ g.memberCount }} members</p>
+                </div>
+                <span
+                  class="card__pill"
+                  [class.card__pill--owed]="g.netCents > 0"
+                  [class.card__pill--owes]="g.netCents < 0"
+                >
+                  {{ g.netCents > 0 ? "You're owed" : g.netCents < 0 ? 'You owe' : 'Settled' }}
+                </span>
+              </div>
+
+              <div class="card__tiles">
+                <div class="card__tile">
+                  <p class="card__tile-label">You are owed</p>
+                  <p class="card__tile-val dc-amount dc-amount--owed">${{ display(g.youAreOwedCents) }}</p>
+                </div>
+                <div class="card__tile">
+                  <p class="card__tile-label">You owe</p>
+                  <p class="card__tile-val dc-amount dc-amount--owes">${{ display(g.youOweCents) }}</p>
+                </div>
+              </div>
+
+              <div class="card__stats">
+                <div>
+                  <p class="card__stat-label">Total spent</p>
+                  <p class="card__stat-val">${{ display(g.totalSpentCents) }}</p>
+                </div>
+                <div>
+                  <p class="card__stat-label">Members</p>
+                  <p class="card__stat-val">{{ g.memberCount }}</p>
+                </div>
+                <div class="card__stat--right">
+                  <p class="card__stat-label">Net balance</p>
+                  <p
+                    class="card__stat-val dc-amount"
+                    [class.dc-amount--owed]="g.netCents > 0"
+                    [class.dc-amount--owes]="g.netCents < 0"
+                    [class.dc-amount--settled]="g.netCents === 0"
+                  >
+                    {{ g.netCents >= 0 ? '+' : '−' }}${{ display(g.netCents < 0 ? -g.netCents : g.netCents) }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="card__foot">
+                <a class="dc-btn-outline card__btn" [routerLink]="['/groups', g.id]">Members</a>
+                <a class="dc-btn-ghost card__btn card__btn--open" [routerLink]="['/groups', g.id]">
+                  Open <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Activity + People -->
+    <section class="dash__grid">
+      <div class="panel">
+        <h2 class="panel__title">Recent activity</h2>
+        @if (d.activity.length === 0) {
+          <p class="dash__empty">Nothing yet.</p>
+        } @else {
+          <ul class="feed">
+            @for (a of d.activity; track a.id) {
+              <li class="feed__row">
+                <span class="feed__ico" aria-hidden="true">{{ activityGlyph(a) }}</span>
+                <span class="feed__text">
+                  <span class="feed__title">{{ activityTitle(a) }}</span>
+                  <span class="feed__sub">{{ activitySub(a) }}</span>
+                </span>
+                <span class="feed__right">
+                  @if (a.kind === 'PAYMENT' || a.viewerDeltaCents === 0) {
+                    <span class="feed__amt">${{ display(a.amountCents) }}</span>
+                  } @else {
+                    <span
+                      class="feed__amt dc-amount"
+                      [class.dc-amount--owed]="a.viewerDeltaCents > 0"
+                      [class.dc-amount--owes]="a.viewerDeltaCents < 0"
+                    >
+                      {{ a.viewerDeltaCents >= 0 ? '+' : '−' }}${{ display(a.viewerDeltaCents < 0 ? -a.viewerDeltaCents : a.viewerDeltaCents) }}
+                    </span>
+                  }
+                  <span class="feed__date">{{ shortDate(a.date) }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">People</h2>
+        @if (d.people.length === 0) {
+          <p class="dash__empty">No balances with anyone.</p>
+        } @else {
+          <ul class="people">
+            @for (p of d.people; track p.user.id) {
+              <li class="people__row">
+                <span class="dc-avatar people__av" aria-hidden="true">{{ initials(p.user.displayName) }}</span>
+                <span class="people__text">
+                  <span class="people__name">{{ p.user.displayName }}</span>
+                  <span class="people__sub">{{ p.netCents > 0 ? 'owes you' : 'you owe' }}</span>
+                </span>
+                <span
+                  class="people__amt dc-amount"
+                  [class.dc-amount--owed]="p.netCents > 0"
+                  [class.dc-amount--owes]="p.netCents < 0"
+                >
+                  ${{ display(p.netCents < 0 ? -p.netCents : p.netCents) }}
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    </section>
+  } @else {
+    <p class="dash__empty">Couldn't load your dashboard. Try refreshing.</p>
+  }
+</div>

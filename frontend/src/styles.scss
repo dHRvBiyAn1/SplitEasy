@@ -36,7 +36,8 @@ html {
 }
 
 body {
-  color-scheme: light;
+  // Follow the OS theme for native controls (date picker, scrollbars, form fields).
+  color-scheme: light dark;
   margin: 0;
   min-height: 100%;
   background-color: var(--bg);

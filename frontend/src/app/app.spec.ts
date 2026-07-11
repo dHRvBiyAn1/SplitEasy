@@ -4,6 +4,14 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
 
+const USER_KEY = 'spliteasy.user';
+const TOKEN_KEY = 'spliteasy.accessToken';
+
+function signIn(): void {
+  localStorage.setItem(TOKEN_KEY, 'test-token');
+  localStorage.setItem(USER_KEY, JSON.stringify({ id: 'u1', email: 'a@b.com', displayName: 'Alex Rivera' }));
+}
+
 describe('App', () => {
   let httpTesting: HttpTestingController;
 
@@ -11,11 +19,7 @@ describe('App', () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
     httpTesting = TestBed.inject(HttpTestingController);
   });
@@ -28,27 +32,38 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     expect(fixture.componentInstance).toBeTruthy();
     fixture.detectChanges();
-    httpTesting.expectOne('/api/health');
+    // Unauthenticated: no shell, no dashboard fetch.
+    httpTesting.expectNone('/api/dashboard');
   });
 
-  it('renders the brand title and checks backend health', () => {
+  it('hides the sidebar shell when unauthenticated', () => {
     const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
-    const req = httpTesting.expectOne('/api/health');
-    req.flush({ status: 'UP', service: 'spliteasy-backend', timestamp: '2026-01-01T00:00:00Z' });
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.topbar__brand')?.textContent).toContain('SplitEasy');
-    expect(compiled.querySelector('.topbar__status')?.textContent?.toLowerCase()).toContain('up');
+    expect(compiled.querySelector('.side')).toBeNull();
   });
 
-  it('shows login/register links when unauthenticated', () => {
+  it('shows the sidebar and loads the dashboard when authenticated', () => {
+    signIn();
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
-    httpTesting.expectOne('/api/health').flush({ status: 'UP', service: 's', timestamp: 't' });
+    // The shell effect pulls the dashboard payload for the sidebar group balances.
+    const req = httpTesting.expectOne('/api/dashboard');
+    req.flush({
+      totalNetCents: 0,
+      owedCents: 0,
+      owedPeopleCount: 0,
+      oweCents: 0,
+      owePeopleCount: 0,
+      groupCount: 0,
+      groups: [],
+      people: [],
+      settlements: [],
+      activity: [],
+    });
     fixture.detectChanges();
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Log in');
-    expect(text).toContain('Sign up');
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.side__brand')?.textContent).toContain('Evenly');
+    expect(compiled.querySelector('.side__user-name')?.textContent).toContain('Alex Rivera');
   });
 });
