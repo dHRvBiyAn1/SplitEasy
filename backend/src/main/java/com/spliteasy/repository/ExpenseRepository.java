@@ -4,6 +4,7 @@ import com.spliteasy.entity.Expense;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,6 +19,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             select e.id as id,
                    e.description as description,
                    e.amountCents as amountCents,
+                   e.category as category,
+                   e.spentOn as spentOn,
                    e.createdAt as createdAt,
                    payer.id as payerId,
                    payer.displayName as payerDisplayName,
@@ -26,9 +29,38 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             from Expense e
             join e.paidBy payer
             where e.group.id = :groupId
-            order by e.createdAt desc
+            order by e.spentOn desc, e.createdAt desc
             """)
     List<ExpenseSummaryView> findSummariesByGroupId(@Param("groupId") UUID groupId);
+
+    /** Total of every expense in a group, in cents (0 if none). Drives the "total spent" card. */
+    @Query("select coalesce(sum(e.amountCents), 0) from Expense e where e.group.id = :groupId")
+    long sumAmountByGroup(@Param("groupId") UUID groupId);
+
+    /**
+     * Recent expenses across a set of groups (the user's groups) for the activity feed, newest
+     * spent-date first, with payer + group name in one query. Caller passes a {@link Pageable}
+     * to cap the row count.
+     */
+    @Query("""
+            select e.id as id,
+                   g.id as groupId,
+                   g.name as groupName,
+                   e.description as description,
+                   e.amountCents as amountCents,
+                   e.category as category,
+                   e.spentOn as spentOn,
+                   e.createdAt as createdAt,
+                   payer.id as payerId,
+                   payer.displayName as payerDisplayName,
+                   payer.email as payerEmail
+            from Expense e
+            join e.paidBy payer
+            join e.group g
+            where g.id in :groupIds
+            order by e.spentOn desc, e.createdAt desc
+            """)
+    List<ActivityExpenseView> findRecentByGroupIds(@Param("groupIds") List<UUID> groupIds, Pageable pageable);
 
     /**
      * A single expense with payer, group, and all participant shares (with their users)
@@ -64,6 +96,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
         long getAmountCents();
 
+        com.spliteasy.entity.ExpenseCategory getCategory();
+
+        java.time.LocalDate getSpentOn();
+
         java.time.Instant getCreatedAt();
 
         UUID getPayerId();
@@ -73,5 +109,30 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
         String getPayerEmail();
 
         long getParticipantCount();
+    }
+
+    /** Projection backing {@link #findRecentByGroupIds(List, Pageable)}. */
+    interface ActivityExpenseView {
+        UUID getId();
+
+        UUID getGroupId();
+
+        String getGroupName();
+
+        String getDescription();
+
+        long getAmountCents();
+
+        com.spliteasy.entity.ExpenseCategory getCategory();
+
+        java.time.LocalDate getSpentOn();
+
+        java.time.Instant getCreatedAt();
+
+        UUID getPayerId();
+
+        String getPayerDisplayName();
+
+        String getPayerEmail();
     }
 }
