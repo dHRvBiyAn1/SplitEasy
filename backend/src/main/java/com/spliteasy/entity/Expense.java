@@ -12,6 +12,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,14 @@ public class Expense {
     @Column(name = "split_type", nullable = false)
     private SplitType splitType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ExpenseCategory category;
+
+    /** The date the money was actually spent (user-chosen); distinct from {@link #createdAt}. */
+    @Column(name = "spent_on", nullable = false)
+    private LocalDate spentOn;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -55,13 +64,22 @@ public class Expense {
         // JPA
     }
 
-    public Expense(Group group, String description, long amountCents, User paidBy, SplitType splitType) {
+    public Expense(
+            Group group, String description, long amountCents, User paidBy, SplitType splitType,
+            ExpenseCategory category, LocalDate spentOn) {
         this.group = group;
         this.description = description;
         this.amountCents = amountCents;
         this.paidBy = paidBy;
         this.splitType = splitType;
+        this.category = category;
+        this.spentOn = spentOn;
         this.createdAt = Instant.now();
+    }
+
+    /** Back-compat convenience: no category/date → {@link ExpenseCategory#OTHER} spent today. */
+    public Expense(Group group, String description, long amountCents, User paidBy, SplitType splitType) {
+        this(group, description, amountCents, paidBy, splitType, ExpenseCategory.OTHER, LocalDate.now());
     }
 
     /** Adds a participant share and keeps both sides of the relationship consistent. */
@@ -92,6 +110,14 @@ public class Expense {
         this.splitType = splitType;
     }
 
+    public void setCategory(ExpenseCategory category) {
+        this.category = category;
+    }
+
+    public void setSpentOn(LocalDate spentOn) {
+        this.spentOn = spentOn;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -114,6 +140,14 @@ public class Expense {
 
     public SplitType getSplitType() {
         return splitType;
+    }
+
+    public ExpenseCategory getCategory() {
+        return category;
+    }
+
+    public LocalDate getSpentOn() {
+        return spentOn;
     }
 
     public Instant getCreatedAt() {
