@@ -63,3 +63,36 @@
   --z-modal: 210;
   --z-toast: 300;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dark theme — follows the OS setting (prefers-color-scheme). Only the base
+// values are overridden; every derived token (--accent-soft, --pos-soft,
+// --neg-soft, etc.) references var(--surface)/var(--accent-base) and so
+// recomputes for dark automatically. Same lime accent; brighter balance
+// colors for contrast on near-black.
+// ─────────────────────────────────────────────────────────────────────────
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent-text: #c8f95e; // bright lime for links/accent text on dark
+
+    --bg: #0a0b0a;
+    --surface: #141613;
+    --surface2: #1c1f1b;
+    --surface3: #262a22;
+
+    --ink: #f2f4ee;
+    --ink2: #a6ab9d;
+    --ink3: #6f746a;
+
+    --line: #23261f;
+    --line2: #313528;
+
+    --pos: #5ad19a;
+    --neg: #ff5f8a;
+    --pos-strong: #63d89e; // bright enough for small text on near-black
+    --neg-strong: #ff6f95;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 34px rgba(0, 0, 0, 0.55);
+    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow);
+  }
+}
