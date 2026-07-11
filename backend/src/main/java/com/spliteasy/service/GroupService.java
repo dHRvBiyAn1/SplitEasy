@@ -6,6 +6,7 @@ import com.spliteasy.dto.GroupSummary;
 import com.spliteasy.dto.UserSummary;
 import com.spliteasy.entity.Group;
 import com.spliteasy.entity.GroupMembership;
+import com.spliteasy.entity.GroupType;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.NotFoundException;
@@ -41,7 +42,8 @@ public class GroupService {
     public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
         User creator = userRepository.findById(requesterId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
-        Group group = groupRepository.save(new Group(request.name().trim(), creator));
+        GroupType type = request.type() != null ? request.type() : GroupType.OTHER;
+        Group group = groupRepository.save(new Group(request.name().trim(), type, creator));
         membershipRepository.save(new GroupMembership(group, creator));
         // One code path for the DTO: toGroupResponse re-reads members (just the creator here).
         return toGroupResponse(group);
@@ -67,7 +69,7 @@ public class GroupService {
     @Transactional(readOnly = true)
     public List<GroupSummary> listMyGroups(UUID requesterId) {
         return membershipRepository.findGroupSummariesForUser(requesterId).stream()
-                .map(v -> new GroupSummary(v.getId(), v.getName(), v.getMemberCount()))
+                .map(v -> new GroupSummary(v.getId(), v.getName(), v.getType(), v.getMemberCount()))
                 .toList();
     }
 
@@ -89,6 +91,7 @@ public class GroupService {
         return new GroupResponse(
                 group.getId(),
                 group.getName(),
+                group.getType(),
                 UserSummary.from(group.getCreatedBy()),
                 members,
                 group.getCreatedAt());

@@ -2,6 +2,8 @@ package com.spliteasy.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -23,6 +25,10 @@ public class Group {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private GroupType type;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false, updatable = false)
     private User createdBy;
@@ -34,10 +40,16 @@ public class Group {
         // JPA
     }
 
-    public Group(String name, User createdBy) {
+    public Group(String name, GroupType type, User createdBy) {
         this.name = name;
+        this.type = type;
         this.createdBy = createdBy;
         this.createdAt = Instant.now();
+    }
+
+    /** Back-compat convenience: untyped group defaults to {@link GroupType#OTHER}. */
+    public Group(String name, User createdBy) {
+        this(name, GroupType.OTHER, createdBy);
     }
 
     public UUID getId() {
@@ -46,6 +58,10 @@ public class Group {
 
     public String getName() {
         return name;
+    }
+
+    public GroupType getType() {
+        return type;
     }
 
     public User getCreatedBy() {

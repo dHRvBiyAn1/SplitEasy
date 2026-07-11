@@ -7,6 +7,7 @@ import com.spliteasy.dto.SplitInput;
 import com.spliteasy.dto.SplitShare;
 import com.spliteasy.dto.UserSummary;
 import com.spliteasy.entity.Expense;
+import com.spliteasy.entity.ExpenseCategory;
 import com.spliteasy.entity.Group;
 import com.spliteasy.entity.SplitType;
 import com.spliteasy.entity.User;
@@ -16,9 +17,11 @@ import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.UserRepository;
+import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.service.split.Share;
 import com.spliteasy.service.split.SplitContext;
 import com.spliteasy.service.split.SplitStrategy;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -36,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
+    private final ExpenseParticipantRepository participantRepository;
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
@@ -45,12 +49,14 @@ public class ExpenseService {
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
+            ExpenseParticipantRepository participantRepository,
             GroupRepository groupRepository,
             GroupMembershipRepository membershipRepository,
             UserRepository userRepository,
             MembershipGuard membershipGuard,
             List<SplitStrategy> splitStrategies) {
         this.expenseRepository = expenseRepository;
+        this.participantRepository = participantRepository;
         this.groupRepository = groupRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
@@ -68,7 +74,8 @@ public class ExpenseService {
         ComputedSplit split = computeSplit(groupId, request);
         Expense expense = new Expense(
                 group, request.description().trim(), request.amountCents(),
-                split.usersById().get(split.payerId()), split.splitType());
+                split.usersById().get(split.payerId()), split.splitType(),
+                categoryOf(request), spentOnOf(request));
         addShares(expense, split);
         expenseRepository.save(expense);
         return toResponse(expense);
@@ -90,6 +97,8 @@ public class ExpenseService {
         expense.setAmountCents(request.amountCents());
         expense.setPaidBy(split.usersById().get(split.payerId()));
         expense.setSplitType(split.splitType());
+        expense.setCategory(categoryOf(request));
+        expense.setSpentOn(spentOnOf(request));
         // Flush the orphan-removal deletes before re-inserting, or the new rows collide with the
         // old ones on the (expense_id, user_id) unique constraint within one flush.
         expense.clearParticipants();
@@ -135,6 +144,14 @@ public class ExpenseService {
         return new ComputedSplit(splitType, payerId, shares, usersById);
     }
 
+    private ExpenseCategory categoryOf(CreateExpenseRequest request) {
+        return request.category() != null ? request.category() : ExpenseCategory.OTHER;
+    }
+
+    private LocalDate spentOnOf(CreateExpenseRequest request) {
+        return request.spentOn() != null ? request.spentOn() : LocalDate.now();
+    }
+
     private void addShares(Expense expense, ComputedSplit split) {
         for (Share share : split.shares()) {
             expense.addParticipant(split.usersById().get(share.userId()), share.shareCents());
@@ -161,6 +178,13 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<ExpenseSummary> listExpenses(UUID requesterId, UUID groupId) {
         membershipGuard.requireMember(groupId, requesterId);
+        // The requester's own share of each expense in the group — drives the "you lent / you
+        // borrowed" delta without an N+1 (one query for the whole group).
+        Map<UUID, Long> myShare = participantRepository
+                .findSharesByUserAndGroups(requesterId, List.of(groupId)).stream()
+                .collect(Collectors.toMap(
+                        ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
+                        ExpenseParticipantRepository.ExpenseShareView::getShareCents));
         return expenseRepository.findSummariesByGroupId(groupId).stream()
                 .map(v -> new ExpenseSummary(
                         v.getId(),
@@ -168,8 +192,21 @@ public class ExpenseService {
                         v.getAmountCents(),
                         new UserSummary(v.getPayerId(), v.getPayerEmail(), v.getPayerDisplayName()),
                         v.getParticipantCount(),
+                        v.getCategory(),
+                        v.getSpentOn(),
+                        viewerDelta(requesterId, v.getPayerId(), v.getAmountCents(), myShare.getOrDefault(v.getId(), 0L)),
                         v.getCreatedAt()))
                 .toList();
+    }
+
+    /**
+     * The requesting member's net for one expense: positive = they lent (paid more than their
+     * share), negative = they borrowed (their share), 0 = not involved. Shared by the group
+     * expense list and the dashboard activity feed so both read the same everywhere.
+     */
+    static long viewerDelta(UUID viewerId, UUID payerId, long amountCents, long viewerShareCents) {
+        long paid = viewerId.equals(payerId) ? amountCents : 0L;
+        return paid - viewerShareCents;
     }
 
     @Transactional(readOnly = true)
@@ -215,6 +252,8 @@ public class ExpenseService {
                 expense.getDescription(),
                 expense.getAmountCents(),
                 expense.getSplitType(),
+                expense.getCategory(),
+                expense.getSpentOn(),
                 UserSummary.from(expense.getPaidBy()),
                 shares,
                 expense.getCreatedAt());
