@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../core/auth/auth.service';
+import { avatarTint } from '../core/avatar';
 import { UserSummary } from '../core/auth/auth.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
@@ -98,6 +99,11 @@ export class NewExpenseModalComponent {
 
   initials(name: string): string {
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+  }
+
+  /** Per-person avatar color (background + text) — never the lime accent. */
+  tint(id: string): { background: string; color: string } {
+    return avatarTint(id);
   }
 
   toggle(id: string): void {

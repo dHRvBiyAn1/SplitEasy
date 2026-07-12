@@ -170,7 +170,7 @@
           <ul class="people">
             @for (p of d.people; track p.user.id) {
               <li class="people__row">
-                <span class="dc-avatar people__av" aria-hidden="true">{{ initials(p.user.displayName) }}</span>
+                <span class="dc-avatar people__av" aria-hidden="true" [style]="tint(p.user.id)">{{ initials(p.user.displayName) }}</span>
                 <span class="people__text">
                   <span class="people__name">{{ p.user.displayName }}</span>
                   <span class="people__sub">{{ p.netCents > 0 ? 'owes you' : 'you owe' }}</span>

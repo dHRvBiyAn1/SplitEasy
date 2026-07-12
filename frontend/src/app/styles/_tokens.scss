@@ -74,29 +74,29 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --accent-text: #c8f95e; // bright lime for links/accent text on dark
+    --on-accent: #0c1006;
 
-    // Neutral near-black grays — NO green tint (each channel equal), so cards/
-    // panels read as clean dark surfaces and the lime accent stays the only green.
-    --bg: #0a0a0a;
-    --surface: #151515;
-    --surface2: #1d1d1d;
-    --surface3: #272727;
+    // Exact dark palette (per design spec) — cool near-black grays.
+    --bg: #08090b;
+    --surface: #131417;
+    --surface2: #191a1e;
+    --surface3: #24262b;
 
-    --ink: #f4f4f4;
-    --ink2: #a6a6a6;
-    --ink3: #6e6e6e;
+    --ink: #f3f4f0;
+    --ink2: #9b9ea4;
+    --ink3: #63666c;
 
-    --line: #262626;
-    --line2: #363636;
+    --line: #202226;
+    --line2: #2e3037;
 
-    // Subtler accent fill for selected chips/avatars on dark (less olive).
+    // Subtler accent fill for selected chips on dark.
     --accent-soft: color-mix(in oklab, var(--accent-base) 16%, var(--surface));
 
-    // Balance colors — clean mint (owed) / rose (owe), bright enough on near-black.
-    --pos: #5fe0a4;
-    --neg: #ff6183;
-    --pos-strong: #5fe0a4;
-    --neg-strong: #ff6183;
+    // Balance signals (dark): mint (owed) / rose (owe).
+    --pos: #37dda8;
+    --neg: #ff5c88;
+    --pos-strong: #37dda8;
+    --neg-strong: #ff5c88;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 34px rgba(0, 0, 0, 0.6);
     --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow);

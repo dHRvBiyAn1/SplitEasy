@@ -9,6 +9,7 @@ import { centsToDisplay } from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
 import { ExpenseSummary } from '../expenses/expense.models';
 import { ModalService } from '../modals/modal.service';
+import { avatarTint } from '../core/avatar';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 
@@ -137,6 +138,10 @@ export class GroupDetailComponent implements OnInit {
 
   initials(name: string): string {
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+  }
+
+  tint(id: string): { background: string; color: string } {
+    return avatarTint(id);
   }
 
   pillLabel(b: PersonBalance): string {

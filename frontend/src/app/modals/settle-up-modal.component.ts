@@ -4,6 +4,7 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
 import { centsToDisplay } from '../expenses/expense.service';
 import { PaymentService } from '../payments/payment.service';
+import { avatarTint } from '../core/avatar';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
 
@@ -24,6 +25,14 @@ export class SettleUpModalComponent {
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+  }
+
+  tint(id: string): { background: string; color: string } {
+    return avatarTint(id);
+  }
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: Settlement): string {

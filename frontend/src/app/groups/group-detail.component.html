@@ -40,7 +40,7 @@
       </span>
       @for (b of myBalances(); track b.user.id) {
         <span class="pill">
-          <span class="dc-avatar pill__av" aria-hidden="true">{{ initials(b.user.displayName) }}</span>
+          <span class="dc-avatar pill__av" aria-hidden="true" [style]="tint(b.user.id)">{{ initials(b.user.displayName) }}</span>
           {{ pillLabel(b) }}
           <strong class="dc-amount" [class.dc-amount--owed]="b.netCents > 0" [class.dc-amount--owes]="b.netCents < 0">
             ${{ display(b.netCents < 0 ? -b.netCents : b.netCents) }}

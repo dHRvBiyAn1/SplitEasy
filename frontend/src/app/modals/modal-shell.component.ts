@@ -11,6 +11,8 @@ import { Component, HostListener, input, output } from '@angular/core';
 })
 export class ModalShellComponent {
   readonly heading = input.required<string>();
+  /** Panel max width in px (per design spec: expense 600 / group 520 / settle 460). */
+  readonly maxWidth = input<number>(520);
   readonly closed = output<void>();
 
   @HostListener('document:keydown.escape')
