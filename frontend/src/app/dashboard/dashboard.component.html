@@ -5,9 +5,12 @@
       <h1 class="dash__title">{{ greeting() }}, {{ firstNameOf() }}.</h1>
     </div>
     <div class="dash__actions">
-      <a class="dc-btn-outline" routerLink="/groups">
-        <span aria-hidden="true">+</span> New group
-      </a>
+      <button type="button" class="dc-btn-outline" (click)="modal.openSettle()">
+        <span aria-hidden="true">⇄</span> Settle up
+      </button>
+      <button type="button" class="dc-btn-accent" (click)="modal.openExpense()">
+        <span aria-hidden="true">+</span> Add expense
+      </button>
     </div>
   </header>
 
@@ -49,7 +52,7 @@
     <section class="dash__section">
       <div class="dash__section-head">
         <h2 class="dash__h2">Your groups</h2>
-        <a class="dash__more" routerLink="/groups"><span aria-hidden="true">+</span> New group</a>
+        <button type="button" class="dash__more dash__more-btn" (click)="modal.openGroup()"><span aria-hidden="true">+</span> New group</button>
       </div>
 
       @if (d.groups.length === 0) {

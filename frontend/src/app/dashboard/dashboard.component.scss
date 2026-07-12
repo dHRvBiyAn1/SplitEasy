@@ -116,6 +116,13 @@
   color: var(--accent-text);
 }
 
+.dash__more-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
 .dash__empty {
   margin: 0;
   color: var(--ink2);

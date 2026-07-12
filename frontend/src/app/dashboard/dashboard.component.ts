@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { UserSummary } from '../core/auth/auth.models';
 import { centsToDisplay } from '../expenses/expense.service';
+import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
 
@@ -27,6 +28,7 @@ const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
 export class DashboardComponent {
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
+  protected readonly modal = inject(ModalService);
 
   protected readonly data = this.dashboard.data;
   protected readonly loading = this.dashboard.loading;

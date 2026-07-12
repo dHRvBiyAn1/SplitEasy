@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
+import { GroupType } from '../dashboard/dashboard.models';
 import { GroupResponse, GroupSummary } from './group.models';
 
 /** One service per backend resource (AGENTS.md); all calls go through ApiService. */
@@ -16,8 +17,8 @@ export class GroupService {
     return this.api.get<GroupResponse>(`/groups/${id}`);
   }
 
-  createGroup(name: string): Observable<GroupResponse> {
-    return this.api.post<GroupResponse>('/groups', { name });
+  createGroup(name: string, type?: GroupType): Observable<GroupResponse> {
+    return this.api.post<GroupResponse>('/groups', { name, type });
   }
 
   addMember(groupId: string, email: string): Observable<GroupResponse> {

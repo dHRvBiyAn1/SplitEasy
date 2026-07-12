@@ -4,10 +4,12 @@ import { filter } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { centsToDisplay } from './expenses/expense.service';
+import { ModalsComponent } from './modals/modals.component';
+import { ModalService } from './modals/modal.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ModalsComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -16,6 +18,7 @@ export class App implements OnInit {
 
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
+  protected readonly modal = inject(ModalService);
   private readonly router = inject(Router);
 
   protected readonly user = this.auth.user;
