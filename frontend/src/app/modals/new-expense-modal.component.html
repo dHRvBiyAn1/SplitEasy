@@ -1,4 +1,4 @@
-<app-modal-shell heading="New expense" [maxWidth]="600" (closed)="close()">
+<app-modal-shell [heading]="heading()" [maxWidth]="600" (closed)="close()">
   <form class="mform" (submit)="$event.preventDefault(); save()">
     <div class="mform__field">
       <span class="dc-field-label">Group</span>

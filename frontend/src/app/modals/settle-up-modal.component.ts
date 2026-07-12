@@ -21,7 +21,12 @@ export class SettleUpModalComponent {
   private readonly modal = inject(ModalService);
 
   protected readonly display = centsToDisplay;
-  protected readonly settlements = () => this.dashboard.data()?.settlements ?? [];
+  /** All settlements, or just this group's when opened from a group's detail page. */
+  protected readonly settlements = () => {
+    const all = this.dashboard.data()?.settlements ?? [];
+    const gid = this.modal.settleGroupId();
+    return gid ? all.filter((s) => s.groupId === gid) : all;
+  };
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);

@@ -47,6 +47,9 @@
           </strong>
         </span>
       }
+      <button type="button" class="pill pill--add" (click)="addMember()">
+        <span aria-hidden="true">+</span> Add member
+      </button>
     </div>
 
     @if (expenses().length === 0) {
@@ -57,28 +60,56 @@
           <h2 class="gd__month-title">{{ m.label }}</h2>
           <ul class="xlist">
             @for (e of m.items; track e.id) {
-              <li class="xrow">
-                <span class="xrow__date" aria-hidden="true">
-                  <span class="xrow__mon">{{ dayMon(e.spentOn) }}</span>
-                  <span class="xrow__day">{{ dayNum(e.spentOn) }}</span>
-                </span>
-                <span class="xrow__ico" aria-hidden="true">{{ categoryGlyph(e.category) }}</span>
-                <span class="xrow__text">
-                  <span class="xrow__title">{{ e.description }}</span>
-                  <span class="xrow__sub">{{ paidSub(e) }}</span>
-                </span>
-                <span class="xrow__right">
-                  <span class="xrow__delta-label">{{ deltaLabel(e) }}</span>
-                  @if (e.viewerDeltaCents === 0) {
-                    <span class="xrow__amt">$0.00</span>
-                  } @else {
-                    <span
-                      class="xrow__amt dc-amount"
-                      [class.dc-amount--owed]="e.viewerDeltaCents > 0"
-                      [class.dc-amount--owes]="e.viewerDeltaCents < 0"
-                    >${{ display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents) }}</span>
-                  }
-                </span>
+              <li class="xitem" [class.xitem--open]="expandedId() === e.id">
+                <button type="button" class="xrow" (click)="toggleExpand(e)" [attr.aria-expanded]="expandedId() === e.id">
+                  <span class="xrow__date" aria-hidden="true">
+                    <span class="xrow__mon">{{ dayMon(e.spentOn) }}</span>
+                    <span class="xrow__day">{{ dayNum(e.spentOn) }}</span>
+                  </span>
+                  <span class="xrow__ico" aria-hidden="true">{{ categoryGlyph(e.category) }}</span>
+                  <span class="xrow__text">
+                    <span class="xrow__title">{{ e.description }}</span>
+                    <span class="xrow__sub">{{ paidSub(e) }}</span>
+                  </span>
+                  <span class="xrow__right">
+                    <span class="xrow__delta-label">{{ deltaLabel(e) }}</span>
+                    @if (e.viewerDeltaCents === 0) {
+                      <span class="xrow__amt">$0.00</span>
+                    } @else {
+                      <span
+                        class="xrow__amt dc-amount"
+                        [class.dc-amount--owed]="e.viewerDeltaCents > 0"
+                        [class.dc-amount--owes]="e.viewerDeltaCents < 0"
+                      >${{ display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents) }}</span>
+                    }
+                  </span>
+                </button>
+
+                @if (expandedId() === e.id) {
+                  <div class="xdetail">
+                    @if (detailLoading()) {
+                      <div class="dc-loading" role="status" aria-label="Loading details"></div>
+                    } @else if (detail(); as d) {
+                      <div class="xdetail__line xdetail__line--paid">
+                        <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>
+                        <span class="xdetail__amt">${{ display(d.amountCents) }}</span>
+                      </div>
+                      @for (p of d.participants; track p.user.id) {
+                        <div class="xdetail__line">
+                          <span class="dc-avatar xdetail__av" aria-hidden="true" [style]="tint(p.user.id)">{{ initials(p.user.displayName) }}</span>
+                          <span class="xdetail__who">{{ partLabel(p) }}</span>
+                          <span class="xdetail__amt">${{ display(p.shareCents) }}</span>
+                        </div>
+                      }
+                      <div class="xdetail__actions">
+                        <button type="button" class="dc-btn-outline" (click)="editExpense(e)">Edit</button>
+                        <button type="button" class="xdetail__del" (click)="deleteExpense(e)" [disabled]="deletingId() === e.id">
+                          <span aria-hidden="true">🗑</span> Delete expense
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
               </li>
             }
           </ul>

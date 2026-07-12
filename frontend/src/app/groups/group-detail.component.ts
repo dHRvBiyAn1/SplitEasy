@@ -7,7 +7,7 @@ import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { centsToDisplay } from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { ExpenseSummary } from '../expenses/expense.models';
+import { ExpenseResponse, ExpenseSummary, SplitShare } from '../expenses/expense.models';
 import { ModalService } from '../modals/modal.service';
 import { avatarTint } from '../core/avatar';
 import { GroupService } from './group.service';
@@ -51,6 +51,12 @@ export class GroupDetailComponent implements OnInit {
   protected readonly group = signal<GroupResponse | null>(null);
   protected readonly myBalances = signal<PersonBalance[]>([]);
   protected readonly expenses = signal<ExpenseSummary[]>([]);
+
+  /** The expense whose detail row is expanded, plus its fetched full breakdown. */
+  protected readonly expandedId = signal<string | null>(null);
+  protected readonly detail = signal<ExpenseResponse | null>(null);
+  protected readonly detailLoading = signal(false);
+  protected readonly deletingId = signal<string | null>(null);
 
   private groupId = '';
 
@@ -108,7 +114,58 @@ export class GroupDetailComponent implements OnInit {
   }
 
   settleUp(): void {
-    this.modal.openSettle();
+    this.modal.openSettle(undefined, this.groupId);
+  }
+
+  addMember(): void {
+    this.modal.openAddMember(this.groupId);
+  }
+
+  /** Expand a row to show its split, or collapse it if it's already open. */
+  toggleExpand(e: ExpenseSummary): void {
+    if (this.expandedId() === e.id) {
+      this.expandedId.set(null);
+      this.detail.set(null);
+      return;
+    }
+    this.expandedId.set(e.id);
+    this.detail.set(null);
+    this.detailLoading.set(true);
+    this.expensesApi.getExpense(this.groupId, e.id).subscribe({
+      next: (d) => {
+        this.detail.set(d);
+        this.detailLoading.set(false);
+      },
+      error: () => this.detailLoading.set(false),
+    });
+  }
+
+  editExpense(e: ExpenseSummary): void {
+    this.modal.openExpense(this.groupId, e.id);
+  }
+
+  deleteExpense(e: ExpenseSummary): void {
+    if (this.deletingId()) {
+      return;
+    }
+    if (!confirm(`Delete "${e.description}"? This can't be undone.`)) {
+      return;
+    }
+    this.deletingId.set(e.id);
+    this.expensesApi.deleteExpense(this.groupId, e.id).subscribe({
+      next: () => {
+        this.expandedId.set(null);
+        this.detail.set(null);
+        this.deletingId.set(null);
+        this.dashboard.refresh(); // effect() re-pulls this group's expenses + balances
+      },
+      error: () => this.deletingId.set(null),
+    });
+  }
+
+  /** Detail-row label: "You owe" / "Priya owes" for each participant's share. */
+  partLabel(p: SplitShare): string {
+    return p.user.id === this.meId() ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
   }
 
   meId(): string {

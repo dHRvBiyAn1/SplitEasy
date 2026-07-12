@@ -218,7 +218,12 @@
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--ink2);
+
+  // Only the neutral (not-involved) amount is muted; the semantic red/green from
+  // .dc-amount--owed/--owes must win over this component-scoped rule.
+  &:not(.dc-amount) {
+    color: var(--ink2);
+  }
 }
 
 @media (max-width: 640px) {
@@ -236,5 +241,113 @@
 
   .gd__name {
     font-size: 27px;
+  }
+}
+
+// ── Add-member pill ──────────────────────────────────────────────────────────
+.pill--add {
+  cursor: pointer;
+  color: var(--accent-text);
+  border-style: dashed;
+  border-color: var(--line2);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+
+  &:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+}
+
+// ── Expandable expense rows (click to reveal the split) ──────────────────────
+.xitem {
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.xrow {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--surface2);
+  }
+}
+
+.xitem--open > .xrow {
+  background: var(--surface2);
+}
+
+.xdetail {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px 16px 16px;
+  background: var(--surface2);
+}
+
+.xdetail__line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+
+.xdetail__line--paid {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.xdetail__av {
+  width: 26px;
+  height: 26px;
+  font-size: 9px;
+}
+
+.xdetail__who {
+  flex: 1;
+  min-width: 0;
+}
+
+.xdetail__amt {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.xdetail__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.xdetail__del {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--neg);
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 }
