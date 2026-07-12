@@ -228,6 +228,20 @@ line here so it's not relitigated next time.)*
   **The token system (`_tokens.scss` + `_ui.scss`) and the `.dc-amount` money-amount
   convention are the standing conventions: any new screen reuses them — do not
   reintroduce Material components or hardcode colors, spacing, or the owed/owing logic.**
+- **Dashboard redesign (dark shell)**: the app is a **sidebar shell** (`App`) + a
+  **dashboard landing page** driven by one `GET /api/dashboard` call cached in
+  `DashboardService` (a signal shared by the sidebar and the page — call
+  `dashboard.refresh()` after any mutation). **Dark theme follows the OS**
+  (`prefers-color-scheme` override in `_tokens.scss` — no manual toggle; `body`
+  uses `color-scheme: light dark`). **Global modals** (`app/modals/`): a `ModalService`
+  signal drives which of New group / New expense / Settle up is open; `ModalsComponent`
+  (mounted once in the shell) renders the active one over a shared `ModalShellComponent`
+  (backdrop + Esc). Any modal `<form>` uses `(submit)="$event.preventDefault(); save()"`
+  — **not** `(ngSubmit)` — because the modals use bare `[formControl]`s without a
+  `formGroup`/`NgForm` directive, so a submit button would otherwise trigger a native
+  page reload. Group detail is a header + pairwise balance pills (`GET
+  /groups/{id}/balances/mine`) + month-grouped expense list (category icon, date chip,
+  per-viewer `you lent`/`you borrowed`). The old inline `*-panel` components were removed.
 
 ## Data Model (evolving)
 

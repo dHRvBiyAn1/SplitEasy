@@ -9,7 +9,10 @@ const TOKEN_KEY = 'spliteasy.accessToken';
 
 function signIn(): void {
   localStorage.setItem(TOKEN_KEY, 'test-token');
-  localStorage.setItem(USER_KEY, JSON.stringify({ id: 'u1', email: 'a@b.com', displayName: 'Alex Rivera' }));
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify({ id: 'u1', email: 'a@b.com', displayName: 'Alex Rivera' }),
+  );
 }
 
 describe('App', () => {

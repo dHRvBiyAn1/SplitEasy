@@ -1,57 +1,96 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { AuthService } from '../core/auth/auth.service';
+import { UserSummary } from '../core/auth/auth.models';
+import { BalanceService } from '../balances/balance.service';
+import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
+import { DashboardService } from '../dashboard/dashboard.service';
+import { centsToDisplay } from '../expenses/expense.service';
+import { ExpenseService } from '../expenses/expense.service';
+import { ExpenseSummary } from '../expenses/expense.models';
+import { ModalService } from '../modals/modal.service';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
-import { ExpensePanelComponent } from '../expenses/expense-panel.component';
-import { BalancePanelComponent } from '../balances/balance-panel.component';
-import { SettleUpPanelComponent } from '../payments/settle-up-panel.component';
-import { SettlePrefill } from '../payments/payment.models';
-import { SimplifyDebtsPanelComponent } from '../debts/simplify-debts-panel.component';
+
+const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
+  FOOD_DRINK: '☕',
+  GROCERIES: '🧺',
+  RENT_HOME: '⌂',
+  UTILITIES: '⚡',
+  TRAVEL: '✈',
+  TRANSPORT: '🚕',
+  FUN: '✦',
+  OTHER: '◆',
+};
+
+interface MonthGroup {
+  label: string;
+  items: ExpenseSummary[];
+}
 
 @Component({
   selector: 'app-group-detail',
-  imports: [
-    ReactiveFormsModule,
-    RouterLink,
-    ExpensePanelComponent,
-    BalancePanelComponent,
-    SimplifyDebtsPanelComponent,
-    SettleUpPanelComponent,
-  ],
+  imports: [RouterLink],
   templateUrl: './group-detail.component.html',
-  styleUrl: './groups.scss',
+  styleUrl: './group-detail.component.scss',
 })
 export class GroupDetailComponent implements OnInit {
-  private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly groups = inject(GroupService);
+  private readonly balances = inject(BalanceService);
+  private readonly expensesApi = inject(ExpenseService);
+  private readonly auth = inject(AuthService);
+  private readonly dashboard = inject(DashboardService);
+  protected readonly modal = inject(ModalService);
+
+  protected readonly display = centsToDisplay;
 
   protected readonly loading = signal(true);
-  protected readonly adding = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
-  /** Bumped whenever an expense or payment changes, to trigger a balances reload. */
-  protected readonly balanceRefresh = signal(0);
-  /** Set when a balance row's "Settle up" is clicked; prefills the settle-up form. */
-  protected readonly settlePrefill = signal<SettlePrefill | null>(null);
-
-  protected readonly form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
-  });
+  protected readonly myBalances = signal<PersonBalance[]>([]);
+  protected readonly expenses = signal<ExpenseSummary[]>([]);
 
   private groupId = '';
 
-  ngOnInit(): void {
-    this.groupId = this.route.snapshot.paramMap.get('id') ?? '';
-    this.load();
+  /** My net in this group = sum of the pairwise nets (positive = I'm owed overall). */
+  protected readonly myNet = computed(() => this.myBalances().reduce((s, b) => s + b.netCents, 0));
+
+  /** Expenses grouped by "MONTH YEAR", newest month first (list already sorted desc). */
+  protected readonly months = computed<MonthGroup[]>(() => {
+    const out: MonthGroup[] = [];
+    for (const e of this.expenses()) {
+      const label = this.monthLabel(e.spentOn);
+      const last = out[out.length - 1];
+      if (last && last.label === label) {
+        last.items.push(e);
+      } else {
+        out.push({ label, items: [e] });
+      }
+    }
+    return out;
+  });
+
+  constructor() {
+    // Reload group-scoped data whenever the shared dashboard payload changes
+    // (a modal action calls dashboard.refresh(), so this stays in sync).
+    effect(() => {
+      this.dashboard.data();
+      if (this.groupId) {
+        this.reload();
+      }
+    });
   }
 
-  private load(): void {
-    this.loading.set(true);
+  ngOnInit(): void {
+    this.groupId = this.route.snapshot.paramMap.get('id') ?? '';
+    this.reload();
+  }
+
+  private reload(): void {
     this.groups.getGroup(this.groupId).subscribe({
-      next: (group) => {
-        this.group.set(group);
+      next: (g) => {
+        this.group.set(g);
         this.loading.set(false);
       },
       error: (err) => {
@@ -59,42 +98,76 @@ export class GroupDetailComponent implements OnInit {
         this.loading.set(false);
       },
     });
+    this.balances.getMyBalances(this.groupId).subscribe({ next: (b) => this.myBalances.set(b) });
+    this.expensesApi.listExpenses(this.groupId).subscribe({ next: (e) => this.expenses.set(e) });
   }
 
-  addMember(): void {
-    if (this.form.invalid || this.adding()) {
-      return;
+  addExpense(): void {
+    this.modal.openExpense(this.groupId);
+  }
+
+  settleUp(): void {
+    this.modal.openSettle();
+  }
+
+  meId(): string {
+    return this.auth.user()?.id ?? '';
+  }
+
+  firstName(u: UserSummary): string {
+    return u.id === this.meId() ? 'You' : u.displayName.split(/\s+/)[0];
+  }
+
+  memberNames(g: GroupResponse): string {
+    return g.members.map((m) => this.firstName(m)).join(', ');
+  }
+
+  typeLabel(g: GroupResponse): string {
+    const t = (g as unknown as { type?: string }).type ?? 'OTHER';
+    return t.charAt(0) + t.slice(1).toLowerCase();
+  }
+
+  glyphHue(name: string): number {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) {
+      h = (h * 31 + name.charCodeAt(i)) % 360;
     }
-    this.adding.set(true);
-    this.error.set(null);
-    this.groups.addMember(this.groupId, this.form.getRawValue().email).subscribe({
-      next: (group) => {
-        this.group.set(group);
-        this.form.reset();
-        this.adding.set(false);
-      },
-      error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not add that member.');
-        this.adding.set(false);
-      },
-    });
+    return h;
   }
 
-  refreshBalances(): void {
-    this.balanceRefresh.update((n) => n + 1);
-  }
-
-  onSettleWith(prefill: SettlePrefill): void {
-    this.settlePrefill.set(prefill);
-  }
-
-  /** Up to two initials for a member avatar, e.g. "Ada Lovelace" → "AL". */
   initials(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0]?.toUpperCase() ?? '')
-      .join('');
+    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+  }
+
+  pillLabel(b: PersonBalance): string {
+    const name = b.user.displayName.split(/\s+/)[0];
+    return b.netCents > 0 ? `${name} owes you` : `you owe ${name}`;
+  }
+
+  categoryGlyph(c: ExpenseCategory): string {
+    return CATEGORY_GLYPH[c] ?? '◆';
+  }
+
+  paidSub(e: ExpenseSummary): string {
+    const who = e.paidBy.id === this.meId() ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
+    return `${who} paid $${this.display(e.amountCents)}`;
+  }
+
+  deltaLabel(e: ExpenseSummary): string {
+    if (e.viewerDeltaCents > 0) return 'you lent';
+    if (e.viewerDeltaCents < 0) return 'you borrowed';
+    return 'not involved';
+  }
+
+  private monthLabel(iso: string): string {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+  }
+
+  dayNum(iso: string): string {
+    return String(new Date(iso + 'T00:00:00').getDate());
+  }
+
+  dayMon(iso: string): string {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
   }
 }
