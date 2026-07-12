@@ -1,0 +1,84 @@
+<app-modal-shell heading="New expense" (closed)="close()">
+  <form class="mform" (submit)="$event.preventDefault(); save()">
+    <div class="mform__field">
+      <span class="dc-field-label">Group</span>
+      <div class="chips">
+        @for (g of groupOptions(); track g.id) {
+          <button type="button" class="chip" [class.chip--on]="groupId() === g.id" (click)="selectGroup(g.id)">
+            {{ g.name }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="mform__field">
+      <label class="dc-field-label" for="ne-desc">Description</label>
+      <input id="ne-desc" class="dc-field" [formControl]="description" placeholder="What was it for?" autocomplete="off" />
+    </div>
+
+    <div class="mform__grid2">
+      <div class="mform__field">
+        <label class="dc-field-label" for="ne-amt">Amount</label>
+        <input id="ne-amt" class="dc-field" type="number" step="0.01" min="0.01" inputmode="decimal" [formControl]="amount" (input)="tick.update((n) => n + 1)" placeholder="0.00" />
+      </div>
+      <div class="mform__field">
+        <label class="dc-field-label" for="ne-date">Date</label>
+        <input id="ne-date" class="dc-field" type="date" [formControl]="date" />
+      </div>
+    </div>
+
+    <div class="mform__field">
+      <span class="dc-field-label">Category</span>
+      <div class="chips">
+        @for (c of categories; track c.value) {
+          <button type="button" class="chip" [class.chip--on]="category() === c.value" (click)="category.set(c.value)">
+            <span class="chip__ico" aria-hidden="true">{{ c.ico }}</span> {{ c.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="mform__field">
+      <span class="dc-field-label">Paid by</span>
+      <div class="chips">
+        @for (m of members(); track m.id) {
+          <button type="button" class="chip" [class.chip--on]="paidBy() === m.id" (click)="paidBy.set(m.id)">
+            <span class="dc-avatar chip__av" aria-hidden="true">{{ initials(m.displayName) }}</span> {{ firstName(m) }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="mform__field">
+      <span class="dc-field-label">Split</span>
+      <div class="seg" role="group" aria-label="Split type">
+        <button type="button" [attr.aria-pressed]="splitType() === 'EQUAL'" (click)="splitType.set('EQUAL')">Equally</button>
+        <button type="button" [attr.aria-pressed]="splitType() === 'UNEQUAL'" (click)="splitType.set('UNEQUAL')">Unequal</button>
+        <button type="button" [attr.aria-pressed]="splitType() === 'PERCENTAGE'" (click)="splitType.set('PERCENTAGE')">Percent</button>
+      </div>
+
+      <div class="prows">
+        @for (m of members(); track m.id) {
+          <div class="prow">
+            <span class="dc-avatar chip__av" aria-hidden="true" style="width:30px;height:30px;font-size:10px">{{ initials(m.displayName) }}</span>
+            <span class="prow__name">{{ firstName(m) }}</span>
+            @if (splitType() === 'EQUAL') {
+              <input type="checkbox" class="prow__check" [checked]="included().has(m.id)" (change)="toggle(m.id)" [attr.aria-label]="'Include ' + m.displayName" />
+            } @else {
+              <input class="prow__val" type="number" step="0.01" min="0" inputmode="decimal" [value]="values()[m.id] || ''" (input)="setValue(m.id, $any($event.target).value)" [placeholder]="splitType() === 'PERCENTAGE' ? '%' : '$'" />
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
+
+    @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
+
+    <div class="mform__actions">
+      <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
+      <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>
+    </div>
+  </form>
+</app-modal-shell>

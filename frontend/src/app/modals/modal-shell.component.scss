@@ -1,0 +1,62 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+
+.mdl-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.mdl-panel {
+  position: relative;
+  z-index: var(--z-modal);
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  box-shadow: var(--shadow);
+  animation: dc-pop 0.14s ease;
+}
+
+.mdl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 22px 0;
+}
+
+.mdl-title {
+  margin: 0;
+  font-size: 26px;
+}
+
+.mdl-close {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ink);
+    border-color: var(--ink3);
+  }
+}
+
+.mdl-body {
+  padding: 18px 22px 22px;
+}

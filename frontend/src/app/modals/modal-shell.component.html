@@ -1,0 +1,11 @@
+<div class="mdl-backdrop" (click)="closed.emit()">
+  <div class="mdl-panel" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <div class="mdl-head">
+      <h2 class="mdl-title">{{ heading() }}</h2>
+      <button class="mdl-close" type="button" aria-label="Close" (click)="closed.emit()">✕</button>
+    </div>
+    <div class="mdl-body">
+      <ng-content />
+    </div>
+  </div>
+</div>

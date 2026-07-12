@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
+import { PersonBalance } from '../dashboard/dashboard.models';
 import { centsToDisplay } from '../expenses/expense.service';
 import { GroupBalancesResponse } from './balance.models';
 
@@ -10,6 +11,11 @@ export class BalanceService {
 
   getBalances(groupId: string): Observable<GroupBalancesResponse> {
     return this.api.get<GroupBalancesResponse>(`/groups/${groupId}/balances`);
+  }
+
+  /** Pairwise "who owes whom, to me" for the group (positive = they owe you). */
+  getMyBalances(groupId: string): Observable<PersonBalance[]> {
+    return this.api.get<PersonBalance[]>(`/groups/${groupId}/balances/mine`);
   }
 }
 
