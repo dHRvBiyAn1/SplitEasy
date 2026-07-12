@@ -17,7 +17,7 @@
   padding: 22px 16px;
   background: var(--bg);
   border-right: 1px solid var(--line);
-  overflow-y: auto;
+  overflow: hidden; // only the group list scrolls; brand + footer stay pinned
 }
 
 .side__brand {
@@ -128,6 +128,8 @@
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto; // scrolls independently so the footer below stays pinned
 }
 
 .side__group {
@@ -179,6 +181,7 @@
 }
 
 .side__foot {
+  flex-shrink: 0; // always pinned to the bottom of the sidebar
   display: flex;
   flex-direction: column;
   gap: 10px;

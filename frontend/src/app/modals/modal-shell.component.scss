@@ -9,11 +9,11 @@
   inset: 0;
   z-index: var(--z-modal-backdrop);
   display: flex;
-  align-items: flex-start;
+  align-items: center; // centered vertically…
   justify-content: center;
-  padding: 48px 16px;
+  padding: 24px 16px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.62);
+  background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(2px);
 }
 
@@ -22,6 +22,12 @@
   z-index: var(--z-modal);
   width: 100%;
   max-width: 480px;
+  // …but if the panel is taller than the viewport, auto margins let it scroll
+  // within the backdrop instead of clipping the top.
+  margin: auto;
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--line2);
   box-shadow: var(--shadow);
@@ -29,10 +35,11 @@
 }
 
 .mdl-head {
+  flex-shrink: 0; // pinned; the body scrolls under it
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 22px 0;
+  padding: 18px 22px 0;
 }
 
 .mdl-title {
@@ -58,5 +65,8 @@
 }
 
 .mdl-body {
-  padding: 18px 22px 22px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto; // long forms (New expense) scroll here, header stays put
+  padding: 16px 22px 22px;
 }

@@ -72,13 +72,14 @@
       </div>
     </div>
 
-    <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
-
     @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
 
-    <div class="mform__actions">
-      <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
-      <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>
+    <div class="mform__foot">
+      <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
+      <div class="mform__foot-actions">
+        <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
+        <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>
+      </div>
     </div>
   </form>
 </app-modal-shell>

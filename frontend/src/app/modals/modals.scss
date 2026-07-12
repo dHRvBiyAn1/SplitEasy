@@ -3,7 +3,7 @@
 .mform {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .mform__field {
@@ -50,6 +50,12 @@
   padding-top: 4px;
 }
 
+.mform__foot-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 // ── Chips (type, category, group, paid-by) ───────────────────────────────────
 .chips {
   display: flex;
@@ -61,7 +67,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 13px;
+  padding: 8px 12px;
   border: 1px solid var(--line2);
   background: var(--surface);
   color: var(--ink2);
@@ -147,7 +153,7 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 8px 4px;
+  padding: 6px 4px;
 
   &:not(:last-child) {
     border-bottom: 1px solid var(--line);
