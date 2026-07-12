@@ -50,7 +50,7 @@ export class GroupListComponent implements OnInit {
     this.groups.createGroup(this.form.getRawValue().name).subscribe({
       next: (group) => {
         this.myGroups.update((list) => [
-          { id: group.id, name: group.name, memberCount: group.members.length },
+          { id: group.id, name: group.name, type: group.type, memberCount: group.members.length },
           ...list,
         ]);
         this.form.reset();

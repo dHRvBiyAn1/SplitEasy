@@ -19,7 +19,7 @@
 
       <div class="side__section">
         <span class="side__eyebrow">Groups</span>
-        <a routerLink="/groups" class="side__add" title="New group" aria-label="New group">+</a>
+        <button type="button" class="side__add" title="New group" aria-label="New group" (click)="modal.openGroup()">+</button>
       </div>
 
       <ul class="side__groups">
@@ -73,3 +73,5 @@
     <router-outlet />
   </main>
 }
+
+<app-modals />

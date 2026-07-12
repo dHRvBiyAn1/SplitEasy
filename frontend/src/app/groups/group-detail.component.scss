@@ -1,0 +1,240 @@
+// Group detail: header, balance pills, month-grouped expenses. Tokens drive light/dark.
+
+.gd {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 34px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.gd__back {
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+
+  &:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+}
+
+.gd__error {
+  margin: 0;
+  font-weight: 600;
+  color: var(--neg);
+}
+
+.gd__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.gd__glyph {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+}
+
+.gd__id {
+  flex: 1;
+  min-width: 0;
+}
+
+.gd__name {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.gd__sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--ink3);
+}
+
+.gd__actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+// ── Balance pills ────────────────────────────────────────────────────────────
+.gd__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink2);
+
+  strong {
+    font-weight: 700;
+  }
+}
+
+.pill--overall {
+  color: var(--ink);
+  font-weight: 600;
+
+  &.pill--owed {
+    background: var(--pos-soft);
+    border-color: transparent;
+  }
+
+  &.pill--owes {
+    background: var(--neg-soft);
+    border-color: transparent;
+  }
+}
+
+.pill__av {
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
+}
+
+// ── Month-grouped expenses ───────────────────────────────────────────────────
+.gd__empty {
+  margin: 0;
+  color: var(--ink2);
+}
+
+.gd__month {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gd__month-title {
+  margin: 6px 0 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ink3);
+}
+
+.xlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.xrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.xrow__date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 38px;
+  flex-shrink: 0;
+}
+
+.xrow__mon {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink3);
+}
+
+.xrow__day {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.xrow__ico {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--surface2);
+  color: var(--ink2);
+  font-size: 16px;
+}
+
+.xrow__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.xrow__title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.xrow__sub {
+  font-size: 12.5px;
+  color: var(--ink3);
+}
+
+.xrow__right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.xrow__delta-label {
+  font-size: 11px;
+  color: var(--ink3);
+}
+
+.xrow__amt {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink2);
+}
+
+@media (max-width: 640px) {
+  .gd {
+    padding: 18px 16px 44px;
+  }
+
+  .gd__head {
+    flex-wrap: wrap;
+  }
+
+  .gd__actions {
+    width: 100%;
+  }
+
+  .gd__name {
+    font-size: 27px;
+  }
+}

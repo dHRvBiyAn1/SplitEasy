@@ -1,0 +1,274 @@
+// Shared styles for the New group / New expense / Settle up modal forms.
+
+.mform {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mform__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mform__row {
+  display: flex;
+  gap: 10px;
+
+  .dc-field {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.mform__grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mform__error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--neg);
+}
+
+.mform__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.mform__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+// ── Chips (type, category, group, paid-by) ───────────────────────────────────
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  color: var(--ink2);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ink);
+    border-color: var(--ink3);
+  }
+
+  &--on {
+    color: var(--accent-text);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  &--tag {
+    cursor: default;
+    color: var(--ink);
+  }
+}
+
+.chip__ico {
+  font-size: 13px;
+}
+
+.chip__av {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+
+.chip__x {
+  border: none;
+  background: none;
+  color: var(--ink3);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+
+  &:hover {
+    color: var(--neg);
+  }
+}
+
+// ── Split segmented control + participant rows (New expense) ─────────────────
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+
+  button {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    background: none;
+    color: var(--ink2);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+    }
+  }
+}
+
+.prows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 4px;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.prow__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.prow__check {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  cursor: pointer;
+
+  &:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2312160a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+}
+
+.prow__val {
+  width: 96px;
+  text-align: right;
+  padding: 8px 10px;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+.running {
+  align-self: flex-start;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink2);
+  background: var(--surface2);
+  border: 1px solid var(--line);
+
+  &--ok {
+    color: var(--pos-strong);
+    background: var(--pos-soft);
+    border-color: transparent;
+  }
+}
+
+// ── Settle-up list ───────────────────────────────────────────────────────────
+.slist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-ui);
+  color: inherit;
+  width: 100%;
+
+  &:hover {
+    border-color: var(--line2);
+    background: var(--surface2);
+  }
+}
+
+.srow__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.srow__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.srow__sub {
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+.srow__amt {
+  font-size: 15px;
+}
+
+.srow__chev {
+  color: var(--ink3);
+  font-size: 14px;
+}
+
+.mempty {
+  margin: 8px 0;
+  color: var(--ink2);
+}

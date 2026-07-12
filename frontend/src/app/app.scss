@@ -105,10 +105,13 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--line2);
+  background: none;
   color: var(--ink2);
+  font-family: var(--font-ui);
   font-size: 15px;
   line-height: 1;
   text-decoration: none;
+  cursor: pointer;
 
   &:hover {
     color: var(--ink);

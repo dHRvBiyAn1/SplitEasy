@@ -1,81 +1,89 @@
-<div class="detail">
-  <a routerLink="/groups" class="dc-btn-ghost detail__back">
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M14.5 6l-6 6 6 6" />
-    </svg>
-    <span>All groups</span>
-  </a>
+<div class="gd">
+  <a class="gd__back" routerLink="/dashboard"><span aria-hidden="true">‹</span> Dashboard</a>
 
   @if (loading()) {
     <div class="dc-loading" role="status" aria-label="Loading group"></div>
+  } @else if (error()) {
+    <p class="gd__error" role="alert">{{ error() }}</p>
   } @else if (group(); as g) {
-    <header class="detail__head">
-      <span class="detail__glyph" aria-hidden="true">{{ g.name.charAt(0).toUpperCase() }}</span>
-      <div class="detail__head-text">
-        <h1 class="detail__name">{{ g.name }}</h1>
-        <p class="detail__meta">
-          Created by {{ g.createdBy.displayName }} ·
-          {{ g.members.length }} member{{ g.members.length === 1 ? '' : 's' }}
-        </p>
+    <header class="gd__head">
+      <span
+        class="gd__glyph"
+        aria-hidden="true"
+        [style.background]="'hsl(' + glyphHue(g.name) + ' 40% 20%)'"
+        [style.color]="'hsl(' + glyphHue(g.name) + ' 70% 72%)'"
+        >{{ g.name.charAt(0) }}</span
+      >
+      <div class="gd__id">
+        <h1 class="gd__name">{{ g.name }}</h1>
+        <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
+      </div>
+      <div class="gd__actions">
+        <button type="button" class="dc-btn-outline" (click)="settleUp()"><span aria-hidden="true">⇄</span> Settle up</button>
+        <button type="button" class="dc-btn-accent" (click)="addExpense()"><span aria-hidden="true">+</span> Add expense</button>
       </div>
     </header>
 
-    <section class="detail__members dc-card">
-      <div class="detail__members-head">
-        <h2 class="detail__section-title">Members</h2>
-        <span class="detail__badge">{{ g.members.length }}</span>
-      </div>
-
-      <ul class="member-chips">
-        @for (member of g.members; track member.id) {
-          <li class="member-chip" [title]="member.email">
-            <span class="member-chip__av" aria-hidden="true">{{ initials(member.displayName) }}</span>
-            <span class="member-chip__name">{{ member.displayName }}</span>
-          </li>
+    <div class="gd__pills">
+      <span
+        class="pill pill--overall"
+        [class.pill--owed]="myNet() > 0"
+        [class.pill--owes]="myNet() < 0"
+      >
+        {{ myNet() > 0 ? 'You are owed' : myNet() < 0 ? 'You owe' : 'Settled up' }}
+        @if (myNet() !== 0) {
+          <strong class="dc-amount" [class.dc-amount--owed]="myNet() > 0" [class.dc-amount--owes]="myNet() < 0">
+            ${{ display(myNet() < 0 ? -myNet() : myNet()) }}
+          </strong>
+          overall
         }
-      </ul>
-
-      <form [formGroup]="form" (ngSubmit)="addMember()" class="detail__add" novalidate>
-        <label class="dc-field-label" for="add-member-email">Add a member by email</label>
-        <div class="detail__add-row">
-          <input
-            id="add-member-email"
-            class="dc-field"
-            type="email"
-            formControlName="email"
-            placeholder="friend@example.com"
-            autocomplete="off"
-          />
-          <button class="dc-btn-accent detail__add-btn" type="submit" [disabled]="adding()">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-              <path d="M12 5.5v13M5.5 12h13" />
-            </svg>
-            <span>Add</span>
-          </button>
-        </div>
-      </form>
-
-      @if (error()) {
-        <p class="detail__error" role="alert">{{ error() }}</p>
+      </span>
+      @for (b of myBalances(); track b.user.id) {
+        <span class="pill">
+          <span class="dc-avatar pill__av" aria-hidden="true">{{ initials(b.user.displayName) }}</span>
+          {{ pillLabel(b) }}
+          <strong class="dc-amount" [class.dc-amount--owed]="b.netCents > 0" [class.dc-amount--owes]="b.netCents < 0">
+            ${{ display(b.netCents < 0 ? -b.netCents : b.netCents) }}
+          </strong>
+        </span>
       }
-    </section>
+    </div>
 
-    <app-balance-panel
-      [groupId]="g.id"
-      [refreshKey]="balanceRefresh()"
-      (settleWith)="onSettleWith($event)"
-    />
-
-    <app-simplify-debts-panel
-      [groupId]="g.id"
-      [refreshKey]="balanceRefresh()"
-      (settleTransaction)="onSettleWith($event)"
-    />
-
-    <app-settle-up-panel [group]="g" [prefill]="settlePrefill()" (paymentRecorded)="refreshBalances()" />
-
-    <app-expense-panel [group]="g" (expensesChanged)="refreshBalances()" />
-  } @else {
-    <p class="detail__error" role="alert">{{ error() ?? 'Group not found.' }}</p>
+    @if (expenses().length === 0) {
+      <p class="gd__empty">No expenses yet. Add the first one.</p>
+    } @else {
+      @for (m of months(); track m.label) {
+        <section class="gd__month">
+          <h2 class="gd__month-title">{{ m.label }}</h2>
+          <ul class="xlist">
+            @for (e of m.items; track e.id) {
+              <li class="xrow">
+                <span class="xrow__date" aria-hidden="true">
+                  <span class="xrow__mon">{{ dayMon(e.spentOn) }}</span>
+                  <span class="xrow__day">{{ dayNum(e.spentOn) }}</span>
+                </span>
+                <span class="xrow__ico" aria-hidden="true">{{ categoryGlyph(e.category) }}</span>
+                <span class="xrow__text">
+                  <span class="xrow__title">{{ e.description }}</span>
+                  <span class="xrow__sub">{{ paidSub(e) }}</span>
+                </span>
+                <span class="xrow__right">
+                  <span class="xrow__delta-label">{{ deltaLabel(e) }}</span>
+                  @if (e.viewerDeltaCents === 0) {
+                    <span class="xrow__amt">$0.00</span>
+                  } @else {
+                    <span
+                      class="xrow__amt dc-amount"
+                      [class.dc-amount--owed]="e.viewerDeltaCents > 0"
+                      [class.dc-amount--owes]="e.viewerDeltaCents < 0"
+                    >${{ display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents) }}</span>
+                  }
+                </span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
   }
 </div>
