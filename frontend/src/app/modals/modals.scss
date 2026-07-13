@@ -3,7 +3,7 @@
 .mform {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .mform__field {
@@ -50,6 +50,12 @@
   padding-top: 4px;
 }
 
+.mform__foot-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 // ── Chips (type, category, group, paid-by) ───────────────────────────────────
 .chips {
   display: flex;
@@ -61,7 +67,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 13px;
+  padding: 8px 12px;
   border: 1px solid var(--line2);
   background: var(--surface);
   color: var(--ink2);
@@ -69,6 +75,10 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    color 0.14s ease,
+    border-color 0.14s ease,
+    background-color 0.14s ease;
 
   &:hover {
     color: var(--ink);
@@ -147,7 +157,7 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 8px 4px;
+  padding: 6px 4px;
 
   &:not(:last-child) {
     border-bottom: 1px solid var(--line);
@@ -226,7 +236,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   border: 1px solid var(--line);
   background: var(--surface);
   cursor: pointer;
@@ -234,11 +244,55 @@
   font-family: var(--font-ui);
   color: inherit;
   width: 100%;
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease,
+    transform 0.14s ease;
 
   &:hover {
     border-color: var(--line2);
     background: var(--surface2);
   }
+
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+// ── Settle-up confirm (one member selected) ──────────────────────────────────
+.settle-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  text-align: center;
+}
+
+.settle-confirm__av {
+  width: 52px;
+  height: 52px;
+  font-size: 17px;
+}
+
+.settle-confirm__label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settle-confirm__amt {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.settle-confirm__group {
+  font-size: 12px;
+  color: var(--ink3);
 }
 
 .srow__text {
@@ -271,4 +325,29 @@
 .mempty {
   margin: 8px 0;
   color: var(--ink2);
+}
+
+.prow__av {
+  width: 30px;
+  height: 30px;
+  font-size: 10px;
+}
+
+.srow__av {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+}
+
+// ── Add-member modal helpers ─────────────────────────────────────────────────
+.mform__lead {
+  margin: -4px 0 4px;
+  font-size: 13px;
+  color: var(--ink3);
+}
+
+.mform__hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink3);
 }
