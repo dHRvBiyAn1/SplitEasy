@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.payment;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;

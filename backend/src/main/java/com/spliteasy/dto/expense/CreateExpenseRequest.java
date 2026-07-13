@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.expense;
 
 import com.spliteasy.entity.ExpenseCategory;
 import com.spliteasy.entity.SplitType;

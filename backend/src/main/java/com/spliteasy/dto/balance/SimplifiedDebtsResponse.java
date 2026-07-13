@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.balance;
 
 import java.util.List;
 import java.util.UUID;

@@ -1,8 +1,11 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.payment.PaymentResponse;
+import com.spliteasy.dto.payment.RecordPaymentRequest;
+
+import lombok.RequiredArgsConstructor;
+
 import com.spliteasy.config.CurrentUserId;
-import com.spliteasy.dto.PaymentResponse;
-import com.spliteasy.dto.RecordPaymentRequest;
 import com.spliteasy.service.PaymentService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -18,13 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/groups/{groupId}/payments")
+@RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
 
-    public PaymentController(PaymentService paymentService) {
-        this.paymentService = paymentService;
-    }
 
     @PostMapping
     public ResponseEntity<PaymentResponse> recordPayment(

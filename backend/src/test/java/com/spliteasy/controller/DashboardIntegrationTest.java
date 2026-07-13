@@ -1,14 +1,15 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.expense.CreateExpenseRequest;
+import com.spliteasy.dto.group.AddMemberRequest;
+import com.spliteasy.dto.group.CreateGroupRequest;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.spliteasy.AbstractIntegrationTest;
-import com.spliteasy.dto.AddMemberRequest;
-import com.spliteasy.dto.AuthResponse;
-import com.spliteasy.dto.CreateExpenseRequest;
-import com.spliteasy.dto.CreateGroupRequest;
 import com.spliteasy.entity.ExpenseCategory;
 import com.spliteasy.entity.GroupType;
 import java.time.LocalDate;

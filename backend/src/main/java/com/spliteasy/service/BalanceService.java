@@ -1,13 +1,17 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.GroupBalancesResponse;
-import com.spliteasy.dto.MemberBalance;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.balance.GroupBalancesResponse;
+import com.spliteasy.dto.balance.MemberBalance;
+import com.spliteasy.dto.common.UserSummary;
+
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
+
+import lombok.RequiredArgsConstructor;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  * +X and -X, the group's balances always sum to zero. All aggregate GROUP BY queries — no loops.
  */
 @Service
+@RequiredArgsConstructor
 public class BalanceService {
 
     private final ExpenseRepository expenseRepository;
@@ -37,19 +42,6 @@ public class BalanceService {
     private final GroupMembershipRepository membershipRepository;
     private final PaymentRepository paymentRepository;
     private final MembershipGuard membershipGuard;
-
-    public BalanceService(
-            ExpenseRepository expenseRepository,
-            ExpenseParticipantRepository participantRepository,
-            GroupMembershipRepository membershipRepository,
-            PaymentRepository paymentRepository,
-            MembershipGuard membershipGuard) {
-        this.expenseRepository = expenseRepository;
-        this.participantRepository = participantRepository;
-        this.membershipRepository = membershipRepository;
-        this.paymentRepository = paymentRepository;
-        this.membershipGuard = membershipGuard;
-    }
 
     @Transactional(readOnly = true)
     public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {

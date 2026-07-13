@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.group;
 
 import com.spliteasy.entity.GroupType;
 import java.util.UUID;

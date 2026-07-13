@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.payment;
+
+import com.spliteasy.dto.common.UserSummary;
 
 import com.spliteasy.entity.Payment;
 import java.time.Instant;

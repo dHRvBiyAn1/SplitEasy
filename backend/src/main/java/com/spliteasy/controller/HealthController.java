@@ -1,6 +1,7 @@
 package com.spliteasy.controller;
 
-import com.spliteasy.dto.HealthResponse;
+import com.spliteasy.dto.common.HealthResponse;
+
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;

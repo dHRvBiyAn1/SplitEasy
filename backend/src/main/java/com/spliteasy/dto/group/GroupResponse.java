@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.group;
+
+import com.spliteasy.dto.common.UserSummary;
 
 import com.spliteasy.entity.GroupType;
 import java.time.Instant;

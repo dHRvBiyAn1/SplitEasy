@@ -1,8 +1,11 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.balance.GroupBalancesResponse;
+import com.spliteasy.dto.balance.PersonBalance;
+
+import lombok.RequiredArgsConstructor;
+
 import com.spliteasy.config.CurrentUserId;
-import com.spliteasy.dto.GroupBalancesResponse;
-import com.spliteasy.dto.PersonBalance;
 import com.spliteasy.service.BalanceService;
 import com.spliteasy.service.PairwiseBalanceService;
 import java.util.List;
@@ -14,15 +17,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/groups/{groupId}/balances")
+@RequiredArgsConstructor
 public class BalanceController {
 
     private final BalanceService balanceService;
     private final PairwiseBalanceService pairwiseService;
 
-    public BalanceController(BalanceService balanceService, PairwiseBalanceService pairwiseService) {
-        this.balanceService = balanceService;
-        this.pairwiseService = pairwiseService;
-    }
 
     @GetMapping
     public GroupBalancesResponse getBalances(@CurrentUserId UUID userId, @PathVariable UUID groupId) {

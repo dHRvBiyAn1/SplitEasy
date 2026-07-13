@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.expense;
+
+import com.spliteasy.dto.common.UserSummary;
 
 import com.spliteasy.entity.ExpenseCategory;
 import java.time.Instant;

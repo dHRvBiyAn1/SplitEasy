@@ -1,9 +1,10 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.CreateGroupRequest;
-import com.spliteasy.dto.GroupResponse;
-import com.spliteasy.dto.GroupSummary;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.group.CreateGroupRequest;
+import com.spliteasy.dto.group.GroupResponse;
+import com.spliteasy.dto.group.GroupSummary;
+
 import com.spliteasy.entity.Group;
 import com.spliteasy.entity.GroupMembership;
 import com.spliteasy.entity.GroupType;
@@ -14,29 +15,22 @@ import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.UserRepository;
 import com.spliteasy.util.Emails;
+
+import lombok.RequiredArgsConstructor;
+
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GroupService {
 
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final MembershipGuard membershipGuard;
-
-    public GroupService(
-            GroupRepository groupRepository,
-            GroupMembershipRepository membershipRepository,
-            UserRepository userRepository,
-            MembershipGuard membershipGuard) {
-        this.groupRepository = groupRepository;
-        this.membershipRepository = membershipRepository;
-        this.userRepository = userRepository;
-        this.membershipGuard = membershipGuard;
-    }
 
     @Transactional
     public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {

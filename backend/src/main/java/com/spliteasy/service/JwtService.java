@@ -1,6 +1,7 @@
 package com.spliteasy.service;
 
 import com.spliteasy.entity.User;
+
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -10,7 +11,10 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
-/** Issues signed HS256 access tokens. Validation is handled by the resource-server filter. */
+/**
+ * Issues signed HS256 access tokens. Validation is handled by the
+ * resource-server filter.
+ */
 @Service
 public class JwtService {
 

@@ -2,6 +2,9 @@ package com.spliteasy.service;
 
 import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.repository.GroupMembershipRepository;
+
+import lombok.RequiredArgsConstructor;
+
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -11,13 +14,10 @@ import org.springframework.stereotype.Component;
  * authorization rule only needs to happen here.
  */
 @Component
+@RequiredArgsConstructor
 public class MembershipGuard {
 
     private final GroupMembershipRepository membershipRepository;
-
-    public MembershipGuard(GroupMembershipRepository membershipRepository) {
-        this.membershipRepository = membershipRepository;
-    }
 
     /** Throws {@link ForbiddenException} (→ 403) if {@code userId} is not a member of {@code groupId}. */
     public void requireMember(UUID groupId, UUID userId) {

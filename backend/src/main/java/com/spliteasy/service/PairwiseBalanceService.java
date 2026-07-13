@@ -1,11 +1,15 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.PersonBalance;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.balance.PersonBalance;
+import com.spliteasy.dto.common.UserSummary;
+
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
+
+import lombok.RequiredArgsConstructor;
+
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,23 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
  * All aggregate GROUP BY queries — no per-expense loops.
  */
 @Service
+@RequiredArgsConstructor
 public class PairwiseBalanceService {
 
     private final ExpenseParticipantRepository participantRepository;
     private final PaymentRepository paymentRepository;
     private final GroupMembershipRepository membershipRepository;
     private final MembershipGuard membershipGuard;
-
-    public PairwiseBalanceService(
-            ExpenseParticipantRepository participantRepository,
-            PaymentRepository paymentRepository,
-            GroupMembershipRepository membershipRepository,
-            MembershipGuard membershipGuard) {
-        this.participantRepository = participantRepository;
-        this.paymentRepository = paymentRepository;
-        this.membershipRepository = membershipRepository;
-        this.membershipGuard = membershipGuard;
-    }
 
     /** Guarded entry point for a single group (enforces membership → 403). */
     @Transactional(readOnly = true)

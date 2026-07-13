@@ -1,5 +1,11 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.expense.CreateExpenseRequest;
+import com.spliteasy.dto.expense.SplitInput;
+import com.spliteasy.dto.group.AddMemberRequest;
+import com.spliteasy.dto.group.CreateGroupRequest;
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -7,11 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.spliteasy.AbstractIntegrationTest;
-import com.spliteasy.dto.AddMemberRequest;
-import com.spliteasy.dto.AuthResponse;
-import com.spliteasy.dto.CreateExpenseRequest;
-import com.spliteasy.dto.CreateGroupRequest;
-import com.spliteasy.dto.SplitInput;
 import com.spliteasy.entity.SplitType;
 import java.util.List;
 import java.util.UUID;
