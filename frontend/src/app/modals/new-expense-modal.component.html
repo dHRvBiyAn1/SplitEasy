@@ -1,4 +1,4 @@
-<app-modal-shell heading="New expense" (closed)="close()">
+<app-modal-shell [heading]="heading()" [maxWidth]="600" (closed)="close()">
   <form class="mform" (submit)="$event.preventDefault(); save()">
     <div class="mform__field">
       <span class="dc-field-label">Group</span>
@@ -43,7 +43,7 @@
       <div class="chips">
         @for (m of members(); track m.id) {
           <button type="button" class="chip" [class.chip--on]="paidBy() === m.id" (click)="paidBy.set(m.id)">
-            <span class="dc-avatar chip__av" aria-hidden="true">{{ initials(m.displayName) }}</span> {{ firstName(m) }}
+            <span class="dc-avatar chip__av" aria-hidden="true" [style]="tint(m.id)">{{ initials(m.displayName) }}</span> {{ firstName(m) }}
           </button>
         }
       </div>
@@ -60,7 +60,7 @@
       <div class="prows">
         @for (m of members(); track m.id) {
           <div class="prow">
-            <span class="dc-avatar chip__av" aria-hidden="true" style="width:30px;height:30px;font-size:10px">{{ initials(m.displayName) }}</span>
+            <span class="dc-avatar prow__av" aria-hidden="true" [style]="tint(m.id)">{{ initials(m.displayName) }}</span>
             <span class="prow__name">{{ firstName(m) }}</span>
             @if (splitType() === 'EQUAL') {
               <input type="checkbox" class="prow__check" [checked]="included().has(m.id)" (change)="toggle(m.id)" [attr.aria-label]="'Include ' + m.displayName" />
@@ -72,13 +72,14 @@
       </div>
     </div>
 
-    <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
-
     @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
 
-    <div class="mform__actions">
-      <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
-      <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>
+    <div class="mform__foot">
+      <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
+      <div class="mform__actions">
+        <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
+        <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>
+      </div>
     </div>
   </form>
 </app-modal-shell>

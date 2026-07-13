@@ -1,16 +1,15 @@
-<app-modal-shell heading="Settle up" (closed)="close()">
+<app-modal-shell heading="Settle up" [maxWidth]="460" (closed)="close()">
   @if (selected(); as s) {
     <div class="mform">
-      <div class="srow" style="cursor: default">
-        <span class="srow__text">
-          <span class="srow__title">{{ label(s) }}</span>
-          <span class="srow__sub">{{ s.groupName }}</span>
-        </span>
+      <div class="settle-confirm">
+        <span class="dc-avatar settle-confirm__av" aria-hidden="true" [style]="tint(s.counterparty.id)">{{ initials(s.counterparty.displayName) }}</span>
+        <span class="settle-confirm__label">{{ label(s) }}</span>
         <span
-          class="srow__amt dc-amount"
+          class="settle-confirm__amt dc-amount"
           [class.dc-amount--owed]="s.netCents > 0"
           [class.dc-amount--owes]="s.netCents < 0"
         >${{ display(s.netCents < 0 ? -s.netCents : s.netCents) }}</span>
+        <span class="settle-confirm__group">{{ s.groupName }}</span>
       </div>
       @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
       <div class="mform__actions">
@@ -26,7 +25,7 @@
     <div class="slist">
       @for (s of settlements(); track s.groupId + s.counterparty.id) {
         <button type="button" class="srow" (click)="select(s)">
-          <span class="dc-avatar chip__av" aria-hidden="true" style="width:34px;height:34px;font-size:12px">{{ s.counterparty.displayName.charAt(0) }}</span>
+          <span class="dc-avatar srow__av" aria-hidden="true" [style]="tint(s.counterparty.id)">{{ initials(s.counterparty.displayName) }}</span>
           <span class="srow__text">
             <span class="srow__title">{{ label(s) }}</span>
             <span class="srow__sub">{{ s.groupName }}</span>

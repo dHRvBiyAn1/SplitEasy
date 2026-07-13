@@ -4,6 +4,7 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
 import { centsToDisplay } from '../expenses/expense.service';
 import { PaymentService } from '../payments/payment.service';
+import { avatarTint } from '../core/avatar';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
 
@@ -20,10 +21,23 @@ export class SettleUpModalComponent {
   private readonly modal = inject(ModalService);
 
   protected readonly display = centsToDisplay;
-  protected readonly settlements = () => this.dashboard.data()?.settlements ?? [];
+  /** All settlements, or just this group's when opened from a group's detail page. */
+  protected readonly settlements = () => {
+    const all = this.dashboard.data()?.settlements ?? [];
+    const gid = this.modal.settleGroupId();
+    return gid ? all.filter((s) => s.groupId === gid) : all;
+  };
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+  }
+
+  tint(id: string): { background: string; color: string } {
+    return avatarTint(id);
+  }
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: Settlement): string {

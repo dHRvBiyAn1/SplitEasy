@@ -1,4 +1,4 @@
-<app-modal-shell heading="New group" (closed)="close()">
+<app-modal-shell heading="New group" [maxWidth]="520" (closed)="close()">
   <form class="mform" (submit)="$event.preventDefault(); save()">
     <div class="mform__field">
       <label class="dc-field-label" for="ng-name">Group name</label>

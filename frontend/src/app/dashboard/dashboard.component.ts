@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { UserSummary } from '../core/auth/auth.models';
 import { centsToDisplay } from '../expenses/expense.service';
+import { avatarTint } from '../core/avatar';
 import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
@@ -84,6 +85,10 @@ export class DashboardComponent {
       h = (h * 31 + name.charCodeAt(i)) % 360;
     }
     return h;
+  }
+
+  tint(id: string): { background: string; color: string } {
+    return avatarTint(id);
   }
 
   activityGlyph(a: ActivityItem): string {

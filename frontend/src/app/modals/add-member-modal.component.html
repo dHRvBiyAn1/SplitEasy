@@ -1,0 +1,40 @@
+<app-modal-shell heading="Add member" [maxWidth]="460" (closed)="close()">
+  <div class="mform">
+    <p class="mform__lead">to {{ groupName() || 'this group' }}</p>
+
+    <div class="mform__field">
+      <label class="dc-field-label" for="am-email">Add someone by email</label>
+      <div class="mform__row">
+        <input
+          id="am-email"
+          class="dc-field"
+          [formControl]="email"
+          type="email"
+          placeholder="friend@example.com"
+          autocomplete="off"
+          (keydown.enter)="$event.preventDefault(); add()"
+        />
+        <button type="button" class="dc-btn-accent" (click)="add()" [disabled]="!email.value.trim() || saving()">Add</button>
+      </div>
+      <p class="mform__hint">They need an existing Evenly account.</p>
+    </div>
+
+    @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
+
+    <div class="mform__field">
+      <span class="dc-field-label">Already in this group</span>
+      <div class="chips">
+        @for (m of members(); track m.id) {
+          <span class="chip chip--tag">
+            <span class="dc-avatar chip__av" aria-hidden="true" [style]="tint(m.id)">{{ initials(m.displayName) }}</span>
+            {{ m.displayName }}
+          </span>
+        }
+      </div>
+    </div>
+
+    <div class="mform__actions">
+      <button type="button" class="dc-btn-outline" (click)="close()">Done</button>
+    </div>
+  </div>
+</app-modal-shell>

@@ -7,8 +7,9 @@ import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { centsToDisplay } from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { ExpenseSummary } from '../expenses/expense.models';
+import { ExpenseResponse, ExpenseSummary, SplitShare } from '../expenses/expense.models';
 import { ModalService } from '../modals/modal.service';
+import { avatarTint } from '../core/avatar';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 
@@ -51,6 +52,14 @@ export class GroupDetailComponent implements OnInit {
   protected readonly myBalances = signal<PersonBalance[]>([]);
   protected readonly expenses = signal<ExpenseSummary[]>([]);
 
+  /** The expense whose detail row is expanded, plus its fetched full breakdown. */
+  protected readonly expandedId = signal<string | null>(null);
+  protected readonly detail = signal<ExpenseResponse | null>(null);
+  protected readonly detailLoading = signal(false);
+  protected readonly deletingId = signal<string | null>(null);
+  /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
+  private readonly detailCache = new Map<string, ExpenseResponse>();
+
   private groupId = '';
 
   /** My net in this group = sum of the pairwise nets (positive = I'm owed overall). */
@@ -83,18 +92,33 @@ export class GroupDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.groupId = this.route.snapshot.paramMap.get('id') ?? '';
-    this.reload();
+    // Subscribe (not snapshot): Angular reuses this component when navigating between
+    // /groups/:id, so ngOnInit runs once — the snapshot would freeze on the first group.
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id') ?? '';
+      if (id === this.groupId) {
+        return;
+      }
+      this.groupId = id;
+      this.loading.set(true);
+      this.error.set(null);
+      this.expandedId.set(null);
+      this.detail.set(null);
+      this.reload();
+    });
   }
 
   private reload(): void {
+    this.detailCache.clear(); // details may have changed (edit/delete/new expense)
     this.groups.getGroup(this.groupId).subscribe({
       next: (g) => {
         this.group.set(g);
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(err?.status === 403 ? 'You are not a member of this group.' : 'Could not load the group.');
+        this.error.set(
+          err?.status === 403 ? 'You are not a member of this group.' : 'Could not load the group.',
+        );
         this.loading.set(false);
       },
     });
@@ -107,7 +131,67 @@ export class GroupDetailComponent implements OnInit {
   }
 
   settleUp(): void {
-    this.modal.openSettle();
+    this.modal.openSettle(undefined, this.groupId);
+  }
+
+  addMember(): void {
+    this.modal.openAddMember(this.groupId);
+  }
+
+  /** Expand a row to show its split, or collapse it if it's already open. */
+  toggleExpand(e: ExpenseSummary): void {
+    if (this.expandedId() === e.id) {
+      this.expandedId.set(null);
+      this.detail.set(null);
+      return;
+    }
+    this.expandedId.set(e.id);
+    const cached = this.detailCache.get(e.id);
+    if (cached) {
+      this.detail.set(cached);
+      this.detailLoading.set(false);
+      return;
+    }
+    this.detail.set(null);
+    this.detailLoading.set(true);
+    this.expensesApi.getExpense(this.groupId, e.id).subscribe({
+      next: (d) => {
+        this.detailCache.set(e.id, d);
+        if (this.expandedId() === e.id) {
+          this.detail.set(d);
+        }
+        this.detailLoading.set(false);
+      },
+      error: () => this.detailLoading.set(false),
+    });
+  }
+
+  editExpense(e: ExpenseSummary): void {
+    this.modal.openExpense(this.groupId, e.id);
+  }
+
+  deleteExpense(e: ExpenseSummary): void {
+    if (this.deletingId()) {
+      return;
+    }
+    if (!confirm(`Delete "${e.description}"? This can't be undone.`)) {
+      return;
+    }
+    this.deletingId.set(e.id);
+    this.expensesApi.deleteExpense(this.groupId, e.id).subscribe({
+      next: () => {
+        this.expandedId.set(null);
+        this.detail.set(null);
+        this.deletingId.set(null);
+        this.dashboard.refresh(); // effect() re-pulls this group's expenses + balances
+      },
+      error: () => this.deletingId.set(null),
+    });
+  }
+
+  /** Detail-row label: "You owe" / "Priya owes" for each participant's share. */
+  partLabel(p: SplitShare): string {
+    return p.user.id === this.meId() ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
   }
 
   meId(): string {
@@ -136,7 +220,16 @@ export class GroupDetailComponent implements OnInit {
   }
 
   initials(name: string): string {
-    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
+  }
+
+  tint(id: string): { background: string; color: string } {
+    return avatarTint(id);
   }
 
   pillLabel(b: PersonBalance): string {
@@ -160,7 +253,9 @@ export class GroupDetailComponent implements OnInit {
   }
 
   private monthLabel(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+    return new Date(iso + 'T00:00:00')
+      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      .toUpperCase();
   }
 
   dayNum(iso: string): string {
@@ -168,6 +263,8 @@ export class GroupDetailComponent implements OnInit {
   }
 
   dayMon(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    return new Date(iso + 'T00:00:00')
+      .toLocaleDateString('en-US', { month: 'short' })
+      .toUpperCase();
   }
 }
