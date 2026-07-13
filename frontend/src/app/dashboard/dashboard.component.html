@@ -60,7 +60,8 @@
       } @else {
         <div class="cards">
           @for (g of d.groups; track g.id) {
-            <a class="card" [routerLink]="['/groups', g.id]">
+            <article class="card">
+              <a class="card__stretch" [routerLink]="['/groups', g.id]" [attr.aria-label]="'Open ' + g.name"></a>
               <div class="card__head">
                 <span
                   class="card__glyph"
@@ -115,7 +116,13 @@
                 </div>
               </div>
 
-            </a>
+              <div class="card__foot">
+                <a class="dc-btn-outline card__btn" [routerLink]="['/groups', g.id]">Members</a>
+                <a class="dc-btn-outline card__btn card__btn--open" [routerLink]="['/groups', g.id]">
+                  Open <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </article>
           }
         </div>
       }

@@ -57,6 +57,8 @@ export class GroupDetailComponent implements OnInit {
   protected readonly detail = signal<ExpenseResponse | null>(null);
   protected readonly detailLoading = signal(false);
   protected readonly deletingId = signal<string | null>(null);
+  /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
+  private readonly detailCache = new Map<string, ExpenseResponse>();
 
   private groupId = '';
 
@@ -95,6 +97,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   private reload(): void {
+    this.detailCache.clear(); // details may have changed (edit/delete/new expense)
     this.groups.getGroup(this.groupId).subscribe({
       next: (g) => {
         this.group.set(g);
@@ -129,11 +132,20 @@ export class GroupDetailComponent implements OnInit {
       return;
     }
     this.expandedId.set(e.id);
+    const cached = this.detailCache.get(e.id);
+    if (cached) {
+      this.detail.set(cached);
+      this.detailLoading.set(false);
+      return;
+    }
     this.detail.set(null);
     this.detailLoading.set(true);
     this.expensesApi.getExpense(this.groupId, e.id).subscribe({
       next: (d) => {
-        this.detail.set(d);
+        this.detailCache.set(e.id, d);
+        if (this.expandedId() === e.id) {
+          this.detail.set(d);
+        }
         this.detailLoading.set(false);
       },
       error: () => this.detailLoading.set(false),

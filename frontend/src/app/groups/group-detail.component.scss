@@ -3,10 +3,11 @@
 .gd {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 24px 34px 60px;
+  padding: 22px 30px 54px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 20px;
+  animation: dc-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .gd__back {
@@ -77,7 +78,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 13px;
+  padding: 8px 12px;
   background: var(--surface);
   border: 1px solid var(--line);
   font-size: 13px;
@@ -142,7 +143,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 16px;
+  padding: 13px 14px;
 
   &:not(:last-child) {
     border-bottom: 1px solid var(--line);
@@ -246,6 +247,7 @@
 
 // ── Add-member pill ──────────────────────────────────────────────────────────
 .pill--add {
+  margin-left: auto; // pushed to the right end of the pills row
   cursor: pointer;
   color: var(--accent-text);
   border-style: dashed;
@@ -253,6 +255,9 @@
   background: none;
   font: inherit;
   font-size: 13px;
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease;
 
   &:hover {
     border-color: var(--accent);
@@ -275,6 +280,7 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.14s ease;
 
   &:hover {
     background: var(--surface2);
@@ -289,8 +295,27 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  padding: 10px 16px 16px;
+  padding: 9px 14px 14px;
   background: var(--surface2);
+  overflow: hidden;
+  animation: dc-detail-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes dc-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xdetail {
+    animation: none;
+  }
 }
 
 .xdetail__line {

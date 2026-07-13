@@ -5,11 +5,7 @@ import { avatarTint } from '../core/avatar';
 import { UserSummary } from '../core/auth/auth.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
-import {
-  centsToDisplay,
-  dollarsToCents,
-  percentToBasisPoints,
-} from '../expenses/expense.service';
+import { centsToDisplay, dollarsToCents, percentToBasisPoints } from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
 import { CreateExpenseRequest } from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
@@ -49,7 +45,10 @@ export class NewExpenseModalComponent {
   protected readonly groupId = signal<string | null>(null);
   protected readonly members = signal<UserSummary[]>([]);
 
-  protected readonly description = new FormControl('', { nonNullable: true, validators: [Validators.required] });
+  protected readonly description = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required],
+  });
   protected readonly amount = new FormControl<number | null>(null);
   protected readonly date = new FormControl(this.today(), { nonNullable: true });
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
@@ -136,7 +135,12 @@ export class NewExpenseModalComponent {
   }
 
   initials(name: string): string {
-    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 
   /** Per-person avatar color (background + text) — never the lime accent. */
@@ -161,7 +165,10 @@ export class NewExpenseModalComponent {
 
   /** Cents currently assigned across members (exact split) from the raw inputs. */
   private assignedCents(): number {
-    return this.members().reduce((sum, m) => sum + dollarsToCents(Number(this.values()[m.id] ?? 0)), 0);
+    return this.members().reduce(
+      (sum, m) => sum + dollarsToCents(Number(this.values()[m.id] ?? 0)),
+      0,
+    );
   }
 
   private assignedPercent(): number {

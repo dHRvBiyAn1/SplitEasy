@@ -3,10 +3,11 @@
 .dash {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 30px 34px 60px;
+  padding: 26px 30px 54px;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 26px;
+  animation: dc-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 // ── Header ───────────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@
 }
 
 .band__total {
-  padding: 28px 30px;
+  padding: 24px 26px;
   border-right: 1px solid var(--line);
 }
 
@@ -83,7 +84,7 @@
 }
 
 .band__cell {
-  padding: 28px 30px;
+  padding: 24px 26px;
 
   &:first-child {
     border-right: 1px solid var(--line);
@@ -138,20 +139,38 @@
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px;
+  gap: 15px;
+  padding: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
-  color: inherit;
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 
   &:hover {
     border-color: var(--line2);
-    background: var(--surface2);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+}
+
+// Whole-card click target (stretched link) — covers the card so any non-button
+// area navigates to the group, while the footer buttons stay independently clickable.
+.card__stretch {
+  position: absolute;
+  inset: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  &:hover {
     text-decoration: none;
   }
 }
@@ -266,6 +285,24 @@
   text-align: right;
 }
 
+.card__foot {
+  position: relative; // above the stretched link so the buttons stay clickable
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.card__btn {
+  justify-content: center;
+  padding: 9px 0;
+  font-size: 13px;
+}
+
+.card__btn--open {
+  color: var(--accent-text);
+}
+
 // ── Activity + People ────────────────────────────────────────────────────────
 .dash__grid {
   display: grid;
@@ -274,7 +311,7 @@
 }
 
 .panel {
-  padding: 20px 22px;
+  padding: 18px 20px;
   background: var(--surface);
   border: 1px solid var(--line);
 }

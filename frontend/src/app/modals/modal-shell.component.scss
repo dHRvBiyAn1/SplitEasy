@@ -11,7 +11,7 @@
   display: flex;
   align-items: center; // centered on screen
   justify-content: center;
-  padding: 24px 16px;
+  padding: 22px 14px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(2px);
@@ -25,16 +25,16 @@
   overflow-y: auto; // the panel scrolls internally if it's taller than the viewport
   background: var(--surface);
   border: 1px solid var(--line2);
-  border-radius: 22px; // modal containers only
+  border-radius: 0; // sharp edges (design spec)
   box-shadow: var(--shadow);
-  animation: dc-pop 0.14s ease;
+  animation: dc-pop 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .mdl-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 26px 26px 0;
+  padding: 22px 24px 0;
 }
 
 .mdl-title {
@@ -61,5 +61,5 @@
 }
 
 .mdl-body {
-  padding: 16px 26px 26px;
+  padding: 14px 24px 24px;
 }
