@@ -37,6 +37,18 @@ export class AuthService {
     return localStorage.getItem(TOKEN_KEY);
   }
 
+  /** Update the locally-held user (name/email) and persist it. Client-side only for now —
+   * there is no profile-update endpoint yet, so this keeps the UI (sidebar, avatars) in sync. */
+  updateProfile(patch: Partial<Pick<UserSummary, 'displayName' | 'email'>>): void {
+    const current = this.currentUser();
+    if (!current) {
+      return;
+    }
+    const next = { ...current, ...patch };
+    this.currentUser.set(next);
+    localStorage.setItem(USER_KEY, JSON.stringify(next));
+  }
+
   private persist(res: AuthResponse): void {
     localStorage.setItem(TOKEN_KEY, res.accessToken);
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));

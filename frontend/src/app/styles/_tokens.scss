@@ -1,53 +1,80 @@
 // ─────────────────────────────────────────────────────────────────────────
 // SplitEasy design tokens — single source of truth for the "Evenly" visual
-// system (imported from Claude Design). Every screen references these CSS
-// custom properties; never hardcode the hex values in a component.
+// system. Every screen references these CSS custom properties.
 //
-// Fonts: Instrument Serif (display, --font-display) + Hanken Grotesk (UI/body)
-// are loaded in src/index.html.
+// Theme resolution:
+//   default        → light (light-tokens)
+//   system dark    → @media (prefers-color-scheme: dark)
+//   explicit choice→ :root[data-theme='light' | 'dark'] (set by ThemeService)
+// The explicit selectors out-specify the media query, so a user override wins.
+//
+// Fonts: Instrument Serif (display) + Hanken Grotesk (UI/body), loaded in index.html.
 // ─────────────────────────────────────────────────────────────────────────
 
-:root {
-  // Brand accent (lime) + derived roles
+@mixin light-tokens {
   --accent-base: #b6f531;
   --accent: var(--accent-base);
-  --accent-text: color-mix(in oklab, var(--accent-base), black 54%); // accent as readable text/link
+  --accent-text: color-mix(in oklab, var(--accent-base), black 54%);
   --accent-soft: color-mix(in oklab, var(--accent-base) 26%, var(--surface));
-  --on-accent: #12160a; // near-black text on accent fills
+  --on-accent: #12160a;
 
-  // Surfaces & background
   --bg: #f1f2ed;
   --surface: #ffffff;
   --surface2: #f0f1eb;
   --surface3: #e5e7df;
 
-  // Ink (text) ramp
-  --ink: #14161a; // primary text
-  --ink2: #5c6067; // secondary text
-  --ink3: #8e939b; // meta / eyebrows / decorative labels only
+  --ink: #14161a;
+  --ink2: #5c6067;
+  --ink3: #8e939b;
 
-  // Hairlines
   --line: #e7e8e1;
   --line2: #d6d8ce;
 
-  // Balance semantics — green = owed to you (positive), pink = you owe (negative)
   --pos: #0e9a72;
   --pos-soft: color-mix(in oklab, #0e9a72 12%, var(--surface));
   --neg: #de3f76;
   --neg-soft: color-mix(in oklab, #de3f76 10%, var(--surface));
-  // Darkened, text-safe variants (≥4.5:1 on --bg / --surface) for small balance text
   --pos-strong: color-mix(in oklab, #0e9a72, black 26%);
   --neg-strong: color-mix(in oklab, #de3f76, black 24%);
 
-  // Elevation
   --shadow: 0 1px 2px rgba(20, 22, 26, 0.04), 0 10px 30px rgba(20, 22, 26, 0.07);
   --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--shadow);
+}
 
-  // Typography
+// Only the tokens that differ from light; var()-derived ones (accent-soft, pos/neg-soft)
+// recompute automatically off the overridden --surface / --accent-base.
+@mixin dark-tokens {
+  --accent-text: #c8f95e;
+  --on-accent: #0c1006;
+
+  --bg: #08090b;
+  --surface: #131417;
+  --surface2: #191a1e;
+  --surface3: #24262b;
+
+  --ink: #f3f4f0;
+  --ink2: #9b9ea4;
+  --ink3: #63666c;
+
+  --line: #202226;
+  --line2: #2e3037;
+
+  --accent-soft: color-mix(in oklab, var(--accent-base) 16%, var(--surface));
+
+  --pos: #37dda8;
+  --neg: #ff5c88;
+  --pos-strong: #37dda8;
+  --neg-strong: #ff5c88;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 34px rgba(0, 0, 0, 0.6);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow);
+}
+
+:root {
+  // Theme-independent tokens
   --font-display: 'Instrument Serif', Georgia, serif;
   --font-ui: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
 
-  // Spacing scale (rhythm)
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -57,48 +84,25 @@
   --sp-7: 36px;
   --sp-8: 44px;
 
-  // Semantic z-index scale
   --z-sticky: 100;
   --z-modal-backdrop: 200;
   --z-modal: 210;
   --z-toast: 300;
+
+  @include light-tokens;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Dark theme — follows the OS setting (prefers-color-scheme). Only the base
-// values are overridden; every derived token (--accent-soft, --pos-soft,
-// --neg-soft, etc.) references var(--surface)/var(--accent-base) and so
-// recomputes for dark automatically. Same lime accent; brighter balance
-// colors for contrast on near-black.
-// ─────────────────────────────────────────────────────────────────────────
 @media (prefers-color-scheme: dark) {
   :root {
-    --accent-text: #c8f95e; // bright lime for links/accent text on dark
-    --on-accent: #0c1006;
-
-    // Exact dark palette (per design spec) — cool near-black grays.
-    --bg: #08090b;
-    --surface: #131417;
-    --surface2: #191a1e;
-    --surface3: #24262b;
-
-    --ink: #f3f4f0;
-    --ink2: #9b9ea4;
-    --ink3: #63666c;
-
-    --line: #202226;
-    --line2: #2e3037;
-
-    // Subtler accent fill for selected chips on dark.
-    --accent-soft: color-mix(in oklab, var(--accent-base) 16%, var(--surface));
-
-    // Balance signals (dark): mint (owed) / rose (owe).
-    --pos: #37dda8;
-    --neg: #ff5c88;
-    --pos-strong: #37dda8;
-    --neg-strong: #ff5c88;
-
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 34px rgba(0, 0, 0, 0.6);
-    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow);
+    @include dark-tokens;
   }
+}
+
+// Explicit user override (ThemeService stamps data-theme on <html>).
+:root[data-theme='light'] {
+  @include light-tokens;
+}
+
+:root[data-theme='dark'] {
+  @include dark-tokens;
 }

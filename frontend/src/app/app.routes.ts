@@ -28,5 +28,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./groups/group-detail.component').then((m) => m.GroupDetailComponent),
   },
+  {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./profile/profile.component').then((m) => m.ProfileComponent),
+  },
   { path: '**', redirectTo: 'groups' },
 ];

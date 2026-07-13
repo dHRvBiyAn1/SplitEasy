@@ -3,6 +3,8 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { DashboardService } from './dashboard/dashboard.service';
+import { ProfileService } from './core/profile.service';
+import { ThemeService } from './core/theme.service';
 import { centsToDisplay } from './expenses/expense.service';
 import { ModalsComponent } from './modals/modals.component';
 import { ModalService } from './modals/modal.service';
@@ -18,6 +20,8 @@ export class App implements OnInit {
 
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
+  private readonly profile = inject(ProfileService);
+  private readonly theme = inject(ThemeService);
   protected readonly modal = inject(ModalService);
   private readonly router = inject(Router);
 
@@ -38,6 +42,21 @@ export class App implements OnInit {
 
   /** Reflects the OS theme in the sidebar indicator (the theme itself is CSS-driven). */
   protected readonly systemDark = signal(this.prefersDark());
+
+  /** Effective dark state for the sidebar indicator, honouring the user's theme override. */
+  protected readonly effectiveDark = computed(() => {
+    const c = this.theme.choice();
+    return c === 'dark' || (c === 'system' && this.systemDark());
+  });
+
+  /** Sidebar avatar tint follows the color chosen on the profile page. */
+  protected readonly avatarStyle = computed(() => {
+    const c = this.profile.prefs().avatarColor;
+    return {
+      background: `color-mix(in oklab, ${c} 24%, var(--surface))`,
+      color: `color-mix(in oklab, ${c}, white 22%)`,
+    };
+  });
 
   constructor() {
     this.router.events
