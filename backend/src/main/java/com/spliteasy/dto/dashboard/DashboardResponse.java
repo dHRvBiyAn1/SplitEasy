@@ -1,4 +1,7 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.dashboard;
+
+import com.spliteasy.dto.balance.PersonBalance;
+import com.spliteasy.dto.balance.Settlement;
 
 import java.util.List;
 

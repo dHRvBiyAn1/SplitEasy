@@ -8,10 +8,16 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.*;
+
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(
         name = "expense_participants",
         uniqueConstraints = @UniqueConstraint(
@@ -36,29 +42,9 @@ public class ExpenseParticipant {
     @Column(name = "share_cents", nullable = false)
     private long shareCents;
 
-    protected ExpenseParticipant() {
-        // JPA
-    }
-
     public ExpenseParticipant(Expense expense, User user, long shareCents) {
         this.expense = expense;
         this.user = user;
         this.shareCents = shareCents;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public Expense getExpense() {
-        return expense;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public long getShareCents() {
-        return shareCents;
     }
 }

@@ -1,6 +1,7 @@
 package com.spliteasy.exception;
 
-import com.spliteasy.dto.ErrorResponse;
+import com.spliteasy.dto.common.ErrorResponse;
+
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

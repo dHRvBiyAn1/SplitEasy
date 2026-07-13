@@ -1,15 +1,19 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.ActivityItem;
-import com.spliteasy.dto.DashboardGroup;
-import com.spliteasy.dto.DashboardResponse;
-import com.spliteasy.dto.GroupSummary;
-import com.spliteasy.dto.PersonBalance;
-import com.spliteasy.dto.Settlement;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.balance.PersonBalance;
+import com.spliteasy.dto.balance.Settlement;
+import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.dashboard.ActivityItem;
+import com.spliteasy.dto.dashboard.DashboardGroup;
+import com.spliteasy.dto.dashboard.DashboardResponse;
+import com.spliteasy.dto.group.GroupSummary;
+
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.ExpenseRepository.ActivityExpenseView;
+
+import lombok.RequiredArgsConstructor;
+
 import com.spliteasy.repository.PaymentRepository;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -34,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * (group, counterparty) in one query instead.
  */
 @Service
+@RequiredArgsConstructor
 public class DashboardService {
 
     /** Cap on the merged activity feed. */
@@ -44,19 +49,6 @@ public class DashboardService {
     private final ExpenseRepository expenseRepository;
     private final ExpenseParticipantRepository participantRepository;
     private final PaymentRepository paymentRepository;
-
-    public DashboardService(
-            GroupService groupService,
-            PairwiseBalanceService pairwiseService,
-            ExpenseRepository expenseRepository,
-            ExpenseParticipantRepository participantRepository,
-            PaymentRepository paymentRepository) {
-        this.groupService = groupService;
-        this.pairwiseService = pairwiseService;
-        this.expenseRepository = expenseRepository;
-        this.participantRepository = participantRepository;
-        this.paymentRepository = paymentRepository;
-    }
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard(UUID userId) {
@@ -94,10 +86,15 @@ public class DashboardService {
                         .thenComparing(pb -> pb.user().displayName()))
                 .toList();
 
-        long owedCents = people.stream().filter(p -> p.netCents() > 0).mapToLong(PersonBalance::netCents).sum();
-        long oweCents = people.stream().filter(p -> p.netCents() < 0).mapToLong(p -> -p.netCents()).sum();
-        int owedPeople = (int) people.stream().filter(p -> p.netCents() > 0).count();
-        int owePeople = (int) people.stream().filter(p -> p.netCents() < 0).count();
+        // Headline totals are GROSS (summed across every pairwise balance in every group), not the
+        // per-person net below — so owing someone in one group always shows in "You owe", even when
+        // another group leaves you net-positive with them. totalNet still equals owed - owe.
+        long owedCents = settlements.stream().filter(s -> s.netCents() > 0).mapToLong(Settlement::netCents).sum();
+        long oweCents = settlements.stream().filter(s -> s.netCents() < 0).mapToLong(s -> -s.netCents()).sum();
+        int owedPeople = (int) settlements.stream().filter(s -> s.netCents() > 0)
+                .map(s -> s.counterparty().id()).distinct().count();
+        int owePeople = (int) settlements.stream().filter(s -> s.netCents() < 0)
+                .map(s -> s.counterparty().id()).distinct().count();
 
         // Largest imbalances first for the settle-up modal.
         settlements.sort(Comparator.comparingLong((Settlement s) -> Math.abs(s.netCents())).reversed());

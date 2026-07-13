@@ -1,9 +1,12 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.expense.CreateExpenseRequest;
+import com.spliteasy.dto.expense.ExpenseResponse;
+import com.spliteasy.dto.expense.ExpenseSummary;
+
+import lombok.RequiredArgsConstructor;
+
 import com.spliteasy.config.CurrentUserId;
-import com.spliteasy.dto.CreateExpenseRequest;
-import com.spliteasy.dto.ExpenseResponse;
-import com.spliteasy.dto.ExpenseSummary;
 import com.spliteasy.service.ExpenseService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -22,13 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/groups/{groupId}/expenses")
+@RequiredArgsConstructor
 public class ExpenseController {
 
     private final ExpenseService expenseService;
 
-    public ExpenseController(ExpenseService expenseService) {
-        this.expenseService = expenseService;
-    }
 
     @PostMapping
     public ResponseEntity<ExpenseResponse> createExpense(

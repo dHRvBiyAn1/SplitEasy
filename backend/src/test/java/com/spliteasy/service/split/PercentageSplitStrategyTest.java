@@ -1,9 +1,10 @@
 package com.spliteasy.service.split;
 
+import com.spliteasy.dto.expense.SplitInput;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.spliteasy.dto.SplitInput;
 import com.spliteasy.exception.BadRequestException;
 import java.util.List;
 import java.util.UUID;

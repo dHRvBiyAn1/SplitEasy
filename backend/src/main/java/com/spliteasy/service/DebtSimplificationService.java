@@ -1,9 +1,13 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.MemberBalance;
-import com.spliteasy.dto.SimplifiedDebtsResponse;
-import com.spliteasy.dto.SuggestedTransaction;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.balance.MemberBalance;
+import com.spliteasy.dto.balance.SimplifiedDebtsResponse;
+import com.spliteasy.dto.balance.SuggestedTransaction;
+import com.spliteasy.dto.common.UserSummary;
+
+
+import lombok.RequiredArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -25,13 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
  * every member to exactly zero with no leftover cents.
  */
 @Service
+@RequiredArgsConstructor
 public class DebtSimplificationService {
 
     private final BalanceService balanceService;
-
-    public DebtSimplificationService(BalanceService balanceService) {
-        this.balanceService = balanceService;
-    }
 
     @Transactional(readOnly = true)
     public SimplifiedDebtsResponse simplify(UUID requesterId, UUID groupId) {

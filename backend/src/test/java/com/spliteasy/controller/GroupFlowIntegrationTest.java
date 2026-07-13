@@ -1,5 +1,9 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.group.AddMemberRequest;
+import com.spliteasy.dto.group.CreateGroupRequest;
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -7,9 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import tools.jackson.databind.JsonNode;
 import com.spliteasy.AbstractIntegrationTest;
-import com.spliteasy.dto.AddMemberRequest;
-import com.spliteasy.dto.AuthResponse;
-import com.spliteasy.dto.CreateGroupRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;

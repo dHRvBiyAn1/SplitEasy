@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.balance;
+
+import com.spliteasy.dto.common.UserSummary;
 
 /**
  * One suggested settle-up transfer from the debt-simplification algorithm: {@code from} (a

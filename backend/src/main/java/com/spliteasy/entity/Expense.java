@@ -11,6 +11,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.*;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -19,6 +22,10 @@ import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "expenses")
 public class Expense {
 
@@ -60,10 +67,6 @@ public class Expense {
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ExpenseParticipant> participants = new ArrayList<>();
 
-    protected Expense() {
-        // JPA
-    }
-
     public Expense(
             Group group, String description, long amountCents, User paidBy, SplitType splitType,
             ExpenseCategory category, LocalDate spentOn) {
@@ -92,69 +95,5 @@ public class Expense {
     /** Removes all participant shares (orphanRemoval deletes the rows) — used when re-splitting on edit. */
     public void clearParticipants() {
         participants.clear();
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public void setAmountCents(long amountCents) {
-        this.amountCents = amountCents;
-    }
-
-    public void setPaidBy(User paidBy) {
-        this.paidBy = paidBy;
-    }
-
-    public void setSplitType(SplitType splitType) {
-        this.splitType = splitType;
-    }
-
-    public void setCategory(ExpenseCategory category) {
-        this.category = category;
-    }
-
-    public void setSpentOn(LocalDate spentOn) {
-        this.spentOn = spentOn;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public Group getGroup() {
-        return group;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public long getAmountCents() {
-        return amountCents;
-    }
-
-    public User getPaidBy() {
-        return paidBy;
-    }
-
-    public SplitType getSplitType() {
-        return splitType;
-    }
-
-    public ExpenseCategory getCategory() {
-        return category;
-    }
-
-    public LocalDate getSpentOn() {
-        return spentOn;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public List<ExpenseParticipant> getParticipants() {
-        return participants;
     }
 }

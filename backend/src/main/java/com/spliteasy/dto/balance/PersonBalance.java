@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.balance;
+
+import com.spliteasy.dto.common.UserSummary;
 
 /**
  * A counterparty's net position with the requesting user, aggregated across all shared groups.

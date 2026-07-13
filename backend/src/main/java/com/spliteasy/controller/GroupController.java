@@ -1,10 +1,13 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.group.AddMemberRequest;
+import com.spliteasy.dto.group.CreateGroupRequest;
+import com.spliteasy.dto.group.GroupResponse;
+import com.spliteasy.dto.group.GroupSummary;
+
+import lombok.RequiredArgsConstructor;
+
 import com.spliteasy.config.CurrentUserId;
-import com.spliteasy.dto.AddMemberRequest;
-import com.spliteasy.dto.CreateGroupRequest;
-import com.spliteasy.dto.GroupResponse;
-import com.spliteasy.dto.GroupSummary;
 import com.spliteasy.service.GroupService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -20,13 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/groups")
+@RequiredArgsConstructor
 public class GroupController {
 
     private final GroupService groupService;
 
-    public GroupController(GroupService groupService) {
-        this.groupService = groupService;
-    }
 
     @PostMapping
     public ResponseEntity<GroupResponse> createGroup(

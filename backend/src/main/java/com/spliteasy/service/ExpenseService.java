@@ -1,11 +1,12 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.CreateExpenseRequest;
-import com.spliteasy.dto.ExpenseResponse;
-import com.spliteasy.dto.ExpenseSummary;
-import com.spliteasy.dto.SplitInput;
-import com.spliteasy.dto.SplitShare;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.expense.CreateExpenseRequest;
+import com.spliteasy.dto.expense.ExpenseResponse;
+import com.spliteasy.dto.expense.ExpenseSummary;
+import com.spliteasy.dto.expense.SplitInput;
+import com.spliteasy.dto.expense.SplitShare;
+
 import com.spliteasy.entity.Expense;
 import com.spliteasy.entity.ExpenseCategory;
 import com.spliteasy.entity.Group;
