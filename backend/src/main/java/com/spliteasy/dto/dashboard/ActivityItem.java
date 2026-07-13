@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.dashboard;
+
+import com.spliteasy.dto.common.UserSummary;
 
 import com.spliteasy.entity.ExpenseCategory;
 import java.time.LocalDate;

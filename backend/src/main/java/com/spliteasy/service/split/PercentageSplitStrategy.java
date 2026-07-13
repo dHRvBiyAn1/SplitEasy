@@ -1,6 +1,7 @@
 package com.spliteasy.service.split;
 
-import com.spliteasy.dto.SplitInput;
+import com.spliteasy.dto.expense.SplitInput;
+
 import com.spliteasy.entity.SplitType;
 import com.spliteasy.exception.BadRequestException;
 import java.util.LinkedHashMap;

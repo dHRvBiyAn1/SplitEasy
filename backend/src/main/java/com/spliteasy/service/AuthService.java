@@ -1,30 +1,29 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.AuthResponse;
-import com.spliteasy.dto.LoginRequest;
-import com.spliteasy.dto.RegisterRequest;
-import com.spliteasy.dto.UserSummary;
+import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.auth.LoginRequest;
+import com.spliteasy.dto.auth.RegisterRequest;
+import com.spliteasy.dto.common.UserSummary;
+
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.repository.UserRepository;
 import com.spliteasy.util.Emails;
+
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-    }
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {

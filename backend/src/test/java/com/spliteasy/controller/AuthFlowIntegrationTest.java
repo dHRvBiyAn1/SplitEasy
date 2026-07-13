@@ -1,5 +1,9 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.auth.LoginRequest;
+import com.spliteasy.dto.auth.RegisterRequest;
+
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -7,9 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.spliteasy.AbstractIntegrationTest;
-import com.spliteasy.dto.AuthResponse;
-import com.spliteasy.dto.LoginRequest;
-import com.spliteasy.dto.RegisterRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;

@@ -10,9 +10,16 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA only
 @Table(
         name = "group_memberships",
         uniqueConstraints = @UniqueConstraint(
@@ -36,29 +43,9 @@ public class GroupMembership {
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt;
 
-    protected GroupMembership() {
-        // JPA
-    }
-
     public GroupMembership(Group group, User user) {
         this.group = group;
         this.user = user;
         this.joinedAt = Instant.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public Group getGroup() {
-        return group;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public Instant getJoinedAt() {
-        return joinedAt;
     }
 }

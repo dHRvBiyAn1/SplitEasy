@@ -1,10 +1,11 @@
 package com.spliteasy.service;
 
+import com.spliteasy.dto.balance.MemberBalance;
+import com.spliteasy.dto.balance.SuggestedTransaction;
+import com.spliteasy.dto.common.UserSummary;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.spliteasy.dto.MemberBalance;
-import com.spliteasy.dto.SuggestedTransaction;
-import com.spliteasy.dto.UserSummary;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

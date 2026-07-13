@@ -1,7 +1,8 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.PaymentResponse;
-import com.spliteasy.dto.RecordPaymentRequest;
+import com.spliteasy.dto.payment.PaymentResponse;
+import com.spliteasy.dto.payment.RecordPaymentRequest;
+
 import com.spliteasy.entity.Group;
 import com.spliteasy.entity.Payment;
 import com.spliteasy.entity.User;
@@ -11,6 +12,9 @@ import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
@@ -29,19 +34,6 @@ public class PaymentService {
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final MembershipGuard membershipGuard;
-
-    public PaymentService(
-            PaymentRepository paymentRepository,
-            GroupRepository groupRepository,
-            GroupMembershipRepository membershipRepository,
-            UserRepository userRepository,
-            MembershipGuard membershipGuard) {
-        this.paymentRepository = paymentRepository;
-        this.groupRepository = groupRepository;
-        this.membershipRepository = membershipRepository;
-        this.userRepository = userRepository;
-        this.membershipGuard = membershipGuard;
-    }
 
     @Transactional
     public PaymentResponse recordPayment(UUID requesterId, UUID groupId, RecordPaymentRequest request) {

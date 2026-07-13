@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.common;
 
 import com.spliteasy.entity.User;
 import java.util.UUID;

@@ -1,4 +1,6 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.auth;
+
+import com.spliteasy.dto.common.UserSummary;
 
 public record AuthResponse(
         String accessToken,

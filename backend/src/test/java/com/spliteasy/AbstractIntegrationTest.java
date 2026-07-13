@@ -1,9 +1,10 @@
 package com.spliteasy;
 
+import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.auth.LoginRequest;
+import com.spliteasy.dto.auth.RegisterRequest;
+
 import tools.jackson.databind.ObjectMapper;
-import com.spliteasy.dto.AuthResponse;
-import com.spliteasy.dto.LoginRequest;
-import com.spliteasy.dto.RegisterRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;

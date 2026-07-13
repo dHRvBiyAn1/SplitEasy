@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.expense;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;

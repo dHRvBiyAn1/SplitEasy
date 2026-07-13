@@ -1,4 +1,4 @@
-package com.spliteasy.dto;
+package com.spliteasy.dto.auth;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

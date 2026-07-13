@@ -11,9 +11,16 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA only
 @Table(name = "groups")
 public class Group {
 
@@ -36,10 +43,6 @@ public class Group {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    protected Group() {
-        // JPA
-    }
-
     public Group(String name, GroupType type, User createdBy) {
         this.name = name;
         this.type = type;
@@ -50,25 +53,5 @@ public class Group {
     /** Back-compat convenience: untyped group defaults to {@link GroupType#OTHER}. */
     public Group(String name, User createdBy) {
         this(name, GroupType.OTHER, createdBy);
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public GroupType getType() {
-        return type;
-    }
-
-    public User getCreatedBy() {
-        return createdBy;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }
