@@ -92,8 +92,20 @@ export class GroupDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.groupId = this.route.snapshot.paramMap.get('id') ?? '';
-    this.reload();
+    // Subscribe (not snapshot): Angular reuses this component when navigating between
+    // /groups/:id, so ngOnInit runs once — the snapshot would freeze on the first group.
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('id') ?? '';
+      if (id === this.groupId) {
+        return;
+      }
+      this.groupId = id;
+      this.loading.set(true);
+      this.error.set(null);
+      this.expandedId.set(null);
+      this.detail.set(null);
+      this.reload();
+    });
   }
 
   private reload(): void {
@@ -104,7 +116,9 @@ export class GroupDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(err?.status === 403 ? 'You are not a member of this group.' : 'Could not load the group.');
+        this.error.set(
+          err?.status === 403 ? 'You are not a member of this group.' : 'Could not load the group.',
+        );
         this.loading.set(false);
       },
     });
@@ -206,7 +220,12 @@ export class GroupDetailComponent implements OnInit {
   }
 
   initials(name: string): string {
-    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('');
   }
 
   tint(id: string): { background: string; color: string } {
@@ -234,7 +253,9 @@ export class GroupDetailComponent implements OnInit {
   }
 
   private monthLabel(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+    return new Date(iso + 'T00:00:00')
+      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      .toUpperCase();
   }
 
   dayNum(iso: string): string {
@@ -242,6 +263,8 @@ export class GroupDetailComponent implements OnInit {
   }
 
   dayMon(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    return new Date(iso + 'T00:00:00')
+      .toLocaleDateString('en-US', { month: 'short' })
+      .toUpperCase();
   }
 }
