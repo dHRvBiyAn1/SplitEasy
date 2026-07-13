@@ -51,16 +51,16 @@
 
       <div class="side__foot">
         <span class="side__theme">
-          <span aria-hidden="true">{{ systemDark() ? '☾' : '☀' }}</span>
-          Theme: {{ systemDark() ? 'Dark' : 'Light' }}
+          <span aria-hidden="true">{{ effectiveDark() ? '☾' : '☀' }}</span>
+          Theme: {{ effectiveDark() ? 'Dark' : 'Light' }}
         </span>
-        <button class="side__user" type="button" (click)="logout()" title="Log out">
-          <span class="side__avatar" aria-hidden="true">{{ initials(user()?.displayName) }}</span>
+        <a class="side__user" routerLink="/profile" routerLinkActive="is-active" title="View profile">
+          <span class="side__avatar" aria-hidden="true" [style]="avatarStyle()">{{ initials(user()?.displayName) }}</span>
           <span class="side__user-text">
             <span class="side__user-name">{{ user()?.displayName }}</span>
-            <span class="side__user-sub">Log out</span>
+            <span class="side__user-sub">View profile</span>
           </span>
-        </button>
+        </a>
       </div>
     </aside>
 
