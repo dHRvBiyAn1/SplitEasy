@@ -215,9 +215,17 @@
   text-align: left;
   color: inherit;
   font-family: var(--font-ui);
+  text-decoration: none;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
 
   &:hover {
     border-color: var(--line2);
+    text-decoration: none;
+  }
+
+  &.is-active {
+    border-color: var(--line2);
+    background: var(--surface2);
   }
 }
 

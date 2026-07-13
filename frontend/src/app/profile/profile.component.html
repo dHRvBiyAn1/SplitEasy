@@ -1,0 +1,104 @@
+<div class="profile">
+  <h1 class="profile__title">Profile</h1>
+
+  <section class="pcard">
+    @if (!editing()) {
+      <div class="pcard__head">
+        <span class="dc-avatar pcard__avatar" aria-hidden="true" [style]="avatarStyle()">{{ initials() }}</span>
+        <div class="pcard__id">
+          <h2 class="pcard__name">{{ user()?.displayName }}</h2>
+          <p class="pcard__since">Member since {{ memberSince() }}</p>
+        </div>
+        <button type="button" class="dc-btn-outline pcard__edit" (click)="startEdit()">
+          <span aria-hidden="true">✎</span> Edit
+        </button>
+      </div>
+
+      <dl class="pcard__rows">
+        <div class="prow2">
+          <dt class="dc-field-label">Email</dt>
+          <dd>{{ user()?.email }}</dd>
+        </div>
+        <div class="prow2">
+          <dt class="dc-field-label">Phone</dt>
+          <dd>{{ prefs().phone || '—' }}</dd>
+        </div>
+        <div class="prow2">
+          <dt class="dc-field-label">Currency</dt>
+          <dd>{{ currencyLabel(prefs().currency) }}</dd>
+        </div>
+      </dl>
+    } @else {
+      <form class="pform" (submit)="$event.preventDefault(); save()">
+        <div class="pcard__head">
+          <span class="dc-avatar pcard__avatar" aria-hidden="true" [style]="avatarStyle()">{{ initials() }}</span>
+          <div class="pcard__id">
+            <h2 class="pcard__name">{{ user()?.displayName }}</h2>
+            <p class="pcard__since">Member since {{ memberSince() }}</p>
+          </div>
+        </div>
+
+        <label class="pfield">
+          <span class="dc-field-label">Full name</span>
+          <input class="dc-field" [formControl]="name" autocomplete="name" />
+        </label>
+
+        <label class="pfield">
+          <span class="dc-field-label">Email</span>
+          <input class="dc-field" type="email" [formControl]="email" autocomplete="email" />
+        </label>
+
+        <label class="pfield">
+          <span class="dc-field-label">Phone</span>
+          <input class="dc-field" [formControl]="phone" autocomplete="tel" placeholder="+1 (555) 000-0000" />
+        </label>
+
+        <div class="pfield">
+          <span class="dc-field-label">Currency</span>
+          <div class="chips">
+            @for (c of currencies; track c) {
+              <button type="button" class="chip" [class.chip--on]="currency() === c" (click)="currency.set(c)">{{ c }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="pfield">
+          <span class="dc-field-label">Avatar color</span>
+          <div class="swatches">
+            @for (col of avatarColors; track col) {
+              <button
+                type="button"
+                class="swatch"
+                [class.swatch--on]="avatarColor() === col"
+                [style.background]="col"
+                (click)="avatarColor.set(col)"
+                [attr.aria-label]="'Avatar color ' + col"
+              ></button>
+            }
+          </div>
+        </div>
+
+        <div class="pform__actions">
+          <button type="button" class="dc-btn-outline" (click)="cancel()">Cancel</button>
+          <button type="submit" class="dc-btn-accent">Save changes</button>
+        </div>
+      </form>
+    }
+  </section>
+
+  <section class="pcard pappearance">
+    <div class="pappearance__text">
+      <h3 class="pappearance__title">Appearance</h3>
+      <p class="pappearance__sub">Theme follows your system by default.</p>
+    </div>
+    <div class="dc-segment pappearance__seg" role="group" aria-label="Theme">
+      @for (t of themeOptions; track t.value) {
+        <button type="button" [attr.aria-pressed]="theme.choice() === t.value" (click)="theme.set(t.value)">{{ t.label }}</button>
+      }
+    </div>
+  </section>
+
+  <button type="button" class="dc-btn-outline profile__signout" (click)="signOut()">
+    <span aria-hidden="true">⇥</span> Sign out
+  </button>
+</div>
