@@ -98,6 +98,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   strategy path; participants cleared and **flushed before re-insert** (unique `(expense_id,user_id)`).
   **Delete = hard delete** (204; FK-cascade removes participants). Balances re-aggregate, so edits/deletes
   reflect automatically — no special-casing.
+- **Indexes** live in Flyway migrations, named `idx_<table>_<cols>` (unique constraints
+  `uq_<table>_<cols>`). Every FK column is indexed; **filter+sort paths get a composite
+  `(filter_col, sort_col DESC…)`** whose leftmost prefix also serves the plain filter, so
+  no redundant single-column index is kept alongside it (see V7 for expenses/payments).
 - **Avoid N+1**: `join fetch m.user`; member counts via one aggregate query; expense list via one query
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
@@ -139,9 +143,9 @@ UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 - **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER).
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
-  `split_type` (V4: `EQUAL/UNEQUAL/PERCENTAGE`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Indexed `group_id`.
+  `split_type` (V4: `EQUAL/UNEQUAL/PERCENTAGE`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
 - **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. A settle-up is a **direct transfer**, a separate entity from Expense.
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense.
 
 User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All three split types store into the **same `share_cents`** column (no per-type storage), and each expense's shares sum exactly to its amount.
 
@@ -200,4 +204,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Dashboard redesign + global modals — PR #18 (`dc76572`): sidebar shell + `/api/dashboard` landing (`DashboardService` signal), global modal system (`app/modals/`), redesigned group detail; old inline `*-panel`s removed.
 - [x] UI polish pass — PR #21 (`b8bea88`): sharp modals, ~10% tighter spacing, settle-up confirm card, whole-card click targets + restored buttons, expandable expense rows, motion/hover. Verified in browser.
 - [x] Backend Lombok + DTO sub-packaging — PR #22 (`refactor/backend-lombok-dtos`): entities→Lombok, controllers/services→`@RequiredArgsConstructor`, flat `dto/`→resource sub-packages. Behavior unchanged. B97.
+- [x] Query performance indexes — migration V7 (`V7__query_performance_indexes.sql`): composite
+  `idx_expenses_group_spent_on (group_id, spent_on DESC, created_at DESC)` and
+  `idx_payments_group_created_at (group_id, created_at DESC)` for the group list + dashboard
+  feed + settle-up history; drops the now-redundant single-column `idx_expenses_group`/`idx_payments_group`. Validated against the live schema.
 - [x] Profile page + theme toggle — PR #23 (`feat/profile-page`): `/profile` route, sidebar "View profile" link, view/inline-edit (name/email/phone/currency/avatar-color), System/Light/Dark toggle via `ThemeService`. Prefs client-side only (see Gaps). Verified in browser.
