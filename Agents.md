@@ -102,6 +102,13 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   `uq_<table>_<cols>`). Every FK column is indexed; **filter+sort paths get a composite
   `(filter_col, sort_col DESC…)`** whose leftmost prefix also serves the plain filter, so
   no redundant single-column index is kept alongside it (see V7 for expenses/payments).
+- **Logging**: backend uses **Log4j2** (pom excludes `spring-boot-starter-logging`, adds
+  `spring-boot-starter-log4j2`); code logs via the SLF4J API using Lombok `@Slf4j`. Level
+  convention — **DEBUG** flow detail (dev only), **INFO** business events (register/login,
+  group/expense/payment create·update·delete), **WARN** client errors (4xx, centralized in
+  `GlobalExceptionHandler`), **ERROR** unexpected 5xx (the handler's catch-all, with stack
+  trace). Appender/pattern in `log4j2-spring.xml`; levels via `logging.level.*` in
+  `application[-dev].properties` (`com.spliteasy` = INFO prod / DEBUG dev). Never log secrets/tokens.
 - **Avoid N+1**: `join fetch m.user`; member counts via one aggregate query; expense list via one query
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
@@ -204,6 +211,10 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Dashboard redesign + global modals — PR #18 (`dc76572`): sidebar shell + `/api/dashboard` landing (`DashboardService` signal), global modal system (`app/modals/`), redesigned group detail; old inline `*-panel`s removed.
 - [x] UI polish pass — PR #21 (`b8bea88`): sharp modals, ~10% tighter spacing, settle-up confirm card, whole-card click targets + restored buttons, expandable expense rows, motion/hover. Verified in browser.
 - [x] Backend Lombok + DTO sub-packaging — PR #22 (`refactor/backend-lombok-dtos`): entities→Lombok, controllers/services→`@RequiredArgsConstructor`, flat `dto/`→resource sub-packages. Behavior unchanged. B97.
+- [x] Structured logging (Log4j2) — swapped the backend to Log4j2 and added leveled logging
+  (`@Slf4j`) across services + a centralized `GlobalExceptionHandler`: DEBUG flow, INFO business
+  events, WARN 4xx, ERROR unexpected 5xx. Config in `log4j2-spring.xml` + `logging.level.*`.
+  Backend 97/97 tests passing.
 - [x] Query performance indexes — migration V7 (`V7__query_performance_indexes.sql`): composite
   `idx_expenses_group_spent_on (group_id, spent_on DESC, created_at DESC)` and
   `idx_payments_group_created_at (group_id, created_at DESC)` for the group list + dashboard

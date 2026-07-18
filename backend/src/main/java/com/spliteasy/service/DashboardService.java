@@ -13,6 +13,7 @@ import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.ExpenseRepository.ActivityExpenseView;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import com.spliteasy.repository.PaymentRepository;
 import java.time.ZoneOffset;
@@ -37,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * group. Fine at this scale; if a user ever joins hundreds of groups, batch the aggregates by
  * (group, counterparty) in one query instead.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
@@ -52,6 +54,7 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard(UUID userId) {
+        log.debug("Assembling dashboard for user {}", userId);
         List<GroupSummary> myGroups = groupService.listMyGroups(userId);
 
         List<DashboardGroup> groupCards = new ArrayList<>();

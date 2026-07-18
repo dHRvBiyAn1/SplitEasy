@@ -14,6 +14,7 @@ import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -61,6 +63,8 @@ public class PaymentService {
                 .collect(Collectors.toMap(User::getId, Function.identity()));
         Payment payment = paymentRepository.save(
                 new Payment(group, users.get(payerId), users.get(payeeId), request.amountCents()));
+        log.info("Recorded payment {}: user {} paid user {} {} cents in group {}",
+                payment.getId(), payerId, payeeId, request.amountCents(), groupId);
         return PaymentResponse.from(payment);
     }
 
