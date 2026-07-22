@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Log4j2 is SplitEasy's logging backend (see pom.xml: spring-boot-starter-logging
+  excluded, spring-boot-starter-log4j2 added). This file only defines the appender
+  and pattern; per-package LEVELS (DEBUG/INFO/WARN/ERROR) are set via logging.level.*
+  in application.properties / application-dev.properties so they can vary per profile.
+  Named `log4j2-spring.xml` (not `log4j2.xml`) so Spring Boot's extensions apply.
+-->
+<Configuration status="WARN">
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout
+        pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%t] %logger{36} - %msg%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Root level="INFO">
+      <AppenderRef ref="Console"/>
+    </Root>
+  </Loggers>
+</Configuration>

@@ -17,12 +17,14 @@ import com.spliteasy.repository.UserRepository;
 import com.spliteasy.util.Emails;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GroupService {
@@ -39,6 +41,7 @@ public class GroupService {
         GroupType type = request.type() != null ? request.type() : GroupType.OTHER;
         Group group = groupRepository.save(new Group(request.name().trim(), type, creator));
         membershipRepository.save(new GroupMembership(group, creator));
+        log.info("Group {} '{}' created by user {}", group.getId(), group.getName(), requesterId);
         // One code path for the DTO: toGroupResponse re-reads members (just the creator here).
         return toGroupResponse(group);
     }
@@ -57,6 +60,7 @@ public class GroupService {
             throw new ConflictException("User is already a member of this group");
         }
         membershipRepository.save(new GroupMembership(group, invitee));
+        log.info("User {} added member {} to group {}", requesterId, invitee.getId(), groupId);
         return toGroupResponse(group);
     }
 
