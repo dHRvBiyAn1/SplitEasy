@@ -33,9 +33,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 public class ExpenseService {
 
@@ -69,6 +71,7 @@ public class ExpenseService {
     @Transactional
     public ExpenseResponse createExpense(UUID requesterId, UUID groupId, CreateExpenseRequest request) {
         membershipGuard.requireMember(groupId, requesterId);
+        log.debug("Creating expense in group {} by user {}", groupId, requesterId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
@@ -79,6 +82,8 @@ public class ExpenseService {
                 categoryOf(request), spentOnOf(request));
         addShares(expense, split);
         expenseRepository.save(expense);
+        log.info("Created {} expense {} ({} cents) in group {} paid by {}",
+                split.splitType(), expense.getId(), expense.getAmountCents(), groupId, split.payerId());
         return toResponse(expense);
     }
 
@@ -106,6 +111,7 @@ public class ExpenseService {
         expenseRepository.flush();
         addShares(expense, split);
         expenseRepository.save(expense);
+        log.info("Updated expense {} in group {} by user {}", expenseId, groupId, requesterId);
         return toResponse(expense);
     }
 
@@ -118,6 +124,7 @@ public class ExpenseService {
             throw new NotFoundException("Expense not found in this group");
         }
         expenseRepository.delete(expense); // cascade/orphanRemoval deletes expense_participants
+        log.info("Deleted expense {} from group {} by user {}", expenseId, groupId, requesterId);
     }
 
     /** Everything needed to write an expense's split — computed once, reused by create and update. */

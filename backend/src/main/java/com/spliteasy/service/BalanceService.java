@@ -11,6 +11,7 @@ import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Comparator;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  * not a special case. Because expense shares sum to their amount and each payment contributes
  * +X and -X, the group's balances always sum to zero. All aggregate GROUP BY queries — no loops.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BalanceService {
@@ -46,6 +48,7 @@ public class BalanceService {
     @Transactional(readOnly = true)
     public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
         membershipGuard.requireMember(groupId, requesterId);
+        log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
 
         Map<UUID, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
         Map<UUID, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
