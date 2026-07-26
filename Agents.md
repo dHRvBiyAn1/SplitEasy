@@ -186,6 +186,9 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 - **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. Add before real deploy.
 - **Register reveals email existence** (409 on duplicate) — fine for now; revisit if enumeration matters.
+- **Simplified settle-up is fetched per group** — `/debt-simplification` derives transfers from one
+  group's balances, so the settle-up modal fans out one request per in-scope group
+  (`DebtService.getSimplifiedDebtsForGroups`). Batch server-side if users ever join many groups.
 - **Profile prefs are client-side only** (PR #23) — phone/currency/avatar-color/theme in localStorage,
   "Member since" = first-visit month. No profile-update endpoint or signup-date column yet.
 
@@ -219,4 +222,9 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   `idx_expenses_group_spent_on (group_id, spent_on DESC, created_at DESC)` and
   `idx_payments_group_created_at (group_id, created_at DESC)` for the group list + dashboard
   feed + settle-up history; drops the now-redundant single-column `idx_expenses_group`/`idx_payments_group`. Validated against the live schema.
+- [x] Settle-up simplification + UI fixes — `feat/settle-up-simplify-and-ui-fixes`: Settle up opens on
+  the simplified (fewest) payments with a Simplify switch back to every direct balance, scoped per
+  group; amounts are editable so a balance can be settled partially; Add member moved into the group
+  action row; dashboard member count centered; avatar/glyph colors made theme-aware via `--avatar-ink`
+  (they were dark-mode-only, so light mode showed dark tiles). Frontend 50/50, backend 97/97.
 - [x] Profile page + theme toggle — PR #23 (`feat/profile-page`): `/profile` route, sidebar "View profile" link, view/inline-edit (name/email/phone/currency/avatar-color), System/Light/Dark toggle via `ThemeService`. Prefs client-side only (see Gaps). Verified in browser.
