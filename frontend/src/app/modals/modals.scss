@@ -295,6 +295,85 @@
   color: var(--ink3);
 }
 
+// ── Simplify-debts banner + switch ──────────────────────────────────────────
+.simplify-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+
+  &--on {
+    border-color: color-mix(in oklab, var(--accent) 45%, var(--line));
+    background: var(--accent-soft);
+  }
+}
+
+.simplify-bar__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.simplify-bar__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.simplify-bar__sub {
+  font-size: 12px;
+  color: var(--ink2);
+}
+
+.simplify-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink2);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.simplify-toggle__track {
+  position: relative;
+  width: 38px;
+  height: 21px;
+  border-radius: 999px; // the one pill in a sharp-cornered system: it reads as a switch
+  background: var(--line2);
+  transition: background-color 0.16s ease;
+
+  [aria-checked='true'] & {
+    background: var(--accent);
+  }
+}
+
+.simplify-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+
+  [aria-checked='true'] & {
+    transform: translateX(17px);
+  }
+}
+
 .srow__text {
   flex: 1;
   min-width: 0;

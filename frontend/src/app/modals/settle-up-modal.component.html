@@ -19,25 +19,58 @@
         </button>
       </div>
     </div>
-  } @else if (settlements().length === 0) {
-    <p class="mempty">You're all settled up. Nothing to pay.</p>
   } @else {
-    <div class="slist">
-      @for (s of settlements(); track s.groupId + s.counterparty.id) {
-        <button type="button" class="srow" (click)="select(s)">
-          <span class="dc-avatar srow__av" aria-hidden="true" [style]="tint(s.counterparty.id)">{{ initials(s.counterparty.displayName) }}</span>
-          <span class="srow__text">
-            <span class="srow__title">{{ label(s) }}</span>
-            <span class="srow__sub">{{ s.groupName }}</span>
-          </span>
-          <span
-            class="srow__amt dc-amount"
-            [class.dc-amount--owed]="s.netCents > 0"
-            [class.dc-amount--owes]="s.netCents < 0"
-          >${{ display(s.netCents < 0 ? -s.netCents : s.netCents) }}</span>
-          <span class="srow__chev" aria-hidden="true">›</span>
-        </button>
-      }
+    <div class="simplify-bar" [class.simplify-bar--on]="simplify()">
+      <span class="simplify-bar__text">
+        <span class="simplify-bar__title">
+          {{ simplify() ? 'Simplified · fewest payments' : 'All balances' }}
+        </span>
+        <span class="simplify-bar__sub">
+          @if (simplify()) {
+            @if (saved() > 0) {
+              {{ saved() }} fewer {{ saved() === 1 ? 'payment' : 'payments' }} than settling each debt
+            } @else {
+              Already the fewest payments possible
+            }
+          } @else {
+            Every debt settled directly, person by person
+          }
+        </span>
+      </span>
+      <button
+        type="button"
+        class="simplify-toggle"
+        role="switch"
+        [attr.aria-checked]="simplify()"
+        (click)="toggleSimplify()"
+      >
+        <span class="simplify-toggle__label">Simplify</span>
+        <span class="simplify-toggle__track" aria-hidden="true"><span class="simplify-toggle__knob"></span></span>
+      </button>
     </div>
+
+    @if (simplify() && loadingSimplified()) {
+      <div class="dc-loading" role="status" aria-label="Working out the fewest payments"></div>
+    } @else if (settlements().length === 0) {
+      <p class="mempty">You're all settled up. Nothing to pay.</p>
+    } @else {
+      <div class="slist">
+        @for (s of settlements(); track s.groupId + s.counterparty.id) {
+          <button type="button" class="srow" (click)="select(s)">
+            <span class="dc-avatar srow__av" aria-hidden="true" [style]="tint(s.counterparty.id)">{{ initials(s.counterparty.displayName) }}</span>
+            <span class="srow__text">
+              <span class="srow__title">{{ label(s) }}</span>
+              <span class="srow__sub">{{ s.groupName }}</span>
+            </span>
+            <span
+              class="srow__amt dc-amount"
+              [class.dc-amount--owed]="s.netCents > 0"
+              [class.dc-amount--owes]="s.netCents < 0"
+            >${{ display(s.netCents < 0 ? -s.netCents : s.netCents) }}</span>
+            <span class="srow__chev" aria-hidden="true">›</span>
+          </button>
+        }
+      </div>
+    }
   }
 </app-modal-shell>
