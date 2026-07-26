@@ -295,6 +295,52 @@
   color: var(--ink3);
 }
 
+// ── Editable settle amount (settle in full, or pay part of it) ───────────────
+.settle-amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  transition: border-color 0.14s ease;
+
+  &:focus-within {
+    border-color: var(--accent);
+  }
+}
+
+.settle-amount__sym {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--ink3);
+}
+
+.settle-amount__input {
+  width: 6ch;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1.1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  field-sizing: content; // grows with the value where supported
+
+  &:focus {
+    outline: none;
+  }
+
+  // The spinners crowd a display-sized field; the value is still keyboard-editable.
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+  appearance: textfield;
+}
+
 // ── Simplify-debts banner + switch ──────────────────────────────────────────
 .simplify-bar {
   display: flex;

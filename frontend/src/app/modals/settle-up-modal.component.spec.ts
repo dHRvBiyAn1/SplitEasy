@@ -129,4 +129,41 @@ describe('SettleUpModalComponent', () => {
     expect(getForGroups).toHaveBeenCalledWith(['g1']);
   });
 
+  it('records a partial amount instead of the full balance', async () => {
+    await render();
+    rows()[0].click();
+    fixture.detectChanges();
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('.settle-amount__input');
+    expect(input.value).toBe('30.00'); // prefilled with the full amount
+
+    input.value = '12.50';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.dc-btn-accent').click();
+
+    expect(recordPayment).toHaveBeenCalledWith('g1', {
+      payerUserId: priya.id, // she owes me, so she pays
+      payeeUserId: me.id,
+      amountCents: 1250,
+    });
+  });
+
+  it('rejects a non-positive amount', async () => {
+    await render();
+    rows()[0].click();
+    fixture.detectChanges();
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('.settle-amount__input');
+    input.value = '0';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.dc-btn-accent').click();
+    fixture.detectChanges();
+
+    expect(recordPayment).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.mform__error').textContent).toContain(
+      'greater than zero',
+    );
+  });
 });

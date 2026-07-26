@@ -3,19 +3,29 @@
     <div class="mform">
       <div class="settle-confirm">
         <span class="dc-avatar settle-confirm__av" aria-hidden="true" [style]="tint(s.counterparty.id)">{{ initials(s.counterparty.displayName) }}</span>
-        <span class="settle-confirm__label">{{ label(s) }}</span>
-        <span
-          class="settle-confirm__amt dc-amount"
-          [class.dc-amount--owed]="s.netCents > 0"
-          [class.dc-amount--owes]="s.netCents < 0"
-        >${{ display(s.netCents < 0 ? -s.netCents : s.netCents) }}</span>
-        <span class="settle-confirm__group">{{ s.groupName }}</span>
+        <span class="settle-confirm__label">{{ payingLabel(s) }}</span>
+        <label class="settle-amount">
+          <span class="settle-amount__sym" aria-hidden="true">$</span>
+          <input
+            class="settle-amount__input"
+            type="number"
+            step="0.01"
+            min="0"
+            inputmode="decimal"
+            aria-label="Amount to settle"
+            [value]="amount()"
+            (input)="onAmountInput($any($event.target).value)"
+          />
+        </label>
+        <span class="settle-confirm__group">
+          Recorded in {{ s.groupName }} as a cash settlement. Settle less to pay part of it.
+        </span>
       </div>
       @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
       <div class="mform__actions">
         <button type="button" class="dc-btn-outline" (click)="cancel()" [disabled]="saving()">Back</button>
         <button type="button" class="dc-btn-accent" (click)="confirm()" [disabled]="saving()">
-          Record ${{ display(s.netCents < 0 ? -s.netCents : s.netCents) }} payment
+          Record payment
         </button>
       </div>
     </div>

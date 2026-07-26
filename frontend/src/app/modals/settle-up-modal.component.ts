@@ -4,7 +4,7 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
 import { DebtService } from '../debts/debt.service';
 import { SimplifiedDebtsResponse } from '../debts/debt.models';
-import { centsToDisplay } from '../expenses/expense.service';
+import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
 import { PaymentService } from '../payments/payment.service';
 import { avatarTint } from '../core/avatar';
 import { ModalService } from './modal.service';
@@ -49,6 +49,8 @@ export class SettleUpModalComponent {
   );
 
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
+  /** Editable amount for the selected row, in dollars — settle in full or partially. */
+  protected readonly amount = signal('');
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -60,6 +62,11 @@ export class SettleUpModalComponent {
         this.loadSimplified(ids);
       }
     });
+
+    const prefill = this.modal.settlePrefill();
+    if (prefill) {
+      this.amount.set(centsToDisplay(Math.abs(prefill.netCents)));
+    }
   }
 
   /** Groups to simplify: just this one when opened from a group, else all of mine. */
@@ -126,9 +133,27 @@ export class SettleUpModalComponent {
     return s.netCents > 0 ? `${name} owes you` : `You owe ${name}`;
   }
 
+  /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
+  payingLabel(s: Settlement): string {
+    const name = s.counterparty.displayName.split(/\s+/)[0];
+    return s.netCents > 0 ? `${name} is paying you` : `You are paying ${name}`;
+  }
+
   select(s: Settlement): void {
     this.error.set(null);
+    this.amount.set(centsToDisplay(Math.abs(s.netCents)));
     this.selected.set(s);
+  }
+
+  onAmountInput(value: string): void {
+    this.amount.set(value);
+    this.error.set(null);
+  }
+
+  /** Entered dollars as integer cents; NaN/blank becomes 0 so validation rejects it. */
+  protected enteredCents(): number {
+    const n = Number(this.amount());
+    return Number.isFinite(n) ? dollarsToCents(n) : 0;
   }
 
   cancel(): void {
@@ -145,16 +170,17 @@ export class SettleUpModalComponent {
     if (!s || this.saving()) {
       return;
     }
+    const cents = this.enteredCents();
+    if (cents <= 0) {
+      this.error.set('Enter an amount greater than zero.');
+      return;
+    }
     const me = this.auth.user()?.id ?? '';
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
     const [payer, payee] = s.netCents > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
     this.saving.set(true);
     this.payments
-      .recordPayment(s.groupId, {
-        payerUserId: payer,
-        payeeUserId: payee,
-        amountCents: Math.abs(s.netCents),
-      })
+      .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents })
       .subscribe({
         next: () => {
           this.dashboard.refresh();
