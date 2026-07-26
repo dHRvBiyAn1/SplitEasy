@@ -66,8 +66,7 @@
                 <span
                   class="card__glyph"
                   aria-hidden="true"
-                  [style.background]="'hsl(' + glyphHue(g.name) + ' 40% 20%)'"
-                  [style.color]="'hsl(' + glyphHue(g.name) + ' 70% 72%)'"
+                  [style]="glyphTint(g.name)"
                   >{{ g.name.charAt(0) }}</span
                 >
                 <div class="card__id">
@@ -99,7 +98,7 @@
                   <p class="card__stat-label">Total spent</p>
                   <p class="card__stat-val">${{ display(g.totalSpentCents) }}</p>
                 </div>
-                <div>
+                <div class="card__stat--center">
                   <p class="card__stat-label">Members</p>
                   <p class="card__stat-val">{{ g.memberCount }}</p>
                 </div>
