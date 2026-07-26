@@ -245,26 +245,6 @@
   }
 }
 
-// ── Add-member pill ──────────────────────────────────────────────────────────
-.pill--add {
-  margin-left: auto; // pushed to the right end of the pills row
-  cursor: pointer;
-  color: var(--accent-text);
-  border-style: dashed;
-  border-color: var(--line2);
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  transition:
-    border-color 0.14s ease,
-    background-color 0.14s ease;
-
-  &:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-  }
-}
-
 // ── Expandable expense rows (click to reveal the split) ──────────────────────
 .xitem {
   &:not(:last-child) {
