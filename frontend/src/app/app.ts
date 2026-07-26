@@ -8,6 +8,7 @@ import { ThemeService } from './core/theme.service';
 import { centsToDisplay } from './expenses/expense.service';
 import { ModalsComponent } from './modals/modals.component';
 import { ModalService } from './modals/modal.service';
+import { groupGlyphTint } from './core/avatar';
 
 @Component({
   selector: 'app-root',
@@ -54,7 +55,7 @@ export class App implements OnInit {
     const c = this.profile.prefs().avatarColor;
     return {
       background: `color-mix(in oklab, ${c} 24%, var(--surface))`,
-      color: `color-mix(in oklab, ${c}, white 22%)`,
+      color: `color-mix(in oklab, ${c}, var(--avatar-ink) 30%)`,
     };
   });
 
@@ -99,11 +100,7 @@ export class App implements OnInit {
   }
 
   /** Stable per-group tint for the glyph square, derived from the name. */
-  glyphHue(name: string): number {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) {
-      h = (h * 31 + name.charCodeAt(i)) % 360;
-    }
-    return h;
+  glyphTint(name: string): { background: string; color: string } {
+    return groupGlyphTint(name);
   }
 }

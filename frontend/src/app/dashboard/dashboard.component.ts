@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { UserSummary } from '../core/auth/auth.models';
 import { centsToDisplay } from '../expenses/expense.service';
-import { avatarTint } from '../core/avatar';
+import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
@@ -79,12 +79,8 @@ export class DashboardComponent {
       .join('');
   }
 
-  glyphHue(name: string): number {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) {
-      h = (h * 31 + name.charCodeAt(i)) % 360;
-    }
-    return h;
+  glyphTint(name: string): { background: string; color: string } {
+    return groupGlyphTint(name);
   }
 
   tint(id: string): { background: string; color: string } {

@@ -51,7 +51,7 @@ export class ProfileComponent {
     const c = this.editing() ? this.avatarColor() : this.prefs().avatarColor;
     return {
       background: `color-mix(in oklab, ${c} 24%, var(--surface))`,
-      color: `color-mix(in oklab, ${c}, white 22%)`,
+      color: `color-mix(in oklab, ${c}, var(--avatar-ink) 30%)`,
     };
   });
 

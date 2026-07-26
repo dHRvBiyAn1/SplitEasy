@@ -29,8 +29,7 @@
               <span
                 class="side__glyph"
                 aria-hidden="true"
-                [style.background]="'hsl(' + glyphHue(g.name) + ' 40% 22%)'"
-                [style.color]="'hsl(' + glyphHue(g.name) + ' 70% 72%)'"
+                [style]="glyphTint(g.name)"
                 >{{ g.name.charAt(0) }}</span
               >
               <span class="side__group-text">
