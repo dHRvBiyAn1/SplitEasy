@@ -47,8 +47,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET | `/health` | liveness |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
-| GET | `/groups/{g}` | detail (members) |
+| GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
 | POST | `/groups/{g}/members` | add by email |
+| DELETE | `/groups/{g}/members/{m}` | remove a member — or leave, when `{m}` is you (409 if unsettled) |
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
 | GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
@@ -84,8 +85,14 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **403 before 404, uniformly**: every group-scoped op calls `requireMember` *before* loading by id,
   so a non-member gets 403 even for a nonexistent group (API never reveals existence). Followed by
   Group/Expense/Balance/Payment services.
-- **Group authz is flat**: any member can view, add members, and **edit/delete any expense** (matches
-  Splitwise; roles later via `GroupMembership`).
+- **Group authz is flat, with one exception**: any member can view, rename, change settings, add
+  members, remove a settled member, and **edit/delete any expense** (matches Splitwise). The
+  exception is **deleting the group — creator only** (`groups.created_by` is the closest thing to an
+  admin; there is no role column). The creator can also neither be removed nor leave, so a group
+  can't end up with nobody able to delete it.
+- **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
+  **net in the group** is non-zero, so no debt is orphaned. The net comes from
+  `BalanceService.computeBalances` — never a second aggregation.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`PercentageSplitStrategy`
@@ -189,6 +196,11 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - **Simplified settle-up is fetched per group** — `/debt-simplification` derives transfers from one
   group's balances, so the settle-up modal fans out one request per in-scope group
   (`DebtService.getSimplifiedDebtsForGroups`). Batch server-side if users ever join many groups.
+- **Simplify-debts is a group setting, not a view toggle** (`groups.simplify_debts`, V8, default on).
+  Settle up has no switch of its own: it reads each group's flag, so a dashboard-level settle-up can
+  mix simplified and direct rows. The flag rides on the dashboard payload
+  (`GroupSummary` → `DashboardGroup`) — anything changing it must call `dashboard.refresh()`, or the
+  modal keeps reading the cached value.
 - **Profile prefs are client-side only** (PR #23) — phone/currency/avatar-color/theme in localStorage,
   "Member since" = first-visit month. No profile-update endpoint or signup-date column yet.
 
@@ -222,6 +234,13 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   `idx_expenses_group_spent_on (group_id, spent_on DESC, created_at DESC)` and
   `idx_payments_group_created_at (group_id, created_at DESC)` for the group list + dashboard
   feed + settle-up history; drops the now-redundant single-column `idx_expenses_group`/`idx_payments_group`. Validated against the live schema.
+- [x] Group settings + shell polish — `feat/group-settings`: new `/groups/:id/settings` behind a gear
+  in the header (Settle up | Add expense | gear), with inline rename, a members list carrying each
+  balance and a removal gated on being settled, the per-group Simplify debts switch, and inline-confirm
+  Leave / creator-only Delete. Backed by new group mutations (V8 `simplify_debts`, PATCH, member
+  removal/leave, delete). Settle up lost its own toggle and follows the group. Sidebar is collapsible
+  to an icon rail (persisted), glyphs became SVGs, and the old `/groups` list page is gone.
+  Backend 107/107, frontend 50/50.
 - [x] Settle-up simplification + UI fixes — `feat/settle-up-simplify-and-ui-fixes`: Settle up opens on
   the simplified (fewest) payments with a Simplify switch back to every direct balance, scoped per
   group; amounts are editable so a balance can be settled partially; Add member moved into the group
