@@ -72,7 +72,8 @@ public class GroupService {
     @Transactional(readOnly = true)
     public List<GroupSummary> listMyGroups(UUID requesterId) {
         return membershipRepository.findGroupSummariesForUser(requesterId).stream()
-                .map(v -> new GroupSummary(v.getId(), v.getName(), v.getType(), v.getMemberCount()))
+                .map(v -> new GroupSummary(
+                        v.getId(), v.getName(), v.getType(), v.getMemberCount(), v.getSimplifyDebts()))
                 .toList();
     }
 

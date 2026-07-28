@@ -15,4 +15,6 @@ public record DashboardGroup(
         long totalSpentCents,
         long youAreOwedCents,
         long youOweCents,
-        long netCents) {}
+        long netCents,
+        /** Group setting: settle-up suggests the fewest payments for this group. */
+        boolean simplifyDebts) {}

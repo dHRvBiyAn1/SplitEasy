@@ -25,9 +25,7 @@ export class SettleUpModalComponent {
 
   protected readonly display = centsToDisplay;
 
-  /** Simplify is ON by default: open on the fewest payments that clear the debts. */
-  protected readonly simplify = signal(true);
-  /** Simplified rows once fetched (null = not loaded yet). */
+  /** Simplified rows for the groups that ask for them (null = not loaded yet). */
   private readonly simplified = signal<Settlement[] | null>(null);
   protected readonly loadingSimplified = signal(false);
 
@@ -38,14 +36,39 @@ export class SettleUpModalComponent {
     return gid ? all.filter((s) => s.groupId === gid) : all;
   });
 
-  /** What the list shows: the minimal set of payments, or every direct balance. */
-  protected readonly settlements = computed<Settlement[]>(() =>
-    this.simplify() ? (this.simplified() ?? []) : this.direct(),
+  /** Set when the simplified fetch fails, so every group falls back to direct balances. */
+  private readonly simplifyFailed = signal(false);
+
+  /** Group ids whose settings ask for the fewest payments (Advanced settings). */
+  private readonly simplifyingGroupIds = computed(() =>
+    this.simplifyFailed()
+      ? new Set<string>()
+      : new Set(
+          (this.dashboard.data()?.groups ?? []).filter((g) => g.simplifyDebts).map((g) => g.id),
+        ),
   );
+
+  /** True when every in-scope group is on the simplified view (drives the banner copy). */
+  protected readonly allSimplified = computed(() =>
+    this.scopeGroupIds().every((id) => this.simplifyingGroupIds().has(id)),
+  );
+
+  /**
+   * Simplification is a per-group setting, so the list mixes the two: a simplifying group
+   * contributes its minimal payments, any other contributes its direct balances as-is.
+   */
+  protected readonly settlements = computed<Settlement[]>(() => {
+    const simplifying = this.simplifyingGroupIds();
+    const simplified = this.simplified() ?? [];
+    return [
+      ...simplified.filter((s) => simplifying.has(s.groupId)),
+      ...this.direct().filter((s) => !simplifying.has(s.groupId)),
+    ];
+  });
 
   /** Payments saved by simplifying (0 when it doesn't help — the banner hides the line). */
   protected readonly saved = computed(() =>
-    Math.max(0, this.direct().length - (this.simplified()?.length ?? 0)),
+    Math.max(0, this.direct().length - this.settlements().length),
   );
 
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
@@ -86,9 +109,9 @@ export class SettleUpModalComponent {
         this.loadingSimplified.set(false);
       },
       error: () => {
-        // Fall back to the direct balances rather than showing an empty modal.
-        this.simplified.set(null);
-        this.simplify.set(false);
+        // Fall back to every direct balance rather than showing an empty modal.
+        this.simplified.set([]);
+        this.simplifyFailed.set(true);
         this.loadingSimplified.set(false);
       },
     });
@@ -113,10 +136,6 @@ export class SettleUpModalComponent {
 
   private groupName(groupId: string): string {
     return (this.dashboard.data()?.groups ?? []).find((g) => g.id === groupId)?.name ?? '';
-  }
-
-  toggleSimplify(): void {
-    this.simplify.set(!this.simplify());
   }
 
   initials(name: string): string {

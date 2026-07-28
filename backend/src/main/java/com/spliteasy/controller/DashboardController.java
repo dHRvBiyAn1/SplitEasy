@@ -18,7 +18,6 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-
     @GetMapping
     public DashboardResponse getDashboard(@CurrentUserId UUID userId) {
         return dashboardService.getDashboard(userId);

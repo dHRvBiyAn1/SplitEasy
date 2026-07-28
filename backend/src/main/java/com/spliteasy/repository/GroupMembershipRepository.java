@@ -33,12 +33,13 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
      * m2 counts all members of each of those groups.
      */
     @Query("""
-            select g.id as id, g.name as name, g.type as type, count(m2.id) as memberCount
+            select g.id as id, g.name as name, g.type as type, count(m2.id) as memberCount,
+                   g.simplifyDebts as simplifyDebts
             from GroupMembership m1
             join m1.group g
             join GroupMembership m2 on m2.group = g
             where m1.user.id = :userId
-            group by g.id, g.name, g.type, g.createdAt
+            group by g.id, g.name, g.type, g.simplifyDebts, g.createdAt
             order by g.createdAt desc
             """)
     List<GroupSummaryView> findGroupSummariesForUser(@Param("userId") UUID userId);
@@ -52,5 +53,7 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
         com.spliteasy.entity.GroupType getType();
 
         long getMemberCount();
+
+        boolean getSimplifyDebts();
     }
 }

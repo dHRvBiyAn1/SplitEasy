@@ -79,7 +79,8 @@ public class DashboardService {
             }
             groupCards.add(new DashboardGroup(
                     g.id(), g.name(), g.type(), g.memberCount(),
-                    expenseRepository.sumAmountByGroup(g.id()), owed, owe, owed - owe));
+                    expenseRepository.sumAmountByGroup(g.id()), owed, owe, owed - owe,
+                    g.simplifyDebts()));
         }
 
         List<PersonBalance> people = peopleNet.entrySet().stream()
