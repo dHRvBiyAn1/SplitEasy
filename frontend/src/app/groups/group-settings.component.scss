@@ -1,0 +1,346 @@
+// Group settings — sectioned like the profile page, rendered inside the app shell.
+
+.gset {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 22px 30px 54px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: dc-fade-up 0.4s var(--ease-out);
+}
+
+.gset__back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+}
+
+// ── Name row ────────────────────────────────────────────────────────────────
+.gset__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+}
+
+.gset__glyph {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+}
+
+.gset__name {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.gset__name-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.gset__icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--line2);
+  background: var(--surface);
+  color: var(--ink2);
+  cursor: pointer;
+  transition:
+    color 0.14s ease,
+    border-color 0.14s ease,
+    background-color 0.14s ease;
+
+  &:hover:not(:disabled) {
+    color: var(--ink);
+    border-color: var(--ink3);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  // Saving is the affirmative action, so it carries the accent.
+  &--save {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+
+    &:hover:not(:disabled) {
+      color: var(--on-accent);
+      border-color: var(--accent);
+      filter: brightness(1.06);
+    }
+  }
+}
+
+.gset__error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--neg);
+}
+
+// ── Sections ────────────────────────────────────────────────────────────────
+.gcard {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+
+  &--danger {
+    border-color: color-mix(in oklab, var(--neg) 30%, var(--line));
+  }
+}
+
+.gcard__title {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  font-family: var(--font-ui);
+}
+
+// ── Member rows ─────────────────────────────────────────────────────────────
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-ui);
+  color: inherit;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+
+  // "Add member" is pinned above the list and reads as the primary action.
+  &--add {
+    cursor: pointer;
+    color: var(--accent-text);
+    font-weight: 600;
+
+    &:hover .mrow__name {
+      text-decoration: underline;
+    }
+  }
+}
+
+.mrow__av,
+.mrow__plus {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.mrow__plus {
+  border: 1px dashed var(--line2);
+  color: var(--accent-text);
+}
+
+.mrow__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mrow__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.mrow__you {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink3);
+  background: var(--surface2);
+  border: 1px solid var(--line);
+}
+
+.mrow__sub {
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+.mrow__bal {
+  font-size: 13.5px;
+  flex-shrink: 0;
+}
+
+.mrow__x {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink3);
+  cursor: pointer;
+  transition:
+    color 0.14s ease,
+    border-color 0.14s ease;
+
+  &:hover:not(:disabled) {
+    color: var(--neg);
+    border-color: var(--neg);
+  }
+
+  // Disabled while that member still owes or is owed — the reason sits below.
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.mrow__why {
+  margin: -4px 0 8px 46px;
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+
+// ── Setting / danger rows ───────────────────────────────────────────────────
+.grow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.grow__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.grow__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.grow__sub {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink2);
+}
+
+.gconfirm {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gconfirm__yes {
+  border-color: var(--neg);
+  color: var(--neg);
+
+  &:hover:not(:disabled) {
+    background: var(--neg-soft);
+    border-color: var(--neg);
+  }
+}
+
+// ── Simplify switch (lives here now that settle-up just follows the setting) ─
+.simplify-toggle {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.simplify-toggle__track {
+  position: relative;
+  display: block;
+  width: 38px;
+  height: 21px;
+  border-radius: 999px; // the one pill in a sharp-cornered system: it reads as a switch
+  background: var(--line2);
+  transition: background-color 0.16s ease;
+
+  [aria-checked='true'] & {
+    background: var(--accent);
+  }
+}
+
+.simplify-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.16s var(--ease-out);
+
+  [aria-checked='true'] & {
+    transform: translateX(17px);
+  }
+}
+
+@media (max-width: 640px) {
+  .gset {
+    padding: 18px 18px 44px;
+  }
+
+  .grow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

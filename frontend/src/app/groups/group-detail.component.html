@@ -18,9 +18,24 @@
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
       </div>
       <div class="gd__actions">
-        <button type="button" class="dc-btn-outline" (click)="settleUp()"><span aria-hidden="true">⇄</span> Settle up</button>
-        <button type="button" class="dc-btn-outline" (click)="addMember()"><span aria-hidden="true">+</span> Add member</button>
-        <button type="button" class="dc-btn-accent" (click)="addExpense()"><span aria-hidden="true">+</span> Add expense</button>
+        <button type="button" class="dc-btn-outline" (click)="settleUp()">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 8h13l-3-3M20 16H7l3 3" />
+          </svg>
+          Settle up
+        </button>
+        <button type="button" class="dc-btn-accent" (click)="addExpense()">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5.5v13M5.5 12h13" />
+          </svg>
+          Add expense
+        </button>
+        <a class="gd__gear" [routerLink]="['/groups', groupId, 'settings']" title="Group settings" aria-label="Group settings">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.1" />
+            <path d="M19.9 14.2a1.5 1.5 0 00.3 1.65l.05.06a1.9 1.9 0 11-2.7 2.7l-.05-.06a1.5 1.5 0 00-1.65-.3 1.5 1.5 0 00-.9 1.37v.15a1.9 1.9 0 11-3.8 0v-.08a1.5 1.5 0 00-.98-1.37 1.5 1.5 0 00-1.65.3l-.06.06a1.9 1.9 0 11-2.7-2.7l.06-.06a1.5 1.5 0 00.3-1.65 1.5 1.5 0 00-1.37-.9H5.4a1.9 1.9 0 110-3.8h.08a1.5 1.5 0 001.37-.98 1.5 1.5 0 00-.3-1.65l-.06-.06a1.9 1.9 0 112.7-2.7l.06.05a1.5 1.5 0 001.65.3h.07a1.5 1.5 0 00.9-1.37V4.1a1.9 1.9 0 113.8 0v.08a1.5 1.5 0 00.9 1.37 1.5 1.5 0 001.65-.3l.06-.05a1.9 1.9 0 112.7 2.7l-.06.06a1.5 1.5 0 00-.3 1.65v.07a1.5 1.5 0 001.37.9h.15a1.9 1.9 0 110 3.8h-.08a1.5 1.5 0 00-1.37.9z" />
+          </svg>
+        </a>
       </div>
     </header>
 

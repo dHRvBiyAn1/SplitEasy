@@ -31,7 +31,7 @@ export class RegisterComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.auth.register(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigate(['/groups']),
+      next: () => this.router.navigate(['/dashboard']),
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Registration failed. Please try again.');
         this.submitting.set(false);

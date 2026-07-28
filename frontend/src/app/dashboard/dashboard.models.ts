@@ -27,6 +27,8 @@ export interface DashboardGroup {
   youAreOwedCents: number;
   youOweCents: number;
   netCents: number;
+  /** Group setting: settle-up suggests the fewest payments for this group. */
+  simplifyDebts: boolean;
 }
 
 /** One settle-up row: positive netCents = they owe you (in this group). */

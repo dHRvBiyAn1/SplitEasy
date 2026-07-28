@@ -32,6 +32,7 @@ const dashboardData = {
       youAreOwedCents: 5000,
       youOweCents: 2000,
       netCents: 3000,
+      simplifyDebts: true,
     },
   ],
   people: [],
@@ -55,13 +56,10 @@ describe('SettleUpModalComponent', () => {
   let modal: ModalService;
   let recordPayment: ReturnType<typeof vi.fn>;
   let getForGroups: ReturnType<typeof vi.fn>;
+  let data: ReturnType<typeof signal<DashboardResponse>>;
 
   function rows(): HTMLElement[] {
     return Array.from(fixture.nativeElement.querySelectorAll('.srow'));
-  }
-
-  function toggle(): HTMLElement {
-    return fixture.nativeElement.querySelector('.simplify-toggle');
   }
 
   async function render(): Promise<void> {
@@ -74,11 +72,12 @@ describe('SettleUpModalComponent', () => {
   beforeEach(() => {
     recordPayment = vi.fn().mockReturnValue(of({}));
     getForGroups = vi.fn().mockReturnValue(of([simplifiedForG1]));
+    data = signal(dashboardData);
 
     TestBed.configureTestingModule({
       imports: [SettleUpModalComponent],
       providers: [
-        { provide: DashboardService, useValue: { data: signal(dashboardData), refresh: vi.fn() } },
+        { provide: DashboardService, useValue: { data, refresh: vi.fn() } },
         { provide: DebtService, useValue: { getSimplifiedDebtsForGroups: getForGroups } },
         { provide: PaymentService, useValue: { recordPayment } },
         { provide: AuthService, useValue: { user: signal(me) } },
@@ -88,10 +87,9 @@ describe('SettleUpModalComponent', () => {
     modal.openSettle();
   });
 
-  it('opens with simplify on, showing only the minimal set of payments', async () => {
+  it('shows only the minimal set of payments when the group asks to simplify', async () => {
     await render();
 
-    expect(toggle().getAttribute('aria-checked')).toBe('true');
     expect(rows()).toHaveLength(1);
     expect(rows()[0].textContent).toContain('Priya owes you');
     expect(rows()[0].textContent).toContain('30.00');
@@ -110,13 +108,15 @@ describe('SettleUpModalComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('1 fewer payment');
   });
 
-  it('lists every direct balance when simplify is switched off', async () => {
+  it('lists every direct balance when the group has simplify turned off', async () => {
+    // The group's Advanced setting drives this now — there is no toggle in the modal.
+    data.set({
+      ...dashboardData,
+      groups: [{ ...dashboardData.groups[0], simplifyDebts: false }],
+    } as DashboardResponse);
     await render();
 
-    toggle().click();
-    fixture.detectChanges();
-
-    expect(toggle().getAttribute('aria-checked')).toBe('false');
+    expect(fixture.nativeElement.querySelector('.simplify-toggle')).toBeNull();
     expect(rows()).toHaveLength(2);
     expect(fixture.nativeElement.textContent).toContain('Priya owes you');
     expect(fixture.nativeElement.textContent).toContain('You owe Dan');

@@ -30,36 +30,23 @@
       </div>
     </div>
   } @else {
-    <div class="simplify-bar" [class.simplify-bar--on]="simplify()">
+    <div class="simplify-bar" [class.simplify-bar--on]="allSimplified()">
       <span class="simplify-bar__text">
         <span class="simplify-bar__title">
-          {{ simplify() ? 'Simplified · fewest payments' : 'All balances' }}
+          {{ allSimplified() ? 'Simplified · fewest payments' : 'All balances' }}
         </span>
         <span class="simplify-bar__sub">
-          @if (simplify()) {
-            @if (saved() > 0) {
-              {{ saved() }} fewer {{ saved() === 1 ? 'payment' : 'payments' }} than settling each debt
-            } @else {
-              Already the fewest payments possible
-            }
+          @if (saved() > 0) {
+            {{ saved() }} fewer {{ saved() === 1 ? 'payment' : 'payments' }} than settling each debt ·
+            change this in group settings
           } @else {
-            Every debt settled directly, person by person
+            Set per group under Advanced settings
           }
         </span>
       </span>
-      <button
-        type="button"
-        class="simplify-toggle"
-        role="switch"
-        [attr.aria-checked]="simplify()"
-        (click)="toggleSimplify()"
-      >
-        <span class="simplify-toggle__label">Simplify</span>
-        <span class="simplify-toggle__track" aria-hidden="true"><span class="simplify-toggle__knob"></span></span>
-      </button>
     </div>
 
-    @if (simplify() && loadingSimplified()) {
+    @if (loadingSimplified()) {
       <div class="dc-loading" role="status" aria-label="Working out the fewest payments"></div>
     } @else if (settlements().length === 0) {
       <p class="mempty">You're all settled up. Nothing to pay.</p>

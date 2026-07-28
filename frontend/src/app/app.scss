@@ -18,19 +18,51 @@
   padding: 16px 12px 12px;
   background: var(--surface);
   border-right: 1px solid var(--line);
+  // Collapsing snaps rather than animating: the rail resizes a fixed element and
+  // reflows the main column, so a width transition would thrash layout every frame.
   overflow: hidden; // only the group list scrolls; brand + footer stay pinned
+}
+
+// Brand + the rail toggle share the top row.
+.side__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 14px;
 }
 
 .side__brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 8px 18px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 2px;
   color: var(--ink);
   text-decoration: none;
 
   &:hover {
     text-decoration: none;
+  }
+}
+
+.side__collapse {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ink3);
+  cursor: pointer;
+  transition:
+    color 0.14s ease,
+    border-color 0.14s ease;
+
+  &:hover {
+    color: var(--ink);
+    border-color: var(--line2);
   }
 }
 
@@ -84,8 +116,11 @@
 }
 
 .side__link-ico {
-  font-size: 13px;
-  color: var(--accent);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  flex-shrink: 0;
+  color: var(--accent-text);
 }
 
 .side__section {
@@ -112,7 +147,6 @@
   background: none;
   color: var(--ink2);
   font-family: var(--font-ui);
-  font-size: 15px;
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
@@ -204,6 +238,13 @@
   color: var(--ink2);
 }
 
+.side__theme-ico {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
 .side__user {
   display: flex;
   align-items: center;
@@ -271,6 +312,61 @@
 
 .app-content--auth {
   min-height: 100dvh;
+}
+
+// ── Collapsed rail: icons only, labels hidden ────────────────────────────────
+// Above the responsive breakpoint only — below it the sidebar is already a top strip.
+@media (min-width: 821px) {
+  .side--rail {
+    width: 66px;
+    padding-left: 8px;
+    padding-right: 8px;
+
+    .side__top {
+      flex-direction: column;
+      gap: 8px;
+      padding-inline: 0;
+    }
+
+    .side__brand {
+      flex: none;
+      justify-content: center;
+      padding: 0;
+    }
+
+    // Everything that reads as a label folds away; titles keep it usable.
+    .side__word,
+    .side__link-text,
+    .side__eyebrow,
+    .side__group-text,
+    .side__theme-text,
+    .side__user-text {
+      display: none;
+    }
+
+    .side__link,
+    .side__group,
+    .side__user,
+    .side__theme {
+      justify-content: center;
+      padding-inline: 0;
+      gap: 0;
+    }
+
+    .side__section {
+      justify-content: center;
+      padding-inline: 0;
+    }
+
+    .side__user {
+      border: none;
+      background: none;
+    }
+  }
+
+  .shell--rail .shell__main {
+    margin-left: 66px;
+  }
 }
 
 // ── Responsive: collapse the sidebar to a top strip on narrow screens ────────
