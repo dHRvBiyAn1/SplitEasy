@@ -9,6 +9,7 @@ import { centsToDisplay } from './expenses/expense.service';
 import { ModalsComponent } from './modals/modals.component';
 import { ModalService } from './modals/modal.service';
 import { groupGlyphTint } from './core/avatar';
+import { SidebarService } from './core/sidebar.service';
 
 @Component({
   selector: 'app-root',
@@ -24,6 +25,7 @@ export class App implements OnInit {
   private readonly profile = inject(ProfileService);
   private readonly theme = inject(ThemeService);
   protected readonly modal = inject(ModalService);
+  protected readonly sidebar = inject(SidebarService);
   private readonly router = inject(Router);
 
   protected readonly user = this.auth.user;
