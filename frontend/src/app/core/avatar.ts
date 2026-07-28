@@ -6,7 +6,16 @@
 // lettering is shifted toward `--avatar-ink` (black on light surfaces, white on dark ones),
 // so initials stay legible in either theme instead of being tuned for dark only.
 
-const PALETTE = ['#12A57E', '#D96D3F', '#3F7BD9', '#C25B84', '#D9A03F', '#7A5FD9', '#3FADC2', '#5FA05F'];
+const PALETTE = [
+  '#12A57E',
+  '#D96D3F',
+  '#3F7BD9',
+  '#C25B84',
+  '#D9A03F',
+  '#7A5FD9',
+  '#3FADC2',
+  '#5FA05F',
+];
 const FALLBACK = '#8FA096';
 
 /** Returns a `[style]`-bindable object: soft tinted background + legible lettering. */
@@ -18,7 +27,10 @@ export function avatarTint(key: string | undefined | null): { background: string
  * Tile tint for a group's initial, derived from the group name. Same treatment as a person
  * avatar but off a name-derived hue, so every group keeps a stable identity color.
  */
-export function groupGlyphTint(name: string | undefined | null): { background: string; color: string } {
+export function groupGlyphTint(name: string | undefined | null): {
+  background: string;
+  color: string;
+} {
   return tint(`hsl(${hash(name) % 360} 45% 45%)`, 20);
 }
 

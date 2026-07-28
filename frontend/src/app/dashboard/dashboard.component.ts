@@ -35,7 +35,9 @@ export class DashboardComponent {
   protected readonly loading = this.dashboard.loading;
   protected readonly display = centsToDisplay;
 
-  protected readonly firstNameOf = computed(() => this.firstName(this.auth.user()?.displayName ?? ''));
+  protected readonly firstNameOf = computed(() =>
+    this.firstName(this.auth.user()?.displayName ?? ''),
+  );
 
   constructor() {
     this.dashboard.ensureLoaded();
@@ -104,7 +106,9 @@ export class DashboardComponent {
   activityTitle(a: ActivityItem): string {
     if (a.kind === 'PAYMENT') {
       const payer = this.isMe(a.actor) ? 'You' : this.firstName(a.actor.displayName);
-      const payee = this.isMe(a.counterparty) ? 'you' : this.firstName(a.counterparty?.displayName ?? '');
+      const payee = this.isMe(a.counterparty)
+        ? 'you'
+        : this.firstName(a.counterparty?.displayName ?? '');
       return `${payer} paid ${payee}`;
     }
     return a.description;
