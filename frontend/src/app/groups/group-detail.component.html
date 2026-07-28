@@ -10,8 +10,7 @@
       <span
         class="gd__glyph"
         aria-hidden="true"
-        [style.background]="'hsl(' + glyphHue(g.name) + ' 40% 20%)'"
-        [style.color]="'hsl(' + glyphHue(g.name) + ' 70% 72%)'"
+        [style]="glyphTint(g.name)"
         >{{ g.name.charAt(0) }}</span
       >
       <div class="gd__id">
@@ -20,6 +19,7 @@
       </div>
       <div class="gd__actions">
         <button type="button" class="dc-btn-outline" (click)="settleUp()"><span aria-hidden="true">⇄</span> Settle up</button>
+        <button type="button" class="dc-btn-outline" (click)="addMember()"><span aria-hidden="true">+</span> Add member</button>
         <button type="button" class="dc-btn-accent" (click)="addExpense()"><span aria-hidden="true">+</span> Add expense</button>
       </div>
     </header>
@@ -47,9 +47,6 @@
           </strong>
         </span>
       }
-      <button type="button" class="pill pill--add" (click)="addMember()">
-        <span aria-hidden="true">+</span> Add member
-      </button>
     </div>
 
     @if (expenses().length === 0) {

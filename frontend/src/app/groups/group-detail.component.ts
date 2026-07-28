@@ -9,7 +9,7 @@ import { centsToDisplay } from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
 import { ExpenseResponse, ExpenseSummary, SplitShare } from '../expenses/expense.models';
 import { ModalService } from '../modals/modal.service';
-import { avatarTint } from '../core/avatar';
+import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 
@@ -211,12 +211,8 @@ export class GroupDetailComponent implements OnInit {
     return t.charAt(0) + t.slice(1).toLowerCase();
   }
 
-  glyphHue(name: string): number {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) {
-      h = (h * 31 + name.charCodeAt(i)) % 360;
-    }
-    return h;
+  glyphTint(name: string): { background: string; color: string } {
+    return groupGlyphTint(name);
   }
 
   initials(name: string): string {

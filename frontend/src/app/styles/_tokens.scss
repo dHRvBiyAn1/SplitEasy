@@ -39,6 +39,10 @@
 
   --shadow: 0 1px 2px rgba(20, 22, 26, 0.04), 0 10px 30px rgba(20, 22, 26, 0.07);
   --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--shadow);
+
+  // Direction to shift avatar/glyph lettering so it stays legible on its own tint:
+  // toward black on light surfaces, toward white on dark ones (see core/avatar.ts).
+  --avatar-ink: black;
 }
 
 // Only the tokens that differ from light; var()-derived ones (accent-soft, pos/neg-soft)
@@ -46,6 +50,8 @@
 @mixin dark-tokens {
   --accent-text: #c8f95e;
   --on-accent: #0c1006;
+
+  --avatar-ink: white;
 
   --bg: #08090b;
   --surface: #131417;
