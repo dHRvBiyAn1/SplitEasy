@@ -40,6 +40,13 @@ public class Group {
     @JoinColumn(name = "created_by", nullable = false, updatable = false)
     private User createdBy;
 
+    /**
+     * Whether settle-up suggests the minimal set of payments for this group (migration V8).
+     * A group-wide setting, not a per-viewer one: it changes which payments are suggested.
+     */
+    @Column(name = "simplify_debts", nullable = false)
+    private boolean simplifyDebts = true;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -47,6 +54,7 @@ public class Group {
         this.name = name;
         this.type = type;
         this.createdBy = createdBy;
+        this.simplifyDebts = true;
         this.createdAt = Instant.now();
     }
 

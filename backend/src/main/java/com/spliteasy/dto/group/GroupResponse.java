@@ -13,4 +13,5 @@ public record GroupResponse(
         GroupType type,
         UserSummary createdBy,
         List<UserSummary> members,
+        boolean simplifyDebts,
         Instant createdAt) {}

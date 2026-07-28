@@ -4,12 +4,15 @@ import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.group.GroupResponse;
 import com.spliteasy.dto.group.GroupSummary;
+import com.spliteasy.dto.group.UpdateGroupRequest;
 
 import com.spliteasy.entity.Group;
 import com.spliteasy.entity.GroupMembership;
 import com.spliteasy.entity.GroupType;
 import com.spliteasy.entity.User;
+import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
+import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
@@ -33,6 +36,8 @@ public class GroupService {
     private final GroupMembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final MembershipGuard membershipGuard;
+    /** Reused for the settled-up guard on remove/leave — never recompute balances here. */
+    private final BalanceService balanceService;
 
     @Transactional
     public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
@@ -81,6 +86,88 @@ public class GroupService {
         return toGroupResponse(group);
     }
 
+    /**
+     * Partial update of the group's settings (name / type / simplify-debts). Any member may
+     * edit, matching the flat authorization elsewhere; a null field is left untouched.
+     */
+    @Transactional
+    public GroupResponse updateGroup(UUID requesterId, UUID groupId, UpdateGroupRequest request) {
+        membershipGuard.requireMember(groupId, requesterId);
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new NotFoundException("Group not found"));
+
+        if (request.name() != null) {
+            String name = request.name().trim();
+            if (name.isEmpty()) {
+                throw new BadRequestException("Group name cannot be blank");
+            }
+            group.setName(name);
+        }
+        if (request.type() != null) {
+            group.setType(request.type());
+        }
+        if (request.simplifyDebts() != null) {
+            group.setSimplifyDebts(request.simplifyDebts());
+        }
+        log.info("Group {} settings updated by user {}", groupId, requesterId);
+        return toGroupResponse(group);
+    }
+
+    /**
+     * Removes a member — or the requester themselves, which is "leave group". Blocked while the
+     * member still has a non-zero net in the group, so no debt is ever orphaned. The creator
+     * can't be removed or leave: they own the group and delete it instead.
+     */
+    @Transactional
+    public void removeMember(UUID requesterId, UUID groupId, UUID targetUserId) {
+        membershipGuard.requireMember(groupId, requesterId);
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new NotFoundException("Group not found"));
+        if (!membershipRepository.existsByGroupIdAndUserId(groupId, targetUserId)) {
+            throw new NotFoundException("That person is not a member of this group");
+        }
+
+        boolean isSelf = targetUserId.equals(requesterId);
+        if (group.getCreatedBy().getId().equals(targetUserId)) {
+            throw new ConflictException(isSelf
+                    ? "You created this group — delete it instead of leaving"
+                    : "The group creator can't be removed");
+        }
+
+        long net = netOf(requesterId, groupId, targetUserId);
+        if (net != 0) {
+            throw new ConflictException(isSelf
+                    ? "Settle your balance before leaving this group"
+                    : "That member still has an open balance in this group");
+        }
+
+        membershipRepository.deleteByGroupIdAndUserId(groupId, targetUserId);
+        log.info("User {} removed member {} from group {}", requesterId, targetUserId, groupId);
+    }
+
+    /** Deletes the group and everything under it. Creator only — the group's admin. */
+    @Transactional
+    public void deleteGroup(UUID requesterId, UUID groupId) {
+        membershipGuard.requireMember(groupId, requesterId);
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new NotFoundException("Group not found"));
+        if (!group.getCreatedBy().getId().equals(requesterId)) {
+            throw new ForbiddenException("Only the group's creator can delete it");
+        }
+        // Memberships, expenses (+participants) and payments go with it via ON DELETE CASCADE.
+        groupRepository.delete(group);
+        log.info("Group {} deleted by creator {}", groupId, requesterId);
+    }
+
+    /** That member's net in the group, read through the shared balance aggregation. */
+    private long netOf(UUID requesterId, UUID groupId, UUID targetUserId) {
+        return balanceService.computeBalances(requesterId, groupId).balances().stream()
+                .filter(b -> b.user().id().equals(targetUserId))
+                .mapToLong(b -> b.netCents())
+                .findFirst()
+                .orElse(0L);
+    }
+
     /** Builds the full response, fetching members with their users in a single query. */
     private GroupResponse toGroupResponse(Group group) {
         List<UserSummary> members = membershipRepository.findByGroupIdFetchUser(group.getId()).stream()
@@ -92,6 +179,7 @@ public class GroupService {
                 group.getType(),
                 UserSummary.from(group.getCreatedBy()),
                 members,
+                group.isSimplifyDebts(),
                 group.getCreatedAt());
     }
 }

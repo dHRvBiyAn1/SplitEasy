@@ -11,6 +11,11 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
 
     boolean existsByGroupIdAndUserId(UUID groupId, UUID userId);
 
+    /** Removes one membership (remove-member / leave group). Returns rows deleted. */
+    long deleteByGroupIdAndUserId(UUID groupId, UUID userId);
+
+    long countByGroupId(UUID groupId);
+
     /** Ids of every member of a group — used to default an expense's participants to all members. */
     @Query("select m.user.id from GroupMembership m where m.group.id = :groupId")
     List<UUID> findUserIdsByGroupId(@Param("groupId") UUID groupId);
