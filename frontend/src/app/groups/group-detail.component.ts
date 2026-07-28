@@ -60,7 +60,7 @@ export class GroupDetailComponent implements OnInit {
   /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
   private readonly detailCache = new Map<string, ExpenseResponse>();
 
-  private groupId = '';
+  protected groupId = ''; // read by the template for the settings link
 
   /** My net in this group = sum of the pairwise nets (positive = I'm owed overall). */
   protected readonly myNet = computed(() => this.myBalances().reduce((s, b) => s + b.netCents, 0));
@@ -132,10 +132,6 @@ export class GroupDetailComponent implements OnInit {
 
   settleUp(): void {
     this.modal.openSettle(undefined, this.groupId);
-  }
-
-  addMember(): void {
-    this.modal.openAddMember(this.groupId);
   }
 
   /** Expand a row to show its split, or collapse it if it's already open. */

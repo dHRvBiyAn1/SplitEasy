@@ -1,0 +1,179 @@
+<div class="gset">
+  <a class="gset__back" [routerLink]="['/groups', groupId]">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M14.5 6l-6 6 6 6" />
+    </svg>
+    Back to group
+  </a>
+
+  @if (loading()) {
+    <div class="dc-loading" role="status" aria-label="Loading settings"></div>
+  } @else if (group(); as g) {
+    <!-- Name -->
+    <header class="gset__head">
+      <span class="gset__glyph" aria-hidden="true" [style]="glyphTint(g.name)">{{ g.name.charAt(0) }}</span>
+
+      @if (!editingName()) {
+        <h1 class="gset__name">{{ g.name }}</h1>
+        <button type="button" class="gset__icon-btn" (click)="startRename()" title="Rename group" aria-label="Rename group">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 20h4l10-10a2.8 2.8 0 10-4-4L4 16v4z" />
+            <path d="M13.5 6.5l4 4" />
+          </svg>
+        </button>
+      } @else {
+        <input
+          class="dc-field gset__name-input"
+          [formControl]="nameControl"
+          aria-label="Group name"
+          autocomplete="off"
+          (keydown.enter)="saveName()"
+          (keydown.escape)="cancelRename()"
+        />
+        <button type="button" class="gset__icon-btn gset__icon-btn--save" (click)="saveName()" [disabled]="savingName()" title="Save name" aria-label="Save name">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+        </button>
+        <button type="button" class="gset__icon-btn" (click)="cancelRename()" title="Cancel" aria-label="Cancel rename">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      }
+    </header>
+
+    @if (error()) { <p class="gset__error" role="alert">{{ error() }}</p> }
+
+    <!-- Members -->
+    <section class="gcard">
+      <h2 class="gcard__title">Members</h2>
+
+      <button type="button" class="mrow mrow--add" (click)="addMember()">
+        <span class="mrow__plus" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5.5v13M5.5 12h13" />
+          </svg>
+        </span>
+        <span class="mrow__text"><span class="mrow__name">Add member</span></span>
+      </button>
+
+      @for (m of g.members; track m.id) {
+        <div class="mrow">
+          <span class="dc-avatar mrow__av" aria-hidden="true" [style]="tint(m.id)">{{ initials(m.displayName) }}</span>
+          <span class="mrow__text">
+            <span class="mrow__name">
+              {{ m.displayName }}@if (isMe(m.id)) { <span class="mrow__you">you</span> }
+            </span>
+            <span class="mrow__sub">{{ m.email }}</span>
+          </span>
+
+          <span
+            class="mrow__bal dc-amount"
+            [class.dc-amount--owed]="netOf(m.id) > 0"
+            [class.dc-amount--owes]="netOf(m.id) < 0"
+            [class.dc-amount--settled]="netOf(m.id) === 0"
+          >
+            @if (netOf(m.id) === 0) {
+              settled
+            } @else {
+              {{ netOf(m.id) > 0 ? '+' : '−' }}${{ display(netOf(m.id) < 0 ? -netOf(m.id) : netOf(m.id)) }}
+            }
+          </span>
+
+          <button
+            type="button"
+            class="mrow__x"
+            (click)="removeMember(m.id)"
+            [disabled]="!!blockedReason(m.id) || busy()"
+            [title]="blockedReason(m.id) ?? 'Remove ' + m.displayName"
+            [attr.aria-label]="'Remove ' + m.displayName"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        @if (blockedReason(m.id)) {
+          <p class="mrow__why">{{ blockedReason(m.id) }} — can't be removed yet</p>
+        }
+      }
+    </section>
+
+    <!-- Advanced -->
+    <section class="gcard">
+      <h2 class="gcard__title">Advanced settings</h2>
+      <div class="grow">
+        <span class="grow__text">
+          <span class="grow__label">Simplify debts</span>
+          <span class="grow__sub">
+            Settle up suggests the fewest payments that clear this group. Turn it off to settle every
+            balance directly, person by person.
+          </span>
+        </span>
+        <button
+          type="button"
+          class="simplify-toggle"
+          role="switch"
+          [attr.aria-checked]="g.simplifyDebts"
+          [disabled]="savingSimplify()"
+          (click)="toggleSimplify()"
+        >
+          <span class="simplify-toggle__track" aria-hidden="true"><span class="simplify-toggle__knob"></span></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Danger zone -->
+    <section class="gcard gcard--danger">
+      <h2 class="gcard__title">Danger zone</h2>
+
+      <div class="grow">
+        <span class="grow__text">
+          <span class="grow__label">Leave group</span>
+          <span class="grow__sub">
+            @if (isCreator()) {
+              You created this group — delete it instead of leaving.
+            } @else if (myNet() !== 0) {
+              Settle your balance first: you {{ myNet() > 0 ? 'are owed' : 'owe' }}
+              ${{ display(myNet() < 0 ? -myNet() : myNet()) }} in this group.
+            } @else {
+              You're settled up, so you can leave whenever you like.
+            }
+          </span>
+        </span>
+
+        @if (confirming() === 'leave') {
+          <span class="gconfirm">
+            <button type="button" class="dc-btn-outline gconfirm__yes" (click)="leaveGroup()" [disabled]="busy()">Yes, leave</button>
+            <button type="button" class="dc-btn-ghost" (click)="ask(null)" [disabled]="busy()">Cancel</button>
+          </span>
+        } @else {
+          <button type="button" class="dc-btn-outline" (click)="ask('leave')" [disabled]="!canLeave()">Leave group</button>
+        }
+      </div>
+
+      @if (isCreator()) {
+        <div class="grow">
+          <span class="grow__text">
+            <span class="grow__label">Delete group</span>
+            <span class="grow__sub">
+              Permanently deletes "{{ g.name }}" along with its expenses and settlements. This can't be undone.
+            </span>
+          </span>
+
+          @if (confirming() === 'delete') {
+            <span class="gconfirm">
+              <button type="button" class="dc-btn-outline gconfirm__yes" (click)="deleteGroup()" [disabled]="busy()">Yes, delete</button>
+              <button type="button" class="dc-btn-ghost" (click)="ask(null)" [disabled]="busy()">Cancel</button>
+            </span>
+          } @else {
+            <button type="button" class="dc-btn-outline" (click)="ask('delete')">Delete group</button>
+          }
+        </div>
+      }
+    </section>
+  } @else {
+    <p class="gset__error" role="alert">{{ error() ?? "Couldn't load this group." }}</p>
+  }
+</div>

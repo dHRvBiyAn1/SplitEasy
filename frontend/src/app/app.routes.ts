@@ -17,11 +17,8 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
   },
-  {
-    path: 'groups',
-    canActivate: [authGuard],
-    loadComponent: () => import('./groups/group-list.component').then((m) => m.GroupListComponent),
-  },
+  // The dashboard is the group list now — /groups only exists to keep old links working.
+  { path: 'groups', pathMatch: 'full', redirectTo: 'dashboard' },
   {
     path: 'groups/:id',
     canActivate: [authGuard],
@@ -29,9 +26,15 @@ export const routes: Routes = [
       import('./groups/group-detail.component').then((m) => m.GroupDetailComponent),
   },
   {
+    path: 'groups/:id/settings',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./groups/group-settings.component').then((m) => m.GroupSettingsComponent),
+  },
+  {
     path: 'profile',
     canActivate: [authGuard],
     loadComponent: () => import('./profile/profile.component').then((m) => m.ProfileComponent),
   },
-  { path: '**', redirectTo: 'groups' },
+  { path: '**', redirectTo: 'dashboard' },
 ];
