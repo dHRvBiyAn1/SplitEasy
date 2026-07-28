@@ -191,6 +191,8 @@ export class GroupSettingsComponent implements OnInit {
       next: (updated) => {
         this.group.set(updated);
         this.savingSimplify.set(false);
+        // Settle-up reads this flag off the dashboard payload, so refresh it too.
+        this.dashboard.refresh();
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not change that setting.');
