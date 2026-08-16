@@ -1,0 +1,1207 @@
+openapi: 3.1.0
+info:
+  title: SplitEasy API
+  description: |
+    Expense-splitting API. Users create groups, add expenses split among members
+    (equal / unequal / percentage), and the API tracks who owes whom, settle-up
+    payments, and debt-simplification suggestions.
+
+    ## Authentication
+    All endpoints except `/auth/*` and `/health` require a Bearer JWT access token
+    (1h lifetime) obtained from `POST /api/auth/register` or `POST /api/auth/login`.
+    Missing or invalid tokens are rejected with `401`.
+
+    ## Authorization
+    Every group-scoped endpoint is restricted to group members. A non-member receives
+    **403** even for a non-existent group (the API never reveals whether a group
+    exists). Deleting a group is **creator-only**; the creator can neither be removed
+    nor leave.
+
+    ## Money
+    All monetary values are **integer cents** (`long`), never floats. Amounts are
+    capped at `1_000_000_000_000` cents ($10B). For expense shares, `100%` = 10,000
+    basis points. Balances are derived on read and always sum to zero per group.
+
+    ## Error format
+    Errors return the `Error` schema with HTTP status in both the status code and the
+    body (`status`, `error`, `message`, `timestamp`).
+  version: 1.0.0
+  contact:
+    name: SplitEasy
+  license:
+    name: Proprietary
+    identifier: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (backend)
+
+tags:
+  - name: Auth
+    description: Registration and login — issues JWT access tokens
+  - name: Health
+    description: Liveness probe
+  - name: Groups
+    description: Group management, membership, settings
+  - name: Expenses
+    description: Expense creation, listing, editing, deletion
+  - name: Balances
+    description: Net-per-member and pairwise balances
+  - name: Payments
+    description: Settle-up payments between members
+  - name: Debt Simplification
+    description: Minimal-transaction settle-up suggestions (read-only)
+  - name: Dashboard
+    description: Aggregated payload for the shell and landing page
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/register:
+    post:
+      operationId: register
+      summary: Register a new user
+      description: Creates a user account and returns an access token.
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              email: alice@example.com
+              password: super-secret
+              displayName: Alice
+      responses:
+        "201":
+          description: Account created; access token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Email is already registered
+
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: Log in
+      description: |
+        Authenticates with email and password and returns an access token.
+        Invalid credentials are deliberately generic: always
+        "Invalid email or password".
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: alice@example.com
+              password: super-secret
+      responses:
+        "200":
+          description: Access token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/health:
+    get:
+      operationId: getHealth
+      summary: Liveness probe
+      description: Public health check used by the frontend to show backend status.
+      tags: [Health]
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/dashboard:
+    get:
+      operationId: getDashboard
+      summary: Get aggregated dashboard payload
+      description: |
+        One payload for the shell and landing page: cross-group totals, per-group
+        cards, aggregated people, per-group settlements, and a merged recent-activity
+        feed (expenses + payments, newest first, capped at 15).
+      tags: [Dashboard]
+      responses:
+        "200":
+          description: Dashboard payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/groups:
+    get:
+      operationId: listMyGroups
+      summary: List my groups
+      description: Returns lightweight summaries of every group the caller belongs to.
+      tags: [Groups]
+      responses:
+        "200":
+          description: Group summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroupSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createGroup
+      summary: Create a group
+      description: Creates a group; the caller is auto-inserted as its only member and creator.
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupRequest"
+            example:
+              name: Berlin Trip
+              type: TRIP
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/groups/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getGroup
+      summary: Get group detail
+      description: Returns the group with its full member list. Members only.
+      tags: [Groups]
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    patch:
+      operationId: updateGroup
+      summary: Update group settings
+      description: |
+        Partial update (rename / group type / simplify-debts). Every field is
+        optional; null fields are left untouched. Any member may update.
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroupRequest"
+            example:
+              name: Berlin Trip 2026
+              simplifyDebts: true
+      responses:
+        "200":
+          description: Updated group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      operationId: deleteGroup
+      summary: Delete a group
+      description: |
+        Permanently deletes the group and its expenses/payments (cascade). Creator
+        only — any other member (including the creator's only member, if any) gets 403.
+      tags: [Groups]
+      responses:
+        "204":
+          description: Group deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/members:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    post:
+      operationId: addMember
+      summary: Add a member by email
+      description: |
+        Adds an existing registered user to the group by canonical (trimmed,
+        lowercased) email. Any member may add.
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+            example:
+              email: bob@example.com
+      responses:
+        "200":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No user has this email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: User is already a member
+
+  /api/groups/{groupId}/members/{memberId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+      - name: memberId
+        in: path
+        required: true
+        description: The member to remove (or the caller, to leave)
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: removeMember
+      summary: Remove a member — or leave the group
+      description: |
+        Removes `memberId` from the group; when `memberId` is the caller this is a
+        "leave". Blocked with 409 while the member's net balance is non-zero (no debt
+        may be orphaned). The creator can neither be removed nor leave.
+      tags: [Groups]
+      responses:
+        "204":
+          description: Member removed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Member still has a non-zero balance (or is the creator)
+
+  /api/groups/{groupId}/expenses:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: listExpenses
+      summary: List expense summaries
+      description: |
+        Month-ordered list of expenses in the group, newest first, each with the
+        caller's `viewerDeltaCents` (positive = lent, negative = borrowed).
+      tags: [Expenses]
+      responses:
+        "200":
+          description: Expense summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExpenseSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createExpense
+      summary: Create an expense
+      description: |
+        Creates an expense split among participants.
+
+        - `splitType` null → EQUAL. For EQUAL, `participantUserIds` null/empty = all members.
+        - UNEQUAL: `splits` carries per-participant **cents** that must sum to `amountCents`.
+        - PERCENTAGE: `splits` carries per-participant **basis points** that must sum to 10000.
+        - Bad sums → 400 with a clear message (never 500).
+        - Shares always sum exactly to `amountCents`; the payer absorbs rounding remainders.
+      tags: [Expenses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+            examples:
+              equal:
+                summary: Equal split among all members
+                value:
+                  description: Dinner at Thai Place
+                  amountCents: 10000
+                  paidByUserId: 550e8400-e29b-41d4-a716-446655440000
+              percentage:
+                summary: Percentage split
+                value:
+                  description: Apartment rent
+                  amountCents: 120000
+                  paidByUserId: 550e8400-e29b-41d4-a716-446655440000
+                  splitType: PERCENTAGE
+                  category: RENT_HOME
+                  spentOn: "2026-08-01"
+                  splits:
+                    - userId: 550e8400-e29b-41d4-a716-446655440000
+                      value: 6000
+                    - userId: 550e8400-e29b-41d4-a716-446655440001
+                      value: 4000
+      responses:
+        "201":
+          description: Expense created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/expenses/{expenseId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+      - name: expenseId
+        in: path
+        required: true
+        description: The expense ID
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getExpense
+      summary: Get expense detail
+      description: Returns the expense with its per-participant share breakdown.
+      tags: [Expenses]
+      responses:
+        "200":
+          description: Expense detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateExpense
+      summary: Update an expense (full replace)
+      description: |
+        Full-replace edit reusing the create payload. Shares are recomputed through
+        the same split strategy; balances re-aggregate automatically. Any member may
+        edit any expense.
+      tags: [Expenses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+      responses:
+        "200":
+          description: Updated expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteExpense
+      summary: Delete an expense
+      description: Hard-deletes the expense and its participant shares (FK cascade).
+      tags: [Expenses]
+      responses:
+        "204":
+          description: Expense deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/groups/{groupId}/balances:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getBalances
+      summary: Get net-per-member balances
+      description: |
+        Each member's net position in integer cents (positive = owed, negative =
+        owes, 0 = settled). Derived on read from expenses and payments; the nets
+        always sum to zero.
+      tags: [Balances]
+      responses:
+        "200":
+          description: Group balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupBalancesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/balances/mine:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getMyBalances
+      summary: Get pairwise balances to me
+      description: |
+        Per-counterparty net with the caller (positive = they owe you, negative =
+        you owe them). Not netted across people: "Dan owes you $50" and "you owe
+        Sofia $50" can both appear. The pairwise nets sum to the caller's net.
+      tags: [Balances]
+      responses:
+        "200":
+          description: Pairwise balances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PersonBalance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/payments:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: listPayments
+      summary: List settle-up history
+      description: Newest-first history of recorded payments in the group.
+      tags: [Payments]
+      responses:
+        "200":
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: recordPayment
+      summary: Record a settle-up payment
+      description: |
+        Records a direct transfer `payer → payee` in the group. The payer must
+        differ from the payee; both must be members. Overpayments are allowed (the
+        net-per-person model just flips sign).
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordPaymentRequest"
+            example:
+              payerUserId: 550e8400-e29b-41d4-a716-446655440001
+              payeeUserId: 550e8400-e29b-41d4-a716-446655440000
+              amountCents: 5000
+      responses:
+        "201":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/debt-simplification:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getSimplifiedDebts
+      summary: Get minimal settle-up suggestion
+      description: |
+        Read-only: a minimal set of transfers (≤ N−1) that settles the whole group,
+        derived greedily (max creditor ↔ max debtor) from current balances. Zero
+        balances are excluded and cents always work out exactly. Acting on a
+        suggestion just records a normal payment.
+      tags: [Debt Simplification]
+      responses:
+        "200":
+          description: Suggested transfers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimplifiedDebtsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  schemas:
+    GroupType:
+      type: string
+      description: What a group is for (drives the UI glyph/label)
+      enum: [HOME, TRIP, DINING, EVENT, OTHER]
+
+    SplitType:
+      type: string
+      description: How an expense's total is divided among its participants
+      enum: [EQUAL, UNEQUAL, PERCENTAGE]
+
+    ExpenseCategory:
+      type: string
+      description: What an expense was for (drives the UI icon)
+      enum: [FOOD_DRINK, GROCERIES, RENT_HOME, UTILITIES, TRAVEL, TRANSPORT, FUN, OTHER]
+
+    UserSummary:
+      type: object
+      description: Minimal user reference embedded in every resource
+      required: [id, email, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+
+    Error:
+      type: object
+      description: Standard error body from the global exception handler
+      required: [timestamp, status, error, message]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          description: HTTP status code
+        error:
+          type: string
+          description: HTTP reason phrase, e.g. "Bad Request"
+        message:
+          type: string
+          description: Human-readable error message
+
+    HealthResponse:
+      type: object
+      required: [status, service, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [UP]
+        service:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken:
+          type: string
+          description: 'JWT access token; send as `Authorization: Bearer <token>`'
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          format: int64
+          description: Token lifetime in seconds (3600)
+        user:
+          $ref: "#/components/schemas/UserSummary"
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+        displayName:
+          type: string
+          maxLength: 100
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        type:
+          $ref: "#/components/schemas/GroupType"
+          description: Null defaults to OTHER
+
+    UpdateGroupRequest:
+      type: object
+      description: Every field optional; a null field is left untouched
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          $ref: "#/components/schemas/GroupType"
+        simplifyDebts:
+          type: boolean
+          description: Whether settle-up suggests the minimal set of payments
+
+    AddMemberRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Must match a registered user (matched on normalized form)
+
+    GroupResponse:
+      type: object
+      required: [id, name, type, createdBy, members, simplifyDebts, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/GroupType"
+        createdBy:
+          $ref: "#/components/schemas/UserSummary"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+        simplifyDebts:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    GroupSummary:
+      type: object
+      required: [id, name, type, memberCount, simplifyDebts]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/GroupType"
+        memberCount:
+          type: integer
+          format: int64
+        simplifyDebts:
+          type: boolean
+
+    SplitInput:
+      type: object
+      description: |
+        One participant's split value for UNEQUAL/PERCENTAGE expenses.
+        `value` is cents (UNEQUAL) or basis points, i.e. hundredths of a percent
+        (PERCENTAGE). Must be non-negative.
+      required: [userId, value]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        value:
+          type: integer
+          format: int64
+          minimum: 0
+
+    CreateExpenseRequest:
+      type: object
+      required: [description, amountCents, paidByUserId]
+      properties:
+        description:
+          type: string
+          maxLength: 200
+        amountCents:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+          description: Total expense amount in integer cents (≤ $10B)
+        paidByUserId:
+          type: string
+          format: uuid
+          description: The member who paid; must be a group member
+        participantUserIds:
+          type: array
+          description: EQUAL only — subset of members; null/empty = all members
+          items:
+            type: string
+            format: uuid
+        splitType:
+          $ref: "#/components/schemas/SplitType"
+          description: Null defaults to EQUAL
+        splits:
+          type: array
+          description: UNEQUAL/PERCENTAGE only — per-participant value (see SplitInput)
+          items:
+            $ref: "#/components/schemas/SplitInput"
+        category:
+          $ref: "#/components/schemas/ExpenseCategory"
+          description: Null defaults to OTHER
+        spentOn:
+          type: string
+          format: date
+          description: The date the money was actually spent; null defaults to today
+
+    SplitShare:
+      type: object
+      required: [user, shareCents]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        shareCents:
+          type: integer
+          format: int64
+          description: What this participant owes, in integer cents
+
+    ExpenseResponse:
+      type: object
+      required: [id, groupId, description, amountCents, splitType, category, spentOn, paidBy, participants, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        description:
+          type: string
+        amountCents:
+          type: integer
+          format: int64
+        splitType:
+          $ref: "#/components/schemas/SplitType"
+        category:
+          $ref: "#/components/schemas/ExpenseCategory"
+        spentOn:
+          type: string
+          format: date
+        paidBy:
+          $ref: "#/components/schemas/UserSummary"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/SplitShare"
+        createdAt:
+          type: string
+          format: date-time
+
+    ExpenseSummary:
+      type: object
+      required: [id, description, amountCents, paidBy, participantCount, category, spentOn, viewerDeltaCents, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        amountCents:
+          type: integer
+          format: int64
+        paidBy:
+          $ref: "#/components/schemas/UserSummary"
+        participantCount:
+          type: integer
+          format: int64
+        category:
+          $ref: "#/components/schemas/ExpenseCategory"
+        spentOn:
+          type: string
+          format: date
+        viewerDeltaCents:
+          type: integer
+          format: int64
+          description: |
+            The requesting member's net for this expense: positive = they lent
+            (paid more than their share), negative = they borrowed, 0 = not involved
+        createdAt:
+          type: string
+          format: date-time
+
+    MemberBalance:
+      type: object
+      required: [user, netCents]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        netCents:
+          type: integer
+          format: int64
+          description: Net position in cents; positive = owed, negative = owes, 0 = settled
+
+    GroupBalancesResponse:
+      type: object
+      required: [groupId, balances]
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        balances:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberBalance"
+
+    PersonBalance:
+      type: object
+      description: A counterparty's net position with the requesting user
+      required: [user, netCents]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        netCents:
+          type: integer
+          format: int64
+          description: Positive = they owe you; negative = you owe them
+
+    Settlement:
+      type: object
+      description: One suggested settle-up between the caller and a counterparty in a group
+      required: [groupId, groupName, counterparty, netCents]
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        groupName:
+          type: string
+        counterparty:
+          $ref: "#/components/schemas/UserSummary"
+        netCents:
+          type: integer
+          format: int64
+          description: Positive = they owe you; negative = you owe them
+
+    SuggestedTransaction:
+      type: object
+      description: One suggested transfer — `from` (a debtor) pays `to` (a creditor)
+      required: [from, to, amountCents]
+      properties:
+        from:
+          $ref: "#/components/schemas/UserSummary"
+        to:
+          $ref: "#/components/schemas/UserSummary"
+        amountCents:
+          type: integer
+          format: int64
+
+    SimplifiedDebtsResponse:
+      type: object
+      required: [groupId, transactions]
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SuggestedTransaction"
+
+    RecordPaymentRequest:
+      type: object
+      required: [payerUserId, payeeUserId, amountCents]
+      properties:
+        payerUserId:
+          type: string
+          format: uuid
+        payeeUserId:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+          description: Payment amount in integer cents (≤ $10B)
+
+    PaymentResponse:
+      type: object
+      required: [id, payer, payee, amountCents, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        payer:
+          $ref: "#/components/schemas/UserSummary"
+        payee:
+          $ref: "#/components/schemas/UserSummary"
+        amountCents:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+
+    DashboardGroup:
+      type: object
+      description: One group card on the dashboard, from the caller's perspective
+      required: [id, name, type, memberCount, totalSpentCents, youAreOwedCents, youOweCents, netCents, simplifyDebts]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/GroupType"
+        memberCount:
+          type: integer
+          format: int64
+        totalSpentCents:
+          type: integer
+          format: int64
+        youAreOwedCents:
+          type: integer
+          format: int64
+        youOweCents:
+          type: integer
+          format: int64
+        netCents:
+          type: integer
+          format: int64
+          description: Always `youAreOwedCents - youOweCents`
+        simplifyDebts:
+          type: boolean
+
+    ActivityItem:
+      type: object
+      description: One entry in the cross-group recent-activity feed
+      required: [id, kind, groupId, groupName, description, actor, amountCents, viewerDeltaCents, date]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [EXPENSE, PAYMENT]
+        groupId:
+          type: string
+          format: uuid
+        groupName:
+          type: string
+        description:
+          type: string
+        actor:
+          $ref: "#/components/schemas/UserSummary"
+          description: Expense payer, or payment payer
+        counterparty:
+          allOf:
+            - $ref: "#/components/schemas/UserSummary"
+          description: PAYMENT only — who received; null for EXPENSE
+        amountCents:
+          type: integer
+          format: int64
+        viewerDeltaCents:
+          type: integer
+          format: int64
+          description: |
+            EXPENSE: positive = you lent, negative = you borrowed, 0 = not involved.
+            PAYMENT: always 0 (settlements render neutral)
+        category:
+          allOf:
+            - $ref: "#/components/schemas/ExpenseCategory"
+          description: EXPENSE only; null for PAYMENT
+        date:
+          type: string
+          format: date
+
+    DashboardResponse:
+      type: object
+      required:
+        - totalNetCents
+        - owedCents
+        - owedPeopleCount
+        - oweCents
+        - owePeopleCount
+        - groupCount
+        - groups
+        - people
+        - settlements
+        - activity
+      properties:
+        totalNetCents:
+          type: integer
+          format: int64
+          description: Always `owedCents - oweCents`
+        owedCents:
+          type: integer
+          format: int64
+          description: Sum of what people owe you across all groups
+        owedPeopleCount:
+          type: integer
+        oweCents:
+          type: integer
+          format: int64
+          description: Sum of what you owe across all groups
+        owePeopleCount:
+          type: integer
+        groupCount:
+          type: integer
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardGroup"
+        people:
+          type: array
+          description: People-aggregated owed/owe data
+          items:
+            $ref: "#/components/schemas/PersonBalance"
+        settlements:
+          type: array
+          description: Per-group, per-counterparty breakdown powering the settle-up modal
+          items:
+            $ref: "#/components/schemas/Settlement"
+        activity:
+          type: array
+          description: Merged expenses + payments feed, newest first, capped at 15
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+
+  parameters:
+    GroupIdParam:
+      name: groupId
+      in: path
+      required: true
+      description: The group ID
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request (validation failure, bad split sums, amount over cap)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Unauthorized:
+      description: Missing, malformed, or expired Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Forbidden:
+      description: Not a member of this group (also returned for non-existent groups)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: Resource not found within the group
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Conflict:
+      description: State conflict (e.g. member still has a non-zero balance)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token from /api/auth/register or /api/auth/login (HS256, 1h)
