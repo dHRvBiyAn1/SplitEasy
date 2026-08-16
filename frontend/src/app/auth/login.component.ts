@@ -30,7 +30,7 @@ export class LoginComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.auth.login(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigate(['/groups']),
+      next: () => this.router.navigate(['/dashboard']),
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Login failed. Please try again.');
         this.submitting.set(false);

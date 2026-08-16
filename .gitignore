@@ -2,3 +2,9 @@
 *.log
 .idea/
 .vscode/
+.claude/
+.agents/
+.impeccable/
+/graphify-out
+/design
+skills-lock.json

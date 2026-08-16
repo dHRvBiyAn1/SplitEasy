@@ -3,14 +3,7 @@ import { UserSummary } from '../core/auth/auth.models';
 export type GroupType = 'HOME' | 'TRIP' | 'DINING' | 'EVENT' | 'OTHER';
 
 export type ExpenseCategory =
-  | 'FOOD_DRINK'
-  | 'GROCERIES'
-  | 'RENT_HOME'
-  | 'UTILITIES'
-  | 'TRAVEL'
-  | 'TRANSPORT'
-  | 'FUN'
-  | 'OTHER';
+  'FOOD_DRINK' | 'GROCERIES' | 'RENT_HOME' | 'UTILITIES' | 'TRAVEL' | 'TRANSPORT' | 'FUN' | 'OTHER';
 
 /** Positive netCents = they owe you; negative = you owe them. */
 export interface PersonBalance {
