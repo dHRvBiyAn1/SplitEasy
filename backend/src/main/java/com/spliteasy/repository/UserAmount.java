@@ -4,7 +4,7 @@ import java.util.UUID;
 
 /** Aggregate projection: a per-user summed amount in integer cents. */
 public interface UserAmount {
-    UUID getUserId();
+  UUID getUserId();
 
-    long getTotalCents();
+  long getTotalCents();
 }

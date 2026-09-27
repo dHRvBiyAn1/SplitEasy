@@ -20,11 +20,15 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
 
   register(request: RegisterRequest): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/register', request).pipe(tap((res) => this.persist(res)));
+    return this.api
+      .post<AuthResponse>('/auth/register', request)
+      .pipe(tap((res) => this.persist(res)));
   }
 
   login(request: LoginRequest): Observable<AuthResponse> {
-    return this.api.post<AuthResponse>('/auth/login', request).pipe(tap((res) => this.persist(res)));
+    return this.api
+      .post<AuthResponse>('/auth/login', request)
+      .pipe(tap((res) => this.persist(res)));
   }
 
   logout(): void {

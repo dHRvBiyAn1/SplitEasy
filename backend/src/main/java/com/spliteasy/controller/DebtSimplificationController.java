@@ -1,12 +1,10 @@
 package com.spliteasy.controller;
 
-import com.spliteasy.dto.balance.SimplifiedDebtsResponse;
-
-import lombok.RequiredArgsConstructor;
-
 import com.spliteasy.config.CurrentUserId;
+import com.spliteasy.dto.balance.SimplifiedDebtsResponse;
 import com.spliteasy.service.DebtSimplificationService;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,11 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class DebtSimplificationController {
 
-    private final DebtSimplificationService debtSimplificationService;
+  private final DebtSimplificationService debtSimplificationService;
 
-
-    @GetMapping
-    public SimplifiedDebtsResponse getSimplifiedDebts(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
-        return debtSimplificationService.simplify(userId, groupId);
-    }
+  @GetMapping
+  public SimplifiedDebtsResponse getSimplifiedDebts(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return debtSimplificationService.simplify(userId, groupId);
+  }
 }

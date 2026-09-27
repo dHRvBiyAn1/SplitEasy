@@ -2,7 +2,13 @@
   <form class="mform" (submit)="$event.preventDefault(); save()">
     <div class="mform__field">
       <label class="dc-field-label" for="ng-name">Group name</label>
-      <input id="ng-name" class="dc-field" [formControl]="name" placeholder="e.g. Ski weekend" autocomplete="off" />
+      <input
+        id="ng-name"
+        class="dc-field"
+        [formControl]="name"
+        placeholder="e.g. Ski weekend"
+        autocomplete="off"
+      />
     </div>
 
     <div class="mform__field">
@@ -26,23 +32,35 @@
       @if (emails().length) {
         <div class="chips">
           @for (e of emails(); track e) {
-            <span class="chip chip--tag">{{ e }}
-              <button type="button" class="chip__x" (click)="removeEmail(e)" aria-label="Remove">✕</button>
+            <span class="chip chip--tag"
+              >{{ e }}
+              <button type="button" class="chip__x" (click)="removeEmail(e)" aria-label="Remove">
+                ✕
+              </button>
             </span>
           }
         </div>
       }
       <div class="mform__row">
-        <input class="dc-field" [formControl]="emailInput" placeholder="friend@example.com" (keydown.enter)="$event.preventDefault(); addEmail()" />
+        <input
+          class="dc-field"
+          [formControl]="emailInput"
+          placeholder="friend@example.com"
+          (keydown.enter)="$event.preventDefault(); addEmail()"
+        />
         <button type="button" class="dc-btn-outline" (click)="addEmail()">Add</button>
       </div>
     </div>
 
-    @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
+    @if (error()) {
+      <p class="mform__error" role="alert">{{ error() }}</p>
+    }
 
     <div class="mform__actions">
       <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
-      <button type="submit" class="dc-btn-accent" [disabled]="name.invalid || saving()">Create group</button>
+      <button type="submit" class="dc-btn-accent" [disabled]="name.invalid || saving()">
+        Create group
+      </button>
     </div>
   </form>
 </app-modal-shell>

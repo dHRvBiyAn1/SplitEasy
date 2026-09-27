@@ -21,7 +21,9 @@ describe('groupGlyphTint', () => {
   });
 
   it('gives different groups different hues', () => {
-    expect(groupGlyphTint('Lisbon Trip').background).not.toBe(groupGlyphTint('Dinner Club').background);
+    expect(groupGlyphTint('Lisbon Trip').background).not.toBe(
+      groupGlyphTint('Dinner Club').background,
+    );
   });
 });
 

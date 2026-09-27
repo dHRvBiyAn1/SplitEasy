@@ -110,7 +110,9 @@
   outline-offset: 2px;
   cursor: pointer;
   padding: 0;
-  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
 
   &:hover {
     transform: scale(1.08);

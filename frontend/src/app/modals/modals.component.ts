@@ -8,13 +8,26 @@ import { AddMemberModalComponent } from './add-member-modal.component';
 /** Renders whichever global modal is open. Mounted once in the app shell. */
 @Component({
   selector: 'app-modals',
-  imports: [NewGroupModalComponent, NewExpenseModalComponent, SettleUpModalComponent, AddMemberModalComponent],
+  imports: [
+    NewGroupModalComponent,
+    NewExpenseModalComponent,
+    SettleUpModalComponent,
+    AddMemberModalComponent,
+  ],
   template: `
     @switch (modal.active()) {
-      @case ('group') { <app-new-group-modal /> }
-      @case ('expense') { <app-new-expense-modal /> }
-      @case ('settle') { <app-settle-up-modal /> }
-      @case ('member') { <app-add-member-modal /> }
+      @case ('group') {
+        <app-new-group-modal />
+      }
+      @case ('expense') {
+        <app-new-expense-modal />
+      }
+      @case ('settle') {
+        <app-settle-up-modal />
+      }
+      @case ('member') {
+        <app-add-member-modal />
+      }
     }
   `,
 })

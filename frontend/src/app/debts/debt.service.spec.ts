@@ -28,9 +28,13 @@ describe('DebtService', () => {
     let emitted: unknown[] | undefined;
     service.getSimplifiedDebtsForGroups(['g1', 'g2']).subscribe((res) => (emitted = res));
 
-    httpTesting.expectOne('/api/groups/g1/debt-simplification').flush({ groupId: 'g1', transactions: [] });
+    httpTesting
+      .expectOne('/api/groups/g1/debt-simplification')
+      .flush({ groupId: 'g1', transactions: [] });
     expect(emitted).toBeUndefined(); // waits for every group before emitting
-    httpTesting.expectOne('/api/groups/g2/debt-simplification').flush({ groupId: 'g2', transactions: [] });
+    httpTesting
+      .expectOne('/api/groups/g2/debt-simplification')
+      .flush({ groupId: 'g2', transactions: [] });
 
     expect(emitted).toHaveLength(2);
   });

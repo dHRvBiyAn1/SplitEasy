@@ -1,16 +1,14 @@
 package com.spliteasy.controller;
 
+import com.spliteasy.config.CurrentUserId;
 import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.dto.expense.ExpenseResponse;
 import com.spliteasy.dto.expense.ExpenseSummary;
-
-import lombok.RequiredArgsConstructor;
-
-import com.spliteasy.config.CurrentUserId;
 import com.spliteasy.service.ExpenseService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,46 +26,41 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ExpenseController {
 
-    private final ExpenseService expenseService;
+  private final ExpenseService expenseService;
 
+  @PostMapping
+  public ResponseEntity<ExpenseResponse> createExpense(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @Valid @RequestBody CreateExpenseRequest request) {
+    ExpenseResponse response = expenseService.createExpense(userId, groupId, request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
 
-    @PostMapping
-    public ResponseEntity<ExpenseResponse> createExpense(
-            @CurrentUserId UUID userId,
-            @PathVariable UUID groupId,
-            @Valid @RequestBody CreateExpenseRequest request) {
-        ExpenseResponse response = expenseService.createExpense(userId, groupId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+  @GetMapping
+  public List<ExpenseSummary> listExpenses(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return expenseService.listExpenses(userId, groupId);
+  }
 
-    @GetMapping
-    public List<ExpenseSummary> listExpenses(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
-        return expenseService.listExpenses(userId, groupId);
-    }
+  @GetMapping("/{expenseId}")
+  public ExpenseResponse getExpense(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId, @PathVariable UUID expenseId) {
+    return expenseService.getExpense(userId, groupId, expenseId);
+  }
 
-    @GetMapping("/{expenseId}")
-    public ExpenseResponse getExpense(
-            @CurrentUserId UUID userId,
-            @PathVariable UUID groupId,
-            @PathVariable UUID expenseId) {
-        return expenseService.getExpense(userId, groupId, expenseId);
-    }
+  @PutMapping("/{expenseId}")
+  public ExpenseResponse updateExpense(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @PathVariable UUID expenseId,
+      @Valid @RequestBody CreateExpenseRequest request) {
+    return expenseService.updateExpense(userId, groupId, expenseId, request);
+  }
 
-    @PutMapping("/{expenseId}")
-    public ExpenseResponse updateExpense(
-            @CurrentUserId UUID userId,
-            @PathVariable UUID groupId,
-            @PathVariable UUID expenseId,
-            @Valid @RequestBody CreateExpenseRequest request) {
-        return expenseService.updateExpense(userId, groupId, expenseId, request);
-    }
-
-    @DeleteMapping("/{expenseId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteExpense(
-            @CurrentUserId UUID userId,
-            @PathVariable UUID groupId,
-            @PathVariable UUID expenseId) {
-        expenseService.deleteExpense(userId, groupId, expenseId);
-    }
+  @DeleteMapping("/{expenseId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteExpense(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId, @PathVariable UUID expenseId) {
+    expenseService.deleteExpense(userId, groupId, expenseId);
+  }
 }

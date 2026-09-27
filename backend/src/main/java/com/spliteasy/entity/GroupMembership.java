@@ -21,31 +21,32 @@ import org.hibernate.annotations.UuidGenerator;
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA only
 @Table(
-        name = "group_memberships",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_group_memberships_group_user",
-                columnNames = {"group_id", "user_id"}))
+    name = "group_memberships",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uq_group_memberships_group_user",
+            columnNames = {"group_id", "user_id"}))
 public class GroupMembership {
 
-    @Id
-    @UuidGenerator
-    @Column(nullable = false, updatable = false)
-    private UUID id;
+  @Id
+  @UuidGenerator
+  @Column(nullable = false, updatable = false)
+  private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "group_id", nullable = false, updatable = false)
-    private Group group;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "group_id", nullable = false, updatable = false)
+  private Group group;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false, updatable = false)
-    private User user;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "user_id", nullable = false, updatable = false)
+  private User user;
 
-    @Column(name = "joined_at", nullable = false, updatable = false)
-    private Instant joinedAt;
+  @Column(name = "joined_at", nullable = false, updatable = false)
+  private Instant joinedAt;
 
-    public GroupMembership(Group group, User user) {
-        this.group = group;
-        this.user = user;
-        this.joinedAt = Instant.now();
-    }
+  public GroupMembership(Group group, User user) {
+    this.group = group;
+    this.user = user;
+    this.joinedAt = Instant.now();
+  }
 }

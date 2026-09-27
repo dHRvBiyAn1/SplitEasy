@@ -24,42 +24,42 @@ import org.hibernate.annotations.UuidGenerator;
 @Table(name = "groups")
 public class Group {
 
-    @Id
-    @UuidGenerator
-    @Column(nullable = false, updatable = false)
-    private UUID id;
+  @Id
+  @UuidGenerator
+  @Column(nullable = false, updatable = false)
+  private UUID id;
 
-    @Column(nullable = false)
-    private String name;
+  @Column(nullable = false)
+  private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private GroupType type;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private GroupType type;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "created_by", nullable = false, updatable = false)
-    private User createdBy;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "created_by", nullable = false, updatable = false)
+  private User createdBy;
 
-    /**
-     * Whether settle-up suggests the minimal set of payments for this group (migration V8).
-     * A group-wide setting, not a per-viewer one: it changes which payments are suggested.
-     */
-    @Column(name = "simplify_debts", nullable = false)
-    private boolean simplifyDebts = true;
+  /**
+   * Whether settle-up suggests the minimal set of payments for this group (migration V8). A
+   * group-wide setting, not a per-viewer one: it changes which payments are suggested.
+   */
+  @Column(name = "simplify_debts", nullable = false)
+  private boolean simplifyDebts = true;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private Instant createdAt;
 
-    public Group(String name, GroupType type, User createdBy) {
-        this.name = name;
-        this.type = type;
-        this.createdBy = createdBy;
-        this.simplifyDebts = true;
-        this.createdAt = Instant.now();
-    }
+  public Group(String name, GroupType type, User createdBy) {
+    this.name = name;
+    this.type = type;
+    this.createdBy = createdBy;
+    this.simplifyDebts = true;
+    this.createdAt = Instant.now();
+  }
 
-    /** Back-compat convenience: untyped group defaults to {@link GroupType#OTHER}. */
-    public Group(String name, User createdBy) {
-        this(name, GroupType.OTHER, createdBy);
-    }
+  /** Back-compat convenience: untyped group defaults to {@link GroupType#OTHER}. */
+  public Group(String name, User createdBy) {
+    this(name, GroupType.OTHER, createdBy);
+  }
 }

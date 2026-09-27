@@ -15,8 +15,8 @@ import { Component } from '@angular/core';
         Split the bill.<br /><em>Keep the friends.</em>
       </h1>
       <p class="auth-hero__lede">
-        Track who paid what across houses, trips and dinner clubs — split equally, by exact
-        amounts or by percentages — then settle up in one tap.
+        Track who paid what across houses, trips and dinner clubs — split equally, by exact amounts
+        or by percentages — then settle up in one tap.
       </p>
 
       <figure class="auth-hero__sample dc-card">

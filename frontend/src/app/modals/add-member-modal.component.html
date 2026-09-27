@@ -14,19 +14,30 @@
           autocomplete="off"
           (keydown.enter)="$event.preventDefault(); add()"
         />
-        <button type="button" class="dc-btn-accent" (click)="add()" [disabled]="!email.value.trim() || saving()">Add</button>
+        <button
+          type="button"
+          class="dc-btn-accent"
+          (click)="add()"
+          [disabled]="!email.value.trim() || saving()"
+        >
+          Add
+        </button>
       </div>
       <p class="mform__hint">They need an existing Evenly account.</p>
     </div>
 
-    @if (error()) { <p class="mform__error" role="alert">{{ error() }}</p> }
+    @if (error()) {
+      <p class="mform__error" role="alert">{{ error() }}</p>
+    }
 
     <div class="mform__field">
       <span class="dc-field-label">Already in this group</span>
       <div class="chips">
         @for (m of members(); track m.id) {
           <span class="chip chip--tag">
-            <span class="dc-avatar chip__av" aria-hidden="true" [style]="tint(m.id)">{{ initials(m.displayName) }}</span>
+            <span class="dc-avatar chip__av" aria-hidden="true" [style]="tint(m.id)">{{
+              initials(m.displayName)
+            }}</span>
             {{ m.displayName }}
           </span>
         }

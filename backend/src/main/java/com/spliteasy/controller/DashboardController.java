@@ -1,12 +1,10 @@
 package com.spliteasy.controller;
 
-import com.spliteasy.dto.dashboard.DashboardResponse;
-
-import lombok.RequiredArgsConstructor;
-
 import com.spliteasy.config.CurrentUserId;
+import com.spliteasy.dto.dashboard.DashboardResponse;
 import com.spliteasy.service.DashboardService;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,10 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final DashboardService dashboardService;
+  private final DashboardService dashboardService;
 
-    @GetMapping
-    public DashboardResponse getDashboard(@CurrentUserId UUID userId) {
-        return dashboardService.getDashboard(userId);
-    }
+  @GetMapping
+  public DashboardResponse getDashboard(@CurrentUserId UUID userId) {
+    return dashboardService.getDashboard(userId);
+  }
 }

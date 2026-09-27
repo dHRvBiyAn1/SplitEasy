@@ -32,7 +32,9 @@ describe('AuthService', () => {
   });
 
   it('register stores token + user and flips isAuthenticated', () => {
-    service.register({ email: 'alice@example.com', password: 'password123', displayName: 'Alice' }).subscribe();
+    service
+      .register({ email: 'alice@example.com', password: 'password123', displayName: 'Alice' })
+      .subscribe();
     const req = httpTesting.expectOne('/api/auth/register');
     expect(req.request.method).toBe('POST');
     req.flush(authResponse);

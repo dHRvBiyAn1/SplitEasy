@@ -3,74 +3,78 @@ package com.spliteasy.service;
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.MemberBalance;
 import com.spliteasy.dto.common.UserSummary;
-
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Computes net balances per group member from already-persisted expense data.
- * It does NOT re-run the split — it reads the stored {@code paid_by}/{@code amount_cents}
- * and per-participant {@code share_cents}. For each member:
+ * Computes net balances per group member from already-persisted expense data. It does NOT re-run
+ * the split — it reads the stored {@code paid_by}/{@code amount_cents} and per-participant {@code
+ * share_cents}. For each member:
  *
- * <pre>net = (expense amount paid) - (expense shares owed) + (payments made) - (payments received)</pre>
+ * <pre>net = (expense amount paid) - (expense shares owed) + (payments made) - (payments received)
+ * </pre>
  *
- * Positive means the member is owed money; negative means they owe. A settle-up payment
- * {@code payer -> payee} of X raises the payer's net by X (they now owe less) and lowers the
- * payee's by X (they're now owed less) — folded in through the same aggregate path as expenses,
- * not a special case. Because expense shares sum to their amount and each payment contributes
- * +X and -X, the group's balances always sum to zero. All aggregate GROUP BY queries — no loops.
+ * Positive means the member is owed money; negative means they owe. A settle-up payment {@code
+ * payer -> payee} of X raises the payer's net by X (they now owe less) and lowers the payee's by X
+ * (they're now owed less) — folded in through the same aggregate path as expenses, not a special
+ * case. Because expense shares sum to their amount and each payment contributes +X and -X, the
+ * group's balances always sum to zero. All aggregate GROUP BY queries — no loops.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BalanceService {
 
-    private final ExpenseRepository expenseRepository;
-    private final ExpenseParticipantRepository participantRepository;
-    private final GroupMembershipRepository membershipRepository;
-    private final PaymentRepository paymentRepository;
-    private final MembershipGuard membershipGuard;
+  private final ExpenseRepository expenseRepository;
+  private final ExpenseParticipantRepository participantRepository;
+  private final GroupMembershipRepository membershipRepository;
+  private final PaymentRepository paymentRepository;
+  private final MembershipGuard membershipGuard;
 
-    @Transactional(readOnly = true)
-    public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
-        membershipGuard.requireMember(groupId, requesterId);
-        log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
+  @Transactional(readOnly = true)
+  public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
+    membershipGuard.requireMember(groupId, requesterId);
+    log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
 
-        Map<UUID, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
-        Map<UUID, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
-        Map<UUID, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
-        Map<UUID, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
+    Map<UUID, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
+    Map<UUID, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
+    Map<UUID, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
+    Map<UUID, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
 
-        // Include every current member, so freshly-added or uninvolved members show 0.
-        List<MemberBalance> balances = membershipRepository.findByGroupIdFetchUser(groupId).stream()
-                .map(m -> m.getUser())
-                .map(user -> {
-                    UUID id = user.getId();
-                    long net = paid.getOrDefault(id, 0L) - owed.getOrDefault(id, 0L)
-                            + settledOut.getOrDefault(id, 0L) - settledIn.getOrDefault(id, 0L);
-                    return new MemberBalance(UserSummary.from(user), net);
+    // Include every current member, so freshly-added or uninvolved members show 0.
+    List<MemberBalance> balances =
+        membershipRepository.findByGroupIdFetchUser(groupId).stream()
+            .map(m -> m.getUser())
+            .map(
+                user -> {
+                  UUID id = user.getId();
+                  long net =
+                      paid.getOrDefault(id, 0L)
+                          - owed.getOrDefault(id, 0L)
+                          + settledOut.getOrDefault(id, 0L)
+                          - settledIn.getOrDefault(id, 0L);
+                  return new MemberBalance(UserSummary.from(user), net);
                 })
-                .sorted(Comparator.comparing((MemberBalance b) -> b.user().displayName()))
-                .toList();
+            .sorted(Comparator.comparing((MemberBalance b) -> b.user().displayName()))
+            .toList();
 
-        return new GroupBalancesResponse(groupId, balances);
-    }
+    return new GroupBalancesResponse(groupId, balances);
+  }
 
-    private Map<UUID, Long> toMap(List<UserAmount> rows) {
-        return rows.stream().collect(Collectors.toMap(UserAmount::getUserId, UserAmount::getTotalCents));
-    }
+  private Map<UUID, Long> toMap(List<UserAmount> rows) {
+    return rows.stream()
+        .collect(Collectors.toMap(UserAmount::getUserId, UserAmount::getTotalCents));
+  }
 }

@@ -7,33 +7,66 @@
     <p class="gd__error" role="alert">{{ error() }}</p>
   } @else if (group(); as g) {
     <header class="gd__head">
-      <span
-        class="gd__glyph"
-        aria-hidden="true"
-        [style]="glyphTint(g.name)"
-        >{{ g.name.charAt(0) }}</span
-      >
+      <span class="gd__glyph" aria-hidden="true" [style]="glyphTint(g.name)">{{
+        g.name.charAt(0)
+      }}</span>
       <div class="gd__id">
         <h1 class="gd__name">{{ g.name }}</h1>
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
       </div>
       <div class="gd__actions">
         <button type="button" class="dc-btn-outline" (click)="settleUp()">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <path d="M4 8h13l-3-3M20 16H7l3 3" />
           </svg>
           Settle up
         </button>
         <button type="button" class="dc-btn-accent" (click)="addExpense()">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            width="15"
+            height="15"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
             <path d="M12 5.5v13M5.5 12h13" />
           </svg>
           Add expense
         </button>
-        <a class="gd__gear" [routerLink]="['/groups', groupId, 'settings']" title="Group settings" aria-label="Group settings">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <a
+          class="gd__gear"
+          [routerLink]="['/groups', groupId, 'settings']"
+          title="Group settings"
+          aria-label="Group settings"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="17"
+            height="17"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.9"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
             <circle cx="12" cy="12" r="3.1" />
-            <path d="M19.9 14.2a1.5 1.5 0 00.3 1.65l.05.06a1.9 1.9 0 11-2.7 2.7l-.05-.06a1.5 1.5 0 00-1.65-.3 1.5 1.5 0 00-.9 1.37v.15a1.9 1.9 0 11-3.8 0v-.08a1.5 1.5 0 00-.98-1.37 1.5 1.5 0 00-1.65.3l-.06.06a1.9 1.9 0 11-2.7-2.7l.06-.06a1.5 1.5 0 00.3-1.65 1.5 1.5 0 00-1.37-.9H5.4a1.9 1.9 0 110-3.8h.08a1.5 1.5 0 001.37-.98 1.5 1.5 0 00-.3-1.65l-.06-.06a1.9 1.9 0 112.7-2.7l.06.05a1.5 1.5 0 001.65.3h.07a1.5 1.5 0 00.9-1.37V4.1a1.9 1.9 0 113.8 0v.08a1.5 1.5 0 00.9 1.37 1.5 1.5 0 001.65-.3l.06-.05a1.9 1.9 0 112.7 2.7l-.06.06a1.5 1.5 0 00-.3 1.65v.07a1.5 1.5 0 001.37.9h.15a1.9 1.9 0 110 3.8h-.08a1.5 1.5 0 00-1.37.9z" />
+            <path
+              d="M19.9 14.2a1.5 1.5 0 00.3 1.65l.05.06a1.9 1.9 0 11-2.7 2.7l-.05-.06a1.5 1.5 0 00-1.65-.3 1.5 1.5 0 00-.9 1.37v.15a1.9 1.9 0 11-3.8 0v-.08a1.5 1.5 0 00-.98-1.37 1.5 1.5 0 00-1.65.3l-.06.06a1.9 1.9 0 11-2.7-2.7l.06-.06a1.5 1.5 0 00.3-1.65 1.5 1.5 0 00-1.37-.9H5.4a1.9 1.9 0 110-3.8h.08a1.5 1.5 0 001.37-.98 1.5 1.5 0 00-.3-1.65l-.06-.06a1.9 1.9 0 112.7-2.7l.06.05a1.5 1.5 0 001.65.3h.07a1.5 1.5 0 00.9-1.37V4.1a1.9 1.9 0 113.8 0v.08a1.5 1.5 0 00.9 1.37 1.5 1.5 0 001.65-.3l.06-.05a1.9 1.9 0 112.7 2.7l-.06.06a1.5 1.5 0 00-.3 1.65v.07a1.5 1.5 0 001.37.9h.15a1.9 1.9 0 110 3.8h-.08a1.5 1.5 0 00-1.37.9z"
+            />
           </svg>
         </a>
       </div>
@@ -47,7 +80,11 @@
       >
         {{ myNet() > 0 ? 'You are owed' : myNet() < 0 ? 'You owe' : 'Settled up' }}
         @if (myNet() !== 0) {
-          <strong class="dc-amount" [class.dc-amount--owed]="myNet() > 0" [class.dc-amount--owes]="myNet() < 0">
+          <strong
+            class="dc-amount"
+            [class.dc-amount--owed]="myNet() > 0"
+            [class.dc-amount--owes]="myNet() < 0"
+          >
             ${{ display(myNet() < 0 ? -myNet() : myNet()) }}
           </strong>
           overall
@@ -55,9 +92,15 @@
       </span>
       @for (b of myBalances(); track b.user.id) {
         <span class="pill">
-          <span class="dc-avatar pill__av" aria-hidden="true" [style]="tint(b.user.id)">{{ initials(b.user.displayName) }}</span>
+          <span class="dc-avatar pill__av" aria-hidden="true" [style]="tint(b.user.id)">{{
+            initials(b.user.displayName)
+          }}</span>
           {{ pillLabel(b) }}
-          <strong class="dc-amount" [class.dc-amount--owed]="b.netCents > 0" [class.dc-amount--owes]="b.netCents < 0">
+          <strong
+            class="dc-amount"
+            [class.dc-amount--owed]="b.netCents > 0"
+            [class.dc-amount--owes]="b.netCents < 0"
+          >
             ${{ display(b.netCents < 0 ? -b.netCents : b.netCents) }}
           </strong>
         </span>
@@ -73,7 +116,12 @@
           <ul class="xlist">
             @for (e of m.items; track e.id) {
               <li class="xitem" [class.xitem--open]="expandedId() === e.id">
-                <button type="button" class="xrow" (click)="toggleExpand(e)" [attr.aria-expanded]="expandedId() === e.id">
+                <button
+                  type="button"
+                  class="xrow"
+                  (click)="toggleExpand(e)"
+                  [attr.aria-expanded]="expandedId() === e.id"
+                >
                   <span class="xrow__date" aria-hidden="true">
                     <span class="xrow__mon">{{ dayMon(e.spentOn) }}</span>
                     <span class="xrow__day">{{ dayNum(e.spentOn) }}</span>
@@ -92,7 +140,10 @@
                         class="xrow__amt dc-amount"
                         [class.dc-amount--owed]="e.viewerDeltaCents > 0"
                         [class.dc-amount--owes]="e.viewerDeltaCents < 0"
-                      >${{ display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents) }}</span>
+                        >${{
+                          display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents)
+                        }}</span
+                      >
                     }
                   </span>
                 </button>
@@ -108,14 +159,26 @@
                       </div>
                       @for (p of d.participants; track p.user.id) {
                         <div class="xdetail__line">
-                          <span class="dc-avatar xdetail__av" aria-hidden="true" [style]="tint(p.user.id)">{{ initials(p.user.displayName) }}</span>
+                          <span
+                            class="dc-avatar xdetail__av"
+                            aria-hidden="true"
+                            [style]="tint(p.user.id)"
+                            >{{ initials(p.user.displayName) }}</span
+                          >
                           <span class="xdetail__who">{{ partLabel(p) }}</span>
                           <span class="xdetail__amt">${{ display(p.shareCents) }}</span>
                         </div>
                       }
                       <div class="xdetail__actions">
-                        <button type="button" class="dc-btn-outline" (click)="editExpense(e)">Edit</button>
-                        <button type="button" class="xdetail__del" (click)="deleteExpense(e)" [disabled]="deletingId() === e.id">
+                        <button type="button" class="dc-btn-outline" (click)="editExpense(e)">
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          class="xdetail__del"
+                          (click)="deleteExpense(e)"
+                          [disabled]="deletingId() === e.id"
+                        >
                           <span aria-hidden="true">🗑</span> Delete expense
                         </button>
                       </div>

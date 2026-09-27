@@ -23,34 +23,34 @@ import org.hibernate.annotations.UuidGenerator;
 @Table(name = "payments")
 public class Payment {
 
-    @Id
-    @UuidGenerator
-    @Column(nullable = false, updatable = false)
-    private UUID id;
+  @Id
+  @UuidGenerator
+  @Column(nullable = false, updatable = false)
+  private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "group_id", nullable = false, updatable = false)
-    private Group group;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "group_id", nullable = false, updatable = false)
+  private Group group;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "payer_id", nullable = false, updatable = false)
-    private User payer;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "payer_id", nullable = false, updatable = false)
+  private User payer;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "payee_id", nullable = false, updatable = false)
-    private User payee;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "payee_id", nullable = false, updatable = false)
+  private User payee;
 
-    @Column(name = "amount_cents", nullable = false)
-    private long amountCents;
+  @Column(name = "amount_cents", nullable = false)
+  private long amountCents;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private Instant createdAt;
 
-    public Payment(Group group, User payer, User payee, long amountCents) {
-        this.group = group;
-        this.payer = payer;
-        this.payee = payee;
-        this.amountCents = amountCents;
-        this.createdAt = Instant.now();
-    }
+  public Payment(Group group, User payer, User payee, long amountCents) {
+    this.group = group;
+    this.payer = payer;
+    this.payee = payee;
+    this.amountCents = amountCents;
+    this.createdAt = Instant.now();
+  }
 }

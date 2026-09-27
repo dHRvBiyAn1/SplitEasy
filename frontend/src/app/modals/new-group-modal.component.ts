@@ -30,7 +30,10 @@ export class NewGroupModalComponent {
   private readonly router = inject(Router);
 
   protected readonly types = TYPES;
-  protected readonly name = new FormControl('', { nonNullable: true, validators: [Validators.required] });
+  protected readonly name = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required],
+  });
   protected readonly type = signal<GroupType>('HOME');
   protected readonly emails = signal<string[]>([]);
   protected readonly emailInput = new FormControl('', { nonNullable: true });

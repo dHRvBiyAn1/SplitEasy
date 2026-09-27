@@ -16,15 +16,15 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc(addFilters = false)
 class HealthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired private MockMvc mockMvc;
 
-    @Test
-    void healthEndpointReturnsUp() throws Exception {
-        mockMvc.perform(get("/api/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.service").value("spliteasy"))
-                .andExpect(jsonPath("$.timestamp").exists());
-    }
+  @Test
+  void healthEndpointReturnsUp() throws Exception {
+    mockMvc
+        .perform(get("/api/health"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("UP"))
+        .andExpect(jsonPath("$.service").value("spliteasy"))
+        .andExpect(jsonPath("$.timestamp").exists());
+  }
 }

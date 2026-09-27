@@ -6,6 +6,6 @@ import jakarta.validation.constraints.Positive;
 import java.util.UUID;
 
 public record RecordPaymentRequest(
-        @NotNull UUID payerUserId,
-        @NotNull UUID payeeUserId,
-        @Positive @Max(1_000_000_000_000L) long amountCents) {}
+    @NotNull UUID payerUserId,
+    @NotNull UUID payeeUserId,
+    @Positive @Max(1_000_000_000_000L) long amountCents) {}

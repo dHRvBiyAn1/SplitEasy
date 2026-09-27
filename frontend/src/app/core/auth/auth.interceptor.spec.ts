@@ -50,10 +50,9 @@ describe('authInterceptor', () => {
     const logout = vi.spyOn(auth, 'logout');
 
     http.get('/api/groups').subscribe({ error: () => {} });
-    httpTesting.expectOne('/api/groups').flush(
-      { message: 'nope' },
-      { status: 401, statusText: 'Unauthorized' },
-    );
+    httpTesting
+      .expectOne('/api/groups')
+      .flush({ message: 'nope' }, { status: 401, statusText: 'Unauthorized' });
 
     expect(logout).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith(['/login']);

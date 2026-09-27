@@ -4,7 +4,9 @@
   <section class="pcard">
     @if (!editing()) {
       <div class="pcard__head">
-        <span class="dc-avatar pcard__avatar" aria-hidden="true" [style]="avatarStyle()">{{ initials() }}</span>
+        <span class="dc-avatar pcard__avatar" aria-hidden="true" [style]="avatarStyle()">{{
+          initials()
+        }}</span>
         <div class="pcard__id">
           <h2 class="pcard__name">{{ user()?.displayName }}</h2>
           <p class="pcard__since">Member since {{ memberSince() }}</p>
@@ -31,7 +33,9 @@
     } @else {
       <form class="pform" (submit)="$event.preventDefault(); save()">
         <div class="pcard__head">
-          <span class="dc-avatar pcard__avatar" aria-hidden="true" [style]="avatarStyle()">{{ initials() }}</span>
+          <span class="dc-avatar pcard__avatar" aria-hidden="true" [style]="avatarStyle()">{{
+            initials()
+          }}</span>
           <div class="pcard__id">
             <h2 class="pcard__name">{{ user()?.displayName }}</h2>
             <p class="pcard__since">Member since {{ memberSince() }}</p>
@@ -50,14 +54,26 @@
 
         <label class="pfield">
           <span class="dc-field-label">Phone</span>
-          <input class="dc-field" [formControl]="phone" autocomplete="tel" placeholder="+1 (555) 000-0000" />
+          <input
+            class="dc-field"
+            [formControl]="phone"
+            autocomplete="tel"
+            placeholder="+1 (555) 000-0000"
+          />
         </label>
 
         <div class="pfield">
           <span class="dc-field-label">Currency</span>
           <div class="chips">
             @for (c of currencies; track c) {
-              <button type="button" class="chip" [class.chip--on]="currency() === c" (click)="currency.set(c)">{{ c }}</button>
+              <button
+                type="button"
+                class="chip"
+                [class.chip--on]="currency() === c"
+                (click)="currency.set(c)"
+              >
+                {{ c }}
+              </button>
             }
           </div>
         </div>
@@ -93,7 +109,13 @@
     </div>
     <div class="dc-segment pappearance__seg" role="group" aria-label="Theme">
       @for (t of themeOptions; track t.value) {
-        <button type="button" [attr.aria-pressed]="theme.choice() === t.value" (click)="theme.set(t.value)">{{ t.label }}</button>
+        <button
+          type="button"
+          [attr.aria-pressed]="theme.choice() === t.value"
+          (click)="theme.set(t.value)"
+        >
+          {{ t.label }}
+        </button>
       }
     </div>
   </section>
