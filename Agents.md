@@ -36,6 +36,15 @@ Prereqs: Java 21, Node 22+, Docker Desktop running (dev DB **and** backend tests
 - **CORS**: `app.cors.allowed-origins` (dev `http://localhost:4200`), wired via a `CorsConfigurationSource` bean into the Security chain (`http.cors()`), not MVC mappings.
 - **Gotcha**: esbuild `spawn ... -88` / exit 137 = corrupt binary sig → `rm -rf node_modules/@esbuild node_modules/esbuild && npm install`.
 
+## Production Deployment
+
+- AWS Lightsail Mumbai: frontend (Caddy/Angular), backend, PostgreSQL 16 via `compose.prod.yml`; development DB remains `docker-compose.yml`. Runbook: `docs/deployment/lightsail.md`.
+- Production image/Compose explicitly select `prod`, with mandatory server-side PostgreSQL/JWT secrets. Caddy preserves `/api`, serves Angular deep links, automatically manages HTTPS, and blocks `/actuator/*`; backend/DB ports are never published. Internal `/actuator/health/readiness` includes `readinessState,db` and reveals status only.
+- `.github/workflows/ci-cd.yml`: PR tests/build/container smoke; main publishes the tested images to GHCR; optional deployment enabled by repository variable `DEPLOY_ENABLED=true` uses the `production` environment and verified SSH. No AWS credentials needed for delivery.
+- Releases use paired image digests and unique commit/run/attempt directories. Host lock serializes deployment/backups, dump precedes Flyway startup, and only successful readiness/public smoke checks promote `current`/`previous`. Resolve release symlinks physically; clear inherited Compose config/image exports. Rollback requires schema compatibility review; never auto-restore or remove production volumes.
+- Backup script supports optional private S3 uploads; schedule daily backups separately and test restoration. Existing review defects and the refresh-token prerequisite remain open. No VPS purchase or remote deployment performed in the setup task.
+- CI and frontend images pin Node 22. Node 26's experimental Web Storage interfered with the local jsdom/Vitest `localStorage`; use Node 22 for the validated test runtime.
+
 ## API
 
 All under `/api`; all except `auth/*` and `health` require `Authorization: Bearer <jwt>`.
@@ -247,3 +256,5 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   action row; dashboard member count centered; avatar/glyph colors made theme-aware via `--avatar-ink`
   (they were dark-mode-only, so light mode showed dark tiles). Frontend 50/50, backend 97/97.
 - [x] Profile page + theme toggle — PR #23 (`feat/profile-page`): `/profile` route, sidebar "View profile" link, view/inline-edit (name/email/phone/currency/avatar-color), System/Light/Dark toggle via `ThemeService`. Prefs client-side only (see Gaps). Verified in browser.
+
+- [x] Lightsail Docker + CI/CD — `feat/lightsail-deployment`: multi-stage Java/Angular-Caddy images, private PostgreSQL 16 production Compose, explicit prod JWT configuration and DB readiness, pinned GitHub Actions tests/builds/GHCR digest releases/verified SSH, locked pre-migration backups and schema-aware rollback runbook. Backend 108/108, frontend 50/50 on Node 22; container auth/deep-link/persistence and real backup restore verified; release tests and shell/workflow lint pass. Infrastructure implemented; remote deployment requires server/domain/secrets.

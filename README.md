@@ -140,6 +140,13 @@ Group routes are member-only — non-members get **403, even for nonexistent gro
 | `GET/POST` | `/groups/{g}/payments` | settle-up history / record |
 | `GET` | `/groups/{g}/debt-simplification` | minimal transfer suggestions |
 
+## Production deployment
+
+The [Lightsail Mumbai runbook](docs/deployment/lightsail.md) covers the production
+Docker stack, HTTPS, GitHub Actions releases, server secrets, backups, and rollback.
+Use `compose.prod.yml` for production; `docker-compose.yml` remains the local dev DB.
+Production images explicitly select the `prod` profile and require a private JWT key.
+
 ## 🗄 Data model
 
 ```
