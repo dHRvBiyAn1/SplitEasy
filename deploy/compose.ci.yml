@@ -1,0 +1,6 @@
+# Only for a disposable local/CI stack. Production has no published ports.
+services:
+  caddy:
+    ports: ["127.0.0.1:18080:80"]
+  cloudflared:
+    profiles: [tunnel]

@@ -3,7 +3,7 @@ set -Eeuo pipefail
 umask 077
 root=${SPLITEASY_ROOT:-/opt/spliteasy}
 release=${SPLITEASY_RELEASE:-$root/current}
-unset BACKEND_IMAGE FRONTEND_IMAGE POSTGRES_PASSWORD APP_JWT_SECRET SITE_ADDRESS PUBLIC_ORIGIN HTTP_PORT HTTPS_PORT
+unset BACKEND_IMAGE FRONTEND_IMAGE POSTGRES_PASSWORD APP_JWT_SECRET SITE_ADDRESS PUBLIC_ORIGIN API_ORIGIN TUNNEL_TOKEN_FILE HTTP_PORT HTTPS_PORT
 [[ "$root" = /* && -f "$root/.env" && -f "$release/release.env" ]] || {
   echo 'Missing server or release configuration.' >&2; exit 1;
 }
