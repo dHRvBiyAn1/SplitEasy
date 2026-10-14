@@ -48,6 +48,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/auth/**", "/api/health")
                     .permitAll()
+                    // Internal container probe; Caddy blocks all /actuator routes.
+                    .requestMatchers(HttpMethod.GET, "/actuator/health/readiness")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));

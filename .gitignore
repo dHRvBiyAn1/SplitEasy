@@ -8,3 +8,11 @@
 /graphify-out
 /design
 skills-lock.json
+.env
+.env.*
+!.env.example
+release.env
+*.dump
+*.pem
+deploy/backups/
+__pycache__/
