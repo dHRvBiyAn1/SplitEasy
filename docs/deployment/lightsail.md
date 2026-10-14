@@ -386,7 +386,7 @@ On the first failed release, `current` may not exist. Use the exact release dire
 | Browser CORS error | Frontend really at split-easy.io; PUBLIC_ORIGIN exact; no Access challenge intercepting API |
 | Registry denied | Deploy user's GHCR login, package visibility/access and token expiry |
 | Pages error | Correct account ID, Pages Edit token, project name and production branch |
-| Old frontend | Deployment succeeded on main, correct custom domain/project and artifact revision |
+| Old frontend | Pages may briefly serve previous HTML after upload. The workflow retries each public route up to 12 times before failing; check the custom domain/project and artifact revision if it persists. A failed frontend check leaves the backend deployed. |
 
 ### Backups
 
