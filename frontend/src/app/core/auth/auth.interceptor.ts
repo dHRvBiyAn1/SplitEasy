@@ -2,7 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { AUTH_URL_PREFIX } from '../api/api.service';
+import { API_BASE_URL, apiPath } from '../api/api.service';
 import { AuthService } from './auth.service';
 
 /**
@@ -15,13 +15,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
 
   const token = auth.getToken();
-  const isAuthCall = req.url.startsWith(AUTH_URL_PREFIX);
+  const path = apiPath(req.url, inject(API_BASE_URL));
+  const isPrivateApi = path !== null && !path.startsWith('/auth/');
   const authorized =
-    token && !isAuthCall ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+    token && isPrivateApi ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
 
   return next(authorized).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401 && !isAuthCall) {
+      if (error.status === 401 && isPrivateApi) {
         auth.logout();
         router.navigate(['/login']);
       }

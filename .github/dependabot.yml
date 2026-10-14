@@ -2,13 +2,21 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: /backend
+    target-branch: dev
     schedule:
       interval: monthly
-  - package-ecosystem: docker
-    directory: /frontend
-    schedule:
-      interval: monthly
+    groups:
+      backend-images:
+        patterns: ["*"]
+    ignore:
+      # Java major upgrades need an explicit toolchain migration, not a base-image bump.
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]

@@ -142,8 +142,12 @@ Group routes are member-only — non-members get **403, even for nonexistent gro
 
 ## Production deployment
 
-The [Lightsail Mumbai runbook](docs/deployment/lightsail.md) covers the production
-Docker stack, HTTPS, GitHub Actions releases, server secrets, backups, and rollback.
+The [step-by-step deployment guide](docs/deployment/lightsail.md) covers Angular on
+Cloudflare Pages at **split-easy.io**, with Java/PostgreSQL on Lightsail Sydney.
+**api.split-easy.io** reaches private Caddy through Cloudflare Tunnel; application
+ports stay closed publicly. GitHub Actions tests `dev` and deploys tested `main`
+changes to the backend first, then Pages. The guide explains account setup,
+secrets, first deployment, daily development, backups and recovery.
 Use `compose.prod.yml` for production; `docker-compose.yml` remains the local dev DB.
 Production images explicitly select the `prod` profile and require a private JWT key.
 

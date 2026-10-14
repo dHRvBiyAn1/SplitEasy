@@ -24,13 +24,28 @@ def request(path, body=None, token=None):
 
 
 assert json.loads(request("/api/health"))["status"] == "UP"
-assert "<app-root" in request("/groups/00000000-0000-0000-0000-000000000000")
-for path, expected in [("/actuator/health/readiness", 404), ("/api/dashboard", 401)]:
+for path, expected in [("/actuator/health/readiness", 404), ("/api/dashboard", 401), ("/login", 404)]:
     try:
         request(path)
         raise AssertionError(f"{path} should return {expected}")
     except HTTPError as error:
         assert error.code == expected, (path, error.code)
+
+for path in ["/api/auth/login", "/api/groups"]:
+    req = Request(origin + path, method="OPTIONS", headers={
+        "Origin": "https://split-easy.io",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type",
+    })
+    with urlopen(req, timeout=20) as response:
+        assert response.headers["Access-Control-Allow-Origin"] == "https://split-easy.io"
+        assert "authorization" in response.headers["Access-Control-Allow-Headers"].lower()
+    req.headers["Origin"] = "https://untrusted.example"
+    try:
+        with urlopen(req, timeout=20) as response:
+            assert response.headers.get("Access-Control-Allow-Origin") is None
+    except HTTPError as error:
+        assert error.code == 403
 
 if len(sys.argv) > 1 and sys.argv[1] == "verify-persistence":
     state = json.loads(state_file.read_text())

@@ -38,12 +38,15 @@ Prereqs: Java 21, Node 22+, Docker Desktop running (dev DB **and** backend tests
 
 ## Production Deployment
 
-- AWS Lightsail Mumbai: frontend (Caddy/Angular), backend, PostgreSQL 16 via `compose.prod.yml`; development DB remains `docker-compose.yml`. Runbook: `docs/deployment/lightsail.md`.
-- Production image/Compose explicitly select `prod`, with mandatory server-side PostgreSQL/JWT secrets. Caddy preserves `/api`, serves Angular deep links, automatically manages HTTPS, and blocks `/actuator/*`; backend/DB ports are never published. Internal `/actuator/health/readiness` includes `readinessState,db` and reveals status only.
-- `.github/workflows/ci-cd.yml`: PR tests/build/container smoke; main publishes the tested images to GHCR; optional deployment enabled by repository variable `DEPLOY_ENABLED=true` uses the `production` environment and verified SSH. No AWS credentials needed for delivery.
-- Releases use paired image digests and unique commit/run/attempt directories. Host lock serializes deployment/backups, dump precedes Flyway startup, and only successful readiness/public smoke checks promote `current`/`previous`. Resolve release symlinks physically; clear inherited Compose config/image exports. Rollback requires schema compatibility review; never auto-restore or remove production volumes.
-- Backup script supports optional private S3 uploads; schedule daily backups separately and test restoration. Existing review defects and the refresh-token prerequisite remain open. No VPS purchase or remote deployment performed in the setup task.
-- CI and frontend images pin Node 22. Node 26's experimental Web Storage interfered with the local jsdom/Vitest `localStorage`; use Node 22 for the validated test runtime.
+- Angular is served by Cloudflare Pages at `https://split-easy.io`; Java and PostgreSQL run on the existing AWS Lightsail Sydney instance (user-confirmed `ap-southeast-2`). `api.split-easy.io` routes through remotely managed Cloudflare Tunnel → private HTTP Caddy → Java. `compose.prod.yml` has no public application ports; PostgreSQL is on its own internal network. Verified SSH on port 22 remains the deployment path. Runbook: `docs/deployment/lightsail.md` (beginner steps for each console/terminal).
+- Cloudflared runs as UID 65532 with a private server-only token file (`TUNNEL_TOKEN_FILE`, mode 0400, owner 65532) mounted read-only. Production Caddy/cloudflared images are digest-pinned. Caddy preserves `/api`, rejects all other paths, and sets API no-store; Cloudflare supplies public HTTPS.
+- Angular local environment uses `/api`; production file replacement uses `https://api.split-easy.io/api`. `apiPath` normalizes URL origin/path boundaries; `authInterceptor` attaches JWT and handles 401 only for trusted non-auth API routes. Prod CORS allows exactly `https://split-easy.io`; previews are not implicitly trusted.
+- `.github/workflows/ci-cd.yml`: PR/dev checks, Node 22 Pages artifact, real backend/Caddy/Postgres smoke, main-only GHCR backend digest publication. Serialized production delivery requires repository `DEPLOY_ENABLED=true`, production environment SSH settings, Cloudflare account/project variables and Pages Edit token. Backend/tunnel health succeeds before Pages upload. `deploy/deliver.sh` implements that ordering and skips superseded main revisions. No AWS API keys required for delivery.
+- Releases use a single backend digest manifest and unique directories. Retain host lock, pre-migration pg_dump, physical release paths, failed-release pointer protection and schema-aware rollback. PostgreSQL volume identity remains unchanged. Pages and backend publication are not atomic; Pages failure leaves the healthy backend in place.
+- `deploy/compose.ci.yml` is disposable-only: Caddy port on 127.0.0.1:18080, cloudflared disabled behind a profile. Never use this override or `down --volumes` on production.
+- Daily off-host backups are configured separately; `deploy/backup.sh` supports exported `BACKUP_S3_URI`. A value placed only in Compose .env is not automatically exported to the backup script. Existing application review gaps/refresh tokens remain outside this deployment migration.
+- CI and frontend verification use Node 22. Node 26 experimental Web Storage interferes with jsdom/Vitest localStorage; use the validated runtime.
+- Main activation requires merging the deployment PR and completing the server token/account/DNS checks; public deployment verification remains pending.
 
 ## API
 
@@ -71,7 +74,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   records grouped in sub-packages under `com.spliteasy.dto`: `auth/ group/ expense/
   payment/ balance/ dashboard/ common/`.
 - Frontend: one Angular service per backend resource; all HTTP via `core/api/api.service.ts`
-  (base `/api`); `authInterceptor` attaches the token + handles 401; `authGuard` on private routes.
+  (local base `/api`, production `https://api.split-easy.io/api`); `authInterceptor` attaches the token + handles 401 for trusted API requests; `authGuard` on private routes.
 - **UI tokens live in one place**: `frontend/src/app/styles/_tokens.scss` (colors, type,
   spacing, motion as CSS vars) + `_ui.scss` (`.dc-*` primitives). Both `@use`d once in
   `styles.scss`. Reference `var(--…)` / `.dc-*` — never hardcode. Design ref `design/evenly.dc.html`.
@@ -261,3 +264,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Lightsail Docker + CI/CD — `feat/lightsail-deployment`: multi-stage Java/Angular-Caddy images, private PostgreSQL 16 production Compose, explicit prod JWT configuration and DB readiness, pinned GitHub Actions tests/builds/GHCR digest releases/verified SSH, locked pre-migration backups and schema-aware rollback runbook. Backend 108/108, frontend 50/50 on Node 22; container auth/deep-link/persistence and real backup restore verified; release tests and shell/workflow lint pass. Infrastructure implemented; remote deployment requires server/domain/secrets.
 
 - [x] Development branch workflow (2026-10-15) — `dev` created from current `origin/main` (`7476c12`) and published; development uses `dev`, promotion uses `dev` → `main`. PR #28 adds dev-push CI while keeping image publication/production deployment restricted to main; Actionlint passed. Main activation still requires merging the deployment workflow and setting the Lightsail server/secrets.
+
+- [x] Pages + Lightsail Tunnel deployment (2026-10-15) — split-easy.io Angular Pages artifact; api.split-easy.io Tunnel → private Caddy → Java/PostgreSQL on the existing Sydney instance. No published production app ports; server-only tunnel token, scoped API JWT handling and backend-first main-only delivery with verified SSH/backups. Backend 108, frontend 57, deployment methods 10; real CORS/auth/persistence/dump-restore, Caddy validation, Wrangler SPA preview and script/workflow lint passed. Beginner runbook includes separate ubuntu administration and deploy commands. Main merge and live activation remain pending; metadata-only SSH recheck confirms the user-populated tunnel token is nonempty, owner65532:65532/mode0400; connector authentication is unverified.
+
+- [x] CI portability + dependency maintenance (2026-10-15) — reproduced/fixed Compose JSON false-field omission on Linux Compose2.39.2; retains unsafe-mount rejection. Consolidated pinned checkout7/setup-node7/setup-java6 into dev with Java21/Node22 unchanged; monthly Dependabot version updates grouped and directed to dev, Java major image bumps ignored. Backend108/frontend57 and deployment10 on Linux/local Compose, formatting/build/lint passed; PR34 CI verification and main promotion pending.

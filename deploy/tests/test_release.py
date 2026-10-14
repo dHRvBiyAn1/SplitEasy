@@ -16,6 +16,13 @@ class ReleaseTest(unittest.TestCase):
             previous.mkdir(parents=True)
             (root / "current").symlink_to(previous)
             (root / ".env").write_text("server-config")
+            token = root / "tunnel.token"
+            token.write_text("" if failure == "token_empty" else "disposable-token")
+            token.chmod(0o400)
+            if failure == "token":
+                token.unlink()
+            elif failure == "token_public":
+                token.chmod(0o644)
             binaries = root / "bin"
             binaries.mkdir()
             docker = binaries / "docker"
@@ -23,14 +30,16 @@ class ReleaseTest(unittest.TestCase):
 set -eu
 [[ -z "${BACKEND_IMAGE:-}" && -z "${FRONTEND_IMAGE:-}" ]] || exit 1
 printf '%s\\n' "$*" >> "$CALLS"
-if [[ "$*" == *"config --quiet"* ]]; then exit 0; fi
-if [[ "$*" == *"pull backend frontend"* && "$FAILURE" == pull ]]; then exit 1; fi
+if [[ "$*" == *"config --quiet"* ]]; then [[ "$FAILURE" != config ]]; exit; fi
+if [[ "$*" == *"run --rm"* && "$FAILURE" == token_permission ]]; then exit 1; fi
+if [[ "$*" == *"exec -T backend curl"* && "$FAILURE" == readiness ]]; then exit 1; fi
+if [[ "$*" == *"pull backend caddy cloudflared"* && "$FAILURE" == pull ]]; then exit 1; fi
 if [[ "$*" == *"pg_dump"* ]]; then
   [[ "$FAILURE" != backup ]] || exit 1
   printf 'fake-dump'
 fi
-if [[ "$*" == *"up"* && "$*" == *"backend frontend"* && "$FAILURE" == startup ]]; then exit 1; fi
-if [[ "$*" == *"printenv APP_CORS_ALLOWED_ORIGINS"* ]]; then printf 'https://app.example.com'; fi
+if [[ "$*" == *"up"* && "$*" == *"backend caddy cloudflared"* && "$FAILURE" == startup ]]; then exit 1; fi
+if [[ "$*" == *"config --format json"* ]]; then printf '{"services":{"cloudflared":{"volumes":[{"target":"/run/secrets/tunnel-token","source":"%s"}]}},"x-api-origin":"%s"}' "$TOKEN_FILE" "${API_ORIGIN_TEST:-https://api.split-easy.io}"; fi
 ''')
             curl = binaries / "curl"
             curl.write_text('''#!/usr/bin/env bash
@@ -50,7 +59,7 @@ if [[ "$*" == *"/api/health"* ]]; then printf '{"status":"UP"}'; else printf '<a
             shutil.copy(REPO / "compose.prod.yml", release / "compose.prod.yml")
             (release / "release.env").write_text(
                 "BACKEND_IMAGE=ghcr.io/example/app-backend@sha256:" + "b" * 64 + "\n"
-                "FRONTEND_IMAGE=ghcr.io/example/app-frontend@sha256:" + "c" * 64 + "\n"
+
             )
             if failure in ["manifest", "manifest_no_newline"]:
                 with (release / "release.env").open("a") as file:
@@ -65,7 +74,8 @@ if [[ "$*" == *"/api/health"* ]]; then printf '{"status":"UP"}'; else printf '<a
                 (root / "previous").symlink_to(release)
                 script = root / "previous/deploy/deploy.sh"
             env = dict(os.environ, SPLITEASY_ROOT=str(root), PATH=f"{binaries}:{os.environ['PATH']}",
-                       FAILURE=failure, CALLS=str(root / "calls"),
+                       FAILURE=failure, CALLS=str(root / "calls"), TOKEN_FILE=str(token),
+                       API_ORIGIN_TEST="https://evil.example" if failure == "origin" else "https://api.split-easy.io",
                        BACKEND_IMAGE="untrusted:tag", FRONTEND_IMAGE="untrusted:tag")
             result = subprocess.run(["bash", str(script)], env=env,
                                     capture_output=True, text=True)
@@ -75,12 +85,12 @@ if [[ "$*" == *"/api/health"* ]]; then printf '{"status":"UP"}'; else printf '<a
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(active, previous)
                 if failure in ["pull", "backup"]:
-                    self.assertNotIn("--wait-timeout 180 backend frontend", calls)
+                    self.assertNotIn("--wait-timeout 180 backend caddy cloudflared", calls)
             else:
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(active, release)
                 self.assertEqual(Path(os.readlink(root / "current")), release)
-                self.assertLess(calls.index("pg_dump"), calls.index("--wait-timeout 180 backend frontend"))
+                self.assertLess(calls.index("pg_dump"), calls.index("--wait-timeout 180 backend caddy cloudflared"))
                 self.assertEqual((root / "previous").resolve(), previous)
             self.assertNotIn("down", calls)
 
@@ -88,7 +98,7 @@ if [[ "$*" == *"/api/health"* ]]; then printf '{"status":"UP"}'; else printf '<a
         self.run_release()
 
     def test_failed_release_keeps_active_pointer(self):
-        for failure in ["manifest", "manifest_no_newline", "pull", "backup", "startup", "smoke"]:
+        for failure in ["manifest", "manifest_no_newline", "config", "token", "token_empty", "token_public", "token_permission", "origin", "pull", "backup", "startup", "readiness", "smoke"]:
             with self.subTest(failure=failure):
                 self.run_release(failure)
 

@@ -43,6 +43,29 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
+  it.each(['/api-admin', '/api/../outside', 'https://untrusted.example/api/groups'])(
+    'does not disclose a token or log out for an unrelated request: %s',
+    (url) => {
+      localStorage.setItem('spliteasy.accessToken', 'jwt-token');
+      const logout = vi.spyOn(auth, 'logout');
+      http.get(url).subscribe({ error: () => {} });
+      const req = httpTesting.expectOne(url);
+      expect(req.request.headers.has('Authorization')).toBe(false);
+      req.flush({}, { status: 401, statusText: 'Unauthorized' });
+      expect(logout).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves the session when registration fails with 401', () => {
+    localStorage.setItem('spliteasy.accessToken', 'jwt-token');
+    const logout = vi.spyOn(auth, 'logout');
+    http.post('/api/auth/register', {}).subscribe({ error: () => {} });
+    const req = httpTesting.expectOne('/api/auth/register');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(logout).not.toHaveBeenCalled();
+  });
+
   it('logs out and redirects to /login on 401', () => {
     localStorage.setItem('spliteasy.accessToken', 'jwt-token');
     const router = TestBed.inject(Router);
