@@ -38,8 +38,20 @@ if ! "$wrangler" pages deploy "$pages" --project-name="$CLOUDFLARE_PAGES_PROJECT
   echo 'Pages upload failed; the healthy backend remains deployed. Retry this workflow; do not restore the database.' >&2
   exit 1
 fi
-for path in /login /groups/00000000-0000-0000-0000-000000000000; do
-  curl --fail --silent --show-error --connect-timeout 5 --max-time 20 --retry 5 --retry-all-errors --retry-delay 3 \
-    "https://split-easy.io$path" | grep -q '<app-root'
+for route in /login /groups/00000000-0000-0000-0000-000000000000; do
+  ready=false
+  # Pages can briefly serve the previous HTML with HTTP 200 after a successful upload.
+  for attempt in {1..12}; do
+    if html=$(curl --fail --silent --show-error --connect-timeout 5 --max-time 10 \
+      "https://split-easy.io$route") && [[ "$html" == *'<app-root'* ]]; then
+      ready=true
+      break
+    fi
+    if (( attempt < 12 )); then sleep 5; fi
+  done
+  if [[ "$ready" != true ]]; then
+    echo "Frontend did not become ready at $route; backend remains deployed. Check Pages domain routing and retry the workflow." >&2
+    exit 1
+  fi
 done
 echo 'Backend and frontend deployment checks passed.'

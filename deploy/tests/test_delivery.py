@@ -14,7 +14,7 @@ class DeliveryTest(unittest.TestCase):
             root = Path(tmp)
             binaries = root / "bin"
             binaries.mkdir()
-            for name in ["git", "ssh", "scp", "tar", "curl", "wrangler"]:
+            for name in ["git", "ssh", "scp", "tar", "curl", "wrangler", "sleep"]:
                 binary = binaries / name
                 binary.write_text('''#!/usr/bin/env bash
 set -eu
@@ -26,7 +26,11 @@ if [[ "$name" == git ]]; then
 fi
 if [[ "$name" == ssh && "$*" == *"bash"* && "$FAILURE" == backend ]]; then exit 1; fi
 if [[ "$name" == wrangler && "$FAILURE" == pages ]]; then exit 1; fi
-if [[ "$name" == curl ]]; then printf '<app-root></app-root>'; fi
+if [[ "$name" == curl ]]; then
+  if [[ "$FAILURE" == frontend || ( "$FAILURE" == propagation && $(grep -c '^curl ' "$CALLS") -le 2 ) ]]; then
+    printf '<html>Previous setup page</html>'
+  else printf '<app-root></app-root>'; fi
+fi
 ''')
                 binary.chmod(0o755)
             (root / "pages").mkdir()
@@ -60,6 +64,18 @@ if [[ "$name" == curl ]]; then printf '<app-root></app-root>'; fi
         result, calls = self.run_delivery("backend")
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("wrangler", calls)
+
+    def test_frontend_propagation_retries_successful_http_with_previous_page(self):
+        result, calls = self.run_delivery("propagation")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertGreaterEqual(calls.count("curl "), 3)
+
+    def test_frontend_never_ready_reports_failure_after_bounded_retries(self):
+        result, calls = self.run_delivery("frontend")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Frontend did not become ready", result.stderr)
+        self.assertIn("wrangler pages deploy", calls)
+        self.assertNotIn("rollback", calls)
 
     def test_dev_or_superseded_revision_has_no_production_effects(self):
         for failure in ["branch", "stale"]:
