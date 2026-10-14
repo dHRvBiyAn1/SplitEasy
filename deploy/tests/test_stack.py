@@ -35,7 +35,8 @@ class StackTest(unittest.TestCase):
         token = next(v for v in config["services"]["cloudflared"]["volumes"]
                      if v["target"] == "/run/secrets/tunnel-token")
         self.assertTrue(token["read_only"])
-        self.assertFalse(token["bind"]["create_host_path"])
+        # Some Compose versions omit false booleans in normalized JSON.
+        self.assertFalse(token["bind"].get("create_host_path", False))
 
     def test_ci_exposes_only_a_loopback_proxy_and_skips_the_real_tunnel(self):
         config = self.config(ci=True)
