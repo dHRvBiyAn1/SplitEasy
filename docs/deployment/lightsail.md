@@ -125,7 +125,7 @@ No AWS access key is required by this SSH delivery workflow. Set branch protecti
 
 `.github/workflows/ci-cd.yml` does the following:
 
-1. Every PR: backend tests with throwaway PostgreSQL, frontend tests/build with Node 22, release-script checks, Docker builds, and real container smoke/persistence checks. PRs never access production secrets or publish images.
+1. Every PR and every `dev` push: backend tests with throwaway PostgreSQL, frontend tests/build with Node 22, release-script checks, Docker builds, and real container smoke/persistence checks. PRs and `dev` pushes never access production secrets or publish images.
 2. A `main` push or manual dispatch **on main**: publish exactly the images that passed the checks to `ghcr.io/<owner>/spliteasy-backend:<commit>` and `...-frontend:<commit>`; owner/repository names are lowercased automatically.
 3. Deployment reads the registry digests, verifies SSH, and transfers a release into `/opt/spliteasy/releases/<commit>-<run-id>-<attempt>`. Every run gets a fresh directory, so reruns cannot overwrite the active release manifest. No Git checkout, npm/Maven build, or registry-write credential is needed on the VPS.
 4. GitHub serializes production deploy jobs; the server additionally uses `flock`. Superseded main revisions are skipped before SSH deployment. A new commit during an in-flight deployment can briefly leave the prior revision active until its successor finishes.
@@ -135,6 +135,8 @@ No AWS access key is required by this SSH delivery workflow. Set branch protecti
 Third-party actions are pinned to verified release commit hashes; Dependabot checks Docker and Actions updates monthly. Base images track Java 21, Node 22, Caddy 2, and PostgreSQL 16; review updates and rebuild regularly. Do not delete GHCR digests required by `current`, `previous`, or a planned rollback.
 
 ## 5. First deployment and verification
+
+Use `dev` for development and push there to run CI. Promote tested changes through a `dev` → `main` PR. Only a push/merge into `main` (or manual dispatch on `main`) publishes production images and can deploy. Keep `main` protected with the required checks. The deployment workflow must first be merged into `main`; creating `dev` alone does not install it on either branch. Then bring `dev` up to date from `main` to receive the workflow.
 
 Commit/push the changes when ready and merge into `main`, or run **CI and Lightsail deployment** manually on `main`. The first backup contains an empty pre-migration database; PostgreSQL and TLS volumes are then created and retained. Ensure A-record propagation and public ports 80/443 before this run: Caddy obtains a certificate automatically. [Caddy HTTPS](https://caddyserver.com/docs/automatic-https).
 

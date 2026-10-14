@@ -215,7 +215,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Git Workflow
 
-- One branch per feature: `feat/<name>` (or `fix/`, `refactor/`, `docs/`). Conventional commit messages.
+- Use `dev` for development; promote tested changes through a `dev` → `main` PR. `main` is the production branch. Conventional commit messages.
+- Pushes to `dev` run CI only; production image publication and Lightsail deployment are restricted to `main`, with the server/secrets and `DEPLOY_ENABLED=true` configured first.
 - Commit/push only when asked; if on `main`, branch first. Before a PR: run full backend + frontend suites,
   no lint errors, include a "Testing" section with end-to-end evidence.
 
@@ -258,3 +259,5 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Profile page + theme toggle — PR #23 (`feat/profile-page`): `/profile` route, sidebar "View profile" link, view/inline-edit (name/email/phone/currency/avatar-color), System/Light/Dark toggle via `ThemeService`. Prefs client-side only (see Gaps). Verified in browser.
 
 - [x] Lightsail Docker + CI/CD — `feat/lightsail-deployment`: multi-stage Java/Angular-Caddy images, private PostgreSQL 16 production Compose, explicit prod JWT configuration and DB readiness, pinned GitHub Actions tests/builds/GHCR digest releases/verified SSH, locked pre-migration backups and schema-aware rollback runbook. Backend 108/108, frontend 50/50 on Node 22; container auth/deep-link/persistence and real backup restore verified; release tests and shell/workflow lint pass. Infrastructure implemented; remote deployment requires server/domain/secrets.
+
+- [x] Development branch workflow (2026-10-15) — `dev` created from current `origin/main` (`7476c12`) and published; development uses `dev`, promotion uses `dev` → `main`. PR #28 adds dev-push CI while keeping image publication/production deployment restricted to main; Actionlint passed. Main activation still requires merging the deployment workflow and setting the Lightsail server/secrets.
