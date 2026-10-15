@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.spliteasy.dto.expense.SplitInput;
 import com.spliteasy.exception.BadRequestException;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Focused unit tests for PERCENTAGE split math — no Spring, no DB. Assertions carried over verbatim
@@ -26,7 +29,7 @@ class PercentageSplitStrategyTest {
   }
 
   private static long sum(List<Share> shares) {
-    return shares.stream().mapToLong(Share::shareCents).sum();
+    return shares.stream().mapToLong(Share::shareCents).reduce(0L, Math::addExact);
   }
 
   private static long shareOf(List<Share> shares, UUID id) {
@@ -77,5 +80,41 @@ class PercentageSplitStrategyTest {
     assertThat(sum(shares)).isEqualTo(999);
     assertThat(shareOf(shares, A)).isEqualTo(100);
     assertThat(shareOf(shares, B)).isEqualTo(899);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"9223372036854775807,9223372036854775807,10002", "-1,10001,0", "10001,0,0"})
+  void rejectsOutOfRangeBasisPointsEvenWhenTheSumWrapsOrMatches(long a, long b, long c) {
+    assertThatThrownBy(
+            () -> split(1000, A, new SplitInput(A, a), new SplitInput(B, b), new SplitInput(C, c)))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"1000000000000", "9223372036854775807"})
+  void zeroAndFullPercentageStayExactAtLargeTotals(long total) {
+    var shares = split(total, A, new SplitInput(A, 0), new SplitInput(B, 10000));
+    assertThat(shareOf(shares, A)).isZero();
+    assertThat(shareOf(shares, B)).isEqualTo(total);
+    assertThat(sum(shares)).isEqualTo(total);
+  }
+
+  @Test
+  void largeTotalKeepsDeterministicPayerRemainderWithoutMultiplicationOverflow() {
+    var shares =
+        split(
+            Long.MAX_VALUE,
+            C,
+            new SplitInput(A, 3333),
+            new SplitInput(B, 3333),
+            new SplitInput(C, 3334));
+    assertThat(shareOf(shares, A)).isEqualTo(3_074_149_899_883_696_776L);
+    assertThat(shareOf(shares, B)).isEqualTo(3_074_149_899_883_696_776L);
+    assertThat(shareOf(shares, C)).isEqualTo(3_075_072_237_087_382_255L);
+    assertThat(
+            shares.stream()
+                .map(s -> BigInteger.valueOf(s.shareCents()))
+                .reduce(BigInteger.ZERO, BigInteger::add))
+        .isEqualTo(BigInteger.valueOf(Long.MAX_VALUE));
   }
 }

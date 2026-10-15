@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
+import { SessionService } from '../core/auth/session.service';
 import { avatarTint } from '../core/avatar';
 import { UserSummary } from '../core/auth/auth.models';
 import { DashboardService } from '../dashboard/dashboard.service';
@@ -37,6 +39,7 @@ export class NewExpenseModalComponent {
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
+  private readonly session = inject(SessionService);
 
   protected readonly categories = CATEGORIES;
   protected readonly display = centsToDisplay;
@@ -88,42 +91,48 @@ export class NewExpenseModalComponent {
     if (!id) {
       return;
     }
-    this.groups.getGroup(id).subscribe((g) => {
-      this.members.set(g.members);
-      if (this.editId && !this.prefilled) {
-        this.prefillFromExpense(id, this.editId);
-      } else {
-        this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
-        this.included.set(new Set(g.members.map((m) => m.id)));
-        this.values.set({});
-      }
-    });
+    this.groups
+      .getGroup(id)
+      .pipe(takeUntil(this.session.changes))
+      .subscribe((g) => {
+        this.members.set(g.members);
+        if (this.editId && !this.prefilled) {
+          this.prefillFromExpense(id, this.editId);
+        } else {
+          this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
+          this.included.set(new Set(g.members.map((m) => m.id)));
+          this.values.set({});
+        }
+      });
   }
 
   /** Load an existing expense into the form. Any custom split is re-edited as exact
    * amounts (UNEQUAL) — lossless and always valid, so we never reconstruct percentages. */
   private prefillFromExpense(groupId: string, expenseId: string): void {
-    this.expenses.getExpense(groupId, expenseId).subscribe((e) => {
-      this.prefilled = true;
-      this.description.setValue(e.description);
-      this.amount.setValue(e.amountCents / 100);
-      this.date.setValue(e.spentOn);
-      this.category.set(e.category);
-      this.paidBy.set(e.paidBy.id);
-      this.included.set(new Set(e.participants.map((p) => p.user.id)));
-      if (e.splitType === 'EQUAL') {
-        this.splitType.set('EQUAL');
-        this.values.set({});
-      } else {
-        this.splitType.set('UNEQUAL');
-        const vals: Record<string, string> = {};
-        for (const p of e.participants) {
-          vals[p.user.id] = this.display(p.shareCents);
+    this.expenses
+      .getExpense(groupId, expenseId)
+      .pipe(takeUntil(this.session.changes))
+      .subscribe((e) => {
+        this.prefilled = true;
+        this.description.setValue(e.description);
+        this.amount.setValue(e.amountCents / 100);
+        this.date.setValue(e.spentOn);
+        this.category.set(e.category);
+        this.paidBy.set(e.paidBy.id);
+        this.included.set(new Set(e.participants.map((p) => p.user.id)));
+        if (e.splitType === 'EQUAL') {
+          this.splitType.set('EQUAL');
+          this.values.set({});
+        } else {
+          this.splitType.set('UNEQUAL');
+          const vals: Record<string, string> = {};
+          for (const p of e.participants) {
+            vals[p.user.id] = this.display(p.shareCents);
+          }
+          this.values.set(vals);
         }
-        this.values.set(vals);
-      }
-      this.tick.update((n) => n + 1);
-    });
+        this.tick.update((n) => n + 1);
+      });
   }
 
   meId(): string {
@@ -249,7 +258,7 @@ export class NewExpenseModalComponent {
     const save$ = this.editId
       ? this.expenses.updateExpense(gid, this.editId, req)
       : this.expenses.createExpense(gid, req);
-    save$.subscribe({
+    save$.pipe(takeUntil(this.session.changes)).subscribe({
       next: () => {
         this.dashboard.refresh();
         this.modal.close();

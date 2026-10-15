@@ -1,9 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { concatMap, from, of } from 'rxjs';
+import { concatMap, from, of, takeUntil } from 'rxjs';
 import { catchError, toArray } from 'rxjs/operators';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { SessionService } from '../core/auth/session.service';
 import { GroupType } from '../dashboard/dashboard.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
@@ -28,6 +29,7 @@ export class NewGroupModalComponent {
   private readonly dashboard = inject(DashboardService);
   private readonly modal = inject(ModalService);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
 
   protected readonly types = TYPES;
   protected readonly name = new FormControl('', {
@@ -62,26 +64,30 @@ export class NewGroupModalComponent {
     }
     this.saving.set(true);
     this.error.set(null);
-    this.groups.createGroup(this.name.value.trim(), this.type()).subscribe({
-      next: (group) => {
-        // Add each member by email in order; ignore individual failures (e.g. unknown user).
-        from(this.emails())
-          .pipe(
-            concatMap((email) =>
-              this.groups.addMember(group.id, email).pipe(catchError(() => of(null))),
-            ),
-            toArray(),
-          )
-          .subscribe(() => {
-            this.dashboard.refresh();
-            this.modal.close();
-            this.router.navigate(['/groups', group.id]);
-          });
-      },
-      error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not create the group.');
-        this.saving.set(false);
-      },
-    });
+    this.groups
+      .createGroup(this.name.value.trim(), this.type())
+      .pipe(takeUntil(this.session.changes))
+      .subscribe({
+        next: (group) => {
+          // Add each member by email in order; ignore individual failures (e.g. unknown user).
+          from(this.emails())
+            .pipe(
+              concatMap((email) =>
+                this.groups.addMember(group.id, email).pipe(catchError(() => of(null))),
+              ),
+              toArray(),
+              takeUntil(this.session.changes),
+            )
+            .subscribe(() => {
+              this.dashboard.refresh();
+              this.modal.close();
+              this.router.navigate(['/groups', group.id]);
+            });
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? 'Could not create the group.');
+          this.saving.set(false);
+        },
+      });
   }
 }

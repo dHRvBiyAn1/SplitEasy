@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -49,7 +50,8 @@ public class DashboardService {
   private final ExpenseParticipantRepository participantRepository;
   private final PaymentRepository paymentRepository;
 
-  @Transactional(readOnly = true)
+  // One snapshot for nested pairwise reads, group totals, expense shares and the activity feed.
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public DashboardResponse getDashboard(UUID userId) {
     log.debug("Assembling dashboard for user {}", userId);
     List<GroupSummary> myGroups = groupService.listMyGroups(userId);

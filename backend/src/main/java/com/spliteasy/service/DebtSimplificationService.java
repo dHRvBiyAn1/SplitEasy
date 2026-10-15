@@ -11,6 +11,7 @@ import java.util.PriorityQueue;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -31,7 +32,8 @@ public class DebtSimplificationService {
 
   private final BalanceService balanceService;
 
-  @Transactional(readOnly = true)
+  // BalanceService joins this transaction, so this boundary must own the consistent snapshot.
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public SimplifiedDebtsResponse simplify(UUID requesterId, UUID groupId) {
     // Reuse the single source of balance truth (also enforces group membership -> 403).
     List<MemberBalance> balances = balanceService.computeBalances(requesterId, groupId).balances();
