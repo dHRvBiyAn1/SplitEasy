@@ -22,6 +22,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -129,7 +130,8 @@ public class GroupService {
    * member still has a non-zero net in the group, so no debt is ever orphaned. The creator can't be
    * removed or leave: they own the group and delete it instead.
    */
-  @Transactional
+  // BalanceService joins this write transaction; its settled-balance guard needs one snapshot.
+  @Transactional(isolation = Isolation.REPEATABLE_READ)
   public void removeMember(UUID requesterId, UUID groupId, UUID targetUserId) {
     membershipGuard.requireMember(groupId, requesterId);
     Group group =

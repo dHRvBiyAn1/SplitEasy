@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -43,7 +44,9 @@ public class BalanceService {
   private final PaymentRepository paymentRepository;
   private final MembershipGuard membershipGuard;
 
-  @Transactional(readOnly = true)
+  // Keep all aggregates and the member list on one PostgreSQL snapshot. Transaction-owning
+  // callers (simplification and member removal) must set this isolation too: REQUIRED joins them.
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
     log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
