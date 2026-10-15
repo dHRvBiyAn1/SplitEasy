@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.spliteasy.dto.expense.SplitInput;
 import com.spliteasy.exception.BadRequestException;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Focused unit tests for UNEQUAL split math — no Spring, no DB. UNEQUAL validation used to live in
@@ -51,5 +54,44 @@ class UnequalSplitStrategyTest {
     List<Share> shares = split(1000, new SplitInput(A, 1000L), new SplitInput(B, 0L));
     assertThat(shareOf(shares, A)).isEqualTo(1000);
     assertThat(shareOf(shares, B)).isZero();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"9223372036854775807,9223372036854775807,1002", "-1,1001,0", "1001,0,0"})
+  void rejectsOutOfRangeSharesEvenWhenTheSumWrapsOrMatches(long a, long b, long c) {
+    assertThatThrownBy(
+            () ->
+                split(
+                    1000,
+                    new SplitInput(A, a),
+                    new SplitInput(B, b),
+                    new SplitInput(new UUID(0, 3), c)))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void maximumAmountAllowsZeroAndFullSharesWithoutLosingCents() {
+    var shares =
+        split(1_000_000_000_000L, new SplitInput(A, 0), new SplitInput(B, 1_000_000_000_000L));
+    assertThat(shareOf(shares, A)).isZero();
+    assertThat(shareOf(shares, B)).isEqualTo(1_000_000_000_000L);
+    assertThat(
+            shares.stream()
+                .map(s -> BigInteger.valueOf(s.shareCents()))
+                .reduce(BigInteger.ZERO, BigInteger::add))
+        .isEqualTo(BigInteger.valueOf(1_000_000_000_000L));
+  }
+
+  @Test
+  void rejectsSumLargerThanLongEvenWhenEachShareIsInRange() {
+    assertThatThrownBy(
+            () ->
+                split(
+                    Long.MAX_VALUE,
+                    new SplitInput(A, Long.MAX_VALUE),
+                    new SplitInput(B, Long.MAX_VALUE),
+                    new SplitInput(new UUID(0, 3), Long.MAX_VALUE),
+                    new SplitInput(new UUID(0, 4), 2)))
+        .isInstanceOf(BadRequestException.class);
   }
 }
