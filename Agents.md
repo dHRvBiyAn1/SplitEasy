@@ -184,6 +184,11 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   computed via a fixed number of aggregate `GROUP BY` queries (never a per-expense loop). Because shares sum to
   amounts, **group balances always sum to zero** (test invariant) — holds with expenses + payments mixed.
   **Overpayment allowed** (net-per-person model; flips sign past zero).
+- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, both public pairwise
+  methods, dashboard and simplification set isolation at their transaction boundaries. Any existing outer
+  transaction must own that isolation too (`GroupService.removeMember` includes the settled-balance guard);
+  an inner `REQUIRED` transaction cannot upgrade its caller. Read-only alone is insufficient. Concurrency
+  regressions use real committed writes between aggregates, without a test-managed reader transaction.
 - **Three views, one source of truth** (persisted expense/payment rows): (1) `BalanceService` net-per-member;
   (2) `DebtSimplificationService` minimal transfers; (3) `PairwiseBalanceService` who-owes-whom-to-me per
   counterparty (drives dashboard cards, People list, settle-up, balance pills). Pairwise is **not netted across
@@ -274,4 +279,5 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 - [x] Production recovery + Pages propagation checks (2026-10-15) — main fcf12e6 deployed backend/tunnel/Pages, but immediate frontend HTML check failed. Verified public API/login/group routes, retried main run38649436260 and confirmed attempt2 success without DB restore/removal. Delivery now retries previous HTTP200 HTML as well as HTTP errors with bounded attempts and clear exhaustion errors. Red/green regressions and deployment12 on Linux/local Compose, ShellCheck/Actionlint, backend108/frontend57 formatting/build passed; follow-up PR/main promotion pending.
 
+- [x] Consistent derived balance snapshots (2026-10-15, #38) — `fix/38-balance-snapshots`: PostgreSQL repeatable-read boundaries cover balances, pairwise, dashboard/activity, simplification and the member-removal guard. Thirteen deterministic regressions coordinate real expense/payment commits (12 behavioral failures before the fix); backend121, frontend57, formatting/build, deployment12, ShellCheck/Actionlint passed. Isolated private Caddy/backend/PostgreSQL HTTP ledger and restart-persistence smoke passed; no schema change, merge to main or deployment.
 - [x] Split overflow validation (#37, 2026-10-15) — bounded exact/percentage values, overflow-safe BigInteger sums and percentage arithmetic before shared POST/PUT persistence; preserves the 1e12 amount cap and deterministic payer remainder. Regression-first strategy/API coverage includes adversarial long inputs, unchanged rejected writes, and zero/full boundary shares. Backend125/frontend57, formatting/production build, deployment12 and ShellCheck/Actionlint passed; disposable Caddy/backend/PostgreSQL HTTP checks confirmed 24 rejected POST/PUT requests leave accounting unchanged, valid boundaries/remainder/zero-sum balances, and persistence after container recreation.
