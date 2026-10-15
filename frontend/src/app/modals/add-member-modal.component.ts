@@ -1,7 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { takeUntil } from 'rxjs';
 import { avatarTint } from '../core/avatar';
 import { UserSummary } from '../core/auth/auth.models';
+import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
@@ -22,6 +24,7 @@ export class AddMemberModalComponent {
   private readonly groups = inject(GroupService);
   private readonly dashboard = inject(DashboardService);
   private readonly modal = inject(ModalService);
+  private readonly session = inject(SessionService);
 
   protected readonly groupId = this.modal.addMemberGroupId();
   protected readonly groupName = signal('');
@@ -32,10 +35,13 @@ export class AddMemberModalComponent {
 
   constructor() {
     if (this.groupId) {
-      this.groups.getGroup(this.groupId).subscribe((g) => {
-        this.groupName.set(g.name);
-        this.members.set(g.members);
-      });
+      this.groups
+        .getGroup(this.groupId)
+        .pipe(takeUntil(this.session.changes))
+        .subscribe((g) => {
+          this.groupName.set(g.name);
+          this.members.set(g.members);
+        });
     }
   }
 
@@ -63,17 +69,20 @@ export class AddMemberModalComponent {
     }
     this.saving.set(true);
     this.error.set(null);
-    this.groups.addMember(this.groupId, email).subscribe({
-      next: (g) => {
-        this.members.set(g.members);
-        this.email.reset();
-        this.saving.set(false);
-        this.dashboard.refresh();
-      },
-      error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not add that member.');
-        this.saving.set(false);
-      },
-    });
+    this.groups
+      .addMember(this.groupId, email)
+      .pipe(takeUntil(this.session.changes))
+      .subscribe({
+        next: (g) => {
+          this.members.set(g.members);
+          this.email.reset();
+          this.saving.set(false);
+          this.dashboard.refresh();
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? 'Could not add that member.');
+          this.saving.set(false);
+        },
+      });
   }
 }

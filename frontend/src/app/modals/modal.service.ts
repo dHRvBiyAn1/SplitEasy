@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { SessionService } from '../core/auth/session.service';
 import { Settlement } from '../dashboard/dashboard.models';
 
 export type ModalKind = 'group' | 'expense' | 'settle' | 'member' | null;
@@ -21,6 +23,12 @@ export class ModalService {
   readonly settleGroupId = signal<string | null>(null);
   /** Group the add-member modal targets. */
   readonly addMemberGroupId = signal<string | null>(null);
+
+  constructor() {
+    inject(SessionService)
+      .changes.pipe(takeUntilDestroyed())
+      .subscribe(() => this.close());
+  }
 
   openGroup(): void {
     this.active.set('group');

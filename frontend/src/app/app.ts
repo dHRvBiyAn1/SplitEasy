@@ -87,7 +87,6 @@ export class App implements OnInit {
 
   logout(): void {
     this.auth.logout();
-    this.dashboard.clear();
     this.router.navigate(['/login']);
   }
 
