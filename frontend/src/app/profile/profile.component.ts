@@ -2,7 +2,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { DashboardService } from '../dashboard/dashboard.service';
 import { ThemeService, ThemeChoice } from '../core/theme.service';
 import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../core/profile.service';
 
@@ -14,7 +13,6 @@ import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../cor
 })
 export class ProfileComponent {
   private readonly auth = inject(AuthService);
-  private readonly dashboard = inject(DashboardService);
   private readonly profile = inject(ProfileService);
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);
@@ -96,7 +94,6 @@ export class ProfileComponent {
 
   signOut(): void {
     this.auth.logout();
-    this.dashboard.clear();
     this.router.navigate(['/login']);
   }
 }

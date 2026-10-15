@@ -136,6 +136,12 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 ## Frontend Conventions
 
+- **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
+  synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
+  call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
+  request; protected 401 logout/redirect must match the initiating session version (even if a new login
+  returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
+  after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - Modal `<form>`s use `(submit)="$event.preventDefault(); save()"` — **not** `(ngSubmit)` — because modals
@@ -279,5 +285,6 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 - [x] Production recovery + Pages propagation checks (2026-10-15) — main fcf12e6 deployed backend/tunnel/Pages, but immediate frontend HTML check failed. Verified public API/login/group routes, retried main run38649436260 and confirmed attempt2 success without DB restore/removal. Delivery now retries previous HTTP200 HTML as well as HTTP errors with bounded attempts and clear exhaustion errors. Red/green regressions and deployment12 on Linux/local Compose, ShellCheck/Actionlint, backend108/frontend57 formatting/build passed; follow-up PR/main promotion pending.
 
+- [x] Account session isolation (#45, 2026-10-15) — shared synchronous session reset clears dashboard/modal state on login/register/logout; earlier-session dashboard callbacks and protected 401s are ignored, and pending modal reads/mutations (including queued member additions) cancel on identity changes. Regression-first HTTP/component coverage: initial14 failures and modal5 failures, then frontend80/80 (23 session cases); backend108/108, Prettier/production build, deployment12, ShellCheck/Actionlint and isolated backend/Caddy/Postgres auth/CORS/persistence smoke passed. Local browser verified Alice expiry → modal closed/login → Bob's own sidebar/group. Main PR pending; no merge/deployment.
 - [x] Consistent derived balance snapshots (2026-10-15, #38) — `fix/38-balance-snapshots`: PostgreSQL repeatable-read boundaries cover balances, pairwise, dashboard/activity, simplification and the member-removal guard. Thirteen deterministic regressions coordinate real expense/payment commits (12 behavioral failures before the fix); backend121, frontend57, formatting/build, deployment12, ShellCheck/Actionlint passed. Isolated private Caddy/backend/PostgreSQL HTTP ledger and restart-persistence smoke passed; no schema change, merge to main or deployment.
 - [x] Split overflow validation (#37, 2026-10-15) — bounded exact/percentage values, overflow-safe BigInteger sums and percentage arithmetic before shared POST/PUT persistence; preserves the 1e12 amount cap and deterministic payer remainder. Regression-first strategy/API coverage includes adversarial long inputs, unchanged rejected writes, and zero/full boundary shares. Backend125/frontend57, formatting/production build, deployment12 and ShellCheck/Actionlint passed; disposable Caddy/backend/PostgreSQL HTTP checks confirmed 24 rejected POST/PUT requests leave accounting unchanged, valid boundaries/remainder/zero-sum balances, and persistence after container recreation.

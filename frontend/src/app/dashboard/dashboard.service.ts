@@ -1,6 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
+import { SessionService } from '../core/auth/session.service';
 import { DashboardResponse } from './dashboard.models';
 
 /**
@@ -11,11 +13,18 @@ import { DashboardResponse } from './dashboard.models';
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
   private readonly api = inject(ApiService);
+  private cacheVersion = 0;
 
   private readonly _data = signal<DashboardResponse | null>(null);
   private readonly _loading = signal(false);
   readonly data = this._data.asReadonly();
   readonly loading = this._loading.asReadonly();
+
+  constructor() {
+    inject(SessionService)
+      .changes.pipe(takeUntilDestroyed())
+      .subscribe(() => this.clear());
+  }
 
   /** Fetch only if we don't already have data and aren't mid-flight. */
   ensureLoaded(): void {
@@ -26,18 +35,29 @@ export class DashboardService {
 
   /** Force a re-fetch (after a mutation). */
   refresh(): void {
+    const version = this.cacheVersion;
     this._loading.set(true);
     this.api
       .get<DashboardResponse>('/dashboard')
-      .pipe(finalize(() => this._loading.set(false)))
+      .pipe(
+        finalize(() => {
+          if (version === this.cacheVersion) this._loading.set(false);
+        }),
+      )
       .subscribe({
-        next: (res) => this._data.set(res),
-        error: () => this._data.set(null),
+        next: (res) => {
+          if (version === this.cacheVersion) this._data.set(res);
+        },
+        error: () => {
+          if (version === this.cacheVersion) this._data.set(null);
+        },
       });
   }
 
-  /** Clear cached data on logout so the next user doesn't see stale numbers. */
+  /** Invalidate outstanding responses as well as cached data at a session boundary. */
   clear(): void {
+    this.cacheVersion++;
     this._data.set(null);
+    this._loading.set(false);
   }
 }

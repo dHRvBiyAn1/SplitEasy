@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { ApiService } from '../api/api.service';
 import { AuthResponse, LoginRequest, RegisterRequest, UserSummary } from './auth.models';
+import { SessionService } from './session.service';
 
 const TOKEN_KEY = 'spliteasy.accessToken';
 const USER_KEY = 'spliteasy.user';
@@ -14,6 +15,7 @@ const USER_KEY = 'spliteasy.user';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly api = inject(ApiService);
+  private readonly session = inject(SessionService);
 
   private readonly currentUser = signal<UserSummary | null>(this.readStoredUser());
   readonly user = this.currentUser.asReadonly();
@@ -32,6 +34,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this.session.reset();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     this.currentUser.set(null);
@@ -54,6 +57,7 @@ export class AuthService {
   }
 
   private persist(res: AuthResponse): void {
+    this.session.reset();
     localStorage.setItem(TOKEN_KEY, res.accessToken);
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));
     this.currentUser.set(res.user);

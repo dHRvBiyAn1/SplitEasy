@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { API_BASE_URL, apiPath } from '../api/api.service';
 import { AuthService } from './auth.service';
+import { SessionService } from './session.service';
 
 /**
  * Attaches the bearer token to outgoing API calls and, on a 401, clears the
@@ -13,6 +14,8 @@ import { AuthService } from './auth.service';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
+  const session = inject(SessionService);
+  const version = session.version;
 
   const token = auth.getToken();
   const path = apiPath(req.url, inject(API_BASE_URL));
@@ -22,7 +25,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(authorized).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401 && isPrivateApi) {
+      if (error.status === 401 && isPrivateApi && session.version === version) {
         auth.logout();
         router.navigate(['/login']);
       }

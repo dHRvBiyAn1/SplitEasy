@@ -1,5 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
+import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
+import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
 import { DebtService } from '../debts/debt.service';
@@ -22,6 +24,7 @@ export class SettleUpModalComponent {
   private readonly debts = inject(DebtService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
+  private readonly session = inject(SessionService);
 
   protected readonly display = centsToDisplay;
 
@@ -103,18 +106,21 @@ export class SettleUpModalComponent {
 
   private loadSimplified(groupIds: string[]): void {
     this.loadingSimplified.set(true);
-    this.debts.getSimplifiedDebtsForGroups(groupIds).subscribe({
-      next: (responses) => {
-        this.simplified.set(responses.flatMap((r) => this.toSettlements(r)));
-        this.loadingSimplified.set(false);
-      },
-      error: () => {
-        // Fall back to every direct balance rather than showing an empty modal.
-        this.simplified.set([]);
-        this.simplifyFailed.set(true);
-        this.loadingSimplified.set(false);
-      },
-    });
+    this.debts
+      .getSimplifiedDebtsForGroups(groupIds)
+      .pipe(takeUntil(this.session.changes))
+      .subscribe({
+        next: (responses) => {
+          this.simplified.set(responses.flatMap((r) => this.toSettlements(r)));
+          this.loadingSimplified.set(false);
+        },
+        error: () => {
+          // Fall back to every direct balance rather than showing an empty modal.
+          this.simplified.set([]);
+          this.simplifyFailed.set(true);
+          this.loadingSimplified.set(false);
+        },
+      });
   }
 
   /**
@@ -205,6 +211,7 @@ export class SettleUpModalComponent {
     this.saving.set(true);
     this.payments
       .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents })
+      .pipe(takeUntil(this.session.changes))
       .subscribe({
         next: () => {
           this.dashboard.refresh();
