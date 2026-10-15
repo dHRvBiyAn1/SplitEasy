@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -41,7 +42,7 @@ public class PairwiseBalanceService {
   private final MembershipGuard membershipGuard;
 
   /** Guarded entry point for a single group (enforces membership → 403). */
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<PersonBalance> forGroup(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
     return compute(requesterId, groupId);
@@ -50,9 +51,10 @@ public class PairwiseBalanceService {
   /**
    * Unguarded compute — callers that already resolved the user's own groups (e.g. the dashboard)
    * skip the redundant membership check. Returns every counterparty with a non-zero balance,
-   * ordered by magnitude (largest first) then name.
+   * ordered by magnitude (largest first) then name. An existing caller transaction must also use
+   * REPEATABLE_READ so the aggregates share its snapshot (see DashboardService).
    */
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<PersonBalance> compute(UUID requesterId, UUID groupId) {
     Map<UUID, Long> owedToMe = toMap(participantRepository.sumOwedToUser(groupId, requesterId));
     Map<UUID, Long> iOwe = toMap(participantRepository.sumOwedByUser(groupId, requesterId));
