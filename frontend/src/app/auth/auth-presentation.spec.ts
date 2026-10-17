@@ -47,4 +47,47 @@ describe('authentication presentation', () => {
     expect(f.nativeElement.textContent).toContain('Use at least 8 characters');
     TestBed.inject(HttpTestingController).expectNone('/api/auth/register');
   });
+  for (const password of [
+    'a'.repeat(73),
+    'é'.repeat(40),
+    '😀'.repeat(19),
+    'a'.repeat(72),
+    'é'.repeat(36),
+    '😀'.repeat(18),
+  ]) {
+    const bytes = new TextEncoder().encode(password).length;
+    it(`${bytes > 72 ? 'rejects' : 'submits'} a ${bytes}-byte password unchanged (${password.codePointAt(0)})`, () => {
+      const f = TestBed.createComponent(RegisterComponent);
+      f.detectChanges();
+      for (const [name, value] of Object.entries({
+        displayName: 'Alice',
+        email: 'alice@example.com',
+        password,
+      })) {
+        const input = f.nativeElement.querySelector(
+          `[formControlName="${name}"]`,
+        ) as HTMLInputElement;
+        input.value = value;
+        input.dispatchEvent(new Event('input'));
+      }
+      f.nativeElement
+        .querySelector('form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      f.detectChanges();
+      const input = f.nativeElement.querySelector('#auth-password') as HTMLInputElement;
+      expect(input.value).toBe(password);
+      const http = TestBed.inject(HttpTestingController);
+      if (bytes > 72) {
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        expect(f.nativeElement.querySelector('#password-hint').textContent).toContain(
+          '72 UTF-8 bytes',
+        );
+        http.expectNone('/api/auth/register');
+      } else {
+        const request = http.expectOne('/api/auth/register');
+        expect(request.request.body.password).toBe(password);
+        request.flush({ message: 'test complete' }, { status: 400, statusText: 'Bad Request' });
+      }
+    });
+  }
 });
