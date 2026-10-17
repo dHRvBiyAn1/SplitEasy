@@ -13,6 +13,7 @@ import com.spliteasy.dto.group.AddMemberRequest;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.entity.SplitType;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -117,6 +118,43 @@ class SplitBoundsIntegrationTest extends AbstractIntegrationTest {
           method.equals("POST")
               ? jsonPost(expensesUrl, invalid)
               : put(detailUrl).contentType(MediaType.APPLICATION_JSON).content(json(invalid));
+      mockMvc
+          .perform(invalidRequest.header(HttpHeaders.AUTHORIZATION, authorization))
+          .andExpect(status().isBadRequest());
+      assertThat(read(expensesUrl)).isEqualTo(listBefore);
+      assertThat(read(detailUrl)).isEqualTo(detailBefore);
+      assertThat(read(balancesUrl)).isEqualTo(balancesBefore);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"UNEQUAL,POST", "UNEQUAL,PUT", "PERCENTAGE,POST", "PERCENTAGE,PUT"})
+  void nullSplitEntriesAreRejectedWithoutChangingTheLedger(SplitType type, String method)
+      throws Exception {
+    var original =
+        expense(
+            mockMvc
+                .perform(
+                    jsonPost(expensesUrl, new CreateExpenseRequest("Original", 900, ownerId, null))
+                        .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isCreated())
+                .andReturn());
+    String detailUrl = expensesUrl + "/" + original.id();
+    String listBefore = read(expensesUrl);
+    String detailBefore = read(detailUrl);
+    String balancesUrl = expensesUrl.replace("/expenses", "/balances");
+    String balancesBefore = read(balancesUrl);
+    long share = type == SplitType.UNEQUAL ? 500 : 5000;
+    for (List<SplitInput> splits :
+        List.of(
+            Arrays.asList((SplitInput) null),
+            Arrays.asList(new SplitInput(ownerId, share), new SplitInput(secondId, share), null))) {
+      var invalid = new CreateExpenseRequest("Changed", 1000, ownerId, null, type, splits);
+      var invalidRequest =
+          method.equals("POST")
+              ? jsonPost(expensesUrl, invalid)
+              : put(detailUrl).contentType(MediaType.APPLICATION_JSON).content(json(invalid));
+
       mockMvc
           .perform(invalidRequest.header(HttpHeaders.AUTHORIZATION, authorization))
           .andExpect(status().isBadRequest());

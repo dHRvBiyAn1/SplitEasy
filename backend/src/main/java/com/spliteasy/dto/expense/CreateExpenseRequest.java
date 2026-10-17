@@ -25,7 +25,7 @@ public record CreateExpenseRequest(
     @NotNull UUID paidByUserId,
     List<UUID> participantUserIds,
     SplitType splitType,
-    @Valid List<SplitInput> splits,
+    @Valid List<@NotNull SplitInput> splits,
     ExpenseCategory category,
     LocalDate spentOn) {
 
