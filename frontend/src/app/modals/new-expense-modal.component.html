@@ -13,6 +13,7 @@
               class="chip"
               [class.chip--on]="groupId() === g.id"
               [attr.aria-pressed]="groupId() === g.id"
+              [disabled]="!!editId || saving()"
               (click)="selectGroup(g.id)"
             >
               {{ g.name }}
@@ -152,6 +153,9 @@
         </div>
       </div>
 
+      @if (!ready() && !error()) {
+        <p role="status">Loading expense details…</p>
+      }
       @if (error()) {
         <p class="mform__error" role="alert">{{ error() }}</p>
       }
