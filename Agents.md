@@ -131,6 +131,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   `GlobalExceptionHandler`), **ERROR** unexpected 5xx (the handler's catch-all, with stack
   trace). Appender/pattern in `log4j2-spring.xml`; levels via `logging.level.*` in
   `application[-dev].properties` (`com.spliteasy` = INFO prod / DEBUG dev). Never log secrets/tokens.
+- **Raced duplicates**: keep friendly registration/member prechecks; the database owns uniqueness.
+  After service rollback, `GlobalExceptionHandler` maps only SQLState `23505` with exact constraints
+  `users_email_key` / `uq_group_memberships_group_user` to the same 409 messages. Other integrity
+  failures remain server errors; never classify by exception message text.
 - **Avoid N+1**: `join fetch m.user`; member counts via one aggregate query; expense list via one query
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
@@ -317,3 +321,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] Raced unique conflicts (#42, 2026-10-17) — central post-rollback mapping recognizes only the email and group-membership unique constraints with SQLState `23505`; existing duplicate prechecks and unrelated integrity 500 classification remain. Deterministic concurrent MVC/PostgreSQL regressions exercise real prechecks/transactions and require one target row plus success/409 and mapping after transaction cleanup. Backend150/frontend110, Spotless/Prettier and production build passed; no live traffic or deployment.
