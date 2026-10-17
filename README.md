@@ -140,6 +140,23 @@ Group routes are member-only — non-members get **403, even for nonexistent gro
 | `GET/POST` | `/groups/{g}/payments` | settle-up history / record |
 | `GET` | `/groups/{g}/debt-simplification` | minimal transfer suggestions |
 
+Concurrent writes that Spring recognizes as optimistic-lock/stale-state conflicts return
+**409 Conflict** using the standard error body:
+
+```json
+{
+  "timestamp": "2026-10-17T00:00:00Z",
+  "status": 409,
+  "error": "Conflict",
+  "message": "This record was changed by another request. Reload and review the latest changes before saving again."
+}
+```
+
+The losing transaction rolls back; edits are never retried automatically. Reload the expense
+and review the current values before submitting again. This handles detected collisions during
+overlapping transactions. Expense GET/PUT has no version or ETag precondition, so it does not
+reject an edit solely because a separate, earlier GET is stale.
+
 ## Production deployment
 
 The [step-by-step deployment guide](docs/deployment/lightsail.md) covers Angular on

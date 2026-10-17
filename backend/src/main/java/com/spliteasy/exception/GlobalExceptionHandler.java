@@ -3,6 +3,7 @@ package com.spliteasy.exception;
 import com.spliteasy.dto.common.ErrorResponse;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -63,6 +64,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
     log.warn("Conflict: {}", ex.getMessage());
     return build(HttpStatus.CONFLICT, ex.getMessage());
+  }
+
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  public ResponseEntity<ErrorResponse> handleOptimisticConflict(
+      OptimisticLockingFailureException ex) {
+    log.warn("Concurrent update conflict: {}", ex.getMessage());
+    return build(
+        HttpStatus.CONFLICT,
+        "This record was changed by another request. Reload and review the latest changes before saving again.");
   }
 
   @ExceptionHandler(ForbiddenException.class)
