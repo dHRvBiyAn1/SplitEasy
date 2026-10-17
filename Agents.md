@@ -136,6 +136,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 ## Frontend Conventions
 
+- **Expense group ownership**: each member-load callback must match the current selection generation
+  (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
+  member/detail loads. Existing expense edits keep their original group in both UI and component actions.
 - **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
   synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
   call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
@@ -317,3 +320,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] Expense group ownership (#47, 2026-10-17) — member-load generations reject stale successes/errors (including A → B → A); switching groups clears member/payer/split state and save waits for members plus edit details. Edit group controls and component actions stay fixed to the original group. Ten component/HTTP regressions inspect B-first/A-last participants and the actual POST/PUT paths; original source reproduced nine failures plus three unhandled load errors. Backend138/frontend120, Spotless/Prettier and production build passed; independent review found no blockers. No live-browser or production-write claim; PR targets dev, no merge/deployment.

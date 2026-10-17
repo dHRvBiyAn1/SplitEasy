@@ -65,11 +65,12 @@ export class NewExpenseModalComponent {
   protected readonly tick = signal(0);
 
   protected readonly saving = signal(false);
+  protected readonly ready = signal(false);
   protected readonly error = signal<string | null>(null);
 
   /** Set when opened via "Edit" — save() then PUTs instead of POSTing. */
-  private readonly editId = this.modal.editExpenseId();
-  private prefilled = false;
+  protected readonly editId = this.modal.editExpenseId();
+  private groupRequestVersion = 0;
 
   constructor() {
     const preselect = this.modal.expenseGroupId();
@@ -91,22 +92,39 @@ export class NewExpenseModalComponent {
   }
 
   selectGroup(id: string | null): void {
+    if (this.saving() || (this.editId && this.groupId())) {
+      return;
+    }
+    const version = ++this.groupRequestVersion;
     this.groupId.set(id);
+    this.ready.set(false);
+    this.error.set(null);
+    this.members.set([]);
+    this.paidBy.set('');
+    this.included.set(new Set());
+    this.values.set({});
     if (!id) {
       return;
     }
     this.groups
       .getGroup(id)
       .pipe(takeUntil(this.session.changes))
-      .subscribe((g) => {
-        this.members.set(g.members);
-        if (this.editId && !this.prefilled) {
-          this.prefillFromExpense(id, this.editId);
-        } else {
-          this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
-          this.included.set(new Set(g.members.map((m) => m.id)));
-          this.values.set({});
-        }
+      .subscribe({
+        next: (g) => {
+          if (version !== this.groupRequestVersion) return;
+          this.members.set(g.members);
+          if (this.editId) {
+            this.prefillFromExpense(id, this.editId);
+          } else {
+            this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
+            this.included.set(new Set(g.members.map((m) => m.id)));
+            this.ready.set(true);
+          }
+        },
+        error: () => {
+          if (version !== this.groupRequestVersion) return;
+          this.error.set('Could not load group members.');
+        },
       });
   }
 
@@ -116,26 +134,29 @@ export class NewExpenseModalComponent {
     this.expenses
       .getExpense(groupId, expenseId)
       .pipe(takeUntil(this.session.changes))
-      .subscribe((e) => {
-        this.prefilled = true;
-        this.description.setValue(e.description);
-        this.amount.setValue(e.amountCents / 100);
-        this.date.setValue(e.spentOn);
-        this.category.set(e.category);
-        this.paidBy.set(e.paidBy.id);
-        this.included.set(new Set(e.participants.map((p) => p.user.id)));
-        if (e.splitType === 'EQUAL') {
-          this.splitType.set('EQUAL');
-          this.values.set({});
-        } else {
-          this.splitType.set('UNEQUAL');
-          const vals: Record<string, string> = {};
-          for (const p of e.participants) {
-            vals[p.user.id] = this.display(p.shareCents);
+      .subscribe({
+        next: (e) => {
+          this.description.setValue(e.description);
+          this.amount.setValue(e.amountCents / 100);
+          this.date.setValue(e.spentOn);
+          this.category.set(e.category);
+          this.paidBy.set(e.paidBy.id);
+          this.included.set(new Set(e.participants.map((p) => p.user.id)));
+          if (e.splitType === 'EQUAL') {
+            this.splitType.set('EQUAL');
+            this.values.set({});
+          } else {
+            this.splitType.set('UNEQUAL');
+            const vals: Record<string, string> = {};
+            for (const p of e.participants) {
+              vals[p.user.id] = this.display(p.shareCents);
+            }
+            this.values.set(vals);
           }
-          this.values.set(vals);
-        }
-        this.tick.update((n) => n + 1);
+          this.tick.update((n) => n + 1);
+          this.ready.set(true);
+        },
+        error: () => this.error.set('Could not load the expense.'),
       });
   }
 
@@ -213,6 +234,7 @@ export class NewExpenseModalComponent {
   canSave(): boolean {
     return (
       !!this.groupId() &&
+      this.ready() &&
       this.description.valid &&
       this.amountCents() > 0 &&
       !!this.paidBy() &&
