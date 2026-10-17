@@ -183,7 +183,9 @@ Auth routes remain full-bleed with a named Appearance control.
   New or edit expense / Settle up / Add member / Appearance; HTTP/session ownership stays in services.
 - **Group pages:** route/account/destroy changes cancel owned callbacks, and a new reload cancels its
   predecessor. Group, balance and expense reads complete together before actions render. Reload clears
-  displayed receipt details. Offsetting pairwise debts with net zero say “Even overall”, not “All square”.
+  displayed receipt details. Route navigation immediately clears the previous group's metadata,
+  pairwise balances and expense history while the new group loads. Offsetting pairwise debts with net
+  zero say “Even overall”, not “All square”.
 
 ## Data Model
 
@@ -317,3 +319,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] Group route ownership (#48, 2026-10-17) — retain the redesign's route/account/destroy cancellation and combined required reads; clear prior pairwise balances and history immediately on group navigation. Five controlled regressions cover loaded-A reset, late A success/403 in either response order, rendered B header/balances/history/settings and expense/settlement modal scope, and destruction teardown. Regression-first failure confirmed; frontend115/backend138, Prettier/Spotless and production build passed. Local rendered Angular integration verified; no live browser/API check, merge or deployment.
