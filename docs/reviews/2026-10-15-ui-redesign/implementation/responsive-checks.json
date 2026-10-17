@@ -1,0 +1,47 @@
+[
+  {
+    "active": [
+      "Overview"
+    ],
+    "dock": "none",
+    "height": 900,
+    "scrollWidth": 1280,
+    "width": 1280
+  },
+  {
+    "active": [
+      "Overview"
+    ],
+    "dock": "grid",
+    "height": 1024,
+    "scrollWidth": 768,
+    "width": 768
+  },
+  {
+    "active": [
+      "Overview"
+    ],
+    "dock": "grid",
+    "height": 844,
+    "scrollWidth": 390,
+    "width": 390
+  },
+  {
+    "active": [
+      "Overview"
+    ],
+    "dock": "grid",
+    "height": 740,
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "active": [
+      "Overview"
+    ],
+    "dock": "grid",
+    "height": 390,
+    "scrollWidth": 844,
+    "width": 844
+  }
+]

@@ -1,0 +1,170 @@
+[
+  {
+    "design": "club",
+    "failures": [],
+    "mode": "light",
+    "palette": "cobalt",
+    "total": 77
+  },
+  {
+    "design": "club",
+    "failures": [],
+    "mode": "dark",
+    "palette": "cobalt",
+    "total": 77
+  },
+  {
+    "design": "club",
+    "failures": [],
+    "mode": "light",
+    "palette": "juniper",
+    "total": 77
+  },
+  {
+    "design": "club",
+    "failures": [],
+    "mode": "dark",
+    "palette": "juniper",
+    "total": 77
+  },
+  {
+    "design": "club",
+    "failures": [],
+    "mode": "light",
+    "palette": "merlot",
+    "total": 77
+  },
+  {
+    "design": "club",
+    "failures": [],
+    "mode": "dark",
+    "palette": "merlot",
+    "total": 77
+  },
+  {
+    "design": "atlas",
+    "failures": [],
+    "mode": "light",
+    "palette": "forest",
+    "total": 93
+  },
+  {
+    "design": "atlas",
+    "failures": [],
+    "mode": "dark",
+    "palette": "forest",
+    "total": 93
+  },
+  {
+    "design": "atlas",
+    "failures": [],
+    "mode": "light",
+    "palette": "midnight",
+    "total": 93
+  },
+  {
+    "design": "atlas",
+    "failures": [],
+    "mode": "dark",
+    "palette": "midnight",
+    "total": 93
+  },
+  {
+    "design": "atlas",
+    "failures": [],
+    "mode": "light",
+    "palette": "aubergine",
+    "total": 93
+  },
+  {
+    "design": "atlas",
+    "failures": [],
+    "mode": "dark",
+    "palette": "aubergine",
+    "total": 93
+  },
+  {
+    "design": "press",
+    "failures": [],
+    "mode": "light",
+    "palette": "citrus",
+    "total": 73
+  },
+  {
+    "design": "press",
+    "failures": [],
+    "mode": "dark",
+    "palette": "citrus",
+    "total": 73
+  },
+  {
+    "design": "press",
+    "failures": [],
+    "mode": "light",
+    "palette": "sky",
+    "total": 73
+  },
+  {
+    "design": "press",
+    "failures": [],
+    "mode": "dark",
+    "palette": "sky",
+    "total": 73
+  },
+  {
+    "design": "press",
+    "failures": [],
+    "mode": "light",
+    "palette": "cherry",
+    "total": 73
+  },
+  {
+    "design": "press",
+    "failures": [],
+    "mode": "dark",
+    "palette": "cherry",
+    "total": 73
+  },
+  {
+    "design": "objects",
+    "failures": [],
+    "mode": "light",
+    "palette": "lilac",
+    "total": 69
+  },
+  {
+    "design": "objects",
+    "failures": [],
+    "mode": "dark",
+    "palette": "lilac",
+    "total": 69
+  },
+  {
+    "design": "objects",
+    "failures": [],
+    "mode": "light",
+    "palette": "peach",
+    "total": 69
+  },
+  {
+    "design": "objects",
+    "failures": [],
+    "mode": "dark",
+    "palette": "peach",
+    "total": 69
+  },
+  {
+    "design": "objects",
+    "failures": [],
+    "mode": "light",
+    "palette": "seafoam",
+    "total": 69
+  },
+  {
+    "design": "objects",
+    "failures": [],
+    "mode": "dark",
+    "palette": "seafoam",
+    "total": 69
+  }
+]

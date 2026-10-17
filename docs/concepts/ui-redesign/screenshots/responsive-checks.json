@@ -1,0 +1,59 @@
+[
+  {
+    "name": "index",
+    "width": 320,
+    "brokenImages": 0,
+    "clientWidth": 320,
+    "scrollWidth": 320
+  },
+  {
+    "name": "atlas",
+    "width": 320,
+    "brokenImages": 0,
+    "clientWidth": 320,
+    "scrollWidth": 320
+  },
+  {
+    "name": "press",
+    "width": 320,
+    "brokenImages": 0,
+    "clientWidth": 320,
+    "scrollWidth": 320,
+    "correctedMasthead": true
+  },
+  {
+    "name": "objects",
+    "width": 320,
+    "brokenImages": 0,
+    "clientWidth": 320,
+    "scrollWidth": 320
+  },
+  {
+    "name": "index",
+    "width": 768,
+    "brokenImages": 0,
+    "clientWidth": 768,
+    "scrollWidth": 768
+  },
+  {
+    "name": "atlas",
+    "width": 768,
+    "brokenImages": 0,
+    "clientWidth": 768,
+    "scrollWidth": 768
+  },
+  {
+    "name": "press",
+    "width": 768,
+    "brokenImages": 0,
+    "clientWidth": 768,
+    "scrollWidth": 768
+  },
+  {
+    "name": "objects",
+    "width": 768,
+    "brokenImages": 0,
+    "clientWidth": 768,
+    "scrollWidth": 768
+  }
+]

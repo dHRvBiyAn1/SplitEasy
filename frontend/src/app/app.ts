@@ -1,96 +1,114 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  Component,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
+import { SessionService } from './core/auth/session.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { ProfileService } from './core/profile.service';
 import { ThemeService } from './core/theme.service';
-import { centsToDisplay } from './expenses/expense.service';
+import { RibbonService } from './core/ribbon.service';
 import { ModalsComponent } from './modals/modals.component';
 import { ModalService } from './modals/modal.service';
-import { groupGlyphTint } from './core/avatar';
-import { SidebarService } from './core/sidebar.service';
+import { ModalShellComponent } from './modals/modal-shell.component';
+import { IconComponent } from './shared/icon.component';
+import { GroupArtComponent } from './shared/group-art.component';
+import { MoneyComponent } from './shared/money.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ModalsComponent],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    ModalsComponent,
+    ModalShellComponent,
+    IconComponent,
+    GroupArtComponent,
+    MoneyComponent,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App implements OnInit {
-  protected readonly title = signal('Evenly');
-
+export class App {
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
   private readonly profile = inject(ProfileService);
   private readonly theme = inject(ThemeService);
+  private readonly ribbon = inject(RibbonService);
   protected readonly modal = inject(ModalService);
-  protected readonly sidebar = inject(SidebarService);
   private readonly router = inject(Router);
-
   protected readonly user = this.auth.user;
-  protected readonly isAuthenticated = this.auth.isAuthenticated;
-  protected readonly display = centsToDisplay;
-
-  /** Group list + balances for the sidebar come from the shared dashboard payload. */
   protected readonly groups = computed(() => this.dashboard.data()?.groups ?? []);
-
+  protected readonly staleOverview = computed(
+    () => this.dashboard.error() && this.dashboard.data() !== null,
+  );
+  protected readonly groupsOpen = signal(false);
   private readonly currentUrl = signal(this.router.url);
-  protected readonly isAuthRoute = computed(() => {
-    const url = this.currentUrl();
-    return url.startsWith('/login') || url.startsWith('/register');
+  protected readonly isAuthRoute = computed(() =>
+    /^\/(login|register)(?:[/?#]|$)/.test(this.currentUrl()),
+  );
+  protected readonly showShell = computed(() => this.auth.isAuthenticated() && !this.isAuthRoute());
+  protected readonly blocked = computed(() => !!this.modal.active() || this.groupsOpen());
+  protected readonly activeNav = computed(() => {
+    if (this.modal.active() === 'expense') return 'expense';
+    if (this.modal.active() === 'appearance') return 'profile';
+    if (
+      this.groupsOpen() ||
+      this.currentUrl().startsWith('/groups') ||
+      this.modal.active() === 'group' ||
+      this.modal.active() === 'member'
+    )
+      return 'groups';
+    return this.currentUrl().startsWith('/profile') ? 'profile' : 'overview';
   });
-  /** The sidebar shows only for a signed-in user off the full-bleed auth screens. */
-  protected readonly showShell = computed(() => this.isAuthenticated() && !this.isAuthRoute());
-
-  /** Reflects the OS theme in the sidebar indicator (the theme itself is CSS-driven). */
-  protected readonly systemDark = signal(this.prefersDark());
-
-  /** Effective dark state for the sidebar indicator, honouring the user's theme override. */
-  protected readonly effectiveDark = computed(() => {
-    const c = this.theme.choice();
-    return c === 'dark' || (c === 'system' && this.systemDark());
-  });
-
-  /** Sidebar avatar tint follows the color chosen on the profile page. */
-  protected readonly avatarStyle = computed(() => {
-    const c = this.profile.prefs().avatarColor;
-    return {
-      background: `color-mix(in oklab, ${c} 24%, var(--surface))`,
-      color: `color-mix(in oklab, ${c}, var(--avatar-ink) 30%)`,
-    };
-  });
+  protected readonly avatarStyle = computed(() => ({
+    background: `color-mix(in oklab, ${this.profile.prefs().avatarColor} 24%, var(--surface))`,
+    color: `color-mix(in oklab, ${this.profile.prefs().avatarColor}, var(--avatar-ink) 30%)`,
+  }));
 
   constructor() {
     this.router.events
-      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe((e) => this.currentUrl.set(e.urlAfterRedirects));
-
-    const mql = window.matchMedia?.('(prefers-color-scheme: dark)');
-    mql?.addEventListener?.('change', (e) => this.systemDark.set(e.matches));
-
-    // Pull the dashboard payload whenever the shell is visible and we don't have it yet.
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe((e) => {
+        this.currentUrl.set(e.urlAfterRedirects);
+        this.groupsOpen.set(false);
+      });
+    inject(SessionService)
+      .changes.pipe(takeUntilDestroyed())
+      .subscribe(() => this.groupsOpen.set(false));
     effect(() => {
-      if (this.showShell()) {
-        this.dashboard.ensureLoaded();
-      }
+      if (this.showShell()) untracked(() => this.dashboard.ensureLoaded());
     });
+    effect(() => {
+      if (this.modal.active()) this.groupsOpen.set(false);
+    });
+    afterNextRender(() => this.ribbon.init());
   }
-
-  ngOnInit(): void {
-    // no-op: data loading is driven by the effect above.
+  skipToMain(event: Event): void {
+    event.preventDefault();
+    const main = document.getElementById('main-content');
+    main?.focus();
+    main?.scrollIntoView({ block: 'start' });
   }
-
-  private prefersDark(): boolean {
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  retryOverview(): void {
+    this.dashboard.refresh();
   }
-
-  logout(): void {
-    this.auth.logout();
-    this.router.navigate(['/login']);
+  openExpense(): void {
+    this.groupsOpen.set(false);
+    const groupId = this.currentUrl().match(/^\/groups\/([^/?#]+)/)?.[1];
+    this.modal.openExpense(groupId);
   }
-
-  /** Up to two initials, e.g. "Alex Rivera" → "AR". */
   initials(name: string | undefined): string {
     return (name ?? '')
       .split(/\s+/)
@@ -98,10 +116,5 @@ export class App implements OnInit {
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase() ?? '')
       .join('');
-  }
-
-  /** Stable per-group tint for the glyph square, derived from the name. */
-  glyphTint(name: string): { background: string; color: string } {
-    return groupGlyphTint(name);
   }
 }

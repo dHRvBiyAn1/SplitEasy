@@ -77,6 +77,10 @@ export class NewExpenseModalComponent {
     this.selectGroup(preselect ?? first);
   }
 
+  createGroup(): void {
+    this.modal.openGroup();
+  }
+
   heading(): string {
     return this.editId ? 'Edit expense' : 'New expense';
   }

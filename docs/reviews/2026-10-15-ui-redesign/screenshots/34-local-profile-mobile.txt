@@ -1,0 +1,32 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+- main:
+  - heading "Profile" [level=1]
+  - generic: AM
+  - heading "Ada Morgan" [level=2]
+  - paragraph: Member since October 2026
+  - button "Edit":
+    - generic: ✎
+    - text: Edit
+  - term: Email
+  - definition: ada@ui-audit.example
+  - term: Phone
+  - definition: —
+  - term: Currency
+  - definition: USD ($)
+  - heading "Appearance" [level=3]
+  - paragraph: Theme follows your system by default.
+  - group "Theme":
+    - button "System"
+    - button "Light" [pressed]
+    - button "Dark"
+  - button "Sign out":
+    - generic: ⇥
+    - text: Sign out

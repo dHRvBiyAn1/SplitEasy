@@ -15,31 +15,64 @@
       }
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="auth__form" novalidate>
-        <input
-          class="dc-field"
-          type="text"
-          formControlName="displayName"
-          placeholder="Full name"
-          aria-label="Full name"
-          autocomplete="name"
-        />
-        <input
-          class="dc-field"
-          type="email"
-          formControlName="email"
-          placeholder="Email"
-          aria-label="Email"
-          autocomplete="email"
-        />
-        <input
-          class="dc-field"
-          type="password"
-          formControlName="password"
-          placeholder="Password"
-          aria-label="Password"
-          autocomplete="new-password"
-        />
-        <p class="auth__hint">At least 8 characters</p>
+        <label class="auth__field"
+          ><span class="dc-field-label">Full name</span
+          ><input
+            class="dc-field"
+            type="text"
+            formControlName="displayName"
+            autocomplete="name"
+            [attr.aria-invalid]="
+              form.controls.displayName.touched && form.controls.displayName.invalid
+            "
+            aria-describedby="name-hint"
+        /></label>
+        @if (form.controls.displayName.touched && form.controls.displayName.invalid) {
+          <p class="auth__field-error" id="name-hint">Enter a name with up to 100 characters.</p>
+        }
+        <label class="auth__field"
+          ><span class="dc-field-label">Email</span
+          ><input
+            class="dc-field"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid"
+            [attr.aria-describedby]="
+              form.controls.email.touched && form.controls.email.invalid ? 'email-hint' : null
+            "
+        /></label>
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <p class="auth__field-error" id="email-hint">Enter a valid email address.</p>
+        }
+        <div class="auth__field">
+          <label class="dc-field-label" for="auth-password">Password</label
+          ><span class="auth__password"
+            ><input
+              id="auth-password"
+              class="dc-field"
+              [type]="passwordVisible() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="new-password"
+              [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid"
+              [attr.aria-describedby]="
+                form.controls.password.touched && form.controls.password.invalid
+                  ? 'password-hint'
+                  : null
+              "
+            /><button
+              type="button"
+              [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'"
+              (click)="passwordVisible.set(!passwordVisible())"
+            >
+              {{ passwordVisible() ? 'Hide' : 'Show' }}
+            </button></span
+          >
+        </div>
+        @if (form.controls.password.touched && form.controls.password.invalid) {
+          <p class="auth__field-error" id="password-hint">Use at least 8 characters.</p>
+        }
+        <p class="auth__hint">At least 8 characters. A little peace of mind.</p>
 
         @if (error()) {
           <p class="auth__error" role="alert">{{ error() }}</p>

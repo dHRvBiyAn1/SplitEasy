@@ -1,4 +1,8 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
+import { SessionService } from '../core/auth/session.service';
+import { GroupArtComponent } from '../shared/group-art.component';
+import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { UserSummary } from '../core/auth/auth.models';
@@ -31,12 +35,25 @@ interface MonthGroup {
 
 @Component({
   selector: 'app-group-detail',
-  imports: [RouterLink],
+  imports: [RouterLink, GroupArtComponent],
   templateUrl: './group-detail.component.html',
   styleUrl: './group-detail.component.scss',
 })
 export class GroupDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly session = inject(SessionService);
+  private readonly scopeChanges = new Subject<void>();
+  private loadRequest?: Subscription;
+
+  /** End UI callbacks when their route, account or component no longer owns them. */
+  private scoped<T>(request: Observable<T>): Observable<T> {
+    return request.pipe(
+      takeUntil(this.scopeChanges),
+      takeUntil(this.session.changes),
+      takeUntilDestroyed(this.destroyRef),
+    );
+  }
   private readonly groups = inject(GroupService);
   private readonly balances = inject(BalanceService);
   private readonly expensesApi = inject(ExpenseService);
@@ -58,6 +75,7 @@ export class GroupDetailComponent implements OnInit {
   protected readonly detailLoading = signal(false);
   protected readonly deletingId = signal<string | null>(null);
   /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
+  private detailRequest?: Subscription;
   private readonly detailCache = new Map<string, ExpenseResponse>();
 
   protected groupId = ''; // read by the template for the settings link
@@ -83,8 +101,13 @@ export class GroupDetailComponent implements OnInit {
   constructor() {
     // Reload group-scoped data whenever the shared dashboard payload changes
     // (a modal action calls dashboard.refresh(), so this stays in sync).
+    let initial = true;
     effect(() => {
       this.dashboard.data();
+      if (initial) {
+        initial = false;
+        return;
+      }
       if (this.groupId) {
         this.reload();
       }
@@ -94,11 +117,14 @@ export class GroupDetailComponent implements OnInit {
   ngOnInit(): void {
     // Subscribe (not snapshot): Angular reuses this component when navigating between
     // /groups/:id, so ngOnInit runs once — the snapshot would freeze on the first group.
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id') ?? '';
       if (id === this.groupId) {
         return;
       }
+      this.scopeChanges.next();
+      this.group.set(null);
+      this.deletingId.set(null);
       this.groupId = id;
       this.loading.set(true);
       this.error.set(null);
@@ -109,21 +135,36 @@ export class GroupDetailComponent implements OnInit {
   }
 
   private reload(): void {
-    this.detailCache.clear(); // details may have changed (edit/delete/new expense)
-    this.groups.getGroup(this.groupId).subscribe({
-      next: (g) => {
-        this.group.set(g);
+    this.loadRequest?.unsubscribe();
+    this.detailRequest?.unsubscribe();
+    this.detailCache.clear();
+    this.expandedId.set(null);
+    this.detail.set(null);
+    this.detailLoading.set(false);
+    this.loading.set(true);
+    this.error.set(null);
+    this.loadRequest = this.scoped(
+      forkJoin({
+        group: this.groups.getGroup(this.groupId),
+        balances: this.balances.getMyBalances(this.groupId),
+        expenses: this.expensesApi.listExpenses(this.groupId),
+      }),
+    ).subscribe({
+      next: (res) => {
+        this.group.set(res.group);
+        this.myBalances.set(res.balances);
+        this.expenses.set(res.expenses);
         this.loading.set(false);
       },
       error: (err) => {
         this.error.set(
-          err?.status === 403 ? 'You are not a member of this group.' : 'Could not load the group.',
+          err?.status === 403
+            ? 'You are not a member of this group.'
+            : 'Could not load this group and its balances.',
         );
         this.loading.set(false);
       },
     });
-    this.balances.getMyBalances(this.groupId).subscribe({ next: (b) => this.myBalances.set(b) });
-    this.expensesApi.listExpenses(this.groupId).subscribe({ next: (e) => this.expenses.set(e) });
   }
 
   addExpense(): void {
@@ -136,6 +177,7 @@ export class GroupDetailComponent implements OnInit {
 
   /** Expand a row to show its split, or collapse it if it's already open. */
   toggleExpand(e: ExpenseSummary): void {
+    this.detailRequest?.unsubscribe();
     if (this.expandedId() === e.id) {
       this.expandedId.set(null);
       this.detail.set(null);
@@ -150,7 +192,7 @@ export class GroupDetailComponent implements OnInit {
     }
     this.detail.set(null);
     this.detailLoading.set(true);
-    this.expensesApi.getExpense(this.groupId, e.id).subscribe({
+    this.detailRequest = this.scoped(this.expensesApi.getExpense(this.groupId, e.id)).subscribe({
       next: (d) => {
         this.detailCache.set(e.id, d);
         if (this.expandedId() === e.id) {
@@ -174,7 +216,7 @@ export class GroupDetailComponent implements OnInit {
       return;
     }
     this.deletingId.set(e.id);
-    this.expensesApi.deleteExpense(this.groupId, e.id).subscribe({
+    this.scoped(this.expensesApi.deleteExpense(this.groupId, e.id)).subscribe({
       next: () => {
         this.expandedId.set(null);
         this.detail.set(null);

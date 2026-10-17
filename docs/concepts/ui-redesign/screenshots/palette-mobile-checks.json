@@ -1,0 +1,170 @@
+[
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "cobalt",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "cobalt",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "juniper",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "juniper",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "merlot",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "merlot",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "forest",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "forest",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "midnight",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "midnight",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "aubergine",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "aubergine",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "citrus",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "citrus",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "sky",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "sky",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "cherry",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "cherry",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "lilac",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "lilac",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "peach",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "peach",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "light",
+    "overflow": false,
+    "palette": "seafoam",
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "mode": "dark",
+    "overflow": false,
+    "palette": "seafoam",
+    "scrollWidth": 320,
+    "width": 320
+  }
+]

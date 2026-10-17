@@ -1,0 +1,62 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+  - generic: Groups
+  - button "New group":
+  - list:
+    - link "Summer celebration with all our favourite people and their impossibly long names +$6666666666.66":
+      - /url: /groups/9fa89ebb-c784-4301-8b29-870261cc2a45
+      - generic: S
+      - generic: Summer celebration with all our favourite people and their impossibly long names
+      - generic: +$6666666666.66
+    - link "Sunday supper club +$0.00":
+      - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342
+      - generic: S
+      - generic: Sunday supper club
+      - generic: +$0.00
+    - link "Our place on Willow Street −$845.80":
+      - /url: /groups/9cd2b7f0-e79f-4a39-a04e-5ab996a0a3a5
+      - generic: O
+      - generic: Our place on Willow Street
+      - generic: −$845.80
+    - link "Lisbon long weekend +$268.60":
+      - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+      - generic: L
+      - generic: Lisbon long weekend
+      - generic: +$268.60
+  - generic "Dark theme":
+    - generic: "Theme: Dark"
+  - link "Ada Morgan View profile":
+    - /url: /profile
+    - generic: AM
+    - generic: Ada Morgan
+    - generic: View profile
+- main:
+  - heading "Profile" [level=1]
+  - generic: AM
+  - heading "Ada Morgan" [level=2]
+  - paragraph: Member since October 2026
+  - button "Edit":
+    - generic: ✎
+    - text: Edit
+  - term: Email
+  - definition: ada@ui-audit.example
+  - term: Phone
+  - definition: —
+  - term: Currency
+  - definition: USD ($)
+  - heading "Appearance" [level=3]
+  - paragraph: Theme follows your system by default.
+  - group "Theme":
+    - button "System" [pressed]
+    - button "Light"
+    - button "Dark"
+  - button "Sign out":
+    - generic: ⇥
+    - text: Sign out

@@ -1,484 +1,491 @@
-// Dashboard: summary band, group cards, activity + people. Tokens drive light/dark.
-
 .dash {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 26px 30px 54px;
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-  animation: dc-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: 1440px;
+  margin: auto;
+  padding: 0 var(--sp-8) var(--sp-8);
 }
-
-// ── Header ───────────────────────────────────────────────────────────────────
 .dash__head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.dash__eyebrow {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink3);
-}
-
-.dash__title {
-  margin: 0;
-  font-size: 40px;
-  line-height: 1.05;
-}
-
-.dash__actions {
-  display: flex;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-// ── Summary band ─────────────────────────────────────────────────────────────
-.band {
-  display: grid;
-  grid-template-columns: 1fr 1.3fr;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-bottom: 3px solid var(--line);
-  border-top: 3px solid var(--line);
-}
-
-.band__total {
-  padding: 24px 26px;
-  border-right: 1px solid var(--line);
-}
-
-.band__label {
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink3);
-}
-
-.band__big {
-  margin: 0 0 10px;
-  font-family: var(--font-display);
-  font-size: 52px;
-  line-height: 1;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-}
-
-.band__sub {
-  margin: 0;
-  font-size: 13px;
-  color: var(--ink2);
-}
-
-.band__split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.band__cell {
-  padding: 24px 26px;
-
-  &:first-child {
-    border-right: 1px solid var(--line);
-  }
-}
-
-.band__mid {
-  margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-size: 34px;
-  line-height: 1;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-}
-
-// ── Section headings ─────────────────────────────────────────────────────────
-.dash__section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.dash__h2 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.dash__more {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-text);
-}
-
-.dash__more-btn {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-family: var(--font-ui);
-}
-
-.dash__empty {
-  margin: 0;
-  color: var(--ink2);
-}
-
-// ── Group cards ──────────────────────────────────────────────────────────────
-.cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
-
-  &:hover {
-    border-color: var(--line2);
-    box-shadow: var(--shadow);
-    transform: translateY(-2px);
-  }
+  text-align: center;
+  padding: var(--sp-8) 0 var(--sp-7);
 }
-
-// Whole-card click target (stretched link) — covers the card so any non-button
-// area navigates to the group, while the footer buttons stay independently clickable.
-.card__stretch {
+.dash__head p {
+  font-size: 13px;
+  color: var(--ink2);
+  margin: 0 0 var(--sp-3);
+}
+.dash__head h1 {
+  margin: 0;
+  font: 900 clamp(42px, 4.4vw, 66px)/1 var(--font-display);
+  letter-spacing: -0.055em;
+}
+.dash__add {
   position: absolute;
-  inset: 0;
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-
-  &:hover {
-    text-decoration: none;
-  }
+  right: 0;
+  bottom: var(--sp-8);
+  border-radius: var(--radius-pill);
+  box-shadow:
+    inset 0 2px var(--glint),
+    0 5px 0 color-mix(in srgb, var(--accent) 65%, black);
 }
-
-.card__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.card__glyph {
-  width: 42px;
-  height: 42px;
+.pocket-desk {
   display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  font-family: var(--font-display);
-  font-size: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.85fr);
+  gap: var(--sp-6);
+  align-items: start;
 }
-
-.card__id {
-  flex: 1;
+.pocket-desk > * {
   min-width: 0;
 }
-
-.card__name {
-  margin: 0;
-  font-size: 21px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 60px;
+  margin: var(--sp-3) 0 var(--sp-5);
 }
-
-.card__meta {
-  margin: 2px 0 0;
+.section-heading h2 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 900;
+}
+.section-heading p {
+  margin: var(--sp-2) 0 0;
   font-size: 12px;
-  color: var(--ink3);
-}
-
-.card__pill {
-  flex-shrink: 0;
-  padding: 4px 9px;
-  font-size: 11px;
-  font-weight: 700;
   color: var(--ink2);
-  background: var(--surface2);
-  border: 1px solid var(--line);
-
-  &--owed {
-    color: var(--pos-strong);
-    background: var(--pos-soft);
-    border-color: transparent;
-  }
-
-  &--owes {
-    color: var(--neg-strong);
-    background: var(--neg-soft);
-    border-color: transparent;
-  }
 }
-
-.card__tiles {
+.section-heading > button {
+  padding: var(--sp-2);
+  border-radius: 50%;
+}
+.group-objects {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: var(--sp-5);
 }
-
-.card__tile {
-  padding: 12px 14px;
-  background: var(--surface2);
-  border: 1px solid var(--line);
-  text-align: center;
+.group-object {
+  display: flex;
+  position: relative;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-3);
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  color: var(--ink);
+  transition:
+    transform var(--duration) var(--ease-out),
+    box-shadow var(--duration);
 }
-
-.card__tile-label {
-  margin: 0 0 6px;
+.group-object__copy {
+  min-width: 0;
+  flex: 1;
+}
+.group-object strong {
+  font: 800 17px/1.15 var(--font-display);
+  display: block;
+  overflow-wrap: anywhere;
+}
+.group-object small {
+  display: block;
+  margin-top: var(--sp-2);
   font-size: 11px;
-  color: var(--ink3);
+  color: var(--ink2);
 }
-
-.card__tile-val {
-  margin: 0;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
+.group-object__balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  font-size: 12px;
+  margin-top: var(--sp-3);
 }
-
-.card__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding-top: 4px;
-  border-top: 1px solid var(--line);
+.group-object__balance > span {
+  color: var(--ink2);
+  font-size: 10px;
 }
-
-.card__stat-label {
-  margin: 10px 0 3px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink3);
+.group-object__arrow {
+  align-self: flex-start;
+  font-size: 22px;
+  color: var(--ink2);
 }
-
-.card__stat-val {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+.collection-note {
+  margin: var(--sp-6) var(--sp-2) 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink2);
 }
-
-.card__stat--center {
+.balance-object {
   text-align: center;
+  min-width: 0;
 }
-
-.card__stat--right {
-  text-align: right;
+.balance-sculpture {
+  position: relative;
+  height: 110px;
 }
-
-.card__foot {
-  position: relative; // above the stretched link so the buttons stay clickable
-  z-index: 1;
+.sculpture-split {
+  display: flex;
+  gap: 7px;
+  position: absolute;
+  left: calc(50% - 42px);
+  top: var(--sp-3);
+  transform: rotate(20deg);
+}
+.sculpture-split i {
+  height: 80px;
+  width: 38px;
+  border-radius: 50px 0 0 50px;
+  background: var(--warm);
+  box-shadow:
+    inset 3px 3px 6px var(--glint),
+    inset -3px -4px 6px color-mix(in srgb, var(--on-warm) 20%, transparent);
+}
+.sculpture-split i + i {
+  border-radius: 0 50px 50px 0;
+  transform: translateY(-8px);
+}
+.sculpture-avatar {
+  position: absolute;
+  left: 12%;
+  top: var(--sp-8);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--art1);
+  color: var(--feature);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  place-items: center;
+  font-size: 12px;
+  transform: rotate(-8deg);
 }
-
-.card__btn {
-  justify-content: center;
-  padding: 9px 0;
+.sculpture-avatar--friend {
+  left: auto;
+  right: 8%;
+  top: var(--sp-3);
+  background: var(--art2);
+  transform: rotate(10deg);
+}
+.balance-core {
+  --money-long-size: clamp(22px, 6vw, 34px);
+  padding: var(--sp-8) var(--sp-5) var(--sp-7);
+  border-radius: 80px 80px 100px 100px;
+  background: var(--feature);
+  color: var(--on-feature);
+  box-shadow:
+    inset 0 4px 9px var(--shine),
+    inset 0 -8px 12px color-mix(in srgb, var(--ink) 18%, transparent),
+    var(--shadow);
+  --pos-strong: var(--pos-on-feature);
+  --neg-strong: var(--neg-on-feature);
+  --ink3: var(--on-feature);
+}
+.balance-core > span {
   font-size: 13px;
 }
-
-.card__btn--open {
-  color: var(--accent-text);
+.balance-core > app-money {
+  display: block;
+  margin: var(--sp-6) 0 var(--sp-3);
+  font: 900 clamp(32px, 3.7vw, 57px)/1 var(--font-display);
+  letter-spacing: -0.055em;
 }
-
-// ── Activity + People ────────────────────────────────────────────────────────
-.dash__grid {
+.balance-core p {
+  font-size: 13px;
+  margin: 0;
+}
+.balance-settle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-3) var(--sp-5);
+  margin-top: var(--sp-6);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--warm);
+  color: var(--on-warm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    inset 0 2px var(--glint),
+    0 4px 0 color-mix(in srgb, var(--ink) 20%, transparent);
+}
+.balance-pockets {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-4);
+  margin-top: var(--sp-5);
 }
-
-.panel {
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+.balance-pocket {
+  padding: var(--sp-5) var(--sp-4);
+  text-align: left;
+  border-radius: var(--radius-card);
+  background: var(--pos-soft);
+  box-shadow: inset 0 3px var(--shine);
+  transform: rotate(-2deg);
+  min-width: 0;
 }
-
-.panel__title {
-  margin: 0 0 14px;
-  font-size: 22px;
+.balance-pocket--owes {
+  background: var(--neg-soft);
+  transform: rotate(2deg);
 }
-
+.balance-pocket > span,
+.balance-pocket small {
+  display: block;
+  font-size: 11px;
+}
+.balance-pocket > app-money {
+  display: block;
+  font: 900 clamp(21px, 2.1vw, 31px) var(--font-display);
+  margin: var(--sp-2) 0;
+}
+.balance-pocket small {
+  color: var(--ink2);
+  font-size: 10px;
+}
+.friend-object {
+  margin-bottom: var(--sp-5);
+  padding: var(--sp-5) var(--sp-4);
+  border-radius: var(--radius-card);
+  min-width: 0;
+}
+.friend-object .dc-avatar {
+  float: right;
+  width: 34px;
+  height: 34px;
+  font-size: 11px;
+  margin: 0 0 var(--sp-2) var(--sp-2);
+}
+.friend-object h3 {
+  margin: 0;
+  font: 800 17px/1.2 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.friend-object p {
+  color: var(--ink2);
+  font-size: 12px;
+  margin: var(--sp-5) 0 var(--sp-1);
+}
+.friend-object > app-money {
+  font: 900 28px var(--font-display);
+  display: block;
+}
+.friend-object > button {
+  display: block;
+  font-size: 11px;
+  margin-top: var(--sp-3);
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.activity-tray {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--sp-7);
+  padding: var(--sp-7);
+  border-radius: var(--radius-large);
+  background: var(--surface2);
+  margin-top: var(--sp-8);
+  box-shadow: inset 0 3px var(--shine);
+}
+.activity-tray h2 {
+  margin: 0;
+  font-size: 29px;
+  font-weight: 900;
+}
+.activity-tray header p,
+.activity-empty {
+  color: var(--ink2);
+  font-size: 12px;
+  margin: var(--sp-4) 0 0;
+}
 .feed {
   list-style: none;
   margin: 0;
   padding: 0;
+  min-width: 0;
 }
-
 .feed__row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 12px 0;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--line);
-  }
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--line);
 }
-
+.feed__row:first-child {
+  padding-top: 0;
+}
+.feed__row:last-child {
+  border: 0;
+}
 .feed__ico {
-  width: 36px;
-  height: 36px;
   display: grid;
   place-items: center;
-  flex-shrink: 0;
-  background: var(--surface2);
-  color: var(--ink2);
-  font-size: 15px;
+  width: 36px;
+  height: 36px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  flex: none;
 }
-
 .feed__text {
-  flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex: 1;
 }
-
 .feed__title {
+  display: block;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
   color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
-
-.feed__sub {
-  font-size: 12px;
-  color: var(--ink3);
-}
-
-.feed__right {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.feed__amt {
-  font-size: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-
-  // Neutral (settlements / not-involved) only. Expense-delta rows carry
-  // .dc-amount--owed/--owes, whose shared green/pink must win — so don't set a
-  // competing color on those (view-encapsulation would otherwise out-specify it).
-  &:not(.dc-amount) {
-    color: var(--ink2);
-  }
-}
-
+.feed__sub,
 .feed__date {
+  display: block;
+  color: var(--ink2);
   font-size: 11px;
-  color: var(--ink3);
+  margin-top: var(--sp-1);
 }
-
-.people {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.feed__right {
+  text-align: right;
+  max-width: 45%;
+  font-size: 13px;
 }
-
-.people__row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 0;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--line);
+.empty-object {
+  padding: var(--sp-6);
+  border-radius: var(--radius-card);
+}
+.empty-object h3 {
+  margin: var(--sp-4) 0;
+  font-size: 23px;
+}
+.empty-object p {
+  font-size: 13px;
+  color: var(--ink2);
+}
+.empty-object button {
+  margin-top: var(--sp-3);
+}
+@media (hover: hover) and (pointer: fine) {
+  .group-object:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card);
+    text-decoration: none;
+    border-color: var(--accent);
+  }
+  .group-objects--many {
+    max-height: 700px;
+    overflow-y: auto;
+    padding: var(--sp-1);
   }
 }
-
-.people__av {
-  width: 34px;
-  height: 34px;
-  font-size: 12px;
-}
-
-.people__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.people__name {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.people__sub {
-  font-size: 12px;
-  color: var(--ink3);
-}
-
-.people__amt {
-  flex-shrink: 0;
-  font-size: 15px;
-}
-
-// ── Responsive ───────────────────────────────────────────────────────────────
-@media (max-width: 980px) {
-  .cards {
-    grid-template-columns: 1fr;
+@media (max-width: 1180px) {
+  .pocket-desk {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
   }
-
-  .dash__grid {
-    grid-template-columns: 1fr;
+  .friends {
+    grid-column: 1/-1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-4);
+  }
+  .friends .section-heading {
+    grid-column: 1/-1;
+    margin-bottom: 0;
+  }
+  .balance-core > app-money {
+    font-size: 52px;
+  }
+  .dash__add {
+    position: static;
+    margin-top: var(--sp-6);
   }
 }
-
-@media (max-width: 680px) {
+@media (max-width: 700px) {
   .dash {
-    padding: 20px 16px 44px;
+    padding: 0 var(--sp-5) var(--sp-7);
   }
-
   .dash__head {
+    padding: var(--sp-7) 0;
+  }
+  .dash__head h1 {
+    font-size: 47px;
+  }
+  .pocket-desk {
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
+    gap: var(--sp-6);
   }
-
-  .dash__title {
-    font-size: 30px;
+  .pocket-desk > * {
+    width: 100%;
   }
-
-  .band {
+  .balance-object {
+    order: -1;
+  }
+  .balance-core {
+    --money-long-size: clamp(22px, 6vw, 34px);
+    padding: var(--sp-7) var(--sp-5);
+  }
+  .balance-core > app-money {
+    font-size: 56px;
+  }
+  .balance-sculpture {
+    height: 100px;
+  }
+  .balance-pockets {
+    margin-top: var(--sp-5);
+  }
+  .balance-pocket > app-money {
+    font-size: 29px;
+  }
+  .group-object {
+    padding: var(--sp-5) var(--sp-4);
+    gap: var(--sp-4);
+  }
+  .group-object strong {
+    font-size: 20px;
+  }
+  .friends {
+    display: block;
+  }
+  .friend-object {
+    padding: var(--sp-6);
+  }
+  .activity-tray {
     grid-template-columns: 1fr;
+    gap: var(--sp-6);
+    padding: var(--sp-6);
+    margin-top: var(--sp-7);
   }
-
-  .band__total {
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+  .feed__right {
+    max-width: 43%;
+  }
+  .collection-note {
+    margin-top: var(--sp-5);
+  }
+}
+@media (max-width: 360px) {
+  .dash {
+    padding-inline: var(--sp-4);
+  }
+  .dash__head h1 {
+    font-size: 42px;
+  }
+  .balance-core > app-money {
+    font-size: 48px;
+  }
+  .balance-pocket {
+    padding: var(--sp-4) var(--sp-3);
+  }
+  .balance-pocket > app-money {
+    font-size: 23px;
+  }
+  .group-object app-group-art {
+    width: 58px;
+    height: 70px;
+  }
+}
+:host-context([data-motion='reduced']) .group-object:hover {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .group-object:hover {
+    transform: none;
   }
 }

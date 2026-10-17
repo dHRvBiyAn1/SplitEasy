@@ -1,0 +1,67 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+- main:
+  - link "Dashboard":
+    - /url: /dashboard
+    - text: ‹ Dashboard
+  - generic: L
+  - heading "Lisbon long weekend" [level=1]
+  - paragraph: Trip · You, Noor, Luca
+  - button "Settle up":
+    - text: Settle up
+  - button "Add expense":
+    - text: Add expense
+  - link "Group settings":
+    - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07/settings
+  - text: You are owed
+  - strong: $268.60
+  - text: overall
+  - generic: LF
+  - text: Luca owes you
+  - strong: $147.50
+  - generic: NK
+  - text: Noor owes you
+  - strong: $121.10
+  - heading "OCTOBER 2026" [level=2]
+  - list:
+    - button "Pastries by the water Luca paid $10.01 you borrowed $3.35":
+      - generic: OCT
+      - generic: "15"
+      - generic: ☕
+      - generic: Pastries by the water
+      - generic: Luca paid $10.01
+      - generic: you borrowed
+      - generic: $3.35
+    - button "Tram tickets Noor paid $18.00 you borrowed $6.00":
+      - generic: OCT
+      - generic: "15"
+      - generic: 🚕
+      - generic: Tram tickets
+      - generic: Noor paid $18.00
+      - generic: you borrowed
+      - generic: $6.00
+    - button "Dinner at Ramiro You paid $186.30 you lent $124.20":
+      - generic: OCT
+      - generic: "15"
+      - generic: ☕
+      - generic: Dinner at Ramiro
+      - generic: You paid $186.30
+      - generic: you lent
+      - generic: $124.20
+  - heading "SEPTEMBER 2026" [level=2]
+  - list:
+    - button "Apartment for the weekend You paid $360.00 you lent $180.00":
+      - generic: SEP
+      - generic: "28"
+      - generic: ✈
+      - generic: Apartment for the weekend
+      - generic: You paid $360.00
+      - generic: you lent
+      - generic: $180.00

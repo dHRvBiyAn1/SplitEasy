@@ -1,0 +1,133 @@
+{
+  "glassProof": {
+    "blur": "blur(16px) saturate(1.2)",
+    "highlight": "1",
+    "hover": true
+  },
+  "touchProof": {
+    "input": "touch",
+    "layer": true
+  },
+  "reductionProof": {
+    "glassHighlight": "none",
+    "layer": false,
+    "previewDisabled": true,
+    "reduced": true
+  },
+  "navigationChecks": [
+    {
+      "action": "Groups",
+      "active": "groups",
+      "current": [
+        "groups"
+      ]
+    },
+    {
+      "action": "Expense",
+      "active": "expense",
+      "dialog": true
+    },
+    {
+      "action": "Close expense",
+      "active": "groups"
+    },
+    {
+      "action": "Profile",
+      "active": "profile",
+      "appearance": true
+    },
+    {
+      "action": "Overview",
+      "active": "overview",
+      "current": [
+        "overview"
+      ]
+    }
+  ],
+  "pocketContrast": [
+    {
+      "failures": [],
+      "mode": "light",
+      "palette": "seafoam",
+      "scope": "DIALOG",
+      "total": 16
+    },
+    {
+      "failures": [],
+      "mode": "light",
+      "palette": "seafoam",
+      "scope": "BODY",
+      "total": 64
+    },
+    {
+      "failures": [],
+      "mode": "dark",
+      "palette": "seafoam",
+      "scope": "DIALOG",
+      "total": 16
+    },
+    {
+      "failures": [],
+      "mode": "dark",
+      "palette": "seafoam",
+      "scope": "BODY",
+      "total": 64
+    },
+    {
+      "failures": [],
+      "mode": "light",
+      "palette": "lilac",
+      "scope": "DIALOG",
+      "total": 16
+    },
+    {
+      "failures": [],
+      "mode": "light",
+      "palette": "lilac",
+      "scope": "BODY",
+      "total": 64
+    },
+    {
+      "failures": [],
+      "mode": "dark",
+      "palette": "lilac",
+      "scope": "DIALOG",
+      "total": 16
+    },
+    {
+      "failures": [],
+      "mode": "dark",
+      "palette": "lilac",
+      "scope": "BODY",
+      "total": 64
+    },
+    {
+      "failures": [],
+      "mode": "light",
+      "palette": "peach",
+      "scope": "DIALOG",
+      "total": 16
+    },
+    {
+      "failures": [],
+      "mode": "light",
+      "palette": "peach",
+      "scope": "BODY",
+      "total": 64
+    },
+    {
+      "failures": [],
+      "mode": "dark",
+      "palette": "peach",
+      "scope": "DIALOG",
+      "total": 16
+    },
+    {
+      "failures": [],
+      "mode": "dark",
+      "palette": "peach",
+      "scope": "BODY",
+      "total": 64
+    }
+  ]
+}

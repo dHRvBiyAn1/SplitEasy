@@ -42,7 +42,7 @@
     <div class="simplify-bar" [class.simplify-bar--on]="allSimplified()">
       <span class="simplify-bar__text">
         <span class="simplify-bar__title">
-          {{ allSimplified() ? 'Simplified · fewest payments' : 'All balances' }}
+          {{ allSimplified() ? 'Suggested transfers' : 'All balances' }}
         </span>
         <span class="simplify-bar__sub">
           @if (saved() > 0) {
@@ -56,7 +56,7 @@
     </div>
 
     @if (loadingSimplified()) {
-      <div class="dc-loading" role="status" aria-label="Working out the fewest payments"></div>
+      <div class="dc-loading" role="status" aria-label="Loading suggested transfers"></div>
     } @else if (settlements().length === 0) {
       <p class="mempty">You're all settled up. Nothing to pay.</p>
     } @else {

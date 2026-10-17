@@ -15,6 +15,7 @@ export class RegisterComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  protected readonly passwordVisible = signal(false);
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -25,7 +26,11 @@ export class RegisterComponent {
   });
 
   submit(): void {
-    if (this.form.invalid || this.submitting()) {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    if (this.submitting()) {
       return;
     }
     this.submitting.set(true);
