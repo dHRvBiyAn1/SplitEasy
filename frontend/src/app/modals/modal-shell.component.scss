@@ -13,7 +13,7 @@
   justify-content: center;
   padding: 22px 14px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--overlay);
   backdrop-filter: blur(2px);
 }
 
@@ -21,11 +21,11 @@
   position: relative;
   z-index: var(--z-modal);
   width: 100%;
-  max-height: 88vh;
+  max-height: 90dvh;
   overflow-y: auto; // the panel scrolls internally if it's taller than the viewport
   background: var(--surface);
   border: 1px solid var(--line2);
-  border-radius: 0; // sharp edges (design spec)
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow);
   animation: dc-pop 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -39,16 +39,17 @@
 
 .mdl-title {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
+  font-weight: 900;
 }
 
 .mdl-close {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 1px solid var(--line2);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink2);
   font-size: 13px;
@@ -62,4 +63,37 @@
 
 .mdl-body {
   padding: 14px 24px 24px;
+}
+
+.mdl-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: var(--sp-5) var(--sp-6) var(--sp-3);
+  background: var(--surface);
+  gap: var(--sp-4);
+}
+.mdl-title {
+  overflow-wrap: anywhere;
+  line-height: 1.1;
+}
+.mdl-body {
+  min-width: 0;
+}
+.mdl-close {
+  flex: none;
+}
+@media (max-width: 580px) {
+  .mdl-backdrop {
+    padding: var(--sp-3);
+  }
+  .mdl-panel {
+    max-height: calc(100dvh - 24px);
+  }
+  .mdl-head {
+    padding: var(--sp-5) var(--sp-4) var(--sp-3);
+  }
+  .mdl-body {
+    padding: var(--sp-3) var(--sp-4) var(--sp-5);
+  }
 }

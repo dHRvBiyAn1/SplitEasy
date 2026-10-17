@@ -1,0 +1,96 @@
+/* Shared study controls and palette roles; no application styles are imported. */
+body[data-mode] { --ground:var(--bg); --paper:var(--surface); --brand:var(--accent); --on-brand:var(--on-accent); --soft:var(--tint); --butter:var(--warm); color-scheme:light; }
+body[data-mode=dark] { color-scheme:dark; }
+.study-tools,.concept-bar { flex-wrap:wrap; gap:10px; }
+.study-tools>span,.concept-bar>span { margin-right:auto; }
+.preview-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.preview-controls label { display:flex; align-items:center; gap:6px; font-size:12px; color:#eff2ff; }
+.preview-controls select,.preview-controls button { width:auto; min-width:0; min-height:36px; padding:6px 10px; border:1px solid #8191ad; border-radius:6px; background:#2c3b57; color:#fff; font:12px 'DM Sans',sans-serif; }
+.preview-controls select { max-width:190px; }
+.preview-controls :focus-visible { outline:3px solid #f3df75; outline-offset:3px; }
+.preview-controls [data-theme-toggle][data-active=true] { background:#eff2ff; color:#182035; }
+.preview-hint { font-size:11px; color:#cfdaeb; }
+/* Social Club */
+body[data-direction=club] .balance-scene { background:var(--feature); color:var(--on-feature); }
+body[data-direction=club] .balance-ticket::before,body[data-direction=club] .balance-ticket::after { background:var(--feature); }
+body[data-direction=club] .split-art i { color:var(--feature); }
+body[data-direction=club] .pass-art { background:var(--art1); color:var(--art1-ink); }
+body[data-direction=club] .home .pass-art { background:var(--art2); color:var(--art2-ink); }
+body[data-direction=club] .dinner .pass-art { background:var(--art3); color:var(--art3-ink); }
+body[data-direction=club] .avatar.lilac { background:var(--art2); color:var(--art2-ink); }
+body[data-direction=club] .avatar.peach { background:var(--art3); color:var(--art3-ink); }
+/* Night Atlas */
+.atlas-intro h1>span { color:var(--muted); }
+.atlas-map { background:radial-gradient(ellipse at 48% 50%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 65%); }
+.orbit-lines { stroke:var(--line); }
+.orbit-lines .map-path { stroke:var(--positive); }
+.orbit-lines .owes-path { stroke:var(--negative); }
+.map-you>span { background:var(--accent); color:var(--on-accent); box-shadow:0 0 0 12px color-mix(in srgb,var(--accent) 5%,transparent),0 0 0 26px color-mix(in srgb,var(--accent) 3%,transparent); }
+.map-person>span { background:var(--art3); color:var(--art3-ink); }
+.map-luca>span { background:var(--art2); color:var(--art2-ink); }
+.atlas-dot { background:var(--accent); }.atlas-dot.peach { background:var(--warm); }.atlas-dot.blue { background:var(--art2); }
+/* Weekend Press keeps its printed color blocks in both modes. */
+.press-masthead>a>span { color:var(--accent); }
+.press-headline { background:var(--poster); color:var(--poster-ink); }
+.press-flower { color:color-mix(in srgb,var(--poster-ink) 16%,var(--poster)); }
+.press-receipt { background:var(--receipt); color:var(--poster-ink); }
+.press-receipt>div:last-child { border-color:color-mix(in srgb,var(--poster-ink) 45%,var(--receipt)); }
+.press-group-art { background:var(--art1); }.press-group-art svg { stroke:var(--art1-ink); }
+.press-home { background:var(--art2); }.press-home svg { stroke:var(--art2-ink); }
+.press-dinner { background:var(--art3); }.press-dinner svg { stroke:var(--art3-ink); }
+.press-people { background:var(--feature); color:var(--on-feature); }
+.press-people>div { border-color:color-mix(in srgb,var(--on-feature) 40%,var(--feature)); }
+.press-people small,.press-people>p { color:var(--on-feature); }
+.press-people .alt-avatar { background:var(--warm); color:var(--warm-ink); }
+.press-footer button { background:var(--warm); color:var(--warm-ink); }
+/* Pocket Objects: the same material system, with palette-aware surfaces. */
+.objects-design { background:radial-gradient(ellipse at 50% 32%,var(--surface),transparent 55%),var(--bg); }
+.objects-brand i { background:var(--accent); }
+.objects-nav nav .is-active,.objects-profile { background:var(--tint); }
+.objects-profile .alt-avatar { background:var(--art1); color:var(--art1-ink); }
+.objects-add { background:var(--accent); color:var(--on-accent); box-shadow:inset 0 2px #fff3,0 5px 0 color-mix(in srgb,var(--accent) 65%,#000); }
+.objects-add:active { box-shadow:inset 0 2px #fff3,0 2px 0 color-mix(in srgb,var(--accent) 65%,#000); }
+.objects-section-title button { box-shadow:0 3px 0 var(--line); }
+.objects-nav { box-shadow:inset 0 2px #ffffff26,0 8px 22px #00000009; }
+.object-group { background:var(--surface); border-color:var(--line); box-shadow:inset 0 -3px color-mix(in srgb,var(--line) 18%,transparent),0 8px 15px #0000000a; }
+.object-art,.object-home .object-art,.object-dinner .object-art { background:var(--art1); box-shadow:inset 0 3px #fff6,inset 0 -4px color-mix(in srgb,var(--art1-ink) 30%,var(--art1)); }
+.object-art svg { stroke:var(--art1-ink); }
+.object-home .object-art { background:var(--art2); box-shadow:inset 0 3px #fff6,inset 0 -4px color-mix(in srgb,var(--art2-ink) 30%,var(--art2)); }.object-home svg { stroke:var(--art2-ink); }
+.object-dinner .object-art { background:var(--art3); box-shadow:inset 0 3px #fff6,inset 0 -4px color-mix(in srgb,var(--art3-ink) 30%,var(--art3)); }.object-dinner svg { stroke:var(--art3-ink); }
+.objects-split>i { background:var(--warm); }
+.orbit-avatar.a { background:var(--art1); color:var(--art1-ink); }.orbit-avatar.b { background:var(--art3); color:var(--art3-ink); }.orbit-avatar.c { background:var(--art2); color:var(--art2-ink); }
+.objects-main-balance { background:var(--feature); color:var(--on-feature); box-shadow:inset 0 4px 9px #ffffff30,inset 0 -8px 12px #0003,0 14px 24px #00000018; }
+.objects-main-balance>span,.objects-main-balance>p { color:var(--on-feature); }
+.objects-main-balance>button { background:var(--warm); color:var(--warm-ink); }
+.objects-pockets>div { background:color-mix(in srgb,var(--positive) 12%,var(--surface)); box-shadow:inset 0 3px #fff2,inset 0 -4px #00000008; }
+.objects-pockets>div+div { background:color-mix(in srgb,var(--negative) 12%,var(--surface)); box-shadow:inset 0 3px #fff2,inset 0 -4px #00000008; }
+.objects-pockets span,.objects-pockets>div+div>span { color:var(--ink); }
+.friend-object { background:color-mix(in srgb,var(--surface) 65%,transparent); border-color:var(--line); }
+.friend-object .alt-avatar { background:var(--art3); color:var(--art3-ink); }.friend-object+div .alt-avatar { background:var(--art2); color:var(--art2-ink); }
+.objects-activity { background:var(--tint); box-shadow:inset 0 3px #ffffff26; }.objects-activity li { border-color:var(--line); }.objects-activity-icon { background:var(--surface); }
+/* Trail overlay sits in the top layer, so it also works over native dialogs. */
+#study-trail { position:fixed; inset:0; width:100vw; height:100dvh; max-width:none; max-height:none; margin:0; padding:0; border:0; overflow:hidden; background:transparent; pointer-events:none; }
+#study-trail::backdrop { background:transparent; pointer-events:none; }
+@media(hover:hover) and (pointer:fine) {
+ body.trail-enabled,body.trail-enabled :is(a,button,summary,label,select) { cursor:var(--study-cursor),auto; }
+ body.trail-enabled :is(input,textarea,[contenteditable=true]) { cursor:text; }
+ body.trail-enabled :disabled { cursor:not-allowed; }
+}
+.palette-links { display:flex; flex-wrap:wrap; gap:8px; padding:0 24px 24px; }
+.palette-links a { display:flex; align-items:center; gap:8px; color:#263753; text-decoration:none; border:1px solid #c7d0df; border-radius:20px; padding:8px 11px; font-size:12px; min-height:40px; }
+.palette-links a:hover { background:#edf1f8; }
+.palette-swatches { display:flex; }.palette-swatches i { width:12px; height:18px; background:var(--swatch); }.palette-swatches i:first-child { border-radius:9px 0 0 9px; }.palette-swatches i:last-child { border-radius:0 9px 9px 0; }
+@media(max-width:720px) { .preview-controls { width:100%; gap:8px; }.preview-controls label { flex:1; font-size:11px; }.preview-controls select { flex:1; width:100%; max-width:none; }.study-tools .preview-controls label { font-size:11px; }.concept-bar { padding:12px 16px; }.preview-hint { width:100%; }.palette-links { padding-inline:20px; } }
+@media(max-width:360px) { .preview-controls label { flex-basis:100%; }.preview-controls select { max-width:220px; }.concept-bar>span { width:100%; } }
+@media(prefers-reduced-motion:reduce),(forced-colors:active) { body.trail-enabled,body.trail-enabled :is(a,button,summary,label,select) { cursor:revert; } #study-trail { display:none; } }
+body.motion-reduced,body.motion-reduced :is(a,button,summary,label,select) { cursor:revert; }
+body[data-direction=club] .balance-note .text-button { color:var(--on-feature); border-color:color-mix(in srgb,var(--on-feature) 40%,transparent); }
+@media(max-width:580px) {
+ .preview-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; }
+ .preview-controls label,.study-tools .preview-controls label { display:block; font-size:0; }
+ .preview-controls select { display:block; width:100%; max-width:none; font-size:12px; }
+ .preview-hint { grid-column:1/-1; }
+ .concept-bar>span,.concept-bar>[data-replay],.study-tools b,.study-tools>#replay,.study-tools>#direction,.study-tools>label[for=direction] { display:none; }
+ .study-tools>span { width:auto; margin-bottom:0; }
+ .preview-controls button { padding-inline:10px; min-width:92px; }
+}

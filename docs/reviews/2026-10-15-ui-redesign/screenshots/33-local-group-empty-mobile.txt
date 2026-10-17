@@ -1,0 +1,24 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+- main:
+  - link "Dashboard":
+    - /url: /dashboard
+    - text: ‹ Dashboard
+  - generic: S
+  - heading "Sunday supper club" [level=1]
+  - paragraph: Dining · You, Noor, Luca
+  - button "Settle up":
+    - text: Settle up
+  - button "Add expense":
+    - text: Add expense
+  - link "Group settings":
+    - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342/settings
+  - generic: Settled up
+  - paragraph: No expenses yet. Add the first one.

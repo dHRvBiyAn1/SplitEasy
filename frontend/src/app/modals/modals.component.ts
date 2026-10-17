@@ -1,3 +1,5 @@
+import { AppearancePanelComponent } from '../shared/appearance-panel.component';
+import { ModalShellComponent } from './modal-shell.component';
 import { Component, inject } from '@angular/core';
 import { ModalService } from './modal.service';
 import { NewGroupModalComponent } from './new-group-modal.component';
@@ -9,6 +11,8 @@ import { AddMemberModalComponent } from './add-member-modal.component';
 @Component({
   selector: 'app-modals',
   imports: [
+    AppearancePanelComponent,
+    ModalShellComponent,
     NewGroupModalComponent,
     NewExpenseModalComponent,
     SettleUpModalComponent,
@@ -16,6 +20,11 @@ import { AddMemberModalComponent } from './add-member-modal.component';
   ],
   template: `
     @switch (modal.active()) {
+      @case ('appearance') {
+        <app-modal-shell heading="Make it yours." (closed)="modal.close()"
+          ><app-appearance-panel
+        /></app-modal-shell>
+      }
       @case ('group') {
         <app-new-group-modal />
       }

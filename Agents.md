@@ -77,7 +77,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   (local base `/api`, production `https://api.split-easy.io/api`); `authInterceptor` attaches the token + handles 401 for trusted API requests; `authGuard` on private routes.
 - **UI tokens live in one place**: `frontend/src/app/styles/_tokens.scss` (colors, type,
   spacing, motion as CSS vars) + `_ui.scss` (`.dc-*` primitives). Both `@use`d once in
-  `styles.scss`. Reference `var(--…)` / `.dc-*` — never hardcode. Design ref `design/evenly.dc.html`.
+  `styles.scss`. Reference `var(--…)` / `.dc-*` — never hardcode. Selected design ref `docs/concepts/ui-redesign/objects.html`.
 
 ## Backend Conventions
 
@@ -150,25 +150,40 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   muted; small text uses darkened `--pos-strong`/`--neg-strong` for ≥4.5:1). A **net balance** uses the
   modifiers; a **plain total** (expense amount, payment) uses `.dc-amount` bare. Reuse — don't re-derive.
 
-## Design System ("Evenly") — complete
+## Design System ("Pocket Objects") — implemented locally
 
-Editorial system on **every** screen (imported from Claude Design, `design/evenly.dc.html`): **Instrument
-Serif** display + **Hanken Grotesk** UI; lime accent `--accent` `#B6F531` on near-black `--on-accent`;
-green-tinted near-white `--bg`; **sharp corners** (`border-radius: 0`); 16px cards; circular avatars. All
-values in `_tokens.scss`. **Standing rule: new screens reuse the tokens + `.dc-*` + `.dc-amount` — never
-reintroduce Material components or hardcode colors/spacing/owed-owing logic.** Auth screens (`/login`,
-`/register`) are full-bleed (no shell).
+The selected Pocket Objects design now covers every Angular route and global modal. Seafoam & Petrol
+is the default palette, with Lilac & Plum and Peach & Cocoa alternatives. Rounded material objects,
+locally bundled Nunito Sans display / DM Sans UI fonts, SVG group illustrations, restrained glass sheen
+and shared CSS tokens replace the earlier Evenly presentation. The editable selected study lives at
+`docs/concepts/ui-redesign/objects.html`; actual implementation evidence is in
+`docs/reviews/2026-10-15-ui-redesign/implementation/verification.md`.
 
-- **Shell + dashboard**: sidebar shell (`App`) + landing page from one `GET /api/dashboard` cached in
-  `DashboardService` (a signal shared by sidebar + page — call `dashboard.refresh()` after any mutation).
-- **Theme**: OS default, **user-overridable**. `_tokens.scss` applies `light-tokens`/`dark-tokens` mixins to
-  `:root`, the `prefers-color-scheme: dark` query, and `:root[data-theme='light'|'dark']` (the attribute
-  out-specifies the query so user choice wins). `ThemeService` (`core/theme.service.ts`) stamps `data-theme`
-  on `<html>` and persists `system`/`light`/`dark` to localStorage `spliteasy.theme`; driven by the profile Appearance toggle.
-- **Global modals** (`app/modals/`): `ModalService` signal picks which of New group / New expense / Settle up
-  is open; `ModalsComponent` (mounted once) renders it over a shared `ModalShellComponent` (backdrop + Esc).
-- **Group detail**: header + pairwise balance pills (`/balances/mine`) + month-grouped expense list (category
-  icon, date chip, per-viewer `you lent`/`you borrowed`, expandable rows with split + Edit/Delete).
+**Standing rule:** reuse `_tokens.scss`, `.dc-*` and `.dc-amount`; never reintroduce Material presentation
+or duplicate money-status logic. `app-money` formats integer cents for the dashboard/tray, keeps plain
+totals neutral, and makes unusually long amounts keyboard-scrollable with their full text available.
+Auth routes remain full-bleed with a named Appearance control.
+
+- **Shell + dashboard:** capsule header, Groups tray and a four-icon labelled Overview / Groups /
+  Expense / Profile dock through 1024px. Active selection derives from route + modal; Expense is active
+  only during composition. One cached `GET /api/dashboard` remains the data source. Mutations call
+  `dashboard.refresh()`. Failed refresh retains only current-session trusted data with a retry notice;
+  failed initial loads settle into the retry view instead of automatically looping.
+- **Appearance:** `ThemeService` owns independent `spliteasy.palette` (`seafoam` default / `lilac` /
+  `peach`) and existing `spliteasy.theme` (`system` default / `light` / `dark`). Explicit mode overrides
+  OS CSS and sets native `color-scheme`; System follows live OS changes. Header and Profile use the
+  same Appearance panel. Preferences are device-local, independent of account state.
+- **Motion:** `MotionPreferenceService` owns `spliteasy.motion`; OS reduction always wins. One optional
+  `RibbonService` canvas runs outside Angular with passive pointer/touch input. Silk Ribbon uses a
+  precise SVG mouse tip, tapered trail, and brief touch bloom/trace. Clear on session reset, multi-touch,
+  cancellation, blur/hidden state, reduction and teardown; native scroll/pinch stays available. Glass
+  uses bounded shared CSS with reduced-motion/forced-color fallbacks. No new motion dependency.
+- **Dialogs:** shared named `ModalShellComponent` uses CDK focus trapping/restoration, inert shell,
+  body scroll locking, Escape and a scroll-contained mobile surface. `ModalService` owns New group /
+  New or edit expense / Settle up / Add member / Appearance; HTTP/session ownership stays in services.
+- **Group pages:** route/account/destroy changes cancel owned callbacks, and a new reload cancels its
+  predecessor. Group, balance and expense reads complete together before actions render. Reload clears
+  displayed receipt details. Offsetting pairwise debts with net zero say “Even overall”, not “All square”.
 
 ## Data Model
 
@@ -228,7 +243,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   (`GroupSummary` → `DashboardGroup`) — anything changing it must call `dashboard.refresh()`, or the
   modal keeps reading the cached value.
 - **Profile prefs are client-side only** (PR #23) — phone/currency/avatar-color/theme in localStorage,
-  "Member since" = first-visit month. No profile-update endpoint or signup-date column yet.
+  "First seen here" = first-visit month. No profile-update endpoint or signup-date column yet.
 
 ## Git Workflow
 
@@ -290,3 +305,13 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Split overflow validation (#37, 2026-10-15) — bounded exact/percentage values, overflow-safe BigInteger sums and percentage arithmetic before shared POST/PUT persistence; preserves the 1e12 amount cap and deterministic payer remainder. Regression-first strategy/API coverage includes adversarial long inputs, unchanged rejected writes, and zero/full boundary shares. Backend125/frontend57, formatting/production build, deployment12 and ShellCheck/Actionlint passed; disposable Caddy/backend/PostgreSQL HTTP checks confirmed 24 rejected POST/PUT requests leave accounting unchanged, valid boundaries/remainder/zero-sum balances, and persistence after container recreation.
 
 Release preparation (2026-10-15): issues #37/#38/#45 integrated through PRs #66/#67/#68 into dev. Synchronized already-released main history into dev to resolve the project-memory conflict and keep the release PR limited to the three P1 fixes. Issue branches target dev; tested releases use dev→main. No schema changes. Production deployment occurs only after the release PR is merged.
+
+UI redesign planning (2026-10-16): isolated `feat/ui-redesign` from fetched `origin/dev` 597fc93. Audit/research at `docs/reviews/2026-10-15-ui-redesign/`, proposed spec/roadmap in `docs/superpowers/`, and four standalone editable concepts plus cursor options at `docs/concepts/ui-redesign/gallery.html`. Taste Skill redesign + UI UX Pro Max were inspected/applied. All artifacts are proposals; no application source, dependency, API, schema, commit, push or deployment change. Review direction/spec/plan before implementation; feature PR targets dev.
+
+UI concept follow-up (2026-10-16): three palettes for each of four layouts (12 options, 24 light/dark combinations) in `docs/concepts/ui-redesign/colors.html`; working theme toggles/profile controls and Silk Ribbon, Comet Trail, Echo Rings directly in all four previews. Shared static palette/preview sources; URL/session-only appearance selection. Desktop/mobile, rendered contrast, dialog overlay and reduced-motion checks recorded alongside screenshots. Prototype artifacts only; no product implementation, commit, push or deployment.
+
+Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol default, switchable Lilac/Plum and Peach/Cocoa plus independent Light/Dark, fixed Silk Ribbon mouse trail and short touch bloom/trace. Static preview now includes persisted Appearance controls, icon-and-label mobile/tablet dock with correct selection restoration, and bounded liquid-glass hover/press. Thirty responsive combinations and480 rendered-text checks passed; hover/reduction and touch rehearsal recorded, real-device touch/performance remains production verification. Spec/plan updated to the selected direction. No Angular/backend change, commit, push or deployment.
+
+- [x] Pocket Objects Angular implementation (2026-10-17) — selected Seafoam/Petrol default with three independent palettes and System/Light/Dark modes across shell, overview, group/settings, auth, profile and all modals; local licensed fonts, SVG objects, icon dock, named focus-trapped dialogs, Silk Ribbon/touch and bounded liquid glass with accessibility fallbacks. Regression-first theme/motion/dialog/nav/cache/route ownership fixes; frontend 105/backend 138/deployment 12, Prettier and warning-free production build passed. Local synthetic browser flows cover registration/account switching, group/member edits, exact→percentage edit/delete, partial settlement, 320px/landscape and near-cap amounts. Physical-device touch/performance QA remains unmeasured. Implemented on feat/ui-redesign; user subsequently authorized commit/push, successful branch CI, then a PR to dev. User subsequently authorized resolving Codex review and merging PR #70 into dev after checks. No production deployment is authorized.
+
+- [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.

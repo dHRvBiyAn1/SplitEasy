@@ -1,0 +1,203 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+  - generic: Groups
+  - button "New group":
+  - list:
+    - link "Summer celebration with all our favourite people and their impossibly long names +$6666666666.66":
+      - /url: /groups/9fa89ebb-c784-4301-8b29-870261cc2a45
+      - generic: S
+      - generic: Summer celebration with all our favourite people and their impossibly long names
+      - generic: +$6666666666.66
+    - link "Sunday supper club +$0.00":
+      - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342
+      - generic: S
+      - generic: Sunday supper club
+      - generic: +$0.00
+    - link "Our place on Willow Street −$845.80":
+      - /url: /groups/9cd2b7f0-e79f-4a39-a04e-5ab996a0a3a5
+      - generic: O
+      - generic: Our place on Willow Street
+      - generic: −$845.80
+    - link "Lisbon long weekend +$269.85":
+      - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+      - generic: L
+      - generic: Lisbon long weekend
+      - generic: +$269.85
+  - generic "Dark theme":
+    - generic: "Theme: Dark"
+  - link "Ada Morgan View profile":
+    - /url: /profile
+    - generic: AM
+    - generic: Ada Morgan
+    - generic: View profile
+- main:
+  - paragraph: THURSDAY, OCTOBER 15
+  - heading "Good evening, Ada." [level=1]
+  - button "Settle up":
+    - generic: ⇄
+    - text: Settle up
+  - button "Add expense":
+    - generic: +
+    - text: Add expense
+  - paragraph: Total balance
+  - paragraph: $6,666,666,090.71
+  - paragraph: you're owed overall · across 4 groups
+  - paragraph: You are owed
+  - paragraph: $6,666,666,936.51
+  - paragraph: from 2 people
+  - paragraph: You owe
+  - paragraph: $845.80
+  - paragraph: to 2 people
+  - heading "Your groups" [level=2]
+  - button "New group": + New group
+  - article:
+    - link "Open Summer celebration with all our favourite people and their impossibly long names":
+      - /url: /groups/9fa89ebb-c784-4301-8b29-870261cc2a45
+    - generic: S
+    - heading "Summer celebration with all our favourite people and their impossibly long names" [level=3]
+    - paragraph: 3 members
+    - generic: You're owed
+    - paragraph: You are owed
+    - paragraph: $6666666666.66
+    - paragraph: You owe
+    - paragraph: $0.00
+    - paragraph: Total spent
+    - paragraph: $9999999999.99
+    - paragraph: Members
+    - paragraph: "3"
+    - paragraph: Net balance
+    - paragraph: +$6666666666.66
+    - link "Members":
+      - /url: /groups/9fa89ebb-c784-4301-8b29-870261cc2a45
+    - link "Open":
+      - /url: /groups/9fa89ebb-c784-4301-8b29-870261cc2a45
+      - text: Open
+      - generic: ↗
+  - article:
+    - link "Open Sunday supper club":
+      - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342
+    - generic: S
+    - heading "Sunday supper club" [level=3]
+    - paragraph: 3 members
+    - generic: Settled
+    - paragraph: You are owed
+    - paragraph: $0.00
+    - paragraph: You owe
+    - paragraph: $0.00
+    - paragraph: Total spent
+    - paragraph: $0.00
+    - paragraph: Members
+    - paragraph: "3"
+    - paragraph: Net balance
+    - paragraph: +$0.00
+    - link "Members":
+      - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342
+    - link "Open":
+      - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342
+      - text: Open
+      - generic: ↗
+  - article:
+    - link "Open Our place on Willow Street":
+      - /url: /groups/9cd2b7f0-e79f-4a39-a04e-5ab996a0a3a5
+    - generic: O
+    - heading "Our place on Willow Street" [level=3]
+    - paragraph: 3 members
+    - generic: You owe
+    - paragraph: You are owed
+    - paragraph: $0.00
+    - paragraph: You owe
+    - paragraph: $845.80
+    - paragraph: Total spent
+    - paragraph: $2537.42
+    - paragraph: Members
+    - paragraph: "3"
+    - paragraph: Net balance
+    - paragraph: −$845.80
+    - link "Members":
+      - /url: /groups/9cd2b7f0-e79f-4a39-a04e-5ab996a0a3a5
+    - link "Open":
+      - /url: /groups/9cd2b7f0-e79f-4a39-a04e-5ab996a0a3a5
+      - text: Open
+      - generic: ↗
+  - article:
+    - link "Open Lisbon long weekend":
+      - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+    - generic: L
+    - heading "Lisbon long weekend" [level=3]
+    - paragraph: 3 members
+    - generic: You're owed
+    - paragraph: You are owed
+    - paragraph: $269.85
+    - paragraph: You owe
+    - paragraph: $0.00
+    - paragraph: Total spent
+    - paragraph: $574.31
+    - paragraph: Members
+    - paragraph: "3"
+    - paragraph: Net balance
+    - paragraph: +$269.85
+    - link "Members":
+      - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+    - link "Open":
+      - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+      - text: Open
+      - generic: ↗
+  - heading "Recent activity" [level=2]
+  - list:
+    - generic: ✦
+    - generic: Venue deposit with an exceptionally long expense description to inspect wrapping and number alignment
+    - generic: You paid $9999999999.99 · Summer celebration with all our favourite people and their impossibly long names
+    - generic: +$6666666666.66
+    - generic: OCT 15
+    - generic: 🧺
+    - generic: Groceries for the flat
+    - generic: Luca paid $137.42 · Our place on Willow Street
+    - generic: −$45.80
+    - generic: OCT 15
+    - generic: ⌂
+    - generic: October rent
+    - generic: Noor paid $2400.00 · Our place on Willow Street
+    - generic: −$800.00
+    - generic: OCT 15
+    - generic: ☕
+    - generic: Pastries by the water
+    - generic: Luca paid $10.01 · Lisbon long weekend
+    - generic: −$3.35
+    - generic: OCT 15
+    - generic: 🚕
+    - generic: Tram tickets
+    - generic: Noor paid $18.00 · Lisbon long weekend
+    - generic: −$6.00
+    - generic: OCT 15
+    - generic: ☕
+    - generic: Dinner at Ramiro
+    - generic: You paid $186.30 · Lisbon long weekend
+    - generic: +$124.20
+    - generic: OCT 15
+    - generic: ⇄
+    - generic: Noor paid you
+    - generic: Lisbon long weekend · settlement
+    - generic: $25.00
+    - generic: OCT 15
+    - generic: ✈
+    - generic: Apartment for the weekend
+    - generic: You paid $360.00 · Lisbon long weekend
+    - generic: +$180.00
+    - generic: SEP 28
+  - heading "People" [level=2]
+  - list:
+    - generic: LF
+    - generic: Luca Fernández-Rossi
+    - generic: owes you
+    - generic: $3333333436.28
+    - generic: NK
+    - generic: Noor Kapoor
+    - generic: owes you
+    - generic: $3333332654.43

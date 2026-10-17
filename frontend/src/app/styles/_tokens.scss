@@ -1,86 +1,137 @@
-// ─────────────────────────────────────────────────────────────────────────
-// SplitEasy design tokens — single source of truth for the "Evenly" visual
-// system. Every screen references these CSS custom properties.
-//
-// Theme resolution:
-//   default        → light (light-tokens)
-//   system dark    → @media (prefers-color-scheme: dark)
-//   explicit choice→ :root[data-theme='light' | 'dark'] (set by ThemeService)
-// The explicit selectors out-specify the media query, so a user override wins.
-//
-// Fonts: Instrument Serif (display) + Hanken Grotesk (UI/body), loaded in index.html.
-// ─────────────────────────────────────────────────────────────────────────
+@use 'sass:list';
+@use 'sass:map';
 
-@mixin light-tokens {
-  --accent-base: #b6f531;
-  --accent: var(--accent-base);
-  --accent-text: color-mix(in oklab, var(--accent-base), black 54%);
-  --accent-soft: color-mix(in oklab, var(--accent-base) 26%, var(--surface));
-  --on-accent: #12160a;
+// Pocket Objects: all color, typography, material and motion roles live here.
+$palettes: (
+  seafoam: (
+    light: (
+      #e2efea,
+      #f7fdf9,
+      #23464a,
+      #476260,
+      #acc9c5,
+      #286970,
+      #f7fdf9,
+      #cce3dc,
+    ),
+    dark: (
+      #15282a,
+      #21383c,
+      #e9faf6,
+      #b0d0c9,
+      #527b7c,
+      #a2d9d2,
+      #1e4244,
+      #314e50,
+    ),
+    feature: #286970,
+    warm: #edd495,
+  ),
+  lilac: (
+    light: (
+      #eee8f4,
+      #fff9ff,
+      #442d50,
+      #6a5577,
+      #bfaecb,
+      #664273,
+      #fff9ff,
+      #e5d6ec,
+    ),
+    dark: (
+      #231c2d,
+      #32283e,
+      #f7ecff,
+      #ceb8de,
+      #765e87,
+      #d2b3e5,
+      #3d2849,
+      #493853,
+    ),
+    feature: #684678,
+    warm: #e4d890,
+  ),
+  peach: (
+    light: (
+      #f5e7dc,
+      #fffaf2,
+      #4b3029,
+      #715549,
+      #cdb7a5,
+      #805345,
+      #fffaf2,
+      #edd9c8,
+    ),
+    dark: (
+      #2b201c,
+      #3d2e28,
+      #fff1e5,
+      #d6bca9,
+      #876c5c,
+      #eabca3,
+      #493024,
+      #574137,
+    ),
+    feature: #805345,
+    warm: #c7d9a4,
+  ),
+);
 
-  --bg: #f1f2ed;
-  --surface: #ffffff;
-  --surface2: #f0f1eb;
-  --surface3: #e5e7df;
-
-  --ink: #14161a;
-  --ink2: #5c6067;
-  --ink3: #8e939b;
-
-  --line: #e7e8e1;
-  --line2: #d6d8ce;
-
-  --pos: #0e9a72;
-  --pos-soft: color-mix(in oklab, #0e9a72 12%, var(--surface));
-  --neg: #de3f76;
-  --neg-soft: color-mix(in oklab, #de3f76 10%, var(--surface));
-  --pos-strong: color-mix(in oklab, #0e9a72, black 26%);
-  --neg-strong: color-mix(in oklab, #de3f76, black 24%);
-
-  --shadow: 0 1px 2px rgba(20, 22, 26, 0.04), 0 10px 30px rgba(20, 22, 26, 0.07);
-  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--shadow);
-
-  // Direction to shift avatar/glyph lettering so it stays legible on its own tint:
-  // toward black on light surfaces, toward white on dark ones (see core/avatar.ts).
-  --avatar-ink: black;
+@mixin palette($name, $mode) {
+  $p: map.get($palettes, $name);
+  $values: map.get($p, $mode);
+  $roles: bg, surface, ink, ink2, line, accent, on-accent, surface2;
+  @for $i from 1 through list.length($roles) {
+    --#{list.nth($roles,$i)}: #{list.nth($values, $i)};
+  }
+  --feature: #{map.get($p, feature)};
+  --warm: #{map.get($p, warm)};
+  --ink3: var(--ink2);
+  --line2: color-mix(in srgb, var(--ink2) 65%, var(--surface));
+  --accent-base: var(--accent);
+  --accent-text: var(--accent);
+  --accent-soft: var(--surface2);
+  --surface3: color-mix(in srgb, var(--ink) 12%, var(--surface));
+  --art1: color-mix(in srgb, var(--feature) 20%, var(--on-feature));
+  --art2: color-mix(in srgb, var(--warm) 55%, var(--on-feature));
+  --glass: color-mix(in srgb, var(--surface) 88%, transparent);
+  --glass-edge: color-mix(in srgb, var(--line) 70%, var(--surface));
+  @if $mode == dark {
+    color-scheme: dark;
+    --pos: #8be0be;
+    --neg: #ffa8bb;
+    --avatar-ink: white;
+    --shine: #ffffff24;
+    --shadow: 0 10px 30px #00000020;
+  } @else {
+    color-scheme: light;
+    --pos: #17614c;
+    --neg: #9b2948;
+    --avatar-ink: black;
+    --shine: #ffffff80;
+    --shadow: 0 10px 25px #173b3b0a;
+  }
+  --pos-strong: var(--pos);
+  --neg-strong: var(--neg);
+  --pos-soft: color-mix(in srgb, var(--pos) 12%, var(--surface));
+  --neg-soft: color-mix(in srgb, var(--neg) 12%, var(--surface));
+  --shadow-card: inset 0 2px 0 var(--shine), var(--shadow);
 }
 
-// Only the tokens that differ from light; var()-derived ones (accent-soft, pos/neg-soft)
-// recompute automatically off the overridden --surface / --accent-base.
-@mixin dark-tokens {
-  --accent-text: #c8f95e;
-  --on-accent: #0c1006;
-
-  --avatar-ink: white;
-
-  --bg: #08090b;
-  --surface: #131417;
-  --surface2: #191a1e;
-  --surface3: #24262b;
-
-  --ink: #f3f4f0;
-  --ink2: #9b9ea4;
-  --ink3: #63666c;
-
-  --line: #202226;
-  --line2: #2e3037;
-
-  --accent-soft: color-mix(in oklab, var(--accent-base) 16%, var(--surface));
-
-  --pos: #37dda8;
-  --neg: #ff5c88;
-  --pos-strong: #37dda8;
-  --neg-strong: #ff5c88;
-
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 34px rgba(0, 0, 0, 0.6);
-  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow);
+@mixin system-tokens($mode) {
+  :root {
+    @include palette(seafoam, $mode);
+  }
+  @each $name, $p in $palettes {
+    :root[data-palette='#{$name}'] {
+      @include palette($name, $mode);
+    }
+  }
 }
 
 :root {
-  // Theme-independent tokens
-  --font-display: 'Instrument Serif', Georgia, serif;
-  --font-ui: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
-
+  --font-display: 'Nunito Sans', system-ui, sans-serif;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -89,26 +140,46 @@
   --sp-6: 26px;
   --sp-7: 36px;
   --sp-8: 44px;
-
+  --radius-sm: 12px;
+  --radius: 20px;
+  --radius-card: 26px;
+  --radius-large: 40px;
+  --radius-pill: 999px;
   --z-sticky: 100;
   --z-modal-backdrop: 200;
   --z-modal: 210;
   --z-toast: 300;
-
-  @include light-tokens;
+  --z-ribbon: 400;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 160ms;
+  --duration: 240ms;
+  --pos-on-feature: #c1ffe3;
+  --neg-on-feature: #ffe0e9;
+  --on-feature: #fff;
+  --on-warm: #302b25;
+  --overlay: #071a25a8;
+  --glint: #ffffff60;
+  --palette-seafoam: #286970;
+  --palette-seafoam-soft: #e2efea;
+  --palette-seafoam-warm: #edd495;
+  --palette-lilac: #684678;
+  --palette-lilac-soft: #eee8f4;
+  --palette-lilac-warm: #e4d890;
+  --palette-peach: #805345;
+  --palette-peach-soft: #f5e7dc;
+  --palette-peach-warm: #c7d9a4;
 }
-
+@include system-tokens(light);
 @media (prefers-color-scheme: dark) {
-  :root {
-    @include dark-tokens;
+  @include system-tokens(dark);
+}
+@each $mode in light, dark {
+  :root[data-theme='#{$mode}'] {
+    @include palette(seafoam, $mode);
   }
-}
-
-// Explicit user override (ThemeService stamps data-theme on <html>).
-:root[data-theme='light'] {
-  @include light-tokens;
-}
-
-:root[data-theme='dark'] {
-  @include dark-tokens;
+  @each $name, $p in $palettes {
+    :root[data-palette='#{$name}'][data-theme='#{$mode}'] {
+      @include palette($name, $mode);
+    }
+  }
 }

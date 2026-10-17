@@ -1,13 +1,13 @@
+import { AppearancePanelComponent } from '../shared/appearance-panel.component';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { ThemeService, ThemeChoice } from '../core/theme.service';
 import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../core/profile.service';
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, AppearancePanelComponent],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
@@ -15,7 +15,6 @@ export class ProfileComponent {
   private readonly auth = inject(AuthService);
   private readonly profile = inject(ProfileService);
   private readonly router = inject(Router);
-  protected readonly theme = inject(ThemeService);
 
   protected readonly user = this.auth.user;
   protected readonly prefs = this.profile.prefs;
@@ -23,11 +22,6 @@ export class ProfileComponent {
 
   protected readonly currencies: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
   protected readonly avatarColors = AVATAR_COLORS;
-  protected readonly themeOptions: { value: ThemeChoice; label: string }[] = [
-    { value: 'system', label: 'System' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-  ];
 
   protected readonly name = new FormControl('', { nonNullable: true });
   protected readonly email = new FormControl('', { nonNullable: true });

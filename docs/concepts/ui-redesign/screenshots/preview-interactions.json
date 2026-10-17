@@ -1,0 +1,83 @@
+{
+  "interactionChecks": [
+    {
+      "kind": "theme",
+      "mode": "dark",
+      "palette": "merlot",
+      "url": "?palette=merlot&mode=dark&cursor=ribbon"
+    },
+    {
+      "kind": "dialog",
+      "open": true,
+      "surface": "rgb(53, 35, 49)",
+      "theme": "dark",
+      "trailOnTop": true
+    },
+    {
+      "kind": "theme",
+      "mode": "dark",
+      "palette": "aubergine",
+      "url": "?palette=aubergine&mode=dark&cursor=ribbon"
+    },
+    {
+      "kind": "dialog",
+      "open": true,
+      "surface": "rgb(53, 39, 60)",
+      "theme": "dark",
+      "trailOnTop": true
+    },
+    {
+      "kind": "theme",
+      "mode": "dark",
+      "palette": "cherry",
+      "url": "?palette=cherry&mode=dark&cursor=ribbon"
+    },
+    {
+      "kind": "dialog",
+      "open": true,
+      "surface": "rgb(57, 38, 47)",
+      "theme": "dark",
+      "trailOnTop": true
+    },
+    {
+      "kind": "theme",
+      "mode": "dark",
+      "palette": "seafoam",
+      "url": "?palette=seafoam&mode=dark&cursor=ribbon"
+    },
+    {
+      "kind": "dialog",
+      "open": true,
+      "surface": "rgb(33, 56, 60)",
+      "theme": "dark",
+      "trailOnTop": true
+    }
+  ],
+  "cursorChecks": [
+    {
+      "cursor": "ribbon",
+      "enabled": true,
+      "layer": true,
+      "nativeTip": true
+    },
+    {
+      "cursor": "comet",
+      "enabled": true,
+      "layer": true,
+      "nativeTip": true
+    },
+    {
+      "cursor": "echo",
+      "enabled": true,
+      "layer": true,
+      "nativeTip": true
+    },
+    {
+      "buttonDisabled": true,
+      "enabled": false,
+      "kind": "reduced",
+      "layer": false,
+      "status": "Reduced motion · system pointer"
+    }
+  ]
+}

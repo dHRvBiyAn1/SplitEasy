@@ -21,9 +21,7 @@
   } @else if (group(); as g) {
     <!-- Name -->
     <header class="gset__head">
-      <span class="gset__glyph" aria-hidden="true" [style]="glyphTint(g.name)">{{
-        g.name.charAt(0)
-      }}</span>
+      <app-group-art [type]="g.type" />
 
       @if (!editingName()) {
         <h1 class="gset__name">{{ g.name }}</h1>
@@ -194,14 +192,15 @@
         <span class="grow__text">
           <span class="grow__label">Simplify debts</span>
           <span class="grow__sub">
-            Settle up suggests the fewest payments that clear this group. Turn it off to settle
-            every balance directly, person by person.
+            Settle up suggests fewer transfers to clear this group. Turn it off to settle every
+            balance directly, person by person.
           </span>
         </span>
         <button
           type="button"
           class="simplify-toggle"
           role="switch"
+          aria-label="Simplify debts"
           [attr.aria-checked]="g.simplifyDebts"
           [disabled]="savingSimplify()"
           (click)="toggleSimplify()"

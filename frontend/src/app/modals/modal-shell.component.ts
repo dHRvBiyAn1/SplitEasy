@@ -1,22 +1,38 @@
-import { Component, HostListener, input, output } from '@angular/core';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
+import { Component, DestroyRef, HostListener, inject, input, output } from '@angular/core';
 
-/**
- * Reusable modal chrome: dimmed backdrop + centered panel with a serif title and a
- * close button. Backdrop click and Escape both emit `closed`. Content is projected.
- */
+let nextDialogId = 0;
+
+/** One named, scroll-contained, keyboard-trapped surface for every application modal. */
 @Component({
   selector: 'app-modal-shell',
+  imports: [CdkTrapFocus],
   templateUrl: './modal-shell.component.html',
   styleUrl: './modal-shell.component.scss',
 })
 export class ModalShellComponent {
   readonly heading = input.required<string>();
-  /** Panel max width in px (per design spec: expense 600 / group 520 / settle 460). */
   readonly maxWidth = input<number>(520);
   readonly closed = output<void>();
+  readonly headingId = `modal-heading-${++nextDialogId}`;
 
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
+  constructor() {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    inject(DestroyRef).onDestroy(() => {
+      document.body.style.overflow = previous;
+      // CDK restores a connected launcher; routing/session teardown may have removed it.
+      queueMicrotask(() => {
+        if (document.activeElement === document.body) {
+          document.querySelector<HTMLElement>('main')?.focus({ preventScroll: true });
+        }
+      });
+    });
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscape(event: Event): void {
+    event.preventDefault();
     this.closed.emit();
   }
 }

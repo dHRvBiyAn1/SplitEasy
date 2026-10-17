@@ -1,0 +1,120 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+  - generic: Groups
+  - button "New group":
+  - list:
+    - link "Summer celebration with all our favourite people and their impossibly long names +$6666666666.66":
+      - /url: /groups/9fa89ebb-c784-4301-8b29-870261cc2a45
+      - generic: S
+      - generic: Summer celebration with all our favourite people and their impossibly long names
+      - generic: +$6666666666.66
+    - link "Sunday supper club +$0.00":
+      - /url: /groups/b847c80b-e3b3-4d67-a7ab-91de66959342
+      - generic: S
+      - generic: Sunday supper club
+      - generic: +$0.00
+    - link "Our place on Willow Street −$845.80":
+      - /url: /groups/9cd2b7f0-e79f-4a39-a04e-5ab996a0a3a5
+      - generic: O
+      - generic: Our place on Willow Street
+      - generic: −$845.80
+    - link "Lisbon long weekend +$269.85":
+      - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+      - generic: L
+      - generic: Lisbon long weekend
+      - generic: +$269.85
+  - generic "Dark theme":
+    - generic: "Theme: Dark"
+  - link "Ada Morgan View profile":
+    - /url: /profile
+    - generic: AM
+    - generic: Ada Morgan
+    - generic: View profile
+- main:
+  - link "Dashboard":
+    - /url: /dashboard
+    - text: ‹ Dashboard
+  - generic: L
+  - heading "Lisbon long weekend" [level=1]
+  - paragraph: Trip · You, Noor, Luca
+  - button "Settle up":
+    - text: Settle up
+  - button "Add expense":
+    - text: Add expense
+  - link "Group settings":
+    - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07/settings
+  - text: You are owed
+  - strong: $269.85
+  - text: overall
+  - generic: LF
+  - text: Luca owes you
+  - strong: $148.75
+  - generic: NK
+  - text: Noor owes you
+  - strong: $121.10
+  - heading "OCTOBER 2026" [level=2]
+  - list:
+    - button "Pastries by the water Luca paid $10.01 you borrowed $3.35":
+      - generic: OCT
+      - generic: "15"
+      - generic: ☕
+      - generic: Pastries by the water
+      - generic: Luca paid $10.01
+      - generic: you borrowed
+      - generic: $3.35
+    - button "Tram tickets Noor paid $18.00 you borrowed $6.00":
+      - generic: OCT
+      - generic: "15"
+      - generic: 🚕
+      - generic: Tram tickets
+      - generic: Noor paid $18.00
+      - generic: you borrowed
+      - generic: $6.00
+    - button "Dinner at Ramiro You paid $186.30 you lent $124.20" [expanded]:
+      - generic: OCT
+      - generic: "15"
+      - generic: ☕
+      - generic: Dinner at Ramiro
+      - generic: You paid $186.30
+      - generic: you lent
+      - generic: $124.20
+    - generic: You paid
+    - generic: $186.30
+    - generic: AM
+    - generic: You owe
+    - generic: $62.10
+    - generic: LF
+    - generic: Luca owes
+    - generic: $62.10
+    - generic: NK
+    - generic: Noor owes
+    - generic: $62.10
+    - button "Edit"
+    - button "Delete expense": 🗑 Delete expense
+  - heading "SEPTEMBER 2026" [level=2]
+  - list:
+    - button "Apartment for the weekend You paid $360.00 you lent $180.00":
+      - generic: SEP
+      - generic: "28"
+      - generic: ✈
+      - generic: Apartment for the weekend
+      - generic: You paid $360.00
+      - generic: you lent
+      - generic: $180.00
+- dialog:
+  - heading "Settle up" [level=2]
+  - button "Close": ✕
+  - generic: LF
+  - generic: Luca is paying you
+  - generic: $
+  - spinbutton "Amount to settle": "151.42"
+  - generic: Recorded in Lisbon long weekend as a cash settlement. Settle less to pay part of it.
+  - button "Back"
+  - button "Record payment"

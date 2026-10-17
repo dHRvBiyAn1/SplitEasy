@@ -1,9 +1,9 @@
 // Angular Material theming (Material 3). The embedded expense/balance/settle
 // panels still use Material components, so the theme stays — but its system
-// colors are remapped below to the Evenly design tokens for coherence.
+// colors are remapped below to the Pocket Objects design tokens for coherence.
 @use '@angular/material' as mat;
 
-// Evenly design system — tokens + shared UI primitives (single source of truth).
+// Pocket Objects design system — tokens + shared UI primitives (single source of truth).
 @use './app/styles/tokens' as *;
 @use './app/styles/ui' as *;
 
@@ -16,12 +16,12 @@ html {
         primary: mat.$chartreuse-palette,
         tertiary: mat.$spring-green-palette,
       ),
-      typography: 'Hanken Grotesk',
+      typography: 'DM Sans',
       density: 0,
     )
   );
 
-  // Remap Material's system colors onto the Evenly tokens so any Material
+  // Remap Material's system colors onto the Pocket Objects tokens so any Material
   // component (in the expenses/balances/settle panels) matches the redesign.
   --mat-sys-primary: var(--accent);
   --mat-sys-on-primary: var(--on-accent);
@@ -38,13 +38,13 @@ html {
 
 body {
   // Follow the OS theme for native controls (date picker, scrollbars, form fields).
-  color-scheme: light dark;
+  color-scheme: inherit;
   margin: 0;
   min-height: 100%;
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -54,8 +54,8 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.045em;
   color: var(--ink);
 }
 
@@ -108,5 +108,135 @@ a {
       opacity: 1;
       transform: none;
     }
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+img,
+svg {
+  max-width: 100%;
+}
+button {
+  min-height: 44px;
+}
+main {
+  min-width: 0;
+  outline: none;
+}
+body {
+  background: radial-gradient(ellipse at 50% 15%, var(--surface), transparent 65%), var(--bg);
+}
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea,
+  .dc-field {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/nunito-sans-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/nunito-sans-800.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/nunito-sans-900.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/dm-sans-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/dm-sans-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/dm-sans-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/dm-sans-700.woff2') format('woff2');
+}
+.silk-ribbon {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
+  z-index: var(--z-ribbon);
+}
+.silk-ribbon[hidden] {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-ribbon='enabled'] body,
+  :root[data-ribbon='enabled'] :is(a, button, summary, select, label) {
+    cursor: var(--ribbon-cursor), auto;
+  }
+  :root[data-ribbon='enabled'] :is(input, textarea, [contenteditable='true']) {
+    cursor: text;
+  }
+  :root[data-ribbon='enabled'] :disabled {
+    cursor: not-allowed;
+  }
+}
+@media (forced-colors: active), (prefers-reduced-motion: reduce) {
+  .silk-ribbon {
+    display: none;
   }
 }
