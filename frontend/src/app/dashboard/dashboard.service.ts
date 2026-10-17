@@ -7,7 +7,7 @@ import { DashboardResponse } from './dashboard.models';
 
 /**
  * Owns the single `/api/dashboard` payload. Cached in a signal so both the app-shell
- * sidebar (group balances) and the dashboard page read one fetch. Call {@link refresh}
+ * group tray and the dashboard page read one fetch. Call {@link refresh}
  * after any mutation (new expense / group / settlement) to re-pull.
  */
 @Injectable({ providedIn: 'root' })
@@ -17,8 +17,10 @@ export class DashboardService {
 
   private readonly _data = signal<DashboardResponse | null>(null);
   private readonly _loading = signal(false);
+  private readonly _error = signal(false);
   readonly data = this._data.asReadonly();
   readonly loading = this._loading.asReadonly();
+  readonly error = this._error.asReadonly();
 
   constructor() {
     inject(SessionService)
@@ -37,6 +39,7 @@ export class DashboardService {
   refresh(): void {
     const version = this.cacheVersion;
     this._loading.set(true);
+    this._error.set(false);
     this.api
       .get<DashboardResponse>('/dashboard')
       .pipe(
@@ -49,7 +52,7 @@ export class DashboardService {
           if (version === this.cacheVersion) this._data.set(res);
         },
         error: () => {
-          if (version === this.cacheVersion) this._data.set(null);
+          if (version === this.cacheVersion) this._error.set(true);
         },
       });
   }
@@ -59,5 +62,6 @@ export class DashboardService {
     this.cacheVersion++;
     this._data.set(null);
     this._loading.set(false);
+    this._error.set(false);
   }
 }

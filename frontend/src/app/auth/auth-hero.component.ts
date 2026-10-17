@@ -5,18 +5,16 @@ import { Component } from '@angular/core';
   selector: 'app-auth-hero',
   template: `
     <div class="auth-hero__top">
-      <span class="auth-hero__mark" aria-hidden="true">=</span>
+      <span class="dc-split-mark" aria-hidden="true"></span>
       <span class="auth-hero__wordmark">SplitEasy</span>
     </div>
 
     <div class="auth-hero__body">
       <p class="dc-eyebrow">Shared expenses, settled</p>
-      <h1 class="dc-display auth-hero__headline">
-        Split the bill.<br /><em>Keep the friends.</em>
-      </h1>
+      <h1 class="dc-display auth-hero__headline">Good plans.<br /><em>Good company.</em></h1>
       <p class="auth-hero__lede">
         Track who paid what across houses, trips and dinner clubs — split equally, by exact amounts
-        or by percentages — then settle up in one tap.
+        or by percentages — keep every shared cost clear.
       </p>
 
       <figure class="auth-hero__sample dc-card">
@@ -28,13 +26,13 @@ import { Component } from '@angular/core';
           <div class="auth-hero__sample-amount">$186.30</div>
         </div>
         <figcaption class="auth-hero__sample-split">
-          <span>Split 4 ways · equally</span>
-          <span class="auth-hero__sample-back">+$139.72 back to you</span>
+          <span>Split 3 ways · equally</span>
+          <span class="auth-hero__sample-back">+$124.20 back to you</span>
         </figcaption>
       </figure>
     </div>
 
-    <p class="auth-hero__foot">Even splits. Even friendships.</p>
+    <p class="auth-hero__foot">Small tabs. Clear heads.</p>
   `,
   styleUrl: './auth.scss',
 })

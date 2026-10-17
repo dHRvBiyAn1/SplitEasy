@@ -1,0 +1,424 @@
+{
+  "navigationChecks": [
+    {
+      "action": "Groups",
+      "active": "groups",
+      "current": [
+        "groups"
+      ]
+    },
+    {
+      "action": "Expense",
+      "active": "expense",
+      "dialog": true
+    },
+    {
+      "action": "Close expense",
+      "active": "groups"
+    },
+    {
+      "action": "Profile",
+      "active": "profile",
+      "appearance": true
+    },
+    {
+      "action": "Overview",
+      "active": "overview",
+      "current": [
+        "overview"
+      ]
+    }
+  ],
+  "pocketChecks": [
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "light",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 320
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 320
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "light",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 320
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 320
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "light",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 320
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 320
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "light",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 390
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 390
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "light",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 390
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 390
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "light",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 390
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 62,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 390
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "light",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 768
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 768
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "light",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 768
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 768
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "light",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 768
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 768
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "light",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 1024
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 1024
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "light",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 1024
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 1024
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "light",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 1024
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": true,
+      "iconCount": 4,
+      "minimumTarget": 65,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 1024
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": false,
+      "iconCount": 4,
+      "minimumTarget": 0,
+      "mode": "light",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 1440
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": false,
+      "iconCount": 4,
+      "minimumTarget": 0,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "seafoam",
+      "ribbon": true,
+      "width": 1440
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": false,
+      "iconCount": 4,
+      "minimumTarget": 0,
+      "mode": "light",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 1440
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": false,
+      "iconCount": 4,
+      "minimumTarget": 0,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "lilac",
+      "ribbon": true,
+      "width": 1440
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": false,
+      "iconCount": 4,
+      "minimumTarget": 0,
+      "mode": "light",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 1440
+    },
+    {
+      "active": [
+        "overview"
+      ],
+      "dockVisible": false,
+      "iconCount": 4,
+      "minimumTarget": 0,
+      "mode": "dark",
+      "overflow": false,
+      "palette": "peach",
+      "ribbon": true,
+      "width": 1440
+    }
+  ]
+}

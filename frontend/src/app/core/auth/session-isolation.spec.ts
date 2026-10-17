@@ -177,6 +177,8 @@ describe('account session isolation', () => {
     fixture.detectChanges();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
     fixture.detectChanges();
+    fixture.nativeElement.querySelector('.mobile-nav [data-nav=groups]').click();
+    fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Alice private group');
 
     http.get('/api/groups').subscribe({ error: () => {} });
@@ -191,6 +193,8 @@ describe('account session isolation', () => {
     const bobRequest = requests.expectOne('/api/dashboard');
     expect(bobRequest.request.headers.get('Authorization')).toBe('Bearer bob-token');
     bobRequest.flush(bobDashboard);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.mobile-nav [data-nav=groups]').click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Bob private group');
     expect(fixture.nativeElement.textContent).not.toContain('Alice private group');
@@ -374,7 +378,8 @@ describe('account session isolation', () => {
 
     dashboard.refresh();
     requests.expectOne('/api/dashboard').flush({}, { status: 500, statusText: 'Server error' });
-    expect(dashboard.data()).toBeNull();
+    expect(dashboard.data()).toEqual(aliceDashboard);
+    expect(dashboard.error()).toBe(true);
     expect(dashboard.loading()).toBe(false);
   });
 });

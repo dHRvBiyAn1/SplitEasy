@@ -7,9 +7,7 @@
     <p class="gd__error" role="alert">{{ error() }}</p>
   } @else if (group(); as g) {
     <header class="gd__head">
-      <span class="gd__glyph" aria-hidden="true" [style]="glyphTint(g.name)">{{
-        g.name.charAt(0)
-      }}</span>
+      <app-group-art [type]="g.type" />
       <div class="gd__id">
         <h1 class="gd__name">{{ g.name }}</h1>
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
@@ -78,7 +76,15 @@
         [class.pill--owed]="myNet() > 0"
         [class.pill--owes]="myNet() < 0"
       >
-        {{ myNet() > 0 ? 'You are owed' : myNet() < 0 ? 'You owe' : 'Settled up' }}
+        {{
+          myNet() > 0
+            ? 'You are owed'
+            : myNet() < 0
+              ? 'You owe'
+              : myBalances().length
+                ? 'Even overall · open balances'
+                : 'All square'
+        }}
         @if (myNet() !== 0) {
           <strong
             class="dc-amount"

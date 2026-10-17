@@ -1,4 +1,8 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
+import { SessionService } from '../core/auth/session.service';
+import { GroupArtComponent } from '../shared/group-art.component';
+import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
@@ -21,12 +25,25 @@ type Confirming = 'leave' | 'delete' | null;
  */
 @Component({
   selector: 'app-group-settings',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, GroupArtComponent],
   templateUrl: './group-settings.component.html',
   styleUrl: './group-settings.component.scss',
 })
 export class GroupSettingsComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly session = inject(SessionService);
+  private readonly scopeChanges = new Subject<void>();
+  private loadRequest?: Subscription;
+
+  /** End UI callbacks when their route, account or component no longer owns them. */
+  private scoped<T>(request: Observable<T>): Observable<T> {
+    return request.pipe(
+      takeUntil(this.scopeChanges),
+      takeUntil(this.session.changes),
+      takeUntilDestroyed(this.destroyRef),
+    );
+  }
   private readonly router = inject(Router);
   private readonly groups = inject(GroupService);
   private readonly balances = inject(BalanceService);
@@ -61,8 +78,13 @@ export class GroupSettingsComponent implements OnInit {
 
   constructor() {
     // A modal action (add member) refreshes the dashboard; re-read so the list stays in step.
+    let initial = true;
     effect(() => {
       this.dashboard.data();
+      if (initial) {
+        initial = false;
+        return;
+      }
       if (this.groupId) {
         this.reload();
       }
@@ -70,11 +92,16 @@ export class GroupSettingsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id') ?? '';
       if (id === this.groupId) {
         return;
       }
+      this.scopeChanges.next();
+      this.group.set(null);
+      this.savingName.set(false);
+      this.savingSimplify.set(false);
+      this.busy.set(false);
       this.groupId = id;
       this.loading.set(true);
       this.error.set(null);
@@ -85,20 +112,28 @@ export class GroupSettingsComponent implements OnInit {
   }
 
   private reload(): void {
-    this.groups.getGroup(this.groupId).subscribe({
-      next: (g) => {
-        this.group.set(g);
+    this.loadRequest?.unsubscribe();
+    this.loading.set(true);
+    this.error.set(null);
+    this.loadRequest = this.scoped(
+      forkJoin({
+        group: this.groups.getGroup(this.groupId),
+        balances: this.balances.getBalances(this.groupId),
+      }),
+    ).subscribe({
+      next: (res) => {
+        this.group.set(res.group);
+        this.memberBalances.set(res.balances.balances);
         this.loading.set(false);
       },
       error: (err) => {
         this.error.set(
-          err?.status === 403 ? 'You are not a member of this group.' : 'Could not load the group.',
+          err?.status === 403
+            ? 'You are not a member of this group.'
+            : 'Could not load this group and its balances.',
         );
         this.loading.set(false);
       },
-    });
-    this.balances.getBalances(this.groupId).subscribe({
-      next: (res) => this.memberBalances.set(res.balances),
     });
   }
 
@@ -144,7 +179,7 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.savingName.set(true);
-    this.groups.updateGroup(this.groupId, { name }).subscribe({
+    this.scoped(this.groups.updateGroup(this.groupId, { name })).subscribe({
       next: (g) => {
         this.group.set(g);
         this.editingName.set(false);
@@ -168,7 +203,7 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.busy.set(true);
-    this.groups.removeMember(this.groupId, userId).subscribe({
+    this.scoped(this.groups.removeMember(this.groupId, userId)).subscribe({
       next: () => {
         this.busy.set(false);
         this.dashboard.refresh(); // effect() re-reads this group
@@ -187,7 +222,9 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.savingSimplify.set(true);
-    this.groups.updateGroup(this.groupId, { simplifyDebts: !g.simplifyDebts }).subscribe({
+    this.scoped(
+      this.groups.updateGroup(this.groupId, { simplifyDebts: !g.simplifyDebts }),
+    ).subscribe({
       next: (updated) => {
         this.group.set(updated);
         this.savingSimplify.set(false);
@@ -212,7 +249,7 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.busy.set(true);
-    this.groups.removeMember(this.groupId, this.meId()).subscribe({
+    this.scoped(this.groups.removeMember(this.groupId, this.meId())).subscribe({
       next: () => {
         this.dashboard.refresh();
         this.router.navigate(['/dashboard']);
@@ -230,7 +267,7 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.busy.set(true);
-    this.groups.deleteGroup(this.groupId).subscribe({
+    this.scoped(this.groups.deleteGroup(this.groupId)).subscribe({
       next: () => {
         this.dashboard.refresh();
         this.router.navigate(['/dashboard']);

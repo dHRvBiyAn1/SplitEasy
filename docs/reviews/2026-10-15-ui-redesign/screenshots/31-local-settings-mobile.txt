@@ -1,0 +1,48 @@
+- complementary:
+  - link "Evenly":
+    - /url: /dashboard
+    - generic: Evenly
+  - button "Collapse sidebar" [expanded]:
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+- main:
+  - link "Back to group":
+    - /url: /groups/0cf0825c-80cf-47b2-831d-5bcfd1b3ea07
+    - text: Back to group
+  - generic: L
+  - heading "Lisbon long weekend" [level=1]
+  - button "Rename group":
+  - heading "Members" [level=2]
+  - button "Add member":
+    - generic: Add member
+  - generic: AM
+  - generic: Ada Morgan you
+  - generic: ada@ui-audit.example
+  - generic: +$268.60
+  - button "Remove Ada Morgan" [disabled]:
+  - paragraph: Created this group — can't be removed yet
+  - generic: NK
+  - generic: Noor Kapoor
+  - generic: noor@ui-audit.example
+  - generic: −$118.43
+  - button "Remove Noor Kapoor" [disabled]:
+  - paragraph: Owes $118.43 — can't be removed yet
+  - generic: LF
+  - generic: Luca Fernández-Rossi
+  - generic: luca@ui-audit.example
+  - generic: −$150.17
+  - button "Remove Luca Fernández-Rossi" [disabled]:
+  - paragraph: Owes $150.17 — can't be removed yet
+  - heading "Advanced settings" [level=2]
+  - generic: Simplify debts
+  - generic: Settle up suggests the fewest payments that clear this group. Turn it off to settle every balance directly, person by person.
+  - switch
+  - heading "Danger zone" [level=2]
+  - generic: Leave group
+  - generic: You created this group — delete it instead of leaving.
+  - button "Leave group" [disabled]
+  - generic: Delete group
+  - generic: Permanently deletes "Lisbon long weekend" along with its expenses and settlements. This can't be undone.
+  - button "Delete group"

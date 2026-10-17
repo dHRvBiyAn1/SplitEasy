@@ -1,9 +1,12 @@
+import { GroupArtComponent } from '../shared/group-art.component';
+import { MoneyComponent } from '../shared/money.component';
+import { IconComponent } from '../shared/icon.component';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { UserSummary } from '../core/auth/auth.models';
 import { centsToDisplay } from '../expenses/expense.service';
-import { avatarTint, groupGlyphTint } from '../core/avatar';
+import { avatarTint } from '../core/avatar';
 import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
@@ -22,7 +25,7 @@ const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink],
+  imports: [RouterLink, GroupArtComponent, MoneyComponent, IconComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
@@ -31,6 +34,9 @@ export class DashboardComponent {
   private readonly auth = inject(AuthService);
   protected readonly modal = inject(ModalService);
 
+  protected readonly viewerInitials = computed(() =>
+    this.initials(this.auth.user()?.displayName ?? ''),
+  );
   protected readonly data = this.dashboard.data;
   protected readonly loading = this.dashboard.loading;
   protected readonly display = centsToDisplay;
@@ -43,12 +49,8 @@ export class DashboardComponent {
     this.dashboard.ensureLoaded();
   }
 
-  /** "$1,136.82" — grouped thousands, always two decimals, from integer cents. */
-  money(cents: number): string {
-    return (Math.abs(cents) / 100).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+  retry(): void {
+    this.dashboard.refresh();
   }
 
   greeting(): string {
@@ -56,12 +58,6 @@ export class DashboardComponent {
     if (h < 12) return 'Good morning';
     if (h < 18) return 'Good afternoon';
     return 'Good evening';
-  }
-
-  todayLabel(): string {
-    return new Date()
-      .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-      .toUpperCase();
   }
 
   firstName(name: string): string {
@@ -79,10 +75,6 @@ export class DashboardComponent {
       .slice(0, 2)
       .map((w) => w[0]?.toUpperCase() ?? '')
       .join('');
-  }
-
-  glyphTint(name: string): { background: string; color: string } {
-    return groupGlyphTint(name);
   }
 
   tint(id: string): { background: string; color: string } {

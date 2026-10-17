@@ -1,0 +1,92 @@
+[
+  {
+    "palette": "seafoam",
+    "mode": "light",
+    "ratios": {
+      "ink/bg": 8.68,
+      "ink2/bg": 5.58,
+      "ink/surface": 9.96,
+      "ink2/surface": 6.4,
+      "ink2/surface2": 4.9,
+      "pos-strong/surface": 7.15,
+      "neg-strong/surface": 7.26,
+      "on-accent/accent": 6.09,
+      "on-feature/feature": 6.28
+    }
+  },
+  {
+    "palette": "seafoam",
+    "mode": "dark",
+    "ratios": {
+      "ink/bg": 14.22,
+      "ink2/bg": 9.29,
+      "ink/surface": 11.48,
+      "ink2/surface": 7.5,
+      "ink2/surface2": 5.44,
+      "pos-strong/surface": 7.96,
+      "neg-strong/surface": 6.82,
+      "on-accent/accent": 6.98,
+      "on-feature/feature": 6.28
+    }
+  },
+  {
+    "palette": "lilac",
+    "mode": "light",
+    "ratios": {
+      "ink/bg": 10.07,
+      "ink2/bg": 5.5,
+      "ink/surface": 11.66,
+      "ink2/surface": 6.37,
+      "ink2/surface2": 4.77,
+      "pos-strong/surface": 7.1,
+      "neg-strong/surface": 7.22,
+      "on-accent/accent": 7.81,
+      "on-feature/feature": 7.68
+    }
+  },
+  {
+    "palette": "lilac",
+    "mode": "dark",
+    "ratios": {
+      "ink/bg": 14.42,
+      "ink2/bg": 9.04,
+      "ink/surface": 12.19,
+      "ink2/surface": 7.65,
+      "ink2/surface2": 5.84,
+      "pos-strong/surface": 8.95,
+      "neg-strong/surface": 7.67,
+      "on-accent/accent": 7.08,
+      "on-feature/feature": 7.68
+    }
+  },
+  {
+    "palette": "peach",
+    "mode": "light",
+    "ratios": {
+      "ink/bg": 9.89,
+      "ink2/bg": 5.6,
+      "ink/surface": 11.52,
+      "ink2/surface": 6.52,
+      "ink2/surface2": 4.96,
+      "pos-strong/surface": 7.09,
+      "neg-strong/surface": 7.21,
+      "on-accent/accent": 6.24,
+      "on-feature/feature": 6.48
+    }
+  },
+  {
+    "palette": "peach",
+    "mode": "dark",
+    "ratios": {
+      "ink/bg": 14.3,
+      "ink2/bg": 8.77,
+      "ink/surface": 11.71,
+      "ink2/surface": 7.18,
+      "ink2/surface2": 5.24,
+      "pos-strong/surface": 8.34,
+      "neg-strong/surface": 7.14,
+      "on-accent/accent": 7.06,
+      "on-feature/feature": 6.48
+    }
+  }
+]

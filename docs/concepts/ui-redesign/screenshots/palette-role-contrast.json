@@ -1,0 +1,1538 @@
+[
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "body",
+    "ratio": 13.676,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.589,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 6.348,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "button",
+    "ratio": 6.739,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 6.739,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 10.43,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.367,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.488,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 16.342,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 10.107,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 8.626,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 8.291,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 6.739,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 10.43,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 9.75,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "cobalt",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 8.355,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "body",
+    "ratio": 10.754,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.146,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 5.715,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "button",
+    "ratio": 6.726,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 6.726,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 8.23,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.287,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.407,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.635,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.152,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.591,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 7.58,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 6.726,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 8.23,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 8.559,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "juniper",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.333,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "body",
+    "ratio": 12.228,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.443,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 6.062,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "button",
+    "ratio": 8.769,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 8.769,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 8.769,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.132,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.25,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 15.632,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.131,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.746,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 7.66,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 8.769,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 8.769,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 9.403,
+    "passes": true
+  },
+  {
+    "design": "club",
+    "palette": "merlot",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 8.057,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "body",
+    "ratio": 11.671,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.302,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 5.768,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "button",
+    "ratio": 7.472,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 7.472,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 8.153,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.115,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.232,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.582,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.141,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 8.181,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 9.969,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 7.472,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 8.153,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 9.766,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "forest",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 8.368,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "body",
+    "ratio": 11.606,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.253,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 5.753,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "button",
+    "ratio": 7.14,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 7.14,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 7.685,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.155,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.273,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 15.338,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.794,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 8.392,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 8.213,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 7.14,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 7.685,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 9.289,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "midnight",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.959,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "body",
+    "ratio": 11.198,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.225,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 5.798,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "button",
+    "ratio": 6.95,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 6.95,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 7.757,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.132,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.25,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.45,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.149,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.811,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 8.105,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 6.95,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 7.757,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 8.962,
+    "passes": true
+  },
+  {
+    "design": "atlas",
+    "palette": "aubergine",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.679,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "body",
+    "ratio": 13.252,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.792,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 6.283,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "button",
+    "ratio": 11.679,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 12.144,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 11.13,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.085,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.202,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.851,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.17,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.912,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 7.751,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 12.144,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 11.13,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 9.042,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "citrus",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.748,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "body",
+    "ratio": 11.883,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.114,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 5.64,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "button",
+    "ratio": 10.659,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 10.659,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 10.052,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.207,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.326,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.617,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.664,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.953,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 6.929,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 10.659,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 10.052,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 8.506,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "sky",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.288,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "body",
+    "ratio": 11.848,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.248,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 5.75,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "button",
+    "ratio": 8.344,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 8.66,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 11.126,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.097,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.214,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.947,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.19,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.847,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 7.48,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 8.66,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 11.126,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 9.049,
+    "passes": true
+  },
+  {
+    "design": "press",
+    "palette": "cherry",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.754,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "body",
+    "ratio": 10.066,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.501,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 6.37,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "button",
+    "ratio": 7.812,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 7.676,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 9.696,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.102,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.219,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.424,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.044,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.646,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 7.083,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 7.676,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 9.696,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 8.95,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "lilac",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.669,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "body",
+    "ratio": 9.89,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.6,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 6.524,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "button",
+    "ratio": 6.235,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 6.479,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 9.272,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.089,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.206,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.302,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 8.767,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.177,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 7.058,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 6.479,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 9.272,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 8.336,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "peach",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 7.143,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "body",
+    "ratio": 8.683,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "muted",
+    "ratio": 5.581,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "muted surface",
+    "ratio": 6.399,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "button",
+    "ratio": 6.091,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "feature",
+    "ratio": 6.278,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "warm",
+    "ratio": 9.648,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "positive",
+    "ratio": 7.147,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "light",
+    "role": "negative",
+    "ratio": 7.264,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "body",
+    "ratio": 14.224,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "muted",
+    "ratio": 9.287,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "muted surface",
+    "ratio": 7.497,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "button",
+    "ratio": 6.982,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "feature",
+    "ratio": 6.278,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "warm",
+    "ratio": 9.648,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "positive",
+    "ratio": 7.964,
+    "passes": true
+  },
+  {
+    "design": "objects",
+    "palette": "seafoam",
+    "mode": "dark",
+    "role": "negative",
+    "ratio": 6.824,
+    "passes": true
+  }
+]

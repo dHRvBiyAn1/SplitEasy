@@ -19,6 +19,7 @@
             type="button"
             class="chip"
             [class.chip--on]="type() === t.value"
+            [attr.aria-pressed]="type() === t.value"
             (click)="type.set(t.value)"
           >
             {{ t.label }}
@@ -34,7 +35,12 @@
           @for (e of emails(); track e) {
             <span class="chip chip--tag"
               >{{ e }}
-              <button type="button" class="chip__x" (click)="removeEmail(e)" aria-label="Remove">
+              <button
+                type="button"
+                class="chip__x"
+                (click)="removeEmail(e)"
+                [attr.aria-label]="'Remove ' + e"
+              >
                 ✕
               </button>
             </span>
@@ -45,6 +51,8 @@
         <input
           class="dc-field"
           [formControl]="emailInput"
+          type="email"
+          aria-label="Member email"
           placeholder="friend@example.com"
           (keydown.enter)="$event.preventDefault(); addEmail()"
         />

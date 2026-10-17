@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SessionService } from '../core/auth/session.service';
 import { Settlement } from '../dashboard/dashboard.models';
 
-export type ModalKind = 'group' | 'expense' | 'settle' | 'member' | null;
+export type ModalKind = 'group' | 'expense' | 'settle' | 'member' | 'appearance' | null;
 
 /**
  * Which global modal is open (New group / New expense / Settle up) plus its optional
@@ -28,6 +28,10 @@ export class ModalService {
     inject(SessionService)
       .changes.pipe(takeUntilDestroyed())
       .subscribe(() => this.close());
+  }
+
+  openAppearance(): void {
+    this.active.set('appearance');
   }
 
   openGroup(): void {
