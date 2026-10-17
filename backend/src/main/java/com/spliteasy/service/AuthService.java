@@ -5,9 +5,11 @@ import com.spliteasy.dto.auth.LoginRequest;
 import com.spliteasy.dto.auth.RegisterRequest;
 import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.entity.User;
+import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.repository.UserRepository;
 import com.spliteasy.util.Emails;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -26,6 +28,9 @@ public class AuthService {
 
   @Transactional
   public AuthResponse register(RegisterRequest request) {
+    if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+      throw new BadRequestException("Password must be at most 72 UTF-8 bytes");
+    }
     String email = Emails.normalize(request.email());
     log.debug("Registering new user with email {}", email);
     if (userRepository.existsByEmail(email)) {
