@@ -30,7 +30,7 @@ export class DashboardService {
 
   /** Fetch only if we don't already have data and aren't mid-flight. */
   ensureLoaded(): void {
-    if (this._data() === null && !this._loading()) {
+    if (this._data() === null && !this._loading() && !this._error()) {
       this.refresh();
     }
   }
