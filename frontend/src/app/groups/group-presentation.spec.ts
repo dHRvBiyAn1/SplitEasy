@@ -105,4 +105,36 @@ describe('group presentation ownership', () => {
       'Even overall',
     );
   });
+
+  it.each(['/api/groups/a/balances/mine', '/api/groups/a/expenses'])(
+    'withholds settled and empty claims while %s is pending and retries failures',
+    (pendingUrl) => {
+      const fixture = TestBed.createComponent(GroupDetailComponent);
+      fixture.detectChanges();
+      http.expectOne('/api/groups/a').flush(group('a'));
+      const pendingRead = http.expectOne(pendingUrl);
+      if (pendingUrl === '/api/groups/a/balances/mine') {
+        http.expectOne('/api/groups/a/expenses').flush([]);
+      } else {
+        http.expectOne('/api/groups/a/balances/mine').flush([]);
+      }
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('All square');
+      expect(fixture.nativeElement.textContent).not.toContain('No expenses yet');
+      expect(fixture.nativeElement.querySelector('[role="status"]')).not.toBeNull();
+
+      pendingRead.flush('unavailable', { status: 503, statusText: 'Unavailable' });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('All square');
+      expect(fixture.nativeElement.textContent).not.toContain('No expenses yet');
+      fixture.nativeElement.querySelector('button').click();
+      http.expectOne('/api/groups/a').flush(group('a'));
+      http.expectOne('/api/groups/a/balances/mine').flush([]);
+      http.expectOne('/api/groups/a/expenses').flush([]);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('All square');
+      expect(fixture.nativeElement.textContent).toContain('No expenses yet');
+    },
+  );
 });

@@ -5,6 +5,7 @@
     <div class="dc-loading" role="status" aria-label="Loading group"></div>
   } @else if (error()) {
     <p class="gd__error" role="alert">{{ error() }}</p>
+    <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
   } @else if (group(); as g) {
     <header class="gd__head">
       <app-group-art [type]="g.type" />
