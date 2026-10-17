@@ -1,6 +1,6 @@
 <app-modal-shell [heading]="heading()" [maxWidth]="600" (closed)="close()">
   <form class="mform" (submit)="$event.preventDefault(); save()">
-    @if (groupOptions().length === 0) {
+    @if (groupOptions().length === 0 && !groupId()) {
       <p class="mform__lead">Create a group before adding an expense.</p>
       <button type="button" class="dc-btn-outline" (click)="createGroup()">Create a group</button>
     } @else {

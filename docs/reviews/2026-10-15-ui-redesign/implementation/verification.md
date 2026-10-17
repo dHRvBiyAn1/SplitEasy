@@ -114,3 +114,14 @@ evidence. 320px reflow is not a substitute for real browser zoom. Those remain r
 Local review runtime: Angular 4320, backend 18089, disposable PostgreSQL 15439
 (`spliteasy-pocket-db`, no persistent volume). Synthetic sign-in: `ada@pocket.example`, password
 `PocketReview2026!`. This verification preceded publication. The user subsequently authorized commit/push, successful branch CI, then a PR to `dev`. No merge or deployment is authorized.
+
+
+## PR #70 review follow-up — 17 October 2026
+
+[Codex P2 finding](https://github.com/dHRvBiyAn1/SplitEasy/pull/70#discussion_r4301715413):
+scoped expense forms were hidden when the independent overview cache was empty. The empty-state gate
+now also requires no explicit group ID. Create/edit with pending/failed overview each failed before
+correction, then passed through form submission to the correct POST/PUT group endpoint with integer
+cents. The unscoped no-group Create group action is covered as well. Latest local verification:
+**110 frontend tests /23 files**, Prettier and production build passed with no warnings. PR CI and
+resolved review threads gate the authorized dev merge; production remains unchanged.
