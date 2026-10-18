@@ -160,11 +160,15 @@ export class GroupDetailComponent implements OnInit {
         this.error.set(
           err?.status === 403
             ? 'You are not a member of this group.'
-            : 'Could not load this group and its balances.',
+            : 'Could not load this group’s balances and expense history.',
         );
         this.loading.set(false);
       },
     });
+  }
+
+  retry(): void {
+    this.reload();
   }
 
   addExpense(): void {

@@ -342,3 +342,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Raced unique conflicts (#42, 2026-10-17) — central post-rollback mapping recognizes only the email and group-membership unique constraints with SQLState `23505`; existing duplicate prechecks and unrelated integrity 500 classification remain. Deterministic concurrent MVC/PostgreSQL regressions exercise real prechecks/transactions and require one target row plus success/409 and mapping after transaction cleanup. Backend150/frontend110, Spotless/Prettier and production build passed; no live traffic or deployment.
+
+
+- [x] Group financial read states (#49, 2026-10-17) — group detail waits for the combined group/balance/expense reads before showing financial conclusions; failures now identify balances/history as unavailable and offer a retry. Rendered HTTP regressions cover pending and failed balances and expense history, then successful retry. Frontend112, backend138, Prettier and production build pass; no schema change, merge or deployment.
