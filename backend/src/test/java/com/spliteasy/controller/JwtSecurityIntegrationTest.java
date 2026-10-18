@@ -22,7 +22,8 @@ import org.springframework.test.context.TestPropertySource;
 @TestPropertySource(properties = "app.jwt.secret=" + JwtSecurityIntegrationTest.SIGNING_KEY)
 class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
 
-  // At least 64 bytes allow HS512 with the same key, isolating algorithm rejection from key mismatch.
+  // At least 64 bytes allow HS512 with the same key, isolating algorithm rejection from key
+  // mismatch.
   static final String SIGNING_KEY =
       "jwt-security-test-only-key-0000000000000000000000000000000000000000";
 
