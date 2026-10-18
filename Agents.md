@@ -134,6 +134,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   `GlobalExceptionHandler`), **ERROR** unexpected 5xx (the handler's catch-all, with stack
   trace). Appender/pattern in `log4j2-spring.xml`; levels via `logging.level.*` in
   `application[-dev].properties` (`com.spliteasy` = INFO prod / DEBUG dev). Never log secrets/tokens.
+- **Raced duplicates**: keep friendly registration/member prechecks; the database owns uniqueness.
+  After service rollback, `GlobalExceptionHandler` maps only SQLState `23505` with exact constraints
+  `users_email_key` / `uq_group_memberships_group_user` to the same 409 messages. Other integrity
+  failures remain server errors; never classify by exception message text.
 - **Avoid N+1**: `join fetch m.user`; member counts via one aggregate query; expense list via one query
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
@@ -335,3 +339,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Strict integer JSON inputs (#43, 2026-10-17) — disable Jackson floating-point-to-integer coercion before expense POST/PUT, payment and split DTO validation. Raw-JSON regressions cover fractional cents/basis points, valid integers and rejected-edit participant row preservation; 9 reproduced failures → 13 focused passes. Backend151/frontend110, Spotless/Prettier, production build and deployment12 passed; authenticated MVC-to-PostgreSQL ledger checks passed. No schema/dependency changes, merge or deployment.
+
+
+- [x] Raced unique conflicts (#42, 2026-10-17) — central post-rollback mapping recognizes only the email and group-membership unique constraints with SQLState `23505`; existing duplicate prechecks and unrelated integrity 500 classification remain. Deterministic concurrent MVC/PostgreSQL regressions exercise real prechecks/transactions and require one target row plus success/409 and mapping after transaction cleanup. Backend150/frontend110, Spotless/Prettier and production build passed; no live traffic or deployment.

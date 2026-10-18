@@ -3,6 +3,8 @@ package com.spliteasy.exception;
 import com.spliteasy.dto.common.ErrorResponse;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -79,6 +81,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex) {
     log.warn("Access forbidden: {}", ex.getMessage());
     return build(HttpStatus.FORBIDDEN, ex.getMessage());
+  }
+
+  /** Service transactions have rolled back before MVC translates their persistence failures. */
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
+    for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ConstraintViolationException violation
+          && "23505".equals(violation.getSQLState())) {
+        if ("users_email_key".equals(violation.getConstraintName())) {
+          return handleConflict(new ConflictException("Email is already registered"));
+        }
+        if ("uq_group_memberships_group_user".equals(violation.getConstraintName())) {
+          return handleConflict(new ConflictException("User is already a member of this group"));
+        }
+      }
+    }
+    return handleUnexpected(ex);
   }
 
   /** Anything not handled above is an unexpected server fault — log with stack trace. */
