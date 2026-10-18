@@ -190,7 +190,9 @@ Auth routes remain full-bleed with a named Appearance control.
   New or edit expense / Settle up / Add member / Appearance; HTTP/session ownership stays in services.
 - **Group pages:** route/account/destroy changes cancel owned callbacks, and a new reload cancels its
   predecessor. Group, balance and expense reads complete together before actions render. Reload clears
-  displayed receipt details. Offsetting pairwise debts with net zero say “Even overall”, not “All square”.
+  displayed receipt details. Route navigation immediately clears the previous group's metadata,
+  pairwise balances and expense history while the new group loads. Offsetting pairwise debts with net
+  zero say “Even overall”, not “All square”.
 
 ## Data Model
 
@@ -345,3 +347,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Group financial read states (#49, 2026-10-17) — group detail waits for the combined group/balance/expense reads before showing financial conclusions; failures now identify balances/history as unavailable and offer a retry. Rendered HTTP regressions cover pending and failed balances and expense history, then successful retry. Frontend112, backend138, Prettier and production build pass; no schema change, merge or deployment.
+
+
+- [x] Group route ownership (#48, 2026-10-17) — retain the redesign's route/account/destroy cancellation and combined required reads; clear prior pairwise balances and history immediately on group navigation. Five controlled regressions cover loaded-A reset, late A success/403 in either response order, rendered B header/balances/history/settings and expense/settlement modal scope, and destruction teardown. Regression-first failure confirmed; frontend115/backend138, Prettier/Spotless and production build passed. Local rendered Angular integration verified; no live browser/API check, merge or deployment.
