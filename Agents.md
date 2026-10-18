@@ -422,3 +422,5 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
+
+P2 integration and release preparation (2026-10-18): user authorized merging PRs #72–#93 into dev, combined final checks, then a release PR to main. All 22 exact heads retained; released main history synchronized with no tree change. Shared exception/auth/test conflicts preserve both fixes. Combined backend207/frontend187/deployment12, formatting, production build, ShellCheck/Actionlint and synthetic Chromium dashboard/split checks pass; independent integration review found no blockers. Evidence: `docs/reviews/2026-10-18-p2/integration.md`. Dev CI gates release PR creation; main merge and production deployment remain unauthorized.
