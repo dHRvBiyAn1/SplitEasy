@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from '../core/auth/auth.service';
 import { DashboardResponse } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { ExpenseResponse } from '../expenses/expense.models';
+import { CreateExpenseRequest, ExpenseResponse } from '../expenses/expense.models';
 import { GroupResponse } from '../groups/group.models';
 import { ModalService } from './modal.service';
 import { NewExpenseModalComponent } from './new-expense-modal.component';
@@ -130,5 +130,134 @@ describe('expense form independent of overview availability', () => {
     expect(root.textContent).toContain('Create a group before adding an expense.');
     root.querySelector<HTMLButtonElement>('.mform .dc-btn-outline')!.click();
     expect(modal.active()).toBe('group');
+  });
+});
+
+describe('serialized expense split validation', () => {
+  let http: HttpTestingController;
+  const third = { id: 'third', email: 'third@example.test', displayName: 'Sam Lee' };
+  const members = [me, other, third];
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [NewExpenseModalComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: { user: signal(me) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+
+  function open(type: 'UNEQUAL' | 'PERCENTAGE', values: string[], edit = false) {
+    TestBed.inject(ModalService).openExpense(group.id, edit ? expense.id : undefined);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members });
+    if (edit) {
+      http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
+        ...expense,
+        splitType: 'PERCENTAGE',
+        participants: [
+          { user: me, shareCents: 333 },
+          { user: other, shareCents: 667 },
+        ],
+      });
+    }
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    if (!edit) {
+      for (const [selector, value] of [
+        ['#ne-desc', 'Lunch'],
+        ['#ne-amt', '100'],
+      ]) {
+        const input = root.querySelector<HTMLInputElement>(selector)!;
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      root.querySelectorAll<HTMLButtonElement>('.seg button')[type === 'UNEQUAL' ? 1 : 2].click();
+      values.forEach((value, i) => fixture.componentInstance.setValue(members[i].id, value));
+      fixture.detectChanges();
+    }
+    return { fixture, root };
+  }
+
+  function submit(fixture: ReturnType<typeof open>['fixture'], method = 'POST') {
+    fixture.componentInstance.save();
+    const save = http.expectOne({
+      method,
+      url: `/api/groups/${group.id}/expenses${method === 'PUT' ? `/${expense.id}` : ''}`,
+    });
+    const body: CreateExpenseRequest = save.request.body;
+    expect(body.splits!.every((s) => Number.isSafeInteger(s.value) && s.value >= 0)).toBe(true);
+    expect(body.splits!.reduce((total, s) => total + s.value, 0)).toBe(
+      body.splitType === 'PERCENTAGE' ? 10000 : body.amountCents,
+    );
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
+    return body;
+  }
+
+  it('shows the serialized rounded percentage total and blocks the reported thirds', () => {
+    const { fixture, root } = open('PERCENTAGE', ['33.335', '33.335', '33.33']);
+    expect(fixture.componentInstance.runningLabel()).toBe('100.01% / 100%');
+    expect(fixture.componentInstance.splitValid()).toBe(false);
+    expect(root.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
+    fixture.componentInstance.save();
+    http.expectNone((request) => request.method === 'POST');
+  });
+
+  for (const type of ['UNEQUAL', 'PERCENTAGE'] as const) {
+    it.each(['-5', '-0.001', 'NaN', 'Infinity', '-Infinity', '1e309', '9007199254740991'])(
+      `rejects invalid ${type} shares (%s) before filtering or rounding`,
+      (invalid) => {
+        const { fixture, root } = open(type, [invalid, invalid === '-5' ? '105' : '100', '0']);
+        expect(fixture.componentInstance.splitValid()).toBe(false);
+        expect(fixture.componentInstance.runningLabel()).toBe('Enter valid nonnegative shares');
+        expect(root.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
+        fixture.componentInstance.save();
+        http.expectNone((request) => request.method === 'POST');
+      },
+    );
+
+    it(`sends valid two-decimal ${type} shares using the displayed total`, () => {
+      const { fixture, root } = open(type, ['33.33', '33.33', '33.34']);
+      expect(fixture.componentInstance.splitValid()).toBe(true);
+      expect(root.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(false);
+      expect(submit(fixture).splits!.map((s) => s.value)).toEqual([3333, 3333, 3334]);
+    });
+
+    it(`omits zero ${type} shares, including values rounded to zero`, () => {
+      const { fixture } = open(type, ['100', '0', '0.001']);
+      expect(fixture.componentInstance.splitValid()).toBe(true);
+      expect(submit(fixture).splits).toEqual([{ userId: me.id, value: 10000 }]);
+    });
+
+    it(`rounds each ${type} share to the nearest hundredth before validating and sending`, () => {
+      const { fixture } = open(type, ['33.334', '33.334', '33.335']);
+      expect(fixture.componentInstance.splitValid()).toBe(true);
+      expect(submit(fixture).splits!.map((s) => s.value)).toEqual([3333, 3333, 3334]);
+    });
+  }
+
+  it('validates exact cents rather than the unrounded dollar sum', () => {
+    const { fixture } = open('UNEQUAL', ['33.335', '33.335', '33.33']);
+    expect(fixture.componentInstance.runningLabel()).toBe('$100.01 / $100.00');
+    expect(fixture.componentInstance.splitValid()).toBe(false);
+    fixture.componentInstance.save();
+    http.expectNone((request) => request.method === 'POST');
+  });
+
+  it('preserves lossless exact edit prefill for an existing percentage expense', () => {
+    const { fixture, root } = open('UNEQUAL', [], true);
+    expect(
+      root.querySelectorAll<HTMLButtonElement>('.seg button')[1].getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(fixture.componentInstance.runningLabel()).toBe('$10.00 / $10.00');
+    expect(submit(fixture, 'PUT').splits).toEqual([
+      { userId: me.id, value: 333 },
+      { userId: other.id, value: 667 },
+    ]);
   });
 });

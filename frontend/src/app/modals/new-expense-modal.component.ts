@@ -7,9 +7,14 @@ import { avatarTint } from '../core/avatar';
 import { UserSummary } from '../core/auth/auth.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
-import { centsToDisplay, dollarsToCents, percentToBasisPoints } from '../expenses/expense.service';
+import {
+  centsToDisplay,
+  dollarsToCents,
+  percentToBasisPoints,
+  TOTAL_BASIS_POINTS,
+} from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { CreateExpenseRequest } from '../expenses/expense.models';
+import { CreateExpenseRequest, SplitInput } from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
@@ -61,6 +66,23 @@ export class NewExpenseModalComponent {
   /** EQUAL: member ids included. UNEQUAL/PERCENTAGE: raw per-member input strings. */
   protected readonly included = signal<Set<string>>(new Set());
   protected readonly values = signal<Record<string, string>>({});
+  /** Round each nonnegative finite input to the nearest cent/basis point once.
+   * Keep the same positive shares for the running total, save gate and request. */
+  private readonly serializedSplits = computed<SplitInput[] | null>(() => {
+    const convert = this.splitType() === 'PERCENTAGE' ? percentToBasisPoints : dollarsToCents;
+    const values = this.values();
+    const splits: SplitInput[] = [];
+    for (const member of this.members()) {
+      const raw = Number(values[member.id] ?? 0);
+      const value = convert(raw);
+      if (!Number.isFinite(raw) || raw < 0 || !Number.isSafeInteger(value)) return null;
+      if (value > 0) splits.push({ userId: member.id, value });
+    }
+    return splits;
+  });
+  private readonly assignedTotal = computed(() =>
+    this.serializedSplits()?.reduce((sum, split) => sum + split.value, 0),
+  );
   /** Bumped on every keystroke so the running-total getters re-read the form. */
   protected readonly tick = signal(0);
 
@@ -176,27 +198,17 @@ export class NewExpenseModalComponent {
     return dollarsToCents(this.amount.value ?? 0);
   }
 
-  /** Cents currently assigned across members (exact split) from the raw inputs. */
-  private assignedCents(): number {
-    return this.members().reduce(
-      (sum, m) => sum + dollarsToCents(Number(this.values()[m.id] ?? 0)),
-      0,
-    );
-  }
-
-  private assignedPercent(): number {
-    return this.members().reduce((sum, m) => sum + Number(this.values()[m.id] ?? 0), 0);
-  }
-
   runningLabel(): string {
     this.tick();
     if (this.splitType() === 'EQUAL') {
       return `Split equally among ${this.included().size}`;
     }
+    const total = this.assignedTotal();
+    if (total === undefined) return 'Enter valid nonnegative shares';
     if (this.splitType() === 'PERCENTAGE') {
-      return `${this.assignedPercent().toFixed(2)}% / 100%`;
+      return `${this.display(total)}% / 100%`;
     }
-    return `$${this.display(this.assignedCents())} / $${this.display(this.amountCents())}`;
+    return `$${this.display(total)} / $${this.display(this.amountCents())}`;
   }
 
   splitValid(): boolean {
@@ -204,10 +216,12 @@ export class NewExpenseModalComponent {
     if (this.splitType() === 'EQUAL') {
       return this.included().size >= 1;
     }
+    const total = this.assignedTotal();
+    if (total === undefined || !Number.isSafeInteger(total)) return false;
     if (this.splitType() === 'PERCENTAGE') {
-      return Math.round(this.assignedPercent() * 100) === 10000;
+      return total === TOTAL_BASIS_POINTS;
     }
-    return this.amountCents() > 0 && this.assignedCents() === this.amountCents();
+    return this.amountCents() > 0 && total === this.amountCents();
   }
 
   canSave(): boolean {
@@ -240,22 +254,8 @@ export class NewExpenseModalComponent {
     let req: CreateExpenseRequest;
     if (this.splitType() === 'EQUAL') {
       req = { ...base, participantUserIds: [...this.included()] };
-    } else if (this.splitType() === 'PERCENTAGE') {
-      req = {
-        ...base,
-        splitType: 'PERCENTAGE',
-        splits: this.members()
-          .filter((m) => Number(this.values()[m.id] ?? 0) > 0)
-          .map((m) => ({ userId: m.id, value: percentToBasisPoints(Number(this.values()[m.id])) })),
-      };
     } else {
-      req = {
-        ...base,
-        splitType: 'UNEQUAL',
-        splits: this.members()
-          .filter((m) => Number(this.values()[m.id] ?? 0) > 0)
-          .map((m) => ({ userId: m.id, value: dollarsToCents(Number(this.values()[m.id])) })),
-      };
+      req = { ...base, splitType: this.splitType(), splits: this.serializedSplits()! };
     }
     this.saving.set(true);
     this.error.set(null);

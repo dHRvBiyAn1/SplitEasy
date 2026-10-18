@@ -142,6 +142,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   request; protected 401 logout/redirect must match the initiating session version (even if a new login
   returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
   after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
+- **Custom expense splits**: cache the normalized outgoing cents/basis-point list and reuse it for
+  the live total, validation and POST/PUT; reject negative/nonfinite/unsafe values before zero omission.
+  Round each share to the nearest hundredth with existing conversion helpers and explain this in the form.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - Modal `<form>`s use `(submit)="$event.preventDefault(); save()"` — **not** `(ngSubmit)` — because modals
@@ -317,3 +320,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] Serialized split validation (#52, 2026-10-18) — new/edit expense totals, gate and POST/PUT reuse one cached nonnegative finite integer list; per-share nearest-hundredth rounding is explained in the form, zero omission and lossless exact edit prefill preserved. Regression first: 17 failures then focused28/full frontend133; backend138, Prettier, production build and local Chromium form/request checks pass. Browser APIs mocked; independent review cleared; no merge/deployment. Evidence: `docs/reviews/2026-10-17-p2/issue-52.md`.
