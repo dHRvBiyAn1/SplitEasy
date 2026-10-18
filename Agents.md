@@ -89,6 +89,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   AccessLevel.PROTECTED)` + business constructors; controllers/services `@RequiredArgsConstructor`
   (exception: `HealthController` keeps its `@Value` ctor). DTOs stay records.
 - **UUID PKs** everywhere (`@UuidGenerator`, app-side so it works under `validate`; Postgres `uuid`).
+- **Auth abuse limits**: login 30/IP/5min and 5/(normalized email, IP)/5min; registration 20/IP/hour (`APP_AUTH_REGISTRATION_LIMIT`). Atomic process-local fixed windows cap at 10k buckets; restart resets, share enforcement before multiple instances. Prod native Caddy/Tomcat forwarding relies on private Tunnel→Caddy→Java networks; direct dev ignores forwarded headers. See `docs/security/auth-abuse.md`; 429 includes CORS-exposed Retry-After and both forms retain session state.
 - **Auth**: tokens issued in `JwtService` (claims `sub`=user UUID, `email`, `displayName`),
   validated by the resource-server filter (`NimbusJwtDecoder` in `SecurityConfig`). Read caller as
   `@CurrentUserId UUID` (resolver in `config/`) — not raw `Jwt`. Passwords BCrypt.
@@ -414,3 +415,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Idempotent payment operations (#61, 2026-10-18) — optional UUID operation IDs scoped to authenticated requester/group, V9 unique identity, native PostgreSQL conflict arbitration and original-outcome replay; valid changed payloads return 409, separate IDs/legacy omitted IDs remain additive. Angular retains the pending identity through uncertain errors and modal reopen, resets on success/different submitted intent/account change, and cancels old-session requests. Corrected regression-first real API races, 147 backend/114 frontend tests, Spotless/Prettier/production build and production-build Chromium retry/reopen rehearsal passed; independent review found no blockers. Contract/limits and evidence in `docs/api/payment-retries.md` and `docs/reviews/2026-10-18-p2/issue-61.md`. In-memory client identity is lost on reload/cross-tab; no merge/deployment.
+
+
+- [x] Authentication abuse limits (#62, 2026-10-18) — login 30/IP/5min plus 5/(normalized account, IP)/5min; registration 20/IP/hour configurable. Atomic bounded process-local windows, generic 429 with CORS-exposed Retry-After, friendly form retry notices and native private Caddy/Tomcat visitor-IP forwarding. Regression-first backend 146/frontend 112, formatting/build, deployment 12 and pinned Caddy validation passed; real trusted/untrusted proxy-spoof, six-member shared-IP signup, direct-dev HTTP and Chromium actual-429 form checks passed. No schema/dependency/signing/session change; restart resets and multiple instances require shared enforcement. External Cloudflare rules remain unknown; no merge/deployment.

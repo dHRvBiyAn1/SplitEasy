@@ -90,4 +90,39 @@ describe('authentication presentation', () => {
       }
     });
   }
+
+  for (const component of [LoginComponent, RegisterComponent]) {
+    it(`shows a friendly retry notice for ${component.name} without changing session state`, () => {
+      localStorage.setItem('spliteasy.accessToken', 'existing-session');
+      const f = TestBed.createComponent<LoginComponent | RegisterComponent>(component);
+      f.detectChanges();
+      for (const [selector, value] of [
+        ['[formControlName="email"]', 'alice@example.com'],
+        ['#auth-password', 'password123'],
+        ['[formControlName="displayName"]', 'Alice'],
+      ]) {
+        const input = f.nativeElement.querySelector(selector) as HTMLInputElement | null;
+        if (input) {
+          input.value = value;
+          input.dispatchEvent(new Event('input'));
+        }
+      }
+      f.nativeElement
+        .querySelector('form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      const http = TestBed.inject(HttpTestingController);
+      http
+        .expectOne(component === LoginComponent ? '/api/auth/login' : '/api/auth/register')
+        .flush(
+          {},
+          { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '300' } },
+        );
+      f.detectChanges();
+      expect(f.nativeElement.textContent).toContain(
+        'Too many attempts. Please wait before trying again.',
+      );
+      expect(f.nativeElement.querySelector('button[type="submit"]').disabled).toBe(false);
+      expect(localStorage.getItem('spliteasy.accessToken')).toBe('existing-session');
+    });
+  }
 });

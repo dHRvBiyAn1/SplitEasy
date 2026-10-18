@@ -2,6 +2,12 @@
 	admin off
 	auto_https off
 	persist_config off
+	servers {
+		# Only cloudflared reaches this private listener in production.
+		trusted_proxies static private_ranges
+		client_ip_headers CF-Connecting-IP
+		trusted_proxies_strict
+	}
 }
 
 http://:80 {
@@ -14,7 +20,12 @@ http://:80 {
 	handle @api {
 		header Cache-Control "no-store"
 		# Preserve the prefix: Spring controllers already include /api.
-		reverse_proxy backend:8080
+		reverse_proxy backend:8080 {
+			# Replace caller-supplied forwarding with the verified tunnel client.
+			header_up X-Forwarded-For {client_ip}
+			header_up -CF-Connecting-IP
+			header_up -Forwarded
+		}
 	}
 	handle {
 		respond 404
