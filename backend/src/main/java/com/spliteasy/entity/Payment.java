@@ -46,6 +46,12 @@ public class Payment {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
+  @Column(name = "recorded_by", updatable = false)
+  private UUID recordedBy;
+
+  @Column(name = "operation_id", updatable = false)
+  private UUID operationId;
+
   public Payment(Group group, User payer, User payee, long amountCents) {
     this.group = group;
     this.payer = payer;

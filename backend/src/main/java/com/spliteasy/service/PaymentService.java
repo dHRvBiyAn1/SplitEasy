@@ -6,6 +6,7 @@ import com.spliteasy.entity.Group;
 import com.spliteasy.entity.Payment;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
+import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -34,10 +36,16 @@ public class PaymentService {
   private final UserRepository userRepository;
   private final MembershipGuard membershipGuard;
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public PaymentResponse recordPayment(
       UUID requesterId, UUID groupId, RecordPaymentRequest request) {
     membershipGuard.requireMember(groupId, requesterId);
+    if (request.operationId() != null) {
+      var existing =
+          paymentRepository.findByGroupIdAndRecordedByAndOperationId(
+              groupId, requesterId, request.operationId());
+      if (existing.isPresent()) return replay(existing.get(), request);
+    }
     Group group =
         groupRepository
             .findById(groupId)
@@ -63,8 +71,27 @@ public class PaymentService {
         userRepository.findAllById(List.of(payerId, payeeId)).stream()
             .collect(Collectors.toMap(User::getId, Function.identity()));
     Payment payment =
-        paymentRepository.save(
-            new Payment(group, users.get(payerId), users.get(payeeId), request.amountCents()));
+        new Payment(group, users.get(payerId), users.get(payeeId), request.amountCents());
+    if (request.operationId() == null) {
+      payment = paymentRepository.save(payment);
+    } else {
+      int inserted =
+          paymentRepository.insertOperation(
+              UUID.randomUUID(),
+              groupId,
+              payerId,
+              payeeId,
+              request.amountCents(),
+              payment.getCreatedAt(),
+              requesterId,
+              request.operationId());
+      // READ COMMITTED gives this lookup a fresh snapshot after ON CONFLICT waits.
+      payment =
+          paymentRepository
+              .findByGroupIdAndRecordedByAndOperationId(groupId, requesterId, request.operationId())
+              .orElseThrow();
+      if (inserted == 0) return replay(payment, request);
+    }
     log.info(
         "Recorded payment {}: user {} paid user {} {} cents in group {}",
         payment.getId(),
@@ -72,6 +99,15 @@ public class PaymentService {
         payeeId,
         request.amountCents(),
         groupId);
+    return PaymentResponse.from(payment);
+  }
+
+  private PaymentResponse replay(Payment payment, RecordPaymentRequest request) {
+    if (!payment.getPayer().getId().equals(request.payerUserId())
+        || !payment.getPayee().getId().equals(request.payeeUserId())
+        || payment.getAmountCents() != request.amountCents()) {
+      throw new ConflictException("Operation ID already used for a different payment");
+    }
     return PaymentResponse.from(payment);
   }
 

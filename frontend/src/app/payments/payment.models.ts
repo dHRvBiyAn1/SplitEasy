@@ -9,6 +9,7 @@ export interface PaymentResponse {
 }
 
 export interface RecordPaymentRequest {
+  operationId: string;
   payerUserId: string;
   payeeUserId: string;
   amountCents: number;

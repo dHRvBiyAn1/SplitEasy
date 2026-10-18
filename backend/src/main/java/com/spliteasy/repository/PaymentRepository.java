@@ -1,14 +1,41 @@
 package com.spliteasy.repository;
 
 import com.spliteasy.entity.Payment;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
+
+  Optional<Payment> findByGroupIdAndRecordedByAndOperationId(
+      UUID groupId, UUID recordedBy, UUID operationId);
+
+  // PostgreSQL waits for a concurrent winner without aborting the losing transaction.
+  @Modifying
+  @Query(
+      value =
+          """
+      insert into payments
+        (id, group_id, payer_id, payee_id, amount_cents, created_at, recorded_by, operation_id)
+      values (:id, :groupId, :payerId, :payeeId, :amountCents, :createdAt, :requesterId, :operationId)
+      on conflict (group_id, recorded_by, operation_id) do nothing
+      """,
+      nativeQuery = true)
+  int insertOperation(
+      UUID id,
+      UUID groupId,
+      UUID payerId,
+      UUID payeeId,
+      long amountCents,
+      Instant createdAt,
+      UUID requesterId,
+      UUID operationId);
 
   /** Total paid out per payer across a group's settle-up payments (one aggregate query). */
   @Query(

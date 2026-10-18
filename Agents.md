@@ -109,6 +109,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
   **net in the group** is non-zero, so no debt is orphaned. The net comes from
   `BalanceService.computeBalances` — never a second aggregation.
+- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`PercentageSplitStrategy`
@@ -169,6 +170,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 - Financial member controls use full display name plus email for accessible identity (including duplicate names),
   numeric split labels name dollars or percent, and selection buttons expose `aria-pressed`.
+
+- **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Browser reload/cross-tab loses the identity; consult history after an uncertain response.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - New-group member additions retain the created group ID and per-email outcomes; failed-only retries reuse that group. Keep session cancellation after the entire sequential aggregation.
@@ -227,7 +230,7 @@ UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
   `split_type` (V4: `EQUAL/UNEQUAL/PERCENTAGE`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
 - **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense.
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
 
 User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All three split types store into the **same `share_cents`** column (no per-type storage), and each expense's shares sum exactly to its amount.
 
@@ -407,3 +410,7 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 - [x] Financial control accessibility (#59, 2026-10-18) — full display name plus email distinguishes duplicate-name payer/participant controls; exact/percentage labels include units. Preserves existing debt-switch checked and payer/category pressed semantics and financial calculations. Regression-first rendered tests, real Chromium AX/three-member payload checks, frontend 112/backend 138/deployment 12, Prettier and production build passed. No merge or deployment.
 
 - [x] PR #90 formatting follow-up (2026-10-18) — reproduced CI Prettier failure from a final test-selector edit made after the earlier formatting pass; formatted that callback only. Exact full-source Prettier, frontend 112/112, production build and diff checks passed on the final content. No behavior change; backend and browser evidence from #59 remains applicable.
+
+
+
+- [x] Idempotent payment operations (#61, 2026-10-18) — optional UUID operation IDs scoped to authenticated requester/group, V9 unique identity, native PostgreSQL conflict arbitration and original-outcome replay; valid changed payloads return 409, separate IDs/legacy omitted IDs remain additive. Angular retains the pending identity through uncertain errors and modal reopen, resets on success/different submitted intent/account change, and cancels old-session requests. Corrected regression-first real API races, 147 backend/114 frontend tests, Spotless/Prettier/production build and production-build Chromium retry/reopen rehearsal passed; independent review found no blockers. Contract/limits and evidence in `docs/api/payment-retries.md` and `docs/reviews/2026-10-18-p2/issue-61.md`. In-memory client identity is lost on reload/cross-tab; no merge/deployment.
