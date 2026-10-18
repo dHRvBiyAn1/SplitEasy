@@ -82,6 +82,7 @@ into the same `share_cents` column, so balance math is split-type-agnostic.
 
 ### Security posture
 
+- Access tokens expire after one hour by default; re-login is intended. Logout clears client state; copied tokens remain valid to expiry. See the [session lifecycle and future revocation requirements](docs/security/session-lifecycle.md).
 - JWT (HS256) via Spring's OAuth2 resource server; BCrypt passwords; DTOs only — entities are never serialized
 - **403-before-404**: membership is checked *before* existence, so the API never reveals whether a group exists to a non-member
 - No default JWT secret — non-dev boots **fail fast** without `APP_JWT_SECRET` (≥ 32 chars)

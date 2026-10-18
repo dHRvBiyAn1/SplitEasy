@@ -18,7 +18,8 @@ payments and greedy debt-simplification suggestions. Balances are
   Material present but only its `--mat-sys-*` colors are remapped to tokens — screens use
   plain semantic HTML.
 - **Auth**: Spring Security + JWT (HS256, symmetric) via `oauth2-resource-server`. Access
-  tokens only (1h), no refresh yet.
+  tokens only (1h), intended re-login on expiry; client logout does not revoke tokens.
+  Contract and future requirements: [session lifecycle](docs/security/session-lifecycle.md).
 
 ## Run & Test
 
@@ -418,3 +419,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Authentication abuse limits (#62, 2026-10-18) — login 30/IP/5min plus 5/(normalized account, IP)/5min; registration 20/IP/hour configurable. Atomic bounded process-local windows, generic 429 with CORS-exposed Retry-After, friendly form retry notices and native private Caddy/Tomcat visitor-IP forwarding. Regression-first backend 146/frontend 112, formatting/build, deployment 12 and pinned Caddy validation passed; real trusted/untrusted proxy-spoof, six-member shared-IP signup, direct-dev HTTP and Chromium actual-429 form checks passed. No schema/dependency/signing/session change; restart resets and multiple instances require shared enforcement. External Cloudflare rules remain unknown; no merge/deployment.
+
+
+- [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
