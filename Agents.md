@@ -18,7 +18,8 @@ payments and a debt-simplification suggestion (minimize transactions). Balances 
   Material present but only its `--mat-sys-*` colors are remapped to tokens — screens use
   plain semantic HTML.
 - **Auth**: Spring Security + JWT (HS256, symmetric) via `oauth2-resource-server`. Access
-  tokens only (1h), no refresh yet.
+  tokens only (1h), intended re-login on expiry; client logout does not revoke tokens.
+  Contract and future requirements: [session lifecycle](docs/security/session-lifecycle.md).
 
 ## Run & Test
 
@@ -317,3 +318,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
