@@ -230,7 +230,9 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Domain Rules
 
-- Monetary amounts are integer cents — never float.
+- Monetary amounts are integer cents — never float. JSON integer fields reject floating-point tokens
+  through `spring.jackson.deserialization.accept-float-as-int=false` before DTO validation; split
+  values are integer cents (UNEQUAL) or basis points (PERCENTAGE).
 - Every split sums exactly to the expense total; rounding remainder handled deterministically (payer absorbs).
 
 ## Known Gaps / TODOs
@@ -330,3 +332,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Null expense split validation (#40, 2026-10-17) — element-level `@NotNull` validation rejects null split entries before service work. MockMvc/Testcontainers regressions cover null-only and mixed valid/null entries for POST/PUT with UNEQUAL/PERCENTAGE and confirm expense rows, shares and balances remain unchanged. Backend142, frontend110, Spotless, Prettier and production build passed; PR targets dev, no schema change or deployment.
+
+
+- [x] Strict integer JSON inputs (#43, 2026-10-17) — disable Jackson floating-point-to-integer coercion before expense POST/PUT, payment and split DTO validation. Raw-JSON regressions cover fractional cents/basis points, valid integers and rejected-edit participant row preservation; 9 reproduced failures → 13 focused passes. Backend151/frontend110, Spotless/Prettier, production build and deployment12 passed; authenticated MVC-to-PostgreSQL ledger checks passed. No schema/dependency changes, merge or deployment.
