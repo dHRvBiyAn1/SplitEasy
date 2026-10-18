@@ -179,7 +179,9 @@ Auth routes remain full-bleed with a named Appearance control.
   cancellation, blur/hidden state, reduction and teardown; native scroll/pinch stays available. Glass
   uses bounded shared CSS with reduced-motion/forced-color fallbacks. No new motion dependency.
 - **Dialogs:** shared named `ModalShellComponent` uses CDK focus trapping/restoration, inert shell,
-  body scroll locking, Escape and a scroll-contained mobile surface. `ModalService` owns New group /
+  body scroll locking, Escape and a scroll-contained mobile surface. Rendered content changes recover
+  heading focus only when removal leaves focus on body; all background navigation, including the skip
+  link, stays inside the inert shell. `ModalService` owns New group /
   New or edit expense / Settle up / Add member / Appearance; HTTP/session ownership stays in services.
 - **Group pages:** route/account/destroy changes cancel owned callbacks, and a new reload cancels its
   predecessor. Group, balance and expense reads complete together before actions render. Reload clears
@@ -317,3 +319,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] Shared dialog focus continuity (#56, 2026-10-18) — recover heading focus through the existing CDK trap when settlement/content replacement removes its focused control, while preserving retained control focus; include the skip link in the inert background. Regression fails against the baseline shell, then frontend111/backend138, Prettier and production build pass. Synthetic Chromium at 1440×900, 320×568 and 844×390 covers all six dialog variants, keyboard trapping, select/Back and expense split changes, accessible names, Escape/Close launcher restoration and contained scrolling. Evidence: `docs/reviews/2026-10-17-p2/issue-56.md`; no real screen-reader/physical-device or production checks, merge or deployment.

@@ -1,5 +1,5 @@
-<a href="#main-content" class="skip-link" (click)="skipToMain($event)">Skip to content</a>
 <div class="app-frame" [attr.inert]="blocked() ? '' : null">
+  <a href="#main-content" class="skip-link" (click)="skipToMain($event)">Skip to content</a>
   @if (showShell()) {
     <header class="topbar dc-glass">
       <a routerLink="/dashboard" class="brand" aria-label="SplitEasy overview"
