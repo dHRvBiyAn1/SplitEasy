@@ -149,8 +149,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
   synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
   call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
-  request; protected 401 logout/redirect must match the initiating session version (even if a new login
-  returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
+  request; each refresh advances it so only the newest request owns data, error and loading. Protected
+  401 logout/redirect must match the initiating session version (even if a new login returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
   after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
@@ -356,3 +356,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Expense group ownership (#47, 2026-10-17) — member-load generations reject stale successes/errors (including A → B → A); switching groups clears member/payer/split state and save waits for members plus edit details. Edit group controls and component actions stay fixed to the original group. Ten component/HTTP regressions inspect B-first/A-last participants and the actual POST/PUT paths; original source reproduced nine failures plus three unhandled load errors. Backend138/frontend120, Spotless/Prettier and production build passed; independent review found no blockers. No live-browser or production-write claim; PR targets dev, no merge/deployment.
+
+
+- [x] Dashboard refresh ownership (#50, 2026-10-18) — advance the existing cache generation on every refresh so only the newest current-session request can change data, errors or loading; explicit clear and account reset still invalidate outstanding callbacks. Eight overlap regressions cover both completion orders and old/new success/failure (seven failed before fix); focused33/frontend118/backend138, Prettier, warning-free production build and synthetic Chromium8/8 HTTP/rendering checks passed. Browser refreshes use the Angular debug API; no live backend, merge or deployment. Evidence: `docs/reviews/2026-10-17-p2/issue-50.md`.
