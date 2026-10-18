@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
@@ -22,7 +22,15 @@ export class RegisterComponent {
   protected readonly form = this.fb.nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(100)]],
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
+    password: [
+      '',
+      [
+        Validators.required,
+        Validators.minLength(8),
+        (control: AbstractControl) =>
+          new TextEncoder().encode(control.value).length > 72 ? { maxBytes: true } : null,
+      ],
+    ],
   });
 
   submit(): void {
@@ -38,7 +46,11 @@ export class RegisterComponent {
     this.auth.register(this.form.getRawValue()).subscribe({
       next: () => this.router.navigate(['/dashboard']),
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Registration failed. Please try again.');
+        this.error.set(
+          err?.status === 429
+            ? 'Too many attempts. Please wait before trying again.'
+            : (err?.error?.message ?? 'Registration failed. Please try again.'),
+        );
         this.submitting.set(false);
       },
     });

@@ -87,7 +87,7 @@ describe('SettleUpModalComponent', () => {
     modal.openSettle();
   });
 
-  it('shows only the minimal set of payments when the group asks to simplify', async () => {
+  it('shows suggested payments when the group asks to simplify', async () => {
     await render();
 
     expect(rows()).toHaveLength(1);

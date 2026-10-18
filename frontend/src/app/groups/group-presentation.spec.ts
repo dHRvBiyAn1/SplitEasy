@@ -105,4 +105,81 @@ describe('group presentation ownership', () => {
       'Even overall',
     );
   });
+
+  it.each(['/api/groups/a/balances/mine', '/api/groups/a/expenses'])(
+    'withholds settled and empty claims while %s is pending and retries failures',
+    (pendingUrl) => {
+      const fixture = TestBed.createComponent(GroupDetailComponent);
+      fixture.detectChanges();
+      http.expectOne('/api/groups/a').flush(group('a'));
+      const pendingRead = http.expectOne(pendingUrl);
+      if (pendingUrl === '/api/groups/a/balances/mine') {
+        http.expectOne('/api/groups/a/expenses').flush([]);
+      } else {
+        http.expectOne('/api/groups/a/balances/mine').flush([]);
+      }
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('All square');
+      expect(fixture.nativeElement.textContent).not.toContain('No expenses yet');
+      expect(fixture.nativeElement.querySelector('[role="status"]')).not.toBeNull();
+
+      pendingRead.flush('unavailable', { status: 503, statusText: 'Unavailable' });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('All square');
+      expect(fixture.nativeElement.textContent).not.toContain('No expenses yet');
+      fixture.nativeElement.querySelector('button').click();
+      http.expectOne('/api/groups/a').flush(group('a'));
+      http.expectOne('/api/groups/a/balances/mine').flush([]);
+      http.expectOne('/api/groups/a/expenses').flush([]);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('All square');
+      expect(fixture.nativeElement.textContent).toContain('No expenses yet');
+    },
+  );
+
+  it('drops pre-edit detail, then renders the saved amount, payer, and shares on re-expand', () => {
+    const fixture = TestBed.createComponent(GroupDetailComponent);
+    fixture.detectChanges();
+    http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
+    http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
+    http.match('/api/groups/a/expenses').forEach((r) => r.flush([summary]));
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('.xrow').click();
+    const oldDetail = http.expectOne('/api/groups/a/expenses/expense');
+    TestBed.inject(DashboardService).refresh();
+    http.expectOne('/api/dashboard').flush(overview);
+    fixture.detectChanges();
+    http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
+    http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
+    const updated = {
+      ...summary,
+      amountCents: 1203,
+      paidBy: { id: 'noor', displayName: 'Noor Kapoor', email: 'noor@example.test' },
+    };
+    http.match('/api/groups/a/expenses').forEach((r) => r.flush([updated]));
+    fixture.detectChanges();
+
+    expect(oldDetail.cancelled).toBe(true);
+    expect(fixture.nativeElement.querySelector('.xdetail')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('$12.03');
+
+    fixture.nativeElement.querySelector('.xrow').click();
+    http.expectOne('/api/groups/a/expenses/expense').flush({
+      ...updated,
+      groupId: 'a',
+      splitType: 'UNEQUAL',
+      participants: [
+        { user: updated.paidBy, shareCents: 703 },
+        { user, shareCents: 500 },
+      ],
+    });
+    fixture.detectChanges();
+    const receipt = fixture.nativeElement.querySelector('.xdetail').textContent;
+    expect(receipt).toContain('Noor paid');
+    expect(receipt).toContain('$12.03');
+    expect(receipt).toContain('$7.03');
+    expect(receipt).toContain('$5.00');
+  });
 });

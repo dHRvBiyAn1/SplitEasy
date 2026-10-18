@@ -13,6 +13,7 @@ import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.dto.group.AddMemberRequest;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.group.UpdateGroupRequest;
+import com.spliteasy.entity.GroupType;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -119,6 +120,41 @@ class GroupSettingsIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  void sequentialPartialUpdatesAndEmptyPatchesKeepOmittedSettings() throws Exception {
+    AuthResponse owner = register("gs-sequential@example.com", "password123", "Owner");
+    String groupId = createGroup(owner.accessToken(), "Original");
+
+    patchGroup(
+        owner.accessToken(), groupId, new UpdateGroupRequest("  Renamed  ", null, null), 200);
+    patchGroup(
+        owner.accessToken(), groupId, new UpdateGroupRequest(null, GroupType.TRIP, null), 200);
+    patchGroup(owner.accessToken(), groupId, new UpdateGroupRequest(null, null, false), 200);
+    for (String body : List.of("{}", "{\"name\":null,\"type\":null,\"simplifyDebts\":null}")) {
+      mockMvc
+          .perform(
+              patch("/api/groups/" + groupId)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body)
+                  .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.name").value("Renamed"))
+          .andExpect(jsonPath("$.type").value("TRIP"))
+          .andExpect(jsonPath("$.simplifyDebts").value(false));
+    }
+
+    patchGroup(
+        owner.accessToken(), groupId, new UpdateGroupRequest("x".repeat(101), null, null), 400);
+    mockMvc
+        .perform(
+            get("/api/groups/" + groupId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("Renamed"))
+        .andExpect(jsonPath("$.type").value("TRIP"))
+        .andExpect(jsonPath("$.simplifyDebts").value(false));
+  }
+
+  @Test
   void blankNameIsRejected() throws Exception {
     AuthResponse owner = register("gs-blank@example.com", "password123", "Owner");
     String groupId = createGroup(owner.accessToken(), "Keep Me");
@@ -134,6 +170,11 @@ class GroupSettingsIntegrationTest extends AbstractIntegrationTest {
 
     patchGroup(
         outsider.accessToken(), groupId, new UpdateGroupRequest("Hijacked", null, null), 403);
+    patchGroup(
+        outsider.accessToken(),
+        UUID.randomUUID().toString(),
+        new UpdateGroupRequest("Hijacked", null, null),
+        403);
   }
 
   @Test

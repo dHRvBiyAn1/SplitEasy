@@ -20,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Pairwise balances between one member and each other member of a group — the "who owes whom, to me
  * specifically" ledger the dashboard and the group balance-pills render. Unlike {@link
- * BalanceService} (aggregate net per member) and {@link DebtSimplificationService} (minimal netted
- * transfers), this keeps each counterparty relationship separate, so it can simultaneously show
- * "Dan owes you $50" and "you owe Sofia $50" without netting them together.
+ * BalanceService} (aggregate net per member) and {@link DebtSimplificationService} (greedy
+ * suggested netted transfers), this keeps each counterparty relationship separate, so it can
+ * simultaneously show "Dan owes you $50" and "you owe Sofia $50" without netting them together.
  *
  * <p>For counterparty X, from the requesting user's perspective (positive = X owes you):
  *

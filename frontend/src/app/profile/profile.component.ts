@@ -1,5 +1,5 @@
 import { AppearancePanelComponent } from '../shared/appearance-panel.component';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
@@ -18,7 +18,10 @@ export class ProfileComponent {
 
   protected readonly user = this.auth.user;
   protected readonly prefs = this.profile.prefs;
-  protected readonly editing = signal(false);
+  protected readonly editing = linkedSignal({
+    source: () => this.user()?.id,
+    computation: () => false,
+  });
 
   protected readonly currencies: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
   protected readonly avatarColors = AVATAR_COLORS;
@@ -72,6 +75,7 @@ export class ProfileComponent {
   }
 
   save(): void {
+    if (!this.editing()) return;
     const displayName = this.name.value.trim();
     const email = this.email.value.trim();
     this.auth.updateProfile({

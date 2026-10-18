@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, linkedSignal } from '@angular/core';
+import { AuthService } from './auth/auth.service';
 
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR';
 
@@ -20,39 +21,53 @@ interface ProfilePrefs {
 }
 
 const KEY = 'spliteasy.profile';
-const DEFAULTS: ProfilePrefs = {
-  phone: '',
-  currency: 'USD',
-  avatarColor: AVATAR_COLORS[0],
-  joinedAt: new Date().toISOString(),
-};
 
 /**
  * Client-side profile preferences the backend doesn't model yet (phone, display currency, avatar
- * color). Persisted to localStorage; name/email live on the auth user. Backend persistence is a
- * follow-up — see PROFILE note in the PR.
+ * color). Persisted per immutable account ID to localStorage; name/email live on the auth user.
+ * Preferences remain client-side only.
  */
 @Injectable({ providedIn: 'root' })
 export class ProfileService {
-  private readonly _prefs = signal<ProfilePrefs>(this.read());
+  private readonly auth = inject(AuthService);
+  // Reset on identity changes before any read or write, without waiting for an effect.
+  private readonly _prefs = linkedSignal({
+    source: () => this.auth.user()?.id ?? null,
+    computation: (userId) => this.read(userId),
+  });
   readonly prefs = this._prefs.asReadonly();
 
-  update(patch: Partial<ProfilePrefs>): void {
-    const next = { ...this._prefs(), ...patch };
-    this._prefs.set(next);
-    localStorage.setItem(KEY, JSON.stringify(next));
+  constructor() {
+    // The legacy key has no owner: migrating its personal fields could expose another account.
+    localStorage.removeItem(KEY);
   }
 
-  private read(): ProfilePrefs {
+  update(patch: Partial<ProfilePrefs>): void {
+    const userId = this.auth.user()?.id;
+    if (!userId) return;
+    const next = { ...this._prefs(), ...patch };
+    this._prefs.set(next);
+    localStorage.setItem(`${KEY}.${userId}`, JSON.stringify(next));
+  }
+
+  private read(userId: string | null): ProfilePrefs {
+    const defaults: ProfilePrefs = {
+      phone: '',
+      currency: 'USD',
+      avatarColor: AVATAR_COLORS[0],
+      joinedAt: new Date().toISOString(),
+    };
+    if (!userId) return defaults;
+    const key = `${KEY}.${userId}`;
     try {
-      const raw = localStorage.getItem(KEY);
+      const raw = localStorage.getItem(key);
       if (raw) {
-        return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<ProfilePrefs>) };
+        return { ...defaults, ...(JSON.parse(raw) as Partial<ProfilePrefs>) };
       }
     } catch {
       // fall through to defaults
     }
-    localStorage.setItem(KEY, JSON.stringify(DEFAULTS));
-    return DEFAULTS;
+    localStorage.setItem(key, JSON.stringify(defaults));
+    return defaults;
   }
 }

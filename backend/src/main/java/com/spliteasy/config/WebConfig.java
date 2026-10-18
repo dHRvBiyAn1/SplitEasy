@@ -36,6 +36,7 @@ public class WebConfig implements WebMvcConfigurer {
     config.setAllowedOrigins(allowedOrigins);
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
+    config.setExposedHeaders(List.of("Retry-After"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", config);

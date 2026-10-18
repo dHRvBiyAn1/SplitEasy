@@ -70,9 +70,14 @@
           >
         </div>
         @if (form.controls.password.touched && form.controls.password.invalid) {
-          <p class="auth__field-error" id="password-hint">Use at least 8 characters.</p>
+          <p class="auth__field-error" id="password-hint">
+            Use at least 8 characters and at most 72 UTF-8 bytes.
+          </p>
         }
-        <p class="auth__hint">At least 8 characters. A little peace of mind.</p>
+        <p class="auth__hint">
+          At least 8 characters, at most 72 UTF-8 bytes. Symbols and accented letters may use
+          multiple bytes.
+        </p>
 
         @if (error()) {
           <p class="auth__error" role="alert">{{ error() }}</p>

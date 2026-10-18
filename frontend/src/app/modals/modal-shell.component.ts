@@ -1,5 +1,14 @@
 import { CdkTrapFocus } from '@angular/cdk/a11y';
-import { Component, DestroyRef, HostListener, inject, input, output } from '@angular/core';
+import {
+  afterEveryRender,
+  Component,
+  DestroyRef,
+  HostListener,
+  inject,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 
 let nextDialogId = 0;
 
@@ -16,7 +25,15 @@ export class ModalShellComponent {
   readonly closed = output<void>();
   readonly headingId = `modal-heading-${++nextDialogId}`;
 
+  private readonly trap = viewChild(CdkTrapFocus);
+
   constructor() {
+    afterEveryRender(() => {
+      // Replacing focused content (e.g. settlement steps) otherwise leaves focus on body.
+      if (document.activeElement === document.body) {
+        this.trap()?.focusTrap?.focusInitialElement();
+      }
+    });
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     inject(DestroyRef).onDestroy(() => {

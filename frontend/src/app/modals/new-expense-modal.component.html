@@ -13,6 +13,7 @@
               class="chip"
               [class.chip--on]="groupId() === g.id"
               [attr.aria-pressed]="groupId() === g.id"
+              [disabled]="!!editId || saving()"
               (click)="selectGroup(g.id)"
             >
               {{ g.name }}
@@ -78,6 +79,7 @@
               type="button"
               class="chip"
               [class.chip--on]="paidBy() === m.id"
+              [attr.aria-label]="memberLabel(m)"
               [attr.aria-pressed]="paidBy() === m.id"
               (click)="paidBy.set(m.id)"
             >
@@ -130,16 +132,20 @@
                     class="prow__check"
                     [checked]="included().has(m.id)"
                     (change)="toggle(m.id)"
-                    [attr.aria-label]="'Include ' + m.displayName"
+                    [attr.aria-label]="'Include ' + memberLabel(m)"
                 /></label>
               } @else {
                 <input
                   class="prow__val"
+                  aria-describedby="ne-split-precision"
                   [attr.aria-label]="
-                    m.displayName + (splitType() === 'PERCENTAGE' ? ' percentage' : ' exact amount')
+                    memberLabel(m) +
+                    (splitType() === 'PERCENTAGE'
+                      ? ' share in percent'
+                      : ' exact amount in dollars')
                   "
                   type="number"
-                  step="0.01"
+                  step="any"
                   min="0"
                   inputmode="decimal"
                   [value]="values()[m.id] || ''"
@@ -150,8 +156,14 @@
             </div>
           }
         </div>
+        @if (splitType() !== 'EQUAL') {
+          <p class="mform__hint" id="ne-split-precision">Each share rounds to 2 decimal places.</p>
+        }
       </div>
 
+      @if (!ready() && !error()) {
+        <p role="status">Loading expense details…</p>
+      }
       @if (error()) {
         <p class="mform__error" role="alert">{{ error() }}</p>
       }

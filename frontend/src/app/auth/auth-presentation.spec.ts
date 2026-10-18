@@ -47,4 +47,82 @@ describe('authentication presentation', () => {
     expect(f.nativeElement.textContent).toContain('Use at least 8 characters');
     TestBed.inject(HttpTestingController).expectNone('/api/auth/register');
   });
+  for (const password of [
+    'a'.repeat(73),
+    'é'.repeat(40),
+    '😀'.repeat(19),
+    'a'.repeat(72),
+    'é'.repeat(36),
+    '😀'.repeat(18),
+  ]) {
+    const bytes = new TextEncoder().encode(password).length;
+    it(`${bytes > 72 ? 'rejects' : 'submits'} a ${bytes}-byte password unchanged (${password.codePointAt(0)})`, () => {
+      const f = TestBed.createComponent(RegisterComponent);
+      f.detectChanges();
+      for (const [name, value] of Object.entries({
+        displayName: 'Alice',
+        email: 'alice@example.com',
+        password,
+      })) {
+        const input = f.nativeElement.querySelector(
+          `[formControlName="${name}"]`,
+        ) as HTMLInputElement;
+        input.value = value;
+        input.dispatchEvent(new Event('input'));
+      }
+      f.nativeElement
+        .querySelector('form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      f.detectChanges();
+      const input = f.nativeElement.querySelector('#auth-password') as HTMLInputElement;
+      expect(input.value).toBe(password);
+      const http = TestBed.inject(HttpTestingController);
+      if (bytes > 72) {
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        expect(f.nativeElement.querySelector('#password-hint').textContent).toContain(
+          '72 UTF-8 bytes',
+        );
+        http.expectNone('/api/auth/register');
+      } else {
+        const request = http.expectOne('/api/auth/register');
+        expect(request.request.body.password).toBe(password);
+        request.flush({ message: 'test complete' }, { status: 400, statusText: 'Bad Request' });
+      }
+    });
+  }
+
+  for (const component of [LoginComponent, RegisterComponent]) {
+    it(`shows a friendly retry notice for ${component.name} without changing session state`, () => {
+      localStorage.setItem('spliteasy.accessToken', 'existing-session');
+      const f = TestBed.createComponent<LoginComponent | RegisterComponent>(component);
+      f.detectChanges();
+      for (const [selector, value] of [
+        ['[formControlName="email"]', 'alice@example.com'],
+        ['#auth-password', 'password123'],
+        ['[formControlName="displayName"]', 'Alice'],
+      ]) {
+        const input = f.nativeElement.querySelector(selector) as HTMLInputElement | null;
+        if (input) {
+          input.value = value;
+          input.dispatchEvent(new Event('input'));
+        }
+      }
+      f.nativeElement
+        .querySelector('form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      const http = TestBed.inject(HttpTestingController);
+      http
+        .expectOne(component === LoginComponent ? '/api/auth/login' : '/api/auth/register')
+        .flush(
+          {},
+          { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '300' } },
+        );
+      f.detectChanges();
+      expect(f.nativeElement.textContent).toContain(
+        'Too many attempts. Please wait before trying again.',
+      );
+      expect(f.nativeElement.querySelector('button[type="submit"]').disabled).toBe(false);
+      expect(localStorage.getItem('spliteasy.accessToken')).toBe('existing-session');
+    });
+  }
 });

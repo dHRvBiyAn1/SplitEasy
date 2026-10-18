@@ -8,4 +8,9 @@ import java.util.UUID;
 public record RecordPaymentRequest(
     @NotNull UUID payerUserId,
     @NotNull UUID payeeUserId,
-    @Positive @Max(1_000_000_000_000L) long amountCents) {}
+    @Positive @Max(1_000_000_000_000L) long amountCents,
+    UUID operationId) {
+  public RecordPaymentRequest(UUID payerUserId, UUID payeeUserId, long amountCents) {
+    this(payerUserId, payeeUserId, amountCents, null);
+  }
+}

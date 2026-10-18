@@ -10,7 +10,10 @@ import com.spliteasy.AbstractIntegrationTest;
 import com.spliteasy.dto.auth.AuthResponse;
 import com.spliteasy.dto.auth.LoginRequest;
 import com.spliteasy.dto.auth.RegisterRequest;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 
@@ -51,6 +54,32 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
     mockMvc
         .perform(jsonPost("/api/auth/register", new RegisterRequest("not-an-email", "short", "")))
         .andExpect(status().isBadRequest());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "é", "😀"})
+  void registerAccepts72BytePasswordsWithoutTransformingThem(String character) throws Exception {
+    String password = character.repeat(72 / character.getBytes(StandardCharsets.UTF_8).length);
+    String email = "boundary-" + character.codePointAt(0) + "@example.com";
+    mockMvc
+        .perform(jsonPost("/api/auth/register", new RegisterRequest(email, password, "Boundary")))
+        .andExpect(status().isCreated());
+    mockMvc
+        .perform(jsonPost("/api/auth/login", new LoginRequest(email, password)))
+        .andExpect(status().isOk());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "é", "😀"})
+  void registerRejectsPasswordsAbove72Utf8Bytes(String character) throws Exception {
+    String password = character.repeat(72 / character.getBytes(StandardCharsets.UTF_8).length + 1);
+    mockMvc
+        .perform(
+            jsonPost(
+                "/api/auth/register",
+                new RegisterRequest("over-limit@example.com", password, "Over limit")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("Password must be at most 72 UTF-8 bytes"));
   }
 
   @Test

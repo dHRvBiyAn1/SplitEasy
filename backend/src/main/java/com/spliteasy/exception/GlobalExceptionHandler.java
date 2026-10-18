@@ -3,6 +3,9 @@ package com.spliteasy.exception;
 import com.spliteasy.dto.common.ErrorResponse;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -40,6 +43,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(body(HttpStatus.BAD_REQUEST, message));
   }
 
+  @ExceptionHandler(TooManyRequestsException.class)
+  public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.retryAfterSeconds()))
+        .body(body(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
+  }
+
   @ExceptionHandler(BadCredentialsException.class)
   public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
     // Deliberately generic — never reveal whether the email or the password was wrong.
@@ -65,10 +75,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return build(HttpStatus.CONFLICT, ex.getMessage());
   }
 
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  public ResponseEntity<ErrorResponse> handleOptimisticConflict(
+      OptimisticLockingFailureException ex) {
+    log.warn("Concurrent update conflict: {}", ex.getMessage());
+    return build(
+        HttpStatus.CONFLICT,
+        "This record was changed by another request. Reload and review the latest changes before saving again.");
+  }
+
   @ExceptionHandler(ForbiddenException.class)
   public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex) {
     log.warn("Access forbidden: {}", ex.getMessage());
     return build(HttpStatus.FORBIDDEN, ex.getMessage());
+  }
+
+  /** Service transactions have rolled back before MVC translates their persistence failures. */
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
+    for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+      if (cause instanceof ConstraintViolationException violation
+          && "23505".equals(violation.getSQLState())) {
+        if ("users_email_key".equals(violation.getConstraintName())) {
+          return handleConflict(new ConflictException("Email is already registered"));
+        }
+        if ("uq_group_memberships_group_user".equals(violation.getConstraintName())) {
+          return handleConflict(new ConflictException("User is already a member of this group"));
+        }
+      }
+    }
+    return handleUnexpected(ex);
   }
 
   /** Anything not handled above is an unexpected server fault — log with stack trace. */
