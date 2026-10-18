@@ -190,6 +190,10 @@ export class NewExpenseModalComponent {
     return u.id === this.meId() ? 'You' : u.displayName.split(/\s+/)[0];
   }
 
+  memberLabel(u: UserSummary): string {
+    return `${u.id === this.meId() ? 'You: ' : ''}${u.displayName} (${u.email})`;
+  }
+
   initials(name: string): string {
     return name
       .split(/\s+/)

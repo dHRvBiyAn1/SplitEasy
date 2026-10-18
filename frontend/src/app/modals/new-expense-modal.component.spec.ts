@@ -343,6 +343,83 @@ describe('expense modal group ownership and overview availability', () => {
     );
   }
 
+  it.each(['UNEQUAL', 'PERCENTAGE'] as const)(
+    'identifies duplicate-name members and retains selected state and %s validation',
+    (splitType) => {
+      const members = [
+        me,
+        { id: 'alex-two', displayName: 'Alex Chen', email: 'alex.chen@example.test' },
+        { id: 'alex-three', displayName: 'Alex Chen', email: 'another.alex@example.test' },
+      ];
+      modal.openExpense(group.id);
+      const fixture = TestBed.createComponent(NewExpenseModalComponent);
+      http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members });
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      const button = (text: string) =>
+        Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+          b.textContent?.trim().endsWith(text),
+        )!;
+      const payerName = (m: (typeof members)[number]) =>
+        `${m.id === me.id ? 'You: ' : ''}${m.displayName} (${m.email})`;
+      const payerButtons = members.map((m) =>
+        root.querySelector<HTMLButtonElement>(`button[aria-label="${payerName(m)}"]`),
+      );
+      expect(payerButtons.every(Boolean)).toBe(true);
+      expect(payerButtons.map((b) => b?.getAttribute('aria-pressed'))).toEqual([
+        'true',
+        'false',
+        'false',
+      ]);
+      payerButtons[2]!.click();
+      button('Groceries').click();
+      button(splitType === 'UNEQUAL' ? 'Unequal' : 'Percent').click();
+      fixture.detectChanges();
+      expect(payerButtons.map((b) => b!.getAttribute('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'true',
+      ]);
+      expect(button('Groceries').getAttribute('aria-pressed')).toBe('true');
+      expect(button('Food & drink').getAttribute('aria-pressed')).toBe('false');
+      const inputs = members.map((m) =>
+        root.querySelector<HTMLInputElement>(
+          `input[aria-label="${payerName(m)} ${splitType === 'UNEQUAL' ? 'exact amount in dollars' : 'share in percent'}"]`,
+        ),
+      );
+      expect(inputs.every(Boolean)).toBe(true);
+      const fill = (input: HTMLInputElement, value: string) => {
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        fixture.detectChanges();
+      };
+      fill(root.querySelector('#ne-desc')!, 'Shared groceries');
+      fill(root.querySelector('#ne-amt')!, '12.34');
+      const submit = root.querySelector<HTMLButtonElement>('button[type=submit]')!;
+      fill(inputs[0]!, splitType === 'UNEQUAL' ? '4.11' : '30');
+      fill(inputs[1]!, splitType === 'UNEQUAL' ? '4.11' : '30');
+      expect(submit.disabled).toBe(true);
+      fill(inputs[2]!, splitType === 'UNEQUAL' ? '4.12' : '40');
+      expect(submit.disabled).toBe(false);
+      root
+        .querySelector('form')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      const save = http.expectOne({ method: 'POST', url: `/api/groups/${group.id}/expenses` });
+      expect(save.request.body).toMatchObject({
+        amountCents: 1234,
+        paidByUserId: 'alex-three',
+        category: 'GROCERIES',
+        splitType,
+        splits: members.map((m, i) => ({
+          userId: m.id,
+          value: splitType === 'UNEQUAL' ? [411, 411, 412][i] : [3000, 3000, 4000][i],
+        })),
+      });
+      save.flush(expense);
+      http.expectOne('/api/dashboard').flush(emptyOverview);
+    },
+  );
+
   it('still directs an unscoped account with no groups to create its first group', () => {
     dashboard.ensureLoaded();
     http.expectOne('/api/dashboard').flush(emptyOverview);

@@ -166,6 +166,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Custom expense splits**: cache the normalized outgoing cents/basis-point list and reuse it for
   the live total, validation and POST/PUT; reject negative/nonfinite/unsafe values before zero omission.
   Round each share to the nearest hundredth with existing conversion helpers and explain this in the form.
+
+- Financial member controls use full display name plus email for accessible identity (including duplicate names),
+  numeric split labels name dollars or percent, and selection buttons expose `aria-pressed`.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - New-group member additions retain the created group ID and per-email outcomes; failed-only retries reuse that group. Keep session cancellation after the entire sequential aggregation.
@@ -399,3 +402,8 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Shared dialog focus continuity (#56, 2026-10-18) — recover heading focus through the existing CDK trap when settlement/content replacement removes its focused control, while preserving retained control focus; include the skip link in the inert background. Regression fails against the baseline shell, then frontend111/backend138, Prettier and production build pass. Synthetic Chromium at 1440×900, 320×568 and 844×390 covers all six dialog variants, keyboard trapping, select/Back and expense split changes, accessible names, Escape/Close launcher restoration and contained scrolling. Evidence: `docs/reviews/2026-10-17-p2/issue-56.md`; no real screen-reader/physical-device or production checks, merge or deployment.
+
+
+- [x] Financial control accessibility (#59, 2026-10-18) — full display name plus email distinguishes duplicate-name payer/participant controls; exact/percentage labels include units. Preserves existing debt-switch checked and payer/category pressed semantics and financial calculations. Regression-first rendered tests, real Chromium AX/three-member payload checks, frontend 112/backend 138/deployment 12, Prettier and production build passed. No merge or deployment.
+
+- [x] PR #90 formatting follow-up (2026-10-18) — reproduced CI Prettier failure from a final test-selector edit made after the earlier formatting pass; formatted that callback only. Exact full-source Prettier, frontend 112/112, production build and diff checks passed on the final content. No behavior change; backend and browser evidence from #59 remains applicable.
