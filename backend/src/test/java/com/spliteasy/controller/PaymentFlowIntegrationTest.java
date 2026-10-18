@@ -1,6 +1,9 @@
 package com.spliteasy.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mockingDetails;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,17 +14,203 @@ import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.dto.group.AddMemberRequest;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.payment.RecordPaymentRequest;
+import com.spliteasy.repository.UserRepository;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 
 @AutoConfigureMockMvc
 class PaymentFlowIntegrationTest extends AbstractIntegrationTest {
+  @MockitoSpyBean UserRepository userRepository;
+
+  private record Fixture(AuthResponse alice, AuthResponse bob, String group) {}
+
+  private Fixture fixture() throws Exception {
+    String suffix = UUID.randomUUID().toString();
+    var a = register("a-" + suffix + "@example.com", "password123", "Alice");
+    var b = register("b-" + suffix + "@example.com", "password123", "Bob");
+    String g = createGroup(a.accessToken(), "Retry");
+    addMember(a.accessToken(), g, b.user().email());
+    return new Fixture(a, b, g);
+  }
+
+  private MvcResult operation(Fixture f, String token, String group, UUID id, long cents)
+      throws Exception {
+    return mockMvc
+        .perform(
+            jsonPost(
+                    "/api/groups/" + group + "/payments",
+                    Map.of(
+                        "payerUserId",
+                        f.bob().user().id(),
+                        "payeeUserId",
+                        f.alice().user().id(),
+                        "amountCents",
+                        cents,
+                        "operationId",
+                        id))
+                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+        .andReturn();
+  }
+
+  private void history(Fixture f, int size) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/groups/" + f.group() + "/payments")
+                .header(HttpHeaders.AUTHORIZATION, bearer(f.alice().accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(size));
+  }
+
+  @Test
+  void replayReturnsOriginalOutcomeWithoutChangingBalancesAgain() throws Exception {
+    var f = fixture();
+    UUID id = UUID.randomUUID();
+    var first = operation(f, f.bob().accessToken(), f.group(), id, 100);
+    var before = balances(f.alice().accessToken(), f.group());
+    var retry = operation(f, f.bob().accessToken(), f.group(), id, 100);
+    assertThat(first.getResponse().getStatus()).isEqualTo(201);
+    assertThat(retry.getResponse().getStatus()).isEqualTo(201);
+    assertThat(objectMapper.readTree(retry.getResponse().getContentAsString()))
+        .isEqualTo(objectMapper.readTree(first.getResponse().getContentAsString()));
+    assertThat(balances(f.alice().accessToken(), f.group())).isEqualTo(before);
+    history(f, 1);
+  }
+
+  @Test
+  void changedPayloadWithSameOperationIsConflict() throws Exception {
+    var f = fixture();
+    UUID id = UUID.randomUUID();
+    operation(f, f.bob().accessToken(), f.group(), id, 100);
+    assertThat(operation(f, f.bob().accessToken(), f.group(), id, 200).getResponse().getStatus())
+        .isEqualTo(409);
+    history(f, 1);
+    assertThat(balances(f.alice().accessToken(), f.group()).get(f.bob().user().email()))
+        .isEqualTo(100);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"payerUserId", "payeeUserId"})
+  void changedPartyWithSameOperationIsConflict(String field) throws Exception {
+    var f = fixture();
+    UUID id = UUID.randomUUID();
+    var carol = register("carol-" + id + "@example.com", "password123", "Carol");
+    addMember(f.alice().accessToken(), f.group(), carol.user().email());
+    operation(f, f.bob().accessToken(), f.group(), id, 100);
+    var changed =
+        new HashMap<String, Object>(
+            Map.of(
+                "payerUserId",
+                f.bob().user().id(),
+                "payeeUserId",
+                f.alice().user().id(),
+                "amountCents",
+                100,
+                "operationId",
+                id));
+    changed.put(field, carol.user().id());
+    mockMvc
+        .perform(
+            jsonPost("/api/groups/" + f.group() + "/payments", changed)
+                .header(HttpHeaders.AUTHORIZATION, bearer(f.bob().accessToken())))
+        .andExpect(status().isConflict());
+    history(f, 1);
+  }
+
+  @Test
+  void separateIdsAndRequesterAndGroupScopesPermitEqualPayments() throws Exception {
+    var f = fixture();
+    UUID id = UUID.randomUUID();
+    operation(f, f.bob().accessToken(), f.group(), id, 100);
+    operation(f, f.bob().accessToken(), f.group(), UUID.randomUUID(), 100);
+    operation(f, f.alice().accessToken(), f.group(), id, 100);
+    String other = createGroup(f.alice().accessToken(), "Other");
+    addMember(f.alice().accessToken(), other, f.bob().user().email());
+    assertThat(operation(f, f.bob().accessToken(), other, id, 100).getResponse().getStatus())
+        .isEqualTo(201);
+    history(f, 3);
+    assertThat(balances(f.alice().accessToken(), f.group()).get(f.bob().user().email()))
+        .isEqualTo(300);
+  }
+
+  @Test
+  void replayRequiresMembershipEvenForUnknownGroups() throws Exception {
+    var f = fixture();
+    UUID id = UUID.randomUUID();
+    operation(f, f.bob().accessToken(), f.group(), id, 100);
+    var outsider = register("out-" + id + "@example.com", "password123", "Outsider");
+    assertThat(operation(f, outsider.accessToken(), f.group(), id, 100).getResponse().getStatus())
+        .isEqualTo(403);
+    assertThat(
+            operation(f, outsider.accessToken(), UUID.randomUUID().toString(), id, 100)
+                .getResponse()
+                .getStatus())
+        .isEqualTo(403);
+    history(f, 1);
+  }
+
+  @Test
+  void omittedOperationIdKeepsLegacyAdditiveBehavior() throws Exception {
+    var f = fixture();
+    pay(f.bob().accessToken(), f.group(), f.bob().user().id(), f.alice().user().id(), 100);
+    pay(f.bob().accessToken(), f.group(), f.bob().user().id(), f.alice().user().id(), 100);
+    history(f, 2);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void concurrentRetriesReturnOneOutcomeOrConflict(boolean changedPayload) throws Exception {
+    var f = fixture();
+    UUID id = UUID.randomUUID();
+    CyclicBarrier bothValidated = new CyclicBarrier(2);
+    // Both requests must pass the replay lookup before either inserts (no test transaction).
+    doAnswer(
+            call -> {
+              bothValidated.await(10, TimeUnit.SECONDS);
+              return mockingDetails(call.getMock())
+                  .getMockCreationSettings()
+                  .getDefaultAnswer()
+                  .answer(call);
+            })
+        .when(userRepository)
+        .findAllById(any());
+    try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var first = executor.submit(() -> operation(f, f.bob().accessToken(), f.group(), id, 100));
+      var second =
+          executor.submit(
+              () -> operation(f, f.bob().accessToken(), f.group(), id, changedPayload ? 200 : 100));
+      var results = List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
+      assertThat(results.stream().map(r -> r.getResponse().getStatus()).toList())
+          .containsExactlyInAnyOrder(201, changedPayload ? 409 : 201);
+      if (!changedPayload) {
+        assertThat(objectMapper.readTree(results.get(0).getResponse().getContentAsString()))
+            .isEqualTo(objectMapper.readTree(results.get(1).getResponse().getContentAsString()));
+      }
+      history(f, 1);
+      long expected =
+          objectMapper
+              .readTree(
+                  results.stream()
+                      .filter(r -> r.getResponse().getStatus() == 201)
+                      .findFirst()
+                      .orElseThrow()
+                      .getResponse()
+                      .getContentAsString())
+              .get("amountCents")
+              .asLong();
+      assertThat(balances(f.alice().accessToken(), f.group()).get(f.bob().user().email()))
+          .isEqualTo(expected);
+    }
+  }
 
   private String createGroup(String token, String name) throws Exception {
     MvcResult r =

@@ -105,6 +105,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
   **net in the group** is non-zero, so no debt is orphaned. The net comes from
   `BalanceService.computeBalances` — never a second aggregation.
+- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`PercentageSplitStrategy`
@@ -142,6 +143,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   request; protected 401 logout/redirect must match the initiating session version (even if a new login
   returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
   after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
+- **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Browser reload/cross-tab loses the identity; consult history after an uncertain response.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - Modal `<form>`s use `(submit)="$event.preventDefault(); save()"` — **not** `(ngSubmit)` — because modals
@@ -195,7 +197,7 @@ UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
   `split_type` (V4: `EQUAL/UNEQUAL/PERCENTAGE`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
 - **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense.
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
 
 User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All three split types store into the **same `share_cents`** column (no per-type storage), and each expense's shares sum exactly to its amount.
 
@@ -317,3 +319,6 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+
+- [x] Idempotent payment operations (#61, 2026-10-18) — optional UUID operation IDs scoped to authenticated requester/group, V9 unique identity, native PostgreSQL conflict arbitration and original-outcome replay; valid changed payloads return 409, separate IDs/legacy omitted IDs remain additive. Angular retains the pending identity through uncertain errors and modal reopen, resets on success/different submitted intent/account change, and cancels old-session requests. Corrected regression-first real API races, 147 backend/114 frontend tests, Spotless/Prettier/production build and production-build Chromium retry/reopen rehearsal passed; independent review found no blockers. Contract/limits and evidence in `docs/api/payment-retries.md` and `docs/reviews/2026-10-18-p2/issue-61.md`. In-memory client identity is lost on reload/cross-tab; no merge/deployment.
