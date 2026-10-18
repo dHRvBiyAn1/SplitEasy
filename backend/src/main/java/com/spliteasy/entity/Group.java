@@ -15,9 +15,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.UuidGenerator;
 
 @Entity
+@DynamicUpdate // Partial settings edits must not write stale values of omitted fields.
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA only

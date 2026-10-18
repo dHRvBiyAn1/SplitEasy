@@ -102,6 +102,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   exception is **deleting the group — creator only** (`groups.created_by` is the closest thing to an
   admin; there is no role column). The creator can also neither be removed nor leave, so a group
   can't end up with nobody able to delete it.
+- **Group PATCH writes only dirty settings columns** (`Group` uses Hibernate `@DynamicUpdate`), so
+  overlapping partial edits preserve omitted fields. Same-field edits have no version check: the
+  last committed dirty write wins; assigning the loaded value is a no-op. PATCH responses reflect
+  the transaction's loaded entity; use a fresh GET to observe other concurrent commits.
 - **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
   **net in the group** is non-zero, so no debt is orphaned. The net comes from
   `BalanceService.computeBalances` — never a second aggregation.
@@ -385,3 +389,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Account-owned profile preferences (#53, 2026-10-18) — immutable user-ID storage and synchronous linked-signal resets isolate phone/currency/avatar/first-visit across login, registration, logout and reload; stale profile drafts cannot overwrite another account. Ownerless legacy preferences are discarded, while device appearance stays shared. Six privacy regressions reproduced before the fix; frontend117/backend138, Prettier and production build passed. Isolated Chromium synthetic A→B→A login/edit/logout and both-account reloads verified rendered isolation and persistence; auth/dashboard HTTP was intercepted. Client-only persistence remains intentional; no merge/deployment.
+
+
+- [x] Concurrent partial group settings (#58, 2026-10-18) — Hibernate `@DynamicUpdate` prevents stale PATCH transactions from reverting omitted name/type/simplify-debts settings. Six deterministic authenticated owner/member PostgreSQL races failed before the fix, then passed in both commit orders; same-field/no-op behavior, sequential/null/omitted updates, validation and 403-before-404 remain covered. Backend 147/frontend 110, Spotless/Prettier and production build passed; independent review found no blockers. No schema change, merge or deployment.
