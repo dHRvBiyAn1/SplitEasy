@@ -325,3 +325,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Actionable concurrent expense conflicts (#41, 2026-10-17) — map Spring optimistic/stale-row failures to 409 with reload/review guidance. Regression-first concurrent authenticated PUTs against disposable PostgreSQL changed 200/500 to 200/409 while preserving exactly the winning expense, shares and zero-sum ledger; frontend keeps the edit open and never retries automatically. Backend141/frontend111, Spotless, Prettier and production build passed. Documented detected-transaction scope; no version/ETag/schema change, merge or deployment.
+
+
+- [x] Null expense split validation (#40, 2026-10-17) — element-level `@NotNull` validation rejects null split entries before service work. MockMvc/Testcontainers regressions cover null-only and mixed valid/null entries for POST/PUT with UNEQUAL/PERCENTAGE and confirm expense rows, shares and balances remain unchanged. Backend142, frontend110, Spotless, Prettier and production build passed; PR targets dev, no schema change or deployment.
