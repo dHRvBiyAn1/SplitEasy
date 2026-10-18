@@ -136,11 +136,12 @@
               } @else {
                 <input
                   class="prow__val"
+                  aria-describedby="ne-split-precision"
                   [attr.aria-label]="
                     m.displayName + (splitType() === 'PERCENTAGE' ? ' percentage' : ' exact amount')
                   "
                   type="number"
-                  step="0.01"
+                  step="any"
                   min="0"
                   inputmode="decimal"
                   [value]="values()[m.id] || ''"
@@ -151,6 +152,9 @@
             </div>
           }
         </div>
+        @if (splitType() !== 'EQUAL') {
+          <p class="mform__hint" id="ne-split-precision">Each share rounds to 2 decimal places.</p>
+        }
       </div>
 
       @if (!ready() && !error()) {

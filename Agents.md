@@ -152,6 +152,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   request; each refresh advances it so only the newest request owns data, error and loading. Protected
   401 logout/redirect must match the initiating session version (even if a new login returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
   after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
+- **Custom expense splits**: cache the normalized outgoing cents/basis-point list and reuse it for
+  the live total, validation and POST/PUT; reject negative/nonfinite/unsafe values before zero omission.
+  Round each share to the nearest hundredth with existing conversion helpers and explain this in the form.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - Modal `<form>`s use `(submit)="$event.preventDefault(); save()"` — **not** `(ngSubmit)` — because modals
@@ -361,3 +364,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Dashboard refresh ownership (#50, 2026-10-18) — advance the existing cache generation on every refresh so only the newest current-session request can change data, errors or loading; explicit clear and account reset still invalidate outstanding callbacks. Eight overlap regressions cover both completion orders and old/new success/failure (seven failed before fix); focused33/frontend118/backend138, Prettier, warning-free production build and synthetic Chromium8/8 HTTP/rendering checks passed. Browser refreshes use the Angular debug API; no live backend, merge or deployment. Evidence: `docs/reviews/2026-10-17-p2/issue-50.md`.
+
+
+- [x] Serialized split validation (#52, 2026-10-18) — new/edit expense totals, gate and POST/PUT reuse one cached nonnegative finite integer list; per-share nearest-hundredth rounding is explained in the form, zero omission and lossless exact edit prefill preserved. Regression first: 17 failures then focused28/full frontend133; backend138, Prettier, production build and local Chromium form/request checks pass. Browser APIs mocked; independent review cleared; no merge/deployment. Evidence: `docs/reviews/2026-10-17-p2/issue-52.md`.
