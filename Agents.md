@@ -204,7 +204,9 @@ Auth routes remain full-bleed with a named Appearance control.
   cancellation, blur/hidden state, reduction and teardown; native scroll/pinch stays available. Glass
   uses bounded shared CSS with reduced-motion/forced-color fallbacks. No new motion dependency.
 - **Dialogs:** shared named `ModalShellComponent` uses CDK focus trapping/restoration, inert shell,
-  body scroll locking, Escape and a scroll-contained mobile surface. `ModalService` owns New group /
+  body scroll locking, Escape and a scroll-contained mobile surface. Rendered content changes recover
+  heading focus only when removal leaves focus on body; all background navigation, including the skip
+  link, stays inside the inert shell. `ModalService` owns New group /
   New or edit expense / Settle up / Add member / Appearance; HTTP/session ownership stays in services.
 - **Group pages:** route/account/destroy changes cancel owned callbacks, and a new reload cancels its
   predecessor. Group, balance and expense reads complete together before actions render. Reload clears
@@ -394,3 +396,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Concurrent partial group settings (#58, 2026-10-18) — Hibernate `@DynamicUpdate` prevents stale PATCH transactions from reverting omitted name/type/simplify-debts settings. Six deterministic authenticated owner/member PostgreSQL races failed before the fix, then passed in both commit orders; same-field/no-op behavior, sequential/null/omitted updates, validation and 403-before-404 remain covered. Backend 147/frontend 110, Spotless/Prettier and production build passed; independent review found no blockers. No schema change, merge or deployment.
+
+
+- [x] Shared dialog focus continuity (#56, 2026-10-18) — recover heading focus through the existing CDK trap when settlement/content replacement removes its focused control, while preserving retained control focus; include the skip link in the inert background. Regression fails against the baseline shell, then frontend111/backend138, Prettier and production build pass. Synthetic Chromium at 1440×900, 320×568 and 844×390 covers all six dialog variants, keyboard trapping, select/Back and expense split changes, accessible names, Escape/Close launcher restoration and contained scrolling. Evidence: `docs/reviews/2026-10-17-p2/issue-56.md`; no real screen-reader/physical-device or production checks, merge or deployment.
