@@ -133,8 +133,8 @@ describe('expense form independent of overview availability', () => {
       fixture.detectChanges();
       const root: HTMLElement = fixture.nativeElement;
       const button = (text: string) =>
-        Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
-          (b) => b.textContent?.trim().endsWith(text),
+        Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+          b.textContent?.trim().endsWith(text),
         )!;
       const payerName = (m: (typeof members)[number]) =>
         `${m.id === me.id ? 'You: ' : ''}${m.displayName} (${m.email})`;

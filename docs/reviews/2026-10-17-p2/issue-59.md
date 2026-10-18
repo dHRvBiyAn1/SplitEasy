@@ -32,3 +32,9 @@ python3 -m unittest discover -s deploy/tests
 Frontend: 112 tests passed. Prettier and production build passed. Deployment checks: 12 passed. The isolated browser harness and raw AX/payload evidence are retained at `/workspace/issue-59-browser.py` and `/workspace/issue-59-browser-evidence.json` for this session; the assertions and identities are summarized above for durable review.
 
 Backend: 138 tests passed, no failures/errors/skips; Spotless check and Maven verify succeeded. Independent parent review cleared the final implementation. `git diff --check` passed.
+
+## CI formatting follow-up
+
+PR #90 run 39097517030 stopped at the full Prettier check because the final test-selector edit followed the earlier formatting pass. Reproduced the exact check on commit `480e135`: only `new-expense-modal.component.spec.ts` failed. Running Prettier on that file reflows the `find` callback without changing behavior. The full source-tree formatting check was then rerun successfully against the final content.
+
+Follow-up results: full frontend suite 112/112, production build, exact full-source Prettier and `git diff --check` pass. Backend/browser tests were not repeated for the whitespace-only test change; their prior results remain applicable.
