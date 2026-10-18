@@ -137,4 +137,49 @@ describe('group presentation ownership', () => {
       expect(fixture.nativeElement.textContent).toContain('No expenses yet');
     },
   );
+
+  it('drops pre-edit detail, then renders the saved amount, payer, and shares on re-expand', () => {
+    const fixture = TestBed.createComponent(GroupDetailComponent);
+    fixture.detectChanges();
+    http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
+    http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
+    http.match('/api/groups/a/expenses').forEach((r) => r.flush([summary]));
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('.xrow').click();
+    const oldDetail = http.expectOne('/api/groups/a/expenses/expense');
+    TestBed.inject(DashboardService).refresh();
+    http.expectOne('/api/dashboard').flush(overview);
+    fixture.detectChanges();
+    http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
+    http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
+    const updated = {
+      ...summary,
+      amountCents: 1203,
+      paidBy: { id: 'noor', displayName: 'Noor Kapoor', email: 'noor@example.test' },
+    };
+    http.match('/api/groups/a/expenses').forEach((r) => r.flush([updated]));
+    fixture.detectChanges();
+
+    expect(oldDetail.cancelled).toBe(true);
+    expect(fixture.nativeElement.querySelector('.xdetail')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('$12.03');
+
+    fixture.nativeElement.querySelector('.xrow').click();
+    http.expectOne('/api/groups/a/expenses/expense').flush({
+      ...updated,
+      groupId: 'a',
+      splitType: 'UNEQUAL',
+      participants: [
+        { user: updated.paidBy, shareCents: 703 },
+        { user, shareCents: 500 },
+      ],
+    });
+    fixture.detectChanges();
+    const receipt = fixture.nativeElement.querySelector('.xdetail').textContent;
+    expect(receipt).toContain('Noor paid');
+    expect(receipt).toContain('$12.03');
+    expect(receipt).toContain('$7.03');
+    expect(receipt).toContain('$5.00');
+  });
 });
