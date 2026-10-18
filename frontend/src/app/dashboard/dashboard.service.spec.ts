@@ -34,6 +34,37 @@ describe('overview refresh presentation', () => {
     expect(dashboard.loading()).toBe(false);
     expect(dashboard.error()).toBe(true);
   });
+  it('stops after consecutive initial failures until an explicit retry succeeds', () => {
+    const dashboard = TestBed.inject(DashboardService),
+      http = TestBed.inject(HttpTestingController);
+
+    dashboard.ensureLoaded();
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(dashboard.data()).toBeNull();
+    expect(dashboard.loading()).toBe(false);
+    expect(dashboard.error()).toBe(true);
+
+    dashboard.ensureLoaded();
+    dashboard.ensureLoaded();
+    http.expectNone('/api/dashboard');
+
+    dashboard.refresh();
+    expect(dashboard.loading()).toBe(true);
+    expect(dashboard.error()).toBe(false);
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(dashboard.loading()).toBe(false);
+    expect(dashboard.error()).toBe(true);
+    expect(dashboard.data()).toBeNull();
+
+    dashboard.ensureLoaded();
+    http.expectNone('/api/dashboard');
+
+    dashboard.refresh();
+    http.expectOne('/api/dashboard').flush(empty);
+    expect(dashboard.data()).toEqual(empty);
+    expect(dashboard.loading()).toBe(false);
+    expect(dashboard.error()).toBe(false);
+  });
   it('never restores the previous account cache from a late failed refresh', () => {
     const dashboard = TestBed.inject(DashboardService),
       http = TestBed.inject(HttpTestingController);
