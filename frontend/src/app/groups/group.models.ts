@@ -14,7 +14,7 @@ export interface GroupResponse {
   type: GroupType;
   createdBy: UserSummary;
   members: UserSummary[];
-  /** Group-wide: settle-up suggests the fewest payments for this group. */
+  /** Group-wide: settle-up uses suggested netted transfers for this group. */
   simplifyDebts: boolean;
   createdAt: string;
 }

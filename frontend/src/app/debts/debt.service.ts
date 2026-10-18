@@ -3,7 +3,7 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
 import { SimplifiedDebtsResponse } from './debt.models';
 
-/** Read-only: the minimal set of transfers that settles a group, derived from current balances. */
+/** Read-only: suggested greedy transfers that settle a group, derived from current balances. */
 @Injectable({ providedIn: 'root' })
 export class DebtService {
   private readonly api = inject(ApiService);

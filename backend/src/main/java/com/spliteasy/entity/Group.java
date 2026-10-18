@@ -43,8 +43,8 @@ public class Group {
   private User createdBy;
 
   /**
-   * Whether settle-up suggests the minimal set of payments for this group (migration V8). A
-   * group-wide setting, not a per-viewer one: it changes which payments are suggested.
+   * Whether settle-up uses suggested greedy payments for this group (migration V8). A group-wide
+   * setting, not a per-viewer one: it changes which payments are suggested.
    */
   @Column(name = "simplify_debts", nullable = false)
   private boolean simplifyDebts = true;

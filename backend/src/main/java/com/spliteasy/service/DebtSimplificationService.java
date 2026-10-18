@@ -15,16 +15,16 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Derives a minimal set of settle-up transfers from a group's current balances. Reads the netted
+ * Derives suggested greedy settle-up transfers from a group's current balances. Reads the netted
  * balances from {@link BalanceService} (which already folds expenses + payments and guarantees a
  * zero-sum group) — it does NOT re-aggregate anything itself. Read-only and on demand: nothing is
  * persisted.
  *
  * <p>Algorithm: greedy max-creditor / max-debtor matching. Repeatedly settle the largest amount
  * possible between the biggest debtor and biggest creditor. This is a well-known near-optimal
- * heuristic for the (NP-hard) minimum-transaction problem; it yields at most N-1 transfers and is
- * optimal in the common cases. Because balances are zero-sum integer cents, the transfers settle
- * every member to exactly zero with no leftover cents.
+ * heuristic for the minimum-transaction problem; it yields at most N-1 transfers but does not
+ * guarantee the globally fewest transfers. For zero-sum integer-cent balances, the transfer plan
+ * settles every member to exactly zero with no leftover cents.
  */
 @Service
 @RequiredArgsConstructor

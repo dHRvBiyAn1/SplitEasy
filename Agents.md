@@ -7,7 +7,7 @@ Conventions, Data Model, and the Progress Log (append one line per shipped featu
 
 Expense-splitting web app: users create groups, add expenses split among members
 (equal / exact / percentage), and the app tracks who owes whom, plus settle-up
-payments and a debt-simplification suggestion (minimize transactions). Balances are
+payments and greedy debt-simplification suggestions. Balances are
 **derived on read**, never stored.
 
 ## Stack
@@ -66,7 +66,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
 | GET/POST | `/groups/{g}/payments` | settle-up history / record |
-| GET | `/groups/{g}/debt-simplification` | minimal transfers |
+| GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
 ## Architecture
 
@@ -238,7 +238,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   an inner `REQUIRED` transaction cannot upgrade its caller. Read-only alone is insufficient. Concurrency
   regressions use real committed writes between aggregates, without a test-managed reader transaction.
 - **Three views, one source of truth** (persisted expense/payment rows): (1) `BalanceService` net-per-member;
-  (2) `DebtSimplificationService` minimal transfers; (3) `PairwiseBalanceService` who-owes-whom-to-me per
+  (2) `DebtSimplificationService` greedy transfer suggestions; (3) `PairwiseBalanceService` who-owes-whom-to-me per
   counterparty (drives dashboard cards, People list, settle-up, balance pills). Pairwise is **not netted across
   people** (can show "Dan owes you $50" and "you owe Sofia $50" at once); pairwise nets sum to the member's net.
 - **`GET /api/dashboard`** assembles one payload: cross-group totals (`totalNetCents = owed − owe`), per-group
@@ -314,7 +314,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   to an icon rail (persisted), glyphs became SVGs, and the old `/groups` list page is gone.
   Backend 107/107, frontend 50/50.
 - [x] Settle-up simplification + UI fixes — `feat/settle-up-simplify-and-ui-fixes`: Settle up opens on
-  the simplified (fewest) payments with a Simplify switch back to every direct balance, scoped per
+  the suggested netted payments with a Simplify switch back to every direct balance, scoped per
   group; amounts are editable so a balance can be settled partially; Add member moved into the group
   action row; dashboard member count centered; avatar/glyph colors made theme-aware via `--avatar-ink`
   (they were dark-mode-only, so light mode showed dark tiles). Frontend 50/50, backend 97/97.
@@ -341,6 +341,8 @@ UI redesign planning (2026-10-16): isolated `feat/ui-redesign` from fetched `ori
 UI concept follow-up (2026-10-16): three palettes for each of four layouts (12 options, 24 light/dark combinations) in `docs/concepts/ui-redesign/colors.html`; working theme toggles/profile controls and Silk Ribbon, Comet Trail, Echo Rings directly in all four previews. Shared static palette/preview sources; URL/session-only appearance selection. Desktop/mobile, rendered contrast, dialog overlay and reduced-motion checks recorded alongside screenshots. Prototype artifacts only; no product implementation, commit, push or deployment.
 
 Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol default, switchable Lilac/Plum and Peach/Cocoa plus independent Light/Dark, fixed Silk Ribbon mouse trail and short touch bloom/trace. Static preview now includes persisted Appearance controls, icon-and-label mobile/tablet dock with correct selection restoration, and bounded liquid-glass hover/press. Thirty responsive combinations and480 rendered-text checks passed; hover/reduction and touch rehearsal recorded, real-device touch/performance remains production verification. Spec/plan updated to the selected direction. No Angular/backend change, commit, push or deployment.
+
+- [x] Greedy settlement wording (#57) — current UI/API/README copy describes netted transfers as suggestions and removes global fewest-payment claims; greedy algorithm and zero-sum, no-leftover, ≤N−1 guarantees are unchanged.
 
 - [x] Pocket Objects Angular implementation (2026-10-17) — selected Seafoam/Petrol default with three independent palettes and System/Light/Dark modes across shell, overview, group/settings, auth, profile and all modals; local licensed fonts, SVG objects, icon dock, named focus-trapped dialogs, Silk Ribbon/touch and bounded liquid glass with accessibility fallbacks. Regression-first theme/motion/dialog/nav/cache/route ownership fixes; frontend 105/backend 138/deployment 12, Prettier and warning-free production build passed. Local synthetic browser flows cover registration/account switching, group/member edits, exact→percentage edit/delete, partial settlement, 320px/landscape and near-cap amounts. Physical-device touch/performance QA remains unmeasured. Implemented on feat/ui-redesign; user subsequently authorized commit/push, successful branch CI, then a PR to dev. User subsequently authorized resolving Codex review and merging PR #70 into dev after checks. No production deployment is authorized.
 
