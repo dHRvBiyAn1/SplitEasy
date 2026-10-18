@@ -157,6 +157,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   Round each share to the nearest hundredth with existing conversion helpers and explain this in the form.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
+- New-group member additions retain the created group ID and per-email outcomes; failed-only retries reuse that group. Keep session cancellation after the entire sequential aggregation.
 - Modal `<form>`s use `(submit)="$event.preventDefault(); save()"` — **not** `(ngSubmit)` — because modals
   use bare `[formControl]`s (no `formGroup`/`NgForm`), so a submit would otherwise reload the page.
 - **`.dc-amount` is the single owed/owing color convention** (`--owed` green / `--owes` pink / `--settled`
@@ -370,3 +371,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Mobile account navigation (#54, 2026-10-18) — verified the Pocket Objects four-item labeled mobile/tablet dock already exposes Profile through 1024px. Real Chromium keyboard checks at 390, 820, and 821px with both persisted sidebar preferences, plus pointer checks at all three widths, confirmed Profile navigation, reachable sign-out, login redirection, and removal of synthetic access-token/user storage. No product change or duplicate component test was needed; evidence in `docs/reviews/2026-10-17-p2/issue-54.md`.
+
+
+- [x] Partial group member additions (#55, 2026-10-18) — retain the created group and successful member additions, show per-email friendly results, and retry only failed emails against the same group. Sequential request/session cancellation remains intact. Regression-first component/HTTP coverage; frontend114/backend138, full Prettier and production build passed. Local mobile Chromium synthetic 200/404/409/503 flow verified failed-only retry, one create and group navigation; no production failure injection, merge or deployment.
