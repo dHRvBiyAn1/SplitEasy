@@ -37,7 +37,7 @@ export class DashboardService {
 
   /** Force a re-fetch (after a mutation). */
   refresh(): void {
-    const version = this.cacheVersion;
+    const version = ++this.cacheVersion;
     this._loading.set(true);
     this._error.set(false);
     this.api
