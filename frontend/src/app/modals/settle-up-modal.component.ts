@@ -42,7 +42,7 @@ export class SettleUpModalComponent {
   /** Set when the simplified fetch fails, so every group falls back to direct balances. */
   private readonly simplifyFailed = signal(false);
 
-  /** Group ids whose settings ask for the fewest payments (Advanced settings). */
+  /** Group ids whose settings use suggested netted transfers (Advanced settings). */
   private readonly simplifyingGroupIds = computed(() =>
     this.simplifyFailed()
       ? new Set<string>()
@@ -58,7 +58,7 @@ export class SettleUpModalComponent {
 
   /**
    * Simplification is a per-group setting, so the list mixes the two: a simplifying group
-   * contributes its minimal payments, any other contributes its direct balances as-is.
+   * contributes its suggested transfers, any other contributes its direct balances as-is.
    */
   protected readonly settlements = computed<Settlement[]>(() => {
     const simplifying = this.simplifyingGroupIds();

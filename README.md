@@ -30,7 +30,7 @@ percentages**, then settle up in one tap.
 | ➗ | **Three split modes** | **Equal** (remainder cents absorbed by the payer), **Unequal** (exact cents, must sum to the total), **Percentage** (basis points, must sum to 100%). |
 | ⚖️ | **Live balances** | Net per member, plus a pairwise *"who owes whom, to me"* view — recomputed from source rows on every read, so they can never drift. |
 | 🤝 | **Settle up** | Record a payment between two members. Overpayment allowed — real people round up. |
-| 🧠 | **Simplify debts** | A greedy max-creditor/max-debtor matcher suggests the minimal transfer set (≤ N−1 transfers, no leftover cents). One tap turns a suggestion into a payment. |
+| 🧠 | **Simplify debts** | A greedy max-creditor/max-debtor matcher suggests transfers (at most N−1, with no leftover cents); it does not guarantee the globally fewest payments. One tap turns a suggestion into a payment. |
 | 📊 | **Dashboard** | One aggregated payload: cross-group totals, per-group cards, a People list, and a merged activity feed with your +lent / −borrowed delta per item. |
 | 👤 | **Profile & theming** | Inline-editable profile, avatar colors, currency choice, and a System / Light / Dark theme toggle that overrides the OS. |
 
@@ -138,7 +138,7 @@ Group routes are member-only — non-members get **403, even for nonexistent gro
 | `GET/PUT/DELETE` | `/groups/{g}/expenses/{e}` | detail / full-replace edit / delete |
 | `GET` | `/groups/{g}/balances` · `…/balances/mine` | net per member / pairwise to me |
 | `GET/POST` | `/groups/{g}/payments` | settle-up history / record |
-| `GET` | `/groups/{g}/debt-simplification` | minimal transfer suggestions |
+| `GET` | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
 ## Production deployment
 

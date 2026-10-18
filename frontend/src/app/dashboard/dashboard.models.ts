@@ -20,7 +20,7 @@ export interface DashboardGroup {
   youAreOwedCents: number;
   youOweCents: number;
   netCents: number;
-  /** Group setting: settle-up suggests the fewest payments for this group. */
+  /** Group setting: settle-up uses suggested netted transfers for this group. */
   simplifyDebts: boolean;
 }
 
