@@ -146,6 +146,13 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Expense group ownership**: each member-load callback must match the current selection generation
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
   member/detail loads. Existing expense edits keep their original group in both UI and component actions.
+
+- **Profile preferences belong to immutable auth user IDs**: phone, display currency, avatar color and
+  first-visit date use `spliteasy.profile.<userId>`. Linked signals synchronously reload/reset saved prefs
+  and profile edit state when identity changes, including before an immediate save. The ownerless legacy
+  `spliteasy.profile` key is discarded without migration; users re-enter those personal fields. Theme and
+  palette intentionally remain device-wide.
+
 - **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
   synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
   call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
@@ -260,8 +267,9 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   mix simplified and direct rows. The flag rides on the dashboard payload
   (`GroupSummary` → `DashboardGroup`) — anything changing it must call `dashboard.refresh()`, or the
   modal keeps reading the cached value.
-- **Profile prefs are client-side only** (PR #23) — phone/currency/avatar-color/theme in localStorage,
-  "First seen here" = first-visit month. No profile-update endpoint or signup-date column yet.
+- **Profile prefs are client-side only** (PR #23, #53) — phone/currency/avatar-color per account in
+  localStorage; theme/palette per device. "First seen here" = first-visit month. No profile-update
+  endpoint or signup-date column yet.
 
 ## Git Workflow
 
@@ -374,3 +382,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Partial group member additions (#55, 2026-10-18) — retain the created group and successful member additions, show per-email friendly results, and retry only failed emails against the same group. Sequential request/session cancellation remains intact. Regression-first component/HTTP coverage; frontend114/backend138, full Prettier and production build passed. Local mobile Chromium synthetic 200/404/409/503 flow verified failed-only retry, one create and group navigation; no production failure injection, merge or deployment.
+
+
+- [x] Account-owned profile preferences (#53, 2026-10-18) — immutable user-ID storage and synchronous linked-signal resets isolate phone/currency/avatar/first-visit across login, registration, logout and reload; stale profile drafts cannot overwrite another account. Ownerless legacy preferences are discarded, while device appearance stays shared. Six privacy regressions reproduced before the fix; frontend117/backend138, Prettier and production build passed. Isolated Chromium synthetic A→B→A login/edit/logout and both-account reloads verified rendered isolation and persistence; auth/dashboard HTTP was intercepted. Client-only persistence remains intentional; no merge/deployment.
