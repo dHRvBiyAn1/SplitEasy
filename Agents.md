@@ -143,6 +143,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 ## Frontend Conventions
 
+- **Expense group ownership**: each member-load callback must match the current selection generation
+  (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
+  member/detail loads. Existing expense edits keep their original group in both UI and component actions.
 - **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
   synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
   call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
@@ -350,3 +353,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Group route ownership (#48, 2026-10-17) — retain the redesign's route/account/destroy cancellation and combined required reads; clear prior pairwise balances and history immediately on group navigation. Five controlled regressions cover loaded-A reset, late A success/403 in either response order, rendered B header/balances/history/settings and expense/settlement modal scope, and destruction teardown. Regression-first failure confirmed; frontend115/backend138, Prettier/Spotless and production build passed. Local rendered Angular integration verified; no live browser/API check, merge or deployment.
+
+
+- [x] Expense group ownership (#47, 2026-10-17) — member-load generations reject stale successes/errors (including A → B → A); switching groups clears member/payer/split state and save waits for members plus edit details. Edit group controls and component actions stay fixed to the original group. Ten component/HTTP regressions inspect B-first/A-last participants and the actual POST/PUT paths; original source reproduced nine failures plus three unhandled load errors. Backend138/frontend120, Spotless/Prettier and production build passed; independent review found no blockers. No live-browser or production-write claim; PR targets dev, no merge/deployment.
