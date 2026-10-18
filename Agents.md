@@ -367,3 +367,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 
 - [x] Serialized split validation (#52, 2026-10-18) — new/edit expense totals, gate and POST/PUT reuse one cached nonnegative finite integer list; per-share nearest-hundredth rounding is explained in the form, zero omission and lossless exact edit prefill preserved. Regression first: 17 failures then focused28/full frontend133; backend138, Prettier, production build and local Chromium form/request checks pass. Browser APIs mocked; independent review cleared; no merge/deployment. Evidence: `docs/reviews/2026-10-17-p2/issue-52.md`.
+
+
+- [x] Mobile account navigation (#54, 2026-10-18) — verified the Pocket Objects four-item labeled mobile/tablet dock already exposes Profile through 1024px. Real Chromium keyboard checks at 390, 820, and 821px with both persisted sidebar preferences, plus pointer checks at all three widths, confirmed Profile navigation, reachable sign-out, login redirection, and removal of synthetic access-token/user storage. No product change or duplicate component test was needed; evidence in `docs/reviews/2026-10-17-p2/issue-54.md`.
