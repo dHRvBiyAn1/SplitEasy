@@ -3,7 +3,9 @@ package com.spliteasy.controller;
 import com.spliteasy.dto.auth.AuthResponse;
 import com.spliteasy.dto.auth.LoginRequest;
 import com.spliteasy.dto.auth.RegisterRequest;
+import com.spliteasy.service.AuthRateLimiter;
 import com.spliteasy.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,14 +21,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private final AuthService authService;
+  private final AuthRateLimiter rateLimiter;
 
   @PostMapping("/register")
-  public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+  public ResponseEntity<AuthResponse> register(
+      @Valid @RequestBody RegisterRequest request, HttpServletRequest http) {
+    rateLimiter.register(http.getRemoteAddr());
     return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
   }
 
   @PostMapping("/login")
-  public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+  public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+    rateLimiter.login(request.email(), http.getRemoteAddr());
     return authService.login(request);
   }
 }

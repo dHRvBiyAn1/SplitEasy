@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.spliteasy.dto.auth.AuthResponse;
 import com.spliteasy.dto.auth.LoginRequest;
 import com.spliteasy.dto.auth.RegisterRequest;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -22,6 +23,10 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 public abstract class AbstractIntegrationTest {
+  private static final AtomicInteger CLIENT_SEQUENCE = new AtomicInteger();
+  private final int clientId = CLIENT_SEQUENCE.incrementAndGet();
+  // Each test owns a client, while repeated attempts within a test share its real policy bucket.
+  private final String clientIp = "198.18." + (clientId / 256) + "." + (clientId % 256);
 
   @Autowired protected MockMvc mockMvc;
 
@@ -32,7 +37,14 @@ public abstract class AbstractIntegrationTest {
   }
 
   protected MockHttpServletRequestBuilder jsonPost(String url, Object body) throws Exception {
-    return post(url).contentType(MediaType.APPLICATION_JSON).content(json(body));
+    return post(url)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(json(body))
+        .with(
+            request -> {
+              request.setRemoteAddr(clientIp);
+              return request;
+            });
   }
 
   /** Registers a user and returns the issued access token. */

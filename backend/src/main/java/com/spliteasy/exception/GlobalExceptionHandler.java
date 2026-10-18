@@ -40,6 +40,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(body(HttpStatus.BAD_REQUEST, message));
   }
 
+  @ExceptionHandler(TooManyRequestsException.class)
+  public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.retryAfterSeconds()))
+        .body(body(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
+  }
+
   @ExceptionHandler(BadCredentialsException.class)
   public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
     // Deliberately generic — never reveal whether the email or the password was wrong.

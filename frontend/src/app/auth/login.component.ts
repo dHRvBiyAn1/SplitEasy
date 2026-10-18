@@ -37,7 +37,11 @@ export class LoginComponent {
     this.auth.login(this.form.getRawValue()).subscribe({
       next: () => this.router.navigate(['/dashboard']),
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Login failed. Please try again.');
+        this.error.set(
+          err?.status === 429
+            ? 'Too many attempts. Please wait before trying again.'
+            : (err?.error?.message ?? 'Login failed. Please try again.'),
+        );
         this.submitting.set(false);
       },
     });
