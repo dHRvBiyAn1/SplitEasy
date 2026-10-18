@@ -78,6 +78,7 @@
               type="button"
               class="chip"
               [class.chip--on]="paidBy() === m.id"
+              [attr.aria-label]="memberLabel(m)"
               [attr.aria-pressed]="paidBy() === m.id"
               (click)="paidBy.set(m.id)"
             >
@@ -130,13 +131,16 @@
                     class="prow__check"
                     [checked]="included().has(m.id)"
                     (change)="toggle(m.id)"
-                    [attr.aria-label]="'Include ' + m.displayName"
+                    [attr.aria-label]="'Include ' + memberLabel(m)"
                 /></label>
               } @else {
                 <input
                   class="prow__val"
                   [attr.aria-label]="
-                    m.displayName + (splitType() === 'PERCENTAGE' ? ' percentage' : ' exact amount')
+                    memberLabel(m) +
+                    (splitType() === 'PERCENTAGE'
+                      ? ' share in percent'
+                      : ' exact amount in dollars')
                   "
                   type="number"
                   step="0.01"

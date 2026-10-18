@@ -142,6 +142,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   request; protected 401 logout/redirect must match the initiating session version (even if a new login
   returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
   after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
+- Financial member controls use full display name plus email for accessible identity (including duplicate names),
+  numeric split labels name dollars or percent, and selection buttons expose `aria-pressed`.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - Modal `<form>`s use `(submit)="$event.preventDefault(); save()"` — **not** `(ngSubmit)` — because modals
@@ -317,3 +319,5 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 - [x] Scoped expense availability (PR #70 review, 2026-10-17) — preserve Add/Edit Expense when a valid group scope exists even if the overview is pending or failed. Four reproduced failures now pass through rendered fields and correct POST/PUT cents payloads; the genuine no-group Create group prompt remains covered. Frontend 110/110, Prettier and production build pass. PR CI and review-thread resolution gate the user-authorized merge into dev; no production deployment.
 
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
+
+- [x] Financial control accessibility (#59, 2026-10-18) — full display name plus email distinguishes duplicate-name payer/participant controls; exact/percentage labels include units. Preserves existing debt-switch checked and payer/category pressed semantics and financial calculations. Regression-first rendered tests, real Chromium AX/three-member payload checks, frontend 112/backend 138/deployment 12, Prettier and production build passed. No merge or deployment.
