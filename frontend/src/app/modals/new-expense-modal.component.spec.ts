@@ -131,4 +131,31 @@ describe('expense form independent of overview availability', () => {
     root.querySelector<HTMLButtonElement>('.mform .dc-btn-outline')!.click();
     expect(modal.active()).toBe('group');
   });
+
+  it('shows a conflicting edit message and keeps the form open without retrying', () => {
+    modal.openExpense(group.id, expense.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush(expense);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    const description = root.querySelector<HTMLInputElement>('#ne-desc')!;
+    description.value = 'My edit';
+    description.dispatchEvent(new Event('input', { bubbles: true }));
+    root
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const message =
+      'This record was changed by another request. Reload and review the latest changes before saving again.';
+    http
+      .expectOne({ method: 'PUT', url: `/api/groups/${group.id}/expenses/${expense.id}` })
+      .flush({ status: 409, error: 'Conflict', message }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+    expect(root.textContent).toContain(message);
+    expect(description.value).toBe('My edit');
+    expect(root.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(false);
+    expect(modal.active()).toBe('expense');
+    http.expectNone(`/api/groups/${group.id}/expenses/${expense.id}`);
+    http.expectNone('/api/dashboard');
+  });
 });

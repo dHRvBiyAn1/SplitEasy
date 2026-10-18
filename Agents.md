@@ -120,6 +120,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   strategy path; participants cleared and **flushed before re-insert** (unique `(expense_id,user_id)`).
   **Delete = hard delete** (204; FK-cascade removes participants). Balances re-aggregate, so edits/deletes
   reflect automatically — no special-casing.
+- **Detected concurrent writes**: Spring `OptimisticLockingFailureException` (including translated
+  Hibernate stale-row failures) maps to **409** with reload/review guidance. Transactions roll back;
+  clients never automatically retry the edit. No version/ETag contract guards stale separate GET/PUTs.
 - **Indexes** live in Flyway migrations, named `idx_<table>_<cols>` (unique constraints
   `uq_<table>_<cols>`). Every FK column is indexed; **filter+sort paths get a composite
   `(filter_col, sort_col DESC…)`** whose leftmost prefix also serves the plain filter, so
@@ -319,3 +322,6 @@ Selected design (2026-10-16): user chose Pocket Objects with Seafoam & Petrol de
 Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, CI/Codex review resolution, merge and verification that Pocket Objects is live on split-easy.io. Synchronize the already-released #69 main history into dev while preserving the fully tested Pocket Objects application tree, session isolation and scoped-expense fix. Production delivery remains the existing main-only backend-first workflow; no database/schema change.
 
 - [x] BCrypt registration byte boundary (#39, 2026-10-17) — reject passwords over 72 UTF-8 bytes in the shared registration service with a clear 400; preserve minimum 8 characters and unchanged passwords. Angular validates the same byte limit and explains multibyte characters. Red/green ASCII/accent/emoji API and form regressions; backend144/frontend116, Spotless/Prettier and production build passed. Local Chromium rejected 73/80/76-byte inputs with unchanged values and accessible errors; 72-byte registration/login covered against disposable PostgreSQL. No schema change or deployment.
+
+
+- [x] Actionable concurrent expense conflicts (#41, 2026-10-17) — map Spring optimistic/stale-row failures to 409 with reload/review guidance. Regression-first concurrent authenticated PUTs against disposable PostgreSQL changed 200/500 to 200/409 while preserving exactly the winning expense, shares and zero-sum ledger; frontend keeps the edit open and never retries automatically. Backend141/frontend111, Spotless, Prettier and production build passed. Documented detected-transaction scope; no version/ETag/schema change, merge or deployment.
