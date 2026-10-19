@@ -159,6 +159,13 @@
                   </span>
                 </button>
 
+                @if (deleteError(); as failure) {
+                  @if (failure.expenseId === e.id) {
+                    <p role="alert">
+                      Could not delete "{{ e.description }}". {{ failure.message }}
+                    </p>
+                  }
+                }
                 @if (expandedId() === e.id) {
                   <div class="xdetail">
                     @if (detailLoading()) {
@@ -184,9 +191,6 @@
                           <span class="xdetail__who">{{ partLabel(p) }}</span>
                           <span class="xdetail__amt">${{ display(p.shareCents) }}</span>
                         </div>
-                      }
-                      @if (deleteError()) {
-                        <p role="alert">{{ deleteError() }}</p>
                       }
                       <div class="xdetail__actions">
                         <button type="button" class="dc-btn-outline" (click)="editExpense(e)">

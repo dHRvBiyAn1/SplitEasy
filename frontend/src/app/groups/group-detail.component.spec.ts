@@ -16,6 +16,7 @@ const expense = {
   viewerDeltaCents: 1000,
   participants: [{ user, shareCents: 2000 }],
 };
+const secondExpense = { ...expense, id: 'second', description: 'Lunch' };
 describe('visible expense failures', () => {
   let http: HttpTestingController;
   const params = new BehaviorSubject(convertToParamMap({ id: 'a' }));
@@ -32,12 +33,12 @@ describe('visible expense failures', () => {
     http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());
-  function open() {
+  function open(items = [expense]) {
     const fixture = TestBed.createComponent(GroupDetailComponent);
     fixture.detectChanges();
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
-    http.expectOne('/api/groups/a/expenses').flush([expense]);
+    http.expectOne('/api/groups/a/expenses').flush(items);
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.xrow') as HTMLButtonElement).click();
     return fixture;
@@ -76,6 +77,80 @@ describe('visible expense failures', () => {
       'true',
     );
     expect(fixture.nativeElement.textContent).toContain('Dinner');
+  });
+  it('keeps delayed deletion guidance visible on its expense after collapsing it', () => {
+    const fixture = open();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
+    const deletion = http.expectOne('/api/groups/a/expenses/e');
+    (fixture.nativeElement.querySelector('.xrow') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    deletion.flush(
+      { message: 'Re-add former participants before changing this expense.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    fixture.detectChanges();
+    const row = fixture.nativeElement.querySelector('.xitem');
+    expect(row.querySelector('.xrow').getAttribute('aria-expanded')).toBe('false');
+    expect(row.querySelector('[role=alert]')?.textContent).toContain('Re-add former participants');
+    (row.querySelector('.xrow') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(row.querySelector('[role=alert]')?.textContent).toContain('Re-add former participants');
+  });
+  it('keeps delayed deletion guidance on Dinner when Lunch is expanded', () => {
+    const fixture = open([expense, secondExpense]);
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
+    const deletion = http.expectOne('/api/groups/a/expenses/e');
+    (fixture.nativeElement.querySelectorAll('.xrow')[1] as HTMLButtonElement).click();
+    http.expectOne('/api/groups/a/expenses/second').flush(secondExpense);
+    deletion.flush(
+      { message: 'Re-add former participants before changing this expense.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    fixture.detectChanges();
+    const rows = fixture.nativeElement.querySelectorAll('.xitem');
+    expect(rows[0].querySelector('[role=alert]')?.textContent).toContain('Dinner');
+    expect(rows[0].querySelector('[role=alert]')?.textContent).toContain(
+      'Re-add former participants',
+    );
+    expect(rows[1].querySelector('.xrow').getAttribute('aria-expanded')).toBe('true');
+    expect(rows[1].querySelector('[role=alert]')).toBeNull();
+  });
+  it('refreshes the rendered expenses after successful deletion', () => {
+    const fixture = open([expense, secondExpense]);
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
+    http
+      .expectOne('/api/groups/a/expenses/e')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    http.expectOne('/api/dashboard').flush({
+      totalNetCents: 0,
+      owedCents: 0,
+      owedPeopleCount: 0,
+      oweCents: 0,
+      owePeopleCount: 0,
+      groupCount: 1,
+      groups: [],
+      people: [],
+      settlements: [],
+      activity: [],
+    });
+    fixture.detectChanges();
+    http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
+    http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/expenses').flush([secondExpense]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Dinner');
+    expect(fixture.nativeElement.textContent).toContain('Lunch');
+    expect(fixture.nativeElement.querySelectorAll('.xrow')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('[role=alert]')).toBeNull();
   });
   it('exposes the full financial date to assistive technology', () => {
     const fixture = open();

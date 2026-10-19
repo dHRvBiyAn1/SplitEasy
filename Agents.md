@@ -298,7 +298,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Progress Log
 
-- [x] Alignment F03 interactions (2026-10-19) — removed local name/login-email mutation, clarified device-only preferences, exposed detail/delete/load errors with deliberate draft-preserving retries, guarded pending dialog closure across all four mutation dialogs, and completed settlement identity/totals/date accessibility. Regression-first frontend210/backend207, formatting and production build passed; built-app Chromium at1280/390px verified keyboard/retry/pending/payment-operation reuse with intercepted APIs. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. Separate PR to dev; no merge/deployment or claim of real profile/currency implementation.
+- [x] Alignment F03 interactions (2026-10-19) — removed local name/login-email mutation, clarified device-only preferences, exposed detail/delete/load errors with deliberate draft-preserving retries, guarded pending dialog closure across all four mutation dialogs, and completed settlement identity/totals/date accessibility. Regression-first frontend213/backend207, formatting and production build passed; review follow-up keeps delayed DELETE conflicts attached to their original expense row after collapse/switch, with rendered success-refresh coverage. Built-app Chromium at1280/390px verified keyboard/retry/pending/payment-operation reuse, delayed-conflict ownership and successful deletion with intercepted APIs. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. Separate PR to dev; no merge/deployment or claim of real profile/currency implementation.
 
 *(One line per shipped feature, oldest → newest.)*
 

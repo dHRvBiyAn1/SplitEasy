@@ -74,7 +74,7 @@ export class GroupDetailComponent implements OnInit {
   protected readonly detail = signal<ExpenseResponse | null>(null);
   protected readonly detailLoading = signal(false);
   protected readonly detailError = signal<string | null>(null);
-  protected readonly deleteError = signal<string | null>(null);
+  protected readonly deleteError = signal<{ expenseId: string; message: string } | null>(null);
   protected readonly deletingId = signal<string | null>(null);
   /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
   private detailRequest?: Subscription;
@@ -189,7 +189,6 @@ export class GroupDetailComponent implements OnInit {
   toggleExpand(e: ExpenseSummary): void {
     this.detailRequest?.unsubscribe();
     this.detailError.set(null);
-    this.deleteError.set(null);
     if (this.expandedId() === e.id) {
       this.expandedId.set(null);
       this.detail.set(null);
@@ -248,9 +247,10 @@ export class GroupDetailComponent implements OnInit {
       },
       error: (err) => {
         this.deletingId.set(null);
-        this.deleteError.set(
-          err?.error?.message ?? 'Could not delete this expense. Please try again.',
-        );
+        this.deleteError.set({
+          expenseId: e.id,
+          message: err?.error?.message ?? 'Could not delete this expense. Please try again.',
+        });
       },
     });
   }
