@@ -12,8 +12,9 @@ The resource server verifies the HS256 signature, configured `app.jwt.issuer`, a
 token timestamps on protected requests. Spring Security's default timestamp
 validator permits 60 seconds of clock skew; the nominal one-hour lifetime is not
 an exact wall-clock cutoff. An expired or otherwise invalid bearer token receives
-401. The browser keeps the access token and user summary in localStorage across
-page reloads; local identity state is not proof of server authorization. There is
+401. These protected-route failures are produced by the Spring Security filter chain,
+so their error body is not guaranteed to match the application `ErrorResponse` schema.
+The browser keeps the access token and user summary in localStorage across page reloads; local identity state is not proof of server authorization. There is
 no client expiry timer. The next protected API request that returns 401 clears
 the matching client session and redirects to `/login`. A late 401 from an earlier
 session cannot clear a subsequent login.

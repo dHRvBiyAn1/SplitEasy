@@ -3,6 +3,12 @@
 Project living memory. **Read before a task; update after one** — especially
 Conventions, Data Model, and the Progress Log (append one line per shipped feature).
 
+## Agent skills
+
+Use **Matt Pocock's skills instead of Superpowers**, as selected by the user. Before planning, implementation, debugging or review, read [the engineering workflow](docs/agents/engineering-workflow.md); project-local skills live in `.agents/skills/`. Keep Ponytail's simplicity guidance. This repository's instruction file is `Agents.md`; update it without creating a second differently cased file.
+
+Issues use [GitHub](docs/agents/issue-tracker.md); domain documentation uses [a single context](docs/agents/domain.md). Keep at most three active worker threads, no Astra and Sol reasoning at most high. Work branches start from `dev` and PRs target `dev`.
+
 ## Overview
 
 Expense-splitting web app: users create groups, add expenses split among members
@@ -424,3 +430,7 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 - [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
 
 P2 integration and release preparation (2026-10-18): user authorized merging PRs #72–#93 into dev, combined final checks, then a release PR to main. All 22 exact heads retained; released main history synchronized with no tree change. Shared exception/auth/test conflicts preserve both fixes. Combined backend207/frontend187/deployment12, formatting, production build, ShellCheck/Actionlint and synthetic Chromium dashboard/split checks pass; independent integration review found no blockers. Evidence: `docs/reviews/2026-10-18-p2/integration.md`. Dev CI gates release PR creation; main merge and production deployment remain unauthorized.
+
+Splitwise alignment planning (2026-10-19): proposed design in `docs/superpowers/specs/2026-10-19-splitwise-alignment-design.md`, roadmap and first-batch execution plan in `docs/superpowers/plans/2026-10-19-splitwise-alignment*.md`, and CSV/JSON delivery map for all 81 audited features. Thirty-eight work packages prioritize financial lifecycle/projection correctness, then core foundations/social/history/offline, then Pro and conditional integrations. First batch is F01/F03/F04 with at most three streams, no Astra and Sol reasoning at most high. Planning only; no application implementation, commit, push or deployment. The audit's v0.1.0 baseline and current defects are evidence for proposed work, not shipped fixes.
+
+Engineering workflow selection (2026-10-19): user replaced Superpowers with `mattpocock/skills`. Ten upstream skill directories copied unchanged to ignored project-local `.agents/skills/` at commit `49dd158d1076134a641b33efb035946536778336`, retaining MIT license and hash manifest. Repo setup and override rules are in `docs/agents/`; alignment headers now use this workflow. No global plugin registration, application implementation, commit, push or remote changes.
