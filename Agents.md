@@ -72,6 +72,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
 | GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
+| GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
 | GET/POST | `/groups/{g}/payments` | settle-up history / record |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
@@ -153,6 +154,11 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
 ## Frontend Conventions
+
+- **Member departure controls**: settings require both net balances and raw bilateral obligations to load before enabling removal/leave; zero net with obligations is “even overall”, and counterparties/amounts stay visible in either simplification mode. Refresh failures disable removal/leave even when the old group is retained.
+- **Profile identity is read-only until real account endpoints exist**: render the authenticated name/email without local identity-edit controls. Phone/avatar/currency remain account-owned device preferences; state that currency preference does not change or convert recorded money.
+- **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
+- **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
 
 - **Expense group ownership**: each member-load callback must match the current selection generation
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
@@ -246,7 +252,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   computed via a fixed number of aggregate `GROUP BY` queries (never a per-expense loop). Because shares sum to
   amounts, **group balances always sum to zero** (test invariant) — holds with expenses + payments mixed.
   **Overpayment allowed** (net-per-person model; flips sign past zero).
-- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, both public pairwise
+- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, public pairwise
   methods, dashboard and simplification set isolation at their transaction boundaries. Any existing outer
   read transaction must own that isolation too; an inner `REQUIRED` transaction cannot upgrade its caller.
   Guarded financial writes instead own READ COMMITTED plus the shared group-row lock, which prevents other
@@ -300,6 +306,11 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Progress Log
 
+- [x] Alignment F03 interactions (2026-10-19) — removed local name/login-email mutation, clarified device-only preferences, exposed detail/delete/load errors with deliberate draft-preserving retries, guarded pending dialog closure across all four mutation dialogs, and completed settlement identity/totals/date accessibility. Regression-first frontend213/backend207, formatting and production build passed; review follow-up keeps delayed DELETE conflicts attached to their original expense row after collapse/switch, with rendered success-refresh coverage. Built-app Chromium at1280/390px verified keyboard/retry/pending/payment-operation reuse, delayed-conflict ownership and successful deletion with intercepted APIs. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. Separate PR to dev; no merge/deployment or claim of real profile/currency implementation.
+
+- [x] PR #95 roster-retry race (2026-10-19) — one shared Add/Enter gate prevents member POST while roster GET is pending, retaining the email and restoring controls after success/failure. Rendered HTTP regression first observed the unwanted POST, then focused34/full frontend214, Prettier and production build passed. Existing session cancellation/pending-dialog tests remain green; no backend change or new browser run. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. No push, merge or deployment.
+
+
 *(One line per shipped feature, oldest → newest.)*
 
 - [x] Project skeleton — `feat/project-skeleton`: Boot 4.1/Java 21 layered backend + Postgres/Flyway (5433), Angular 21 frontend, `/api/health` verified end-to-end. B2/F4.
@@ -349,6 +360,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Account session isolation (#45, 2026-10-15) — shared synchronous session reset clears dashboard/modal state on login/register/logout; earlier-session dashboard callbacks and protected 401s are ignored, and pending modal reads/mutations (including queued member additions) cancel on identity changes. Regression-first HTTP/component coverage: initial14 failures and modal5 failures, then frontend80/80 (23 session cases); backend108/108, Prettier/production build, deployment12, ShellCheck/Actionlint and isolated backend/Caddy/Postgres auth/CORS/persistence smoke passed. Local browser verified Alice expiry → modal closed/login → Bob's own sidebar/group. Main PR pending; no merge/deployment.
 - [x] Consistent derived balance snapshots (2026-10-15, #38) — `fix/38-balance-snapshots`: PostgreSQL repeatable-read boundaries cover balances, pairwise, dashboard/activity, simplification and the member-removal guard. Thirteen deterministic regressions coordinate real expense/payment commits (12 behavioral failures before the fix); backend121, frontend57, formatting/build, deployment12, ShellCheck/Actionlint passed. Isolated private Caddy/backend/PostgreSQL HTTP ledger and restart-persistence smoke passed; no schema change, merge to main or deployment.
 - [x] Split overflow validation (#37, 2026-10-15) — bounded exact/percentage values, overflow-safe BigInteger sums and percentage arithmetic before shared POST/PUT persistence; preserves the 1e12 amount cap and deterministic payer remainder. Regression-first strategy/API coverage includes adversarial long inputs, unchanged rejected writes, and zero/full boundary shares. Backend125/frontend57, formatting/production build, deployment12 and ShellCheck/Actionlint passed; disposable Caddy/backend/PostgreSQL HTTP checks confirmed 24 rejected POST/PUT requests leave accounting unchanged, valid boundaries/remainder/zero-sum balances, and persistence after container recreation.
+
+- [x] Alignment F01 historical ledger (2026-10-19) — retained historical financial principals without access, blocked net-zero/bilateral departure and unsafe former-participant expense changes, and serialized group financial mutations with post-wait membership checks. Regression-first real PostgreSQL tests cover both lock orders, all waiting mutation callers and group deletion; backend229/frontend187, formatting/build passed. Separate HTTP/review evidence is recorded in `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema migration, automatic repair, optimistic stale-form guarantee, S4/F02 fix, merge or deployment.
 
 Release preparation (2026-10-15): issues #37/#38/#45 integrated through PRs #66/#67/#68 into dev. Synchronized already-released main history into dev to resolve the project-memory conflict and keep the release PR limited to the three P1 fixes. Issue branches target dev; tested releases use dev→main. No schema changes. Production deployment occurs only after the release PR is merged.
 
@@ -438,3 +451,5 @@ Engineering workflow selection (2026-10-19): user replaced Superpowers with `mat
 Alignment execution authorization (2026-10-19): user requested proceeding with the plan, confirming the documented HTTP/PostgreSQL, rendered Angular and browser test seams. F01/F03/F04 run on separate dev-based branches; commits/push/PRs to dev are in scope, while merge and production deployment remain separate. Owner also confirmed all existing amounts are USD: C01 may backfill USD later; no current transaction schema/data changed. Current inspected release is `v0.1.0` at `aa287fb` (the earlier P2 preparation note predates its authorized merge/tag).
 
 - [x] Alignment F04 API contract (2026-10-19) — documented keyed payment replays/conflicts, auth429/Retry-After, narrow overlapping-write conflict scope, OAS3.1 null/default/integer/bounds semantics, greedy wording, activity ordering, gross/net overview and nonuniform error boundaries. Official OAS3.1 schema, duplicate-key rejection and128 internal refs passed. Owned baseline-JAR HTTP confirmed missing/null primitive split values400, explicit0 valid, fractionalamount400, nullable reference defaults and null PATCH no-ops; no application behavior changed. Evidence: `docs/reviews/2026-10-19-alignment/f04-contract.md`. Companion F01/F03 behavior is documented; this documentation must integrate with or after those changes. No merge/deployment.
+
+- [x] PR #96 departure UI review follow-up (2026-10-19) — member-only raw group obligations read uses batched pair aggregates and historical identity resolution; settings gates self/other/creator removal and leave on zero net plus no bilateral debt in either simplify mode, shows each counterparty/amount, and fails closed on pending/failed refreshes. Public HTTP/rendered regressions reproduced 404/enabled-removal before the fix; backend230/frontend193 (Node22), Spotless/Prettier and production builds passed. Evidence: `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema/dependency change, push, merge or deployment by this worker.

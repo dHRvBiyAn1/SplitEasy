@@ -2,15 +2,15 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.MemberBalance;
-import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
-import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -40,12 +40,11 @@ public class BalanceService {
 
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
-  private final GroupMembershipRepository membershipRepository;
+  private final FinancialParticipantService financialParticipants;
   private final PaymentRepository paymentRepository;
   private final MembershipGuard membershipGuard;
 
-  // Keep all aggregates and the member list on one PostgreSQL snapshot. Transaction-owning
-  // callers (simplification and member removal) must set this isolation too: REQUIRED joins them.
+  // Public reads share one snapshot; guarded writes join their stable, group-locked ledger.
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
@@ -56,19 +55,23 @@ public class BalanceService {
     Map<UUID, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
     Map<UUID, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
 
-    // Include every current member, so freshly-added or uninvolved members show 0.
+    Set<UUID> ledgerIds = new HashSet<>(paid.keySet());
+    ledgerIds.addAll(owed.keySet());
+    ledgerIds.addAll(settledOut.keySet());
+    ledgerIds.addAll(settledIn.keySet());
+
+    // Historical financial participation does not depend on current group access.
     List<MemberBalance> balances =
-        membershipRepository.findByGroupIdFetchUser(groupId).stream()
-            .map(m -> m.getUser())
+        financialParticipants.resolve(groupId, ledgerIds).values().stream()
             .map(
                 user -> {
-                  UUID id = user.getId();
+                  UUID id = user.id();
                   long net =
                       paid.getOrDefault(id, 0L)
                           - owed.getOrDefault(id, 0L)
                           + settledOut.getOrDefault(id, 0L)
                           - settledIn.getOrDefault(id, 0L);
-                  return new MemberBalance(UserSummary.from(user), net);
+                  return new MemberBalance(user, net);
                 })
             .sorted(Comparator.comparing((MemberBalance b) -> b.user().displayName()))
             .toList();

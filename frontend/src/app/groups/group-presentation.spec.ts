@@ -69,7 +69,10 @@ describe('group presentation ownership', () => {
       if (component === GroupDetailComponent) {
         http.expectOne('/api/groups/b/balances/mine').flush([]);
         http.expectOne('/api/groups/b/expenses').flush([]);
-      } else http.expectOne('/api/groups/b/balances').flush({ balances: [] });
+      } else {
+        http.expectOne('/api/groups/b/balances').flush({ balances: [] });
+        http.expectOne('/api/groups/b/balances/obligations').flush([]);
+      }
       expect(old.length).toBeGreaterThan(0);
       expect(old.every((r) => r.cancelled)).toBe(true);
       fixture.detectChanges();

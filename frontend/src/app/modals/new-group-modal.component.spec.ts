@@ -61,6 +61,15 @@ describe('new group member results', () => {
     ) as HTMLButtonElement;
   }
 
+  it('releases pending feedback if a dispatched group dialog is destroyed', () => {
+    input('#ng-name', 'Weekend');
+    fixture.componentInstance.save();
+    const request = requests.expectOne('/api/groups');
+    fixture.destroy();
+    expect(request.cancelled).toBe(true);
+    expect(TestBed.inject(ModalService).mutationPending()).toBe(false);
+  });
+
   it('reports mixed results and retries failed emails in the existing group', () => {
     create([
       'added@example.com',

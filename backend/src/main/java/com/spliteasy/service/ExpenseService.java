@@ -12,11 +12,11 @@ import com.spliteasy.entity.Group;
 import com.spliteasy.entity.SplitType;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
+import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
-import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.UserRepository;
 import com.spliteasy.service.split.Share;
 import com.spliteasy.service.split.SplitContext;
@@ -34,6 +34,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -42,7 +43,7 @@ public class ExpenseService {
 
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
-  private final GroupRepository groupRepository;
+  private final GroupWriteGuard groupWriteGuard;
   private final GroupMembershipRepository membershipRepository;
   private final UserRepository userRepository;
   private final MembershipGuard membershipGuard;
@@ -53,14 +54,14 @@ public class ExpenseService {
   public ExpenseService(
       ExpenseRepository expenseRepository,
       ExpenseParticipantRepository participantRepository,
-      GroupRepository groupRepository,
+      GroupWriteGuard groupWriteGuard,
       GroupMembershipRepository membershipRepository,
       UserRepository userRepository,
       MembershipGuard membershipGuard,
       List<SplitStrategy> splitStrategies) {
     this.expenseRepository = expenseRepository;
     this.participantRepository = participantRepository;
-    this.groupRepository = groupRepository;
+    this.groupWriteGuard = groupWriteGuard;
     this.membershipRepository = membershipRepository;
     this.userRepository = userRepository;
     this.membershipGuard = membershipGuard;
@@ -69,15 +70,11 @@ public class ExpenseService {
             .collect(Collectors.toMap(SplitStrategy::type, Function.identity()));
   }
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public ExpenseResponse createExpense(
       UUID requesterId, UUID groupId, CreateExpenseRequest request) {
-    membershipGuard.requireMember(groupId, requesterId);
+    Group group = groupWriteGuard.lockForMember(groupId, requesterId);
     log.debug("Creating expense in group {} by user {}", groupId, requesterId);
-    Group group =
-        groupRepository
-            .findById(groupId)
-            .orElseThrow(() -> new NotFoundException("Group not found"));
 
     ComputedSplit split = computeSplit(groupId, request);
     Expense expense =
@@ -101,10 +98,10 @@ public class ExpenseService {
     return toResponse(expense);
   }
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public ExpenseResponse updateExpense(
       UUID requesterId, UUID groupId, UUID expenseId, CreateExpenseRequest request) {
-    membershipGuard.requireMember(groupId, requesterId);
+    groupWriteGuard.lockForMember(groupId, requesterId);
     Expense expense =
         expenseRepository
             .findByIdFetchAll(expenseId)
@@ -112,6 +109,8 @@ public class ExpenseService {
     if (!expense.getGroup().getId().equals(groupId)) {
       throw new NotFoundException("Expense not found in this group");
     }
+
+    requireActiveExpenseParticipants(expense);
 
     // Full replace: recompute shares from the new state via the same strategy path — never stale.
     ComputedSplit split = computeSplit(groupId, request);
@@ -131,9 +130,9 @@ public class ExpenseService {
     return toResponse(expense);
   }
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public void deleteExpense(UUID requesterId, UUID groupId, UUID expenseId) {
-    membershipGuard.requireMember(groupId, requesterId);
+    groupWriteGuard.lockForMember(groupId, requesterId);
     Expense expense =
         expenseRepository
             .findById(expenseId)
@@ -141,8 +140,19 @@ public class ExpenseService {
     if (!expense.getGroup().getId().equals(groupId)) {
       throw new NotFoundException("Expense not found in this group");
     }
+    requireActiveExpenseParticipants(expense);
     expenseRepository.delete(expense); // cascade/orphanRemoval deletes expense_participants
     log.info("Deleted expense {} from group {} by user {}", expenseId, groupId, requesterId);
+  }
+
+  private void requireActiveExpenseParticipants(Expense expense) {
+    Set<UUID> active =
+        new HashSet<>(membershipRepository.findUserIdsByGroupId(expense.getGroup().getId()));
+    if (!active.contains(expense.getPaidBy().getId())
+        || expense.getParticipants().stream()
+            .anyMatch(p -> !active.contains(p.getUser().getId()))) {
+      throw new ConflictException("Re-add former participants before changing this expense.");
+    }
   }
 
   /** Everything needed to write an expense's split — computed once, reused by create and update. */

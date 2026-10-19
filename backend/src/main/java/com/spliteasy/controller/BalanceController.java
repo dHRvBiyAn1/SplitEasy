@@ -1,6 +1,7 @@
 package com.spliteasy.controller;
 
 import com.spliteasy.config.CurrentUserId;
+import com.spliteasy.dto.balance.DirectObligation;
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.PersonBalance;
 import com.spliteasy.service.BalanceService;
@@ -24,6 +25,13 @@ public class BalanceController {
   @GetMapping
   public GroupBalancesResponse getBalances(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
     return balanceService.computeBalances(userId, groupId);
+  }
+
+  /** Raw bilateral debts (from owes to), including historical counterparties. */
+  @GetMapping("/obligations")
+  public List<DirectObligation> getObligations(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return pairwiseService.obligations(userId, groupId);
   }
 
   /** Pairwise "who owes whom, to me" for the group balance-pills (positive = they owe you). */

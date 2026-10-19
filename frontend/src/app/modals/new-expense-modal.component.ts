@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
@@ -45,6 +46,8 @@ export class NewExpenseModalComponent {
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
+  private readonly sessionVersion = this.session.version;
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly categories = CATEGORIES;
   protected readonly display = centsToDisplay;
@@ -88,6 +91,7 @@ export class NewExpenseModalComponent {
 
   protected readonly saving = signal(false);
   protected readonly ready = signal(false);
+  protected readonly loadFailed = signal(false);
   protected readonly error = signal<string | null>(null);
 
   /** Set when opened via "Edit" — save() then PUTs instead of POSTing. */
@@ -95,6 +99,9 @@ export class NewExpenseModalComponent {
   private groupRequestVersion = 0;
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
+    });
     const preselect = this.modal.expenseGroupId();
     const first = this.groupOptions()[0]?.id ?? null;
     this.selectGroup(preselect ?? first);
@@ -114,10 +121,22 @@ export class NewExpenseModalComponent {
   }
 
   selectGroup(id: string | null): void {
+    if (this.session.version !== this.sessionVersion) return;
     if (this.saving() || (this.editId && this.groupId())) {
       return;
     }
+    this.loadGroup(id);
+  }
+
+  retryMembers(): void {
+    if (this.session.version !== this.sessionVersion) return;
+    if (this.saving() || !this.loadFailed()) return;
+    this.loadGroup(this.groupId());
+  }
+
+  private loadGroup(id: string | null): void {
     const version = ++this.groupRequestVersion;
+    this.loadFailed.set(false);
     this.groupId.set(id);
     this.ready.set(false);
     this.error.set(null);
@@ -130,13 +149,13 @@ export class NewExpenseModalComponent {
     }
     this.groups
       .getGroup(id)
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (g) => {
           if (version !== this.groupRequestVersion) return;
           this.members.set(g.members);
           if (this.editId) {
-            this.prefillFromExpense(id, this.editId);
+            this.prefillFromExpense(id, this.editId, version);
           } else {
             this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
             this.included.set(new Set(g.members.map((m) => m.id)));
@@ -145,6 +164,7 @@ export class NewExpenseModalComponent {
         },
         error: () => {
           if (version !== this.groupRequestVersion) return;
+          this.loadFailed.set(true);
           this.error.set('Could not load group members.');
         },
       });
@@ -152,15 +172,16 @@ export class NewExpenseModalComponent {
 
   /** Load an existing expense into the form. Any custom split is re-edited as exact
    * amounts (UNEQUAL) — lossless and always valid, so we never reconstruct percentages. */
-  private prefillFromExpense(groupId: string, expenseId: string): void {
+  private prefillFromExpense(groupId: string, expenseId: string, version: number): void {
     this.expenses
       .getExpense(groupId, expenseId)
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (e) => {
-          this.description.setValue(e.description);
-          this.amount.setValue(e.amountCents / 100);
-          this.date.setValue(e.spentOn);
+          if (version !== this.groupRequestVersion) return;
+          if (!this.description.dirty) this.description.setValue(e.description);
+          if (!this.amount.dirty) this.amount.setValue(e.amountCents / 100);
+          if (!this.date.dirty) this.date.setValue(e.spentOn);
           this.category.set(e.category);
           this.paidBy.set(e.paidBy.id);
           this.included.set(new Set(e.participants.map((p) => p.user.id)));
@@ -178,7 +199,11 @@ export class NewExpenseModalComponent {
           this.tick.update((n) => n + 1);
           this.ready.set(true);
         },
-        error: () => this.error.set('Could not load the expense.'),
+        error: () => {
+          if (version !== this.groupRequestVersion) return;
+          this.loadFailed.set(true);
+          this.error.set('Could not load the expense.');
+        },
       });
   }
 
@@ -262,10 +287,12 @@ export class NewExpenseModalComponent {
   }
 
   close(): void {
-    this.modal.close();
+    if (this.session.version !== this.sessionVersion) return;
+    this.modal.requestClose();
   }
 
   save(): void {
+    if (this.session.version !== this.sessionVersion) return;
     if (!this.canSave()) {
       return;
     }
@@ -284,11 +311,12 @@ export class NewExpenseModalComponent {
       req = { ...base, splitType: this.splitType(), splits: this.serializedSplits()! };
     }
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     this.error.set(null);
     const save$ = this.editId
       ? this.expenses.updateExpense(gid, this.editId, req)
       : this.expenses.createExpense(gid, req);
-    save$.pipe(takeUntil(this.session.changes)).subscribe({
+    save$.pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.dashboard.refresh();
         this.modal.close();
@@ -296,6 +324,7 @@ export class NewExpenseModalComponent {
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not save the expense.');
         this.saving.set(false);
+        this.modal.setMutationPending(false);
       },
     });
   }

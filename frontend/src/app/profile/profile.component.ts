@@ -26,8 +26,6 @@ export class ProfileComponent {
   protected readonly currencies: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
   protected readonly avatarColors = AVATAR_COLORS;
 
-  protected readonly name = new FormControl('', { nonNullable: true });
-  protected readonly email = new FormControl('', { nonNullable: true });
   protected readonly phone = new FormControl('', { nonNullable: true });
   protected readonly currency = signal<Currency>('USD');
   protected readonly avatarColor = signal<string>(AVATAR_COLORS[0]);
@@ -62,8 +60,6 @@ export class ProfileComponent {
   }
 
   startEdit(): void {
-    this.name.setValue(this.user()?.displayName ?? '');
-    this.email.setValue(this.user()?.email ?? '');
     this.phone.setValue(this.prefs().phone);
     this.currency.set(this.prefs().currency);
     this.avatarColor.set(this.prefs().avatarColor);
@@ -76,12 +72,6 @@ export class ProfileComponent {
 
   save(): void {
     if (!this.editing()) return;
-    const displayName = this.name.value.trim();
-    const email = this.email.value.trim();
-    this.auth.updateProfile({
-      ...(displayName ? { displayName } : {}),
-      ...(email ? { email } : {}),
-    });
     this.profile.update({
       phone: this.phone.value.trim(),
       currency: this.currency(),

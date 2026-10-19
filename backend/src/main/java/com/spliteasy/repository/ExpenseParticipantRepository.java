@@ -9,6 +9,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParticipant, UUID> {
 
+  /** Raw expense debts, grouped by debtor and creditor across the whole group. */
+  @Query(
+      """
+      select p.user.id as fromId, p.expense.paidBy.id as toId, sum(p.shareCents) as totalCents
+      from ExpenseParticipant p
+      where p.expense.group.id = :groupId and p.user.id <> p.expense.paidBy.id
+      group by p.user.id, p.expense.paidBy.id
+      """)
+  List<PairAmount> sumOwedByPair(@Param("groupId") UUID groupId);
+
   /**
    * Total share owed per user across all expenses in a group — one aggregate query, not a
    * per-expense loop.
