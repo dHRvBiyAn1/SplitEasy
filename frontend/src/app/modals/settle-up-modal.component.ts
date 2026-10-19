@@ -1,4 +1,5 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef, Component, computed, effect, inject, signal } from '@angular/core';
 import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
@@ -25,6 +26,8 @@ export class SettleUpModalComponent {
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
+  private readonly sessionVersion = this.session.version;
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly display = centsToDisplay;
 
@@ -81,6 +84,9 @@ export class SettleUpModalComponent {
   protected readonly error = signal<string | null>(null);
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
+    });
     // The group list arrives with the dashboard payload, so load once it's there.
     effect(() => {
       const ids = this.scopeGroupIds();
@@ -105,10 +111,11 @@ export class SettleUpModalComponent {
   }
 
   private loadSimplified(groupIds: string[]): void {
+    if (this.session.version !== this.sessionVersion) return;
     this.loadingSimplified.set(true);
     this.debts
       .getSimplifiedDebtsForGroups(groupIds)
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (responses) => {
           this.simplified.set(responses.flatMap((r) => this.toSettlements(r)));
@@ -159,13 +166,13 @@ export class SettleUpModalComponent {
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: Settlement): string {
-    const name = s.counterparty.displayName.split(/\s+/)[0];
+    const name = `${s.counterparty.displayName} (${s.counterparty.email})`;
     return s.netCents > 0 ? `${name} owes you` : `You owe ${name}`;
   }
 
   /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
   payingLabel(s: Settlement): string {
-    const name = s.counterparty.displayName.split(/\s+/)[0];
+    const name = `${s.counterparty.displayName} (${s.counterparty.email})`;
     return s.netCents > 0 ? `${name} is paying you` : `You are paying ${name}`;
   }
 
@@ -187,15 +194,18 @@ export class SettleUpModalComponent {
   }
 
   cancel(): void {
+    if (this.saving()) return;
     this.selected.set(null);
     this.error.set(null);
   }
 
   close(): void {
-    this.modal.close();
+    if (this.session.version !== this.sessionVersion) return;
+    this.modal.requestClose();
   }
 
   confirm(): void {
+    if (this.session.version !== this.sessionVersion) return;
     const s = this.selected();
     if (!s || this.saving()) {
       return;
@@ -209,9 +219,10 @@ export class SettleUpModalComponent {
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
     const [payer, payee] = s.netCents > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     this.payments
       .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents })
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.dashboard.refresh();
@@ -220,6 +231,7 @@ export class SettleUpModalComponent {
         error: (err) => {
           this.error.set(err?.error?.message ?? 'Could not record the payment.');
           this.saving.set(false);
+          this.modal.setMutationPending(false);
         },
       });
   }

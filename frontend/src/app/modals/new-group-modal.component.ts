@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { concatMap, from, of, takeUntil } from 'rxjs';
@@ -30,6 +31,8 @@ export class NewGroupModalComponent {
   private readonly modal = inject(ModalService);
   private readonly router = inject(Router);
   private readonly session = inject(SessionService);
+  private readonly sessionVersion = this.session.version;
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly types = TYPES;
   protected readonly name = new FormControl('', {
@@ -49,6 +52,12 @@ export class NewGroupModalComponent {
       .map((result) => result.email),
   );
 
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
+    });
+  }
+
   addEmail(): void {
     const e = this.emailInput.value.trim().toLowerCase();
     if (e && !this.emails().includes(e)) {
@@ -62,10 +71,12 @@ export class NewGroupModalComponent {
   }
 
   close(): void {
-    this.modal.close();
+    if (this.session.version !== this.sessionVersion) return;
+    this.modal.requestClose();
   }
 
   viewGroup(): void {
+    if (this.session.version !== this.sessionVersion) return;
     const id = this.createdGroupId();
     if (id && !this.saving()) {
       this.modal.close();
@@ -74,6 +85,7 @@ export class NewGroupModalComponent {
   }
 
   save(): void {
+    if (this.session.version !== this.sessionVersion) return;
     if (this.name.invalid || this.saving()) {
       return;
     }
@@ -83,11 +95,12 @@ export class NewGroupModalComponent {
       return;
     }
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     this.error.set(null);
     const emails = [...this.emails()];
     this.groups
       .createGroup(this.name.value.trim(), this.type())
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (group) => {
           this.createdGroupId.set(group.id);
@@ -96,12 +109,14 @@ export class NewGroupModalComponent {
         error: (err) => {
           this.error.set(err?.error?.message ?? 'Could not create the group.');
           this.saving.set(false);
+          this.modal.setMutationPending(false);
         },
       });
   }
 
   private addMembers(groupId: string, emails: string[]): void {
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     from(emails)
       .pipe(
         concatMap((email) =>
@@ -122,6 +137,7 @@ export class NewGroupModalComponent {
         ),
         toArray(),
         takeUntil(this.session.changes),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((results) => {
         this.results.update((previous) => [
@@ -129,6 +145,7 @@ export class NewGroupModalComponent {
           ...results,
         ]);
         this.saving.set(false);
+        this.modal.setMutationPending(false);
         this.dashboard.refresh();
         if (!this.results().length) this.viewGroup();
       });
