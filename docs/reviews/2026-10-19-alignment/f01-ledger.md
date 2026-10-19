@@ -12,7 +12,7 @@ Scope: Tasks 1–3 of the [foundation plan](../../superpowers/plans/2026-10-19-s
 - Expense POST/PUT/DELETE, payment POST, membership add/remove, and group DELETE acquire the same PostgreSQL group-row write lock. Membership is checked before the lookup and again after waiting, including when concurrent group deletion leaves no row. Write owners use READ COMMITTED; read-only aggregate owners retain REPEATABLE READ.
 - Keyed payments retain exact 201 replay and changed-intent 409. Concurrent financial edits serialize and can both return 200; separate stale forms still have no version/ETag contract. A real stale-row persistence failure remains a transactional 409.
 
-No migration, new dependency, balance table, historical amount rewrite, membership access expansion, or frontend source change is included. `openapi.yaml` describes the stricter removal/history guards and complete financial participant enumeration.
+No migration, new dependency, balance table, historical amount rewrite, or membership access expansion is included. The PR #96 follow-up below adds the matching frontend departure controls. `openapi.yaml` describes the stricter removal/history guards and complete financial participant enumeration.
 
 ## Behavioral evidence
 
@@ -56,3 +56,35 @@ Integration-owner real HTTP rehearsal passed 83 requests against the packaged JA
 This is conservative containment. The audit's S4 simplified-settlement/direct-obligation mismatch remains F02 work; net-zero intermediaries can be blocked even when a future simplified projection could allow departure. Historical damaged ledgers become visible, but correction still requires explicit re-add and mutation. No automatic repair or old membership timestamps are fabricated.
 
 The lock serializes writes within a group, including keyed payment replays; unrelated groups remain independent. There is no optimistic stale-form detection. No schema rollback is needed, but reverting this application change restores the unsafe removal/history race and can hide already-orphaned participants again. This record covers local verification; publishing a reviewed PR is the next authorized delivery step. No production mutation, merge or deployment was performed.
+
+
+## PR #96 review follow-up: settings departure controls
+
+The review found a caller mismatch: `GroupService.removeMember` already rejected a zero-net member with outstanding bilateral debts, but settings used only net balances, labeled that person settled, and enabled removal/leave. The approved HTTP and rendered Angular seams reproduce it; this is a direct caller-data omission, so no speculative diagnosis or internal-collaborator mock was needed. Matt Pocock TDD/debugging/interface guidance and Ponytail informed the bounded fix.
+
+Implementation candidate: `6d416f0c529994d8fd6727ee75b68822bd5980ff`, reviewed against predecessor `b44d3b4`. Settings now loads group, net balances and raw obligations together; a member with offsetting debts is “even overall”, with each counterparty's full name/email and exact amount visible. Removal and leaving require zero net and no raw obligation in either simplification mode. The creator remains protected; fully settled members remain eligible. Pending/failed reads disable removal/leave, including an existing confirmation after a refresh failure retains the old group.
+
+The existing `/balances/mine` is only the caller's pairwise view, and `/debt-simplification` discards the intermediate bilateral edges. The additive member-only `GET /api/groups/{groupId}/balances/obligations` returns `DirectObligation[]`: `{from: UserSummary, to: UserSummary, amountCents: positive integer cents}`, meaning **from owes to**. It includes historical financial counterparties; canceled pairs and self/zero edges are absent. It uses two grouped expense/payment reads and the existing batched financial identity resolver, under REPEATABLE READ, rather than one read per candidate. Caller membership is checked before any financial read, retaining 403 for existing and nonexistent groups. No other response shape changes. The companion PR #97 documents this same contract.
+
+Red/green logs are retained, with credentials redacted, under `/workspace/issue-context/alignment-implementation/F01/pr96/`:
+
+| Seam | Reproduction | Passing result |
+| --- | --- | --- |
+| Authenticated MVC/PostgreSQL | `obligations-red.log`: new raw read returned 404 instead of 200 for the known A→B/B→C intermediary | `obligations-green.log`: exact two directed 1000-cent debts; rejected removal/self-leave preserves ledger |
+| Rendered Angular/HTTP | `ui-red.log`: Bob's zero-net Remove control was enabled despite both raw obligations | `ui-green.log`: disabled removal/leave, both counterparties and amounts shown, settled Dan still eligible |
+| Broader public behavior | Existing safeguards retained | `backend-focused.log`: 29 passed, including historical/payment-only counterparties, former-member 403 for real/missing groups, opposing expenses, payment cancellation/overpayment reversal, and settled departure |
+| Rendered ownership and controls | Same approved seams | `ui-focused.log`: 12 passed, including creator/self/other candidates, both simplify settings, settled leave DELETE, route cancellation, and retained-group refresh failure with an open confirmation |
+
+Final verification at application source `6d416f0`, using JDK `21.0.12.1`, the healthy local Docker 28.4.0 socket, and Node `22.23.3`:
+
+| Command (from resource directory) | Result | Retained log |
+| --- | --- | --- |
+| `JAVA_HOME=/workspace/toolchains/jdk-21.0.12.1+1 PATH=/workspace/toolchains/jdk-21.0.12.1+1/bin:$PATH ./mvnw -s /workspace/maven-proxy-settings.xml spotless:check test package` | Backend **230/230**; no failures/errors/skips; executable Spring Boot JAR | `backend-full.log` |
+| `npm exec --yes --package=node@22 -- node node_modules/@angular/cli/bin/ng.js test --watch=false` | Frontend **193/193**, 27 files | `frontend-full.log` |
+| `npm exec --yes --package=node@22 -- node node_modules/prettier/bin/prettier.cjs --check 'src/**/*.{ts,html,scss,json}'` | All source files formatted | `prettier.log` |
+| `npm exec --yes --package=node@22 -- node node_modules/@angular/cli/bin/ng.js build` | Production build passed without warnings | `frontend-build.log` |
+| `git diff --check` | Passed | Final workspace check |
+
+`verification.json` ties these results and the packaged JAR SHA-256 to the candidate. Focused tracer/controls initially used the workspace default Node24; the full frontend suite, full formatting check and final build explicitly used Node22. The integration owner reported separate Standards/Spec delta reviews with zero findings; their retained reports live outside this worker's edits.
+
+ This follow-up adds no schema/dependency change or production operation. Backend removal remains authoritative if financial activity changes after the read; this is the existing request/response UI model, not a new concurrency guarantee. No separate browser, physical-device or screen-reader rehearsal is claimed for this follow-up.

@@ -66,6 +66,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
 | GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
+| GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
 | GET/POST | `/groups/{g}/payments` | settle-up history / record |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
@@ -147,6 +148,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
 ## Frontend Conventions
+
+- **Member departure controls**: settings require both net balances and raw bilateral obligations to load before enabling removal/leave; zero net with obligations is “even overall”, and counterparties/amounts stay visible in either simplification mode. Refresh failures disable removal/leave even when the old group is retained.
 
 - **Expense group ownership**: each member-load callback must match the current selection generation
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
@@ -240,7 +243,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   computed via a fixed number of aggregate `GROUP BY` queries (never a per-expense loop). Because shares sum to
   amounts, **group balances always sum to zero** (test invariant) — holds with expenses + payments mixed.
   **Overpayment allowed** (net-per-person model; flips sign past zero).
-- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, both public pairwise
+- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, public pairwise
   methods, dashboard and simplification set isolation at their transaction boundaries. Any existing outer
   read transaction must own that isolation too; an inner `REQUIRED` transaction cannot upgrade its caller.
   Guarded financial writes instead own READ COMMITTED plus the shared group-row lock, which prevents other
@@ -425,3 +428,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 - [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
 
 P2 integration and release preparation (2026-10-18): user authorized merging PRs #72–#93 into dev, combined final checks, then a release PR to main. All 22 exact heads retained; released main history synchronized with no tree change. Shared exception/auth/test conflicts preserve both fixes. Combined backend207/frontend187/deployment12, formatting, production build, ShellCheck/Actionlint and synthetic Chromium dashboard/split checks pass; independent integration review found no blockers. Evidence: `docs/reviews/2026-10-18-p2/integration.md`. Dev CI gates release PR creation; main merge and production deployment remain unauthorized.
+
+
+- [x] PR #96 departure UI review follow-up (2026-10-19) — member-only raw group obligations read uses batched pair aggregates and historical identity resolution; settings gates self/other/creator removal and leave on zero net plus no bilateral debt in either simplify mode, shows each counterparty/amount, and fails closed on pending/failed refreshes. Public HTTP/rendered regressions reproduced 404/enabled-removal before the fix; backend230/frontend193 (Node22), Spotless/Prettier and production builds passed. Evidence: `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema/dependency change, push, merge or deployment by this worker.
