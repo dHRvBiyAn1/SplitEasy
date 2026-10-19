@@ -22,8 +22,10 @@
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "depends_on": [],
-      "status": "planned",
-      "conditional": false
+      "status": "pr_ready",
+      "conditional": false,
+      "branch": "fix/alignment-f01-historical-ledger",
+      "integration_state": "not_merged"
     },
     {
       "id": "F02",
@@ -46,8 +48,10 @@
       "model": "gpt-6.1-sol",
       "reasoning": "medium",
       "depends_on": [],
-      "status": "planned",
-      "conditional": false
+      "status": "pr_ready",
+      "conditional": false,
+      "branch": "fix/alignment-f03-honest-interactions",
+      "integration_state": "not_merged"
     },
     {
       "id": "F04",
@@ -57,8 +61,10 @@
       "model": "gpt-6-luna",
       "reasoning": "medium",
       "depends_on": [],
-      "status": "planned",
-      "conditional": false
+      "status": "pr_ready",
+      "conditional": false,
+      "branch": "docs/alignment-f04-contract",
+      "integration_state": "not_merged"
     },
     {
       "id": "A01",
@@ -1807,5 +1813,15 @@
     "replaces": "Superpowers",
     "ponytail": "retained",
     "rea": "retained for investigation"
+  },
+  "first_batch_delivery": {
+    "state": "reviewed_prs_ready",
+    "scope": "F01/F03/F04 only",
+    "next_batch": [
+      "F02",
+      "A01",
+      "E01"
+    ],
+    "dependency_gate": "Required companion changes must land in dev before dependent branches start; no merge/deployment performed."
   }
 }
