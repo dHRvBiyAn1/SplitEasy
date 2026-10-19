@@ -45,3 +45,10 @@ The frontend total retains the baseline 220 count: three new rendered/HTTP cases
 ## Limits
 
 No schema, currency, expense split/editor, authentication/profile, or dependency change. Legacy amounts retain their existing units; C01 owns denomination/backfill. History is neither rewritten nor automatically repaired. No claim of globally minimum payment count. No production traffic, merge or deployment. Browser and independently packaged HTTP rehearsal are separate root-owned follow-ups; the implementation's UI evidence is rendered Angular, not a real-browser claim.
+
+
+## Independent packaged application and browser rehearsal
+
+The final application candidate passed34 real HTTP requests against its packaged JAR and owned PostgreSQL. S4 canonical counterparties, both mode interpretations, payment-to-zero across all simplified consumers, preserved raw cycles, eligible intermediary departure, former-mode exposure409 and the retained inactive-history409 guard all passed. Production Angular/System Chromium1280px and390px passed against that JAR: canonical A→C payment from the modal, actual membership departure and rejected mode change after departure. Each viewport recorded38 real API requests with no fixture responses, page errors or horizontal overflow. The API URL and allowed local Origin alone were adapted for the owned server. An initial harness used the desktop header button on mobile; selecting the group-page action corrected the harness without an application change. All owned resources were stopped.
+
+Both independent review axes report zero remaining findings. The full batch integration below also passes; no sibling application code was copied into this PR.

@@ -39,7 +39,7 @@
       "depends_on": [
         "F01"
       ],
-      "status": "in_progress",
+      "status": "pr_ready",
       "conditional": false,
       "branch": "bugfix/alignment-f02-obligation-projection",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
@@ -89,12 +89,13 @@
         "F03",
         "F04"
       ],
-      "status": "in_progress",
+      "status": "pr_ready",
       "conditional": false,
       "branch": "bugfix/alignment-a01-server-profile",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
       "integration_state": "not_merged",
-      "migration_version": "10"
+      "migration_version": "10",
+      "pull_request": 99
     },
     {
       "id": "A02",
@@ -200,13 +201,14 @@
       "depends_on": [
         "F01"
       ],
-      "status": "in_progress",
+      "status": "pr_ready",
       "conditional": false,
       "branch": "bugfix/alignment-e01-split-intent",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
       "integration_state": "not_merged",
       "migration_version": "11",
-      "migration_rollout_after": "A01 (V10); promote both migrations together or deploy V10 first"
+      "migration_rollout_after": "A01 (V10); promote both migrations together or deploy V10 first",
+      "pull_request": 98
     },
     {
       "id": "E02",
@@ -1851,5 +1853,6 @@
     "E01"
   ],
   "implementation_base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
-  "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137"
+  "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
+  "current_batch_status": "pr_ready"
 }
