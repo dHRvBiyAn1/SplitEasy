@@ -448,7 +448,10 @@ paths:
         participant must still be active; otherwise 409 instructs re-adding former
         participants first. Financial mutations serialize per group. Detected
         persistence write conflicts also return 409 with reload guidance; no version,
-        ETag or If-Match precondition protects a stale form.
+        ETag or If-Match precondition protects a stale form. Omitted/null splitType
+        defaults to EQUAL, participantUserIds null/empty selects all active members for
+        EQUAL, category defaults to OTHER and spentOn defaults to today; omitted fields
+        are not retained from the old expense.
       tags: [Expenses]
       requestBody:
         required: true
@@ -474,7 +477,6 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
           description: Former participant referenced, or detected persistence write conflict
-
     delete:
       operationId: deleteExpense
       summary: Delete an expense
