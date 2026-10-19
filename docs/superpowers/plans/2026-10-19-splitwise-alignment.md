@@ -15,7 +15,7 @@
 - Java 21, Spring Boot 4.1, PostgreSQL 16/Flyway, Angular 21 standalone components/signals, Vitest; CI Node 22.
 - Maximum three concurrent implementation workstreams. No Astra; Sol reasoning must not exceed high. Models and branches are specified per work package.
 - Branch from the latest checked `origin/dev`; implementation PRs target `dev`. Integrate and verify shared changes before starting dependent branches. Release promotion is a separate `dev` to `main` PR.
-- The user authorized implementation on 19 October 2026, including separate branches and PRs to dev. Current work is the dependency-ready first batch F01/F03/F04. Merge, production deployment, new remote issues and paid/provider setup remain separate actions requiring applicable authorization.
+- The user authorized implementation on 19 October 2026, including separate branches and PRs to dev. The first batch F01/F03/F04 merged through PRs #95–#97; its final dev CI passed. The user then explicitly requested the next batch F02/A01/E01, authorizing implementation through reviewed PRs to dev. Merge, production deployment, new remote issues and paid/provider setup remain separate actions requiring applicable authorization.
 - Keep UUID identities, DTO boundaries, `MembershipGuard`, `Emails.normalize`, and 403-before-404 for unauthorized group access. Financial participation never grants group access.
 - Keep derived balances, integer minor-unit arithmetic, the current 1_000_000_000_000 per-entry bound, overflow-safe validation, and consistent financial read snapshots. Never add floats or stored mutable balance totals.
 - Keep current flat group editing permissions and creator-only group deletion until a documented lifecycle change; do not add roles solely for parity.
@@ -36,6 +36,8 @@
 **Batch 1 is exactly three branches:** F01 financial containment (`gpt-6.1-sol`, high), F03 honest profile controls and remaining interaction failures (`gpt-6.1-sol`, medium), F04 contract corrections (`gpt-6-luna`, medium). The [foundation execution plan](2026-10-19-splitwise-alignment-foundation.md) defines their files, interfaces, regression cases, and gates.
 
 F02 obligation coherence depends on F01 and must start from its integrated result. It is deliberately not a fourth concurrent ledger thread. The next three candidates are F02, A01 server-owned profile, and E01 split intent; they can run together after ownership review because they primarily change balance projection, account/profile, and expense/split code respectively. Rebase all three on the same reviewed foundation.
+
+Current execution: the user requested **F02, A01, E01** after the first batch merged. All three branches start at verified `dev` `337858d8197d9228d80a03dfcc7d3aef654b4e04`. F02 owns projection and mode-aware lifecycle controls (Sol high), A01 owns profiles (Sol medium; migration V10), and E01 owns expense intent/editor work (Sol high; migration V11). Keep existing public HTTP/PostgreSQL, rendered Angular and owned-browser test seams. Promote V10 before V11, or promote both in the same release; do not deploy V11 and subsequently introduce V10 out of order. This request does not promote a release or merge the new PRs.
 
 These are planning IDs, not GitHub issue numbers. Implementation was requested on 19 October 2026; execute the first batch and preserve the documented dependency gates. Subsequent batches refill available slots only with dependency-ready tasks; there is no requirement to keep three agents busy when the safe dependency graph exposes fewer.
 

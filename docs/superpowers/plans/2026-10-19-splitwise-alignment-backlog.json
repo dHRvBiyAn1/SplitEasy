@@ -22,10 +22,12 @@
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "depends_on": [],
-      "status": "pr_ready",
+      "status": "merged",
       "conditional": false,
       "branch": "fix/alignment-f01-historical-ledger",
-      "integration_state": "not_merged"
+      "integration_state": "merged_dev",
+      "pull_request": 96,
+      "merge_commit": "0f947a3056c403b2fadb87bef1c45bd2d571476f"
     },
     {
       "id": "F02",
@@ -37,8 +39,11 @@
       "depends_on": [
         "F01"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "in_progress",
+      "conditional": false,
+      "branch": "bugfix/alignment-f02-obligation-projection",
+      "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
+      "integration_state": "not_merged"
     },
     {
       "id": "F03",
@@ -48,10 +53,12 @@
       "model": "gpt-6.1-sol",
       "reasoning": "medium",
       "depends_on": [],
-      "status": "pr_ready",
+      "status": "merged",
       "conditional": false,
       "branch": "fix/alignment-f03-honest-interactions",
-      "integration_state": "not_merged"
+      "integration_state": "merged_dev",
+      "pull_request": 95,
+      "merge_commit": "6a1ba122ad7df93df4ce022370002287e9f813c7"
     },
     {
       "id": "F04",
@@ -64,10 +71,12 @@
         "F01",
         "F03"
       ],
-      "status": "pr_ready",
+      "status": "merged",
       "conditional": false,
       "branch": "docs/alignment-f04-contract",
-      "integration_state": "not_merged"
+      "integration_state": "merged_dev",
+      "pull_request": 97,
+      "merge_commit": "337858d8197d9228d80a03dfcc7d3aef654b4e04"
     },
     {
       "id": "A01",
@@ -80,8 +89,12 @@
         "F03",
         "F04"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "in_progress",
+      "conditional": false,
+      "branch": "bugfix/alignment-a01-server-profile",
+      "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
+      "integration_state": "not_merged",
+      "migration_version": "10"
     },
     {
       "id": "A02",
@@ -187,8 +200,13 @@
       "depends_on": [
         "F01"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "in_progress",
+      "conditional": false,
+      "branch": "bugfix/alignment-e01-split-intent",
+      "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
+      "integration_state": "not_merged",
+      "migration_version": "11",
+      "migration_rollout_after": "A01 (V10); promote both migrations together or deploy V10 first"
     },
     {
       "id": "E02",
@@ -1826,5 +1844,12 @@
       "E01"
     ],
     "dependency_gate": "Required companion changes must land in dev before dependent branches start; no merge/deployment performed."
-  }
+  },
+  "current_batch": [
+    "F02",
+    "A01",
+    "E01"
+  ],
+  "implementation_base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
+  "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137"
 }
