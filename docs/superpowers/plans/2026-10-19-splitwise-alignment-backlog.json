@@ -43,7 +43,8 @@
       "conditional": false,
       "branch": "bugfix/alignment-f02-obligation-projection",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
-      "integration_state": "not_merged"
+      "integration_state": "not_merged",
+      "pull_request": 100
     },
     {
       "id": "F03",
