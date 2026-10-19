@@ -45,6 +45,8 @@ servers:
 tags:
   - name: Auth
     description: Registration and login — issues JWT access tokens
+  - name: Profile
+    description: Current authenticated account profile and default preferences
   - name: Health
     description: Liveness probe
   - name: Groups
@@ -64,6 +66,52 @@ security:
   - bearerAuth: []
 
 paths:
+  /api/me:
+    get:
+      operationId: getCurrentProfile
+      summary: Read the current account profile from the server
+      description: Fresh database values are authoritative; JWT display-name claims are only hints. Phone is unverified contact information.
+      tags: [Profile]
+      responses:
+        "200":
+          description: Current profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponse"
+        "401":
+          description: Missing or invalid bearer token, or account no longer exists
+    patch:
+      operationId: updateCurrentProfile
+      summary: Update the current account name and preferences
+      description: |
+        Uses only the authenticated principal. Unknown fields (including id, userId and email) are ignored;
+        email cannot be changed here. Omitted or null properties are unchanged; empty phone clears it.
+        Validation rejects the whole request before any write. Same-field overlapping writes are last-commit wins;
+        omitted fields are preserved. Currency is a default preference only: all existing money remains USD,
+        with no relabeling or conversion. Phone is unverified contact information.
+      tags: [Profile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile (transaction's loaded values; fresh GET observes other concurrent writes)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponse"
+        "400":
+          description: Invalid name, phone length, avatar choice or currency; no partial write
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid bearer token, or account no longer exists
   /api/auth/register:
     post:
       operationId: register
@@ -719,6 +767,40 @@ components:
       description: What an expense was for (drives the UI icon)
       enum: [FOOD_DRINK, GROCERIES, RENT_HOME, UTILITIES, TRAVEL, TRANSPORT, FUN, OTHER]
 
+    ProfileResponse:
+      type: object
+      required: [id, email, displayName, phone, avatarColor, preferredCurrency, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string, maxLength: 100 }
+        phone: { type: string, maxLength: 50, description: Unverified contact information }
+        avatarColor:
+          type: string
+          enum: ["#12A57E", "#D96D3F", "#3F7BD9", "#C25B84", "#D9A03F"]
+          default: "#12A57E"
+        preferredCurrency:
+          type: string
+          enum: [USD, EUR, GBP, INR]
+          default: USD
+          description: Default preference only; does not denominate or convert recorded money
+        createdAt: { type: string, format: date-time, description: Original server registration date }
+    UpdateProfileRequest:
+      type: object
+      description: All properties optional. Null is a no-op. Unknown properties ignored.
+      properties:
+        displayName:
+          type: [string, "null"]
+          maxLength: 100
+          pattern: '\S'
+          description: Must contain a non-whitespace character; trimmed before storage
+        phone: { type: [string, "null"], maxLength: 50, description: Trimmed; empty string clears unverified contact information }
+        avatarColor:
+          type: [string, "null"]
+          enum: ["#12A57E", "#D96D3F", "#3F7BD9", "#C25B84", "#D9A03F", null]
+        preferredCurrency:
+          type: [string, "null"]
+          enum: [USD, EUR, GBP, INR, null]
     UserSummary:
       type: object
       description: Minimal user reference embedded in every resource

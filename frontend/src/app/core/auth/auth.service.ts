@@ -44,6 +44,15 @@ export class AuthService {
     return localStorage.getItem(TOKEN_KEY);
   }
 
+  /** Fresh profile data may change presentation, never identity, email or the access token. */
+  applyProfileName(id: string, version: number, displayName: string): void {
+    const user = this.currentUser();
+    if (!user || user.id !== id || this.session.version !== version) return;
+    const next = { ...user, displayName };
+    this.currentUser.set(next);
+    localStorage.setItem(USER_KEY, JSON.stringify(next));
+  }
+
   private persist(res: AuthResponse): void {
     this.session.reset();
     localStorage.setItem(TOKEN_KEY, res.accessToken);

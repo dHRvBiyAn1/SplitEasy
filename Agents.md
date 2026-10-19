@@ -64,6 +64,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 |---|---|---|
 | POST | `/auth/register`, `/auth/login` | issue access token |
 | GET | `/health` | liveness |
+| GET/PATCH | `/me` | current server-owned name/contact/default preferences; email read-only |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
 | GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
@@ -156,7 +157,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 ## Frontend Conventions
 
 - **Member departure controls**: settings require both net balances and raw bilateral obligations to load before enabling removal/leave; zero net with obligations is “even overall”, and counterparties/amounts stay visible in either simplification mode. Refresh failures disable removal/leave even when the old group is retained.
-- **Profile identity is read-only until real account endpoints exist**: render the authenticated name/email without local identity-edit controls. Phone/avatar/currency remain account-owned device preferences; state that currency preference does not change or convert recorded money.
+- **Profile identity/preferences are server-owned**: GET/PATCH `/api/me` edits name, unverified phone, avatar and default currency. Email stays read-only. Fresh responses update shell/profile display name without replacing ID/email/token. Currency preference never changes recorded money.
 - **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
 - **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
 
@@ -164,11 +165,12 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
   member/detail loads. Existing expense edits keep their original group in both UI and component actions.
 
-- **Profile preferences belong to immutable auth user IDs**: phone, display currency, avatar color and
-  first-visit date use `spliteasy.profile.<userId>`. Linked signals synchronously reload/reset saved prefs
-  and profile edit state when identity changes, including before an immediate save. The ownerless legacy
-  `spliteasy.profile` key is discarded without migration; users re-enter those personal fields. Theme and
-  palette intentionally remain device-wide.
+- **Profile requests belong to immutable IDs and session versions**: linked signals reset loaded profile,
+  pending/error and edit state synchronously, including repeat login to the same account. Cancel HTTP with
+  `takeUntil(session.changes)` and guard callback generations. Keep Auth→Profile dependency absent.
+  `spliteasy.profile.<userId>` is retained only as an explicit owned import source; cancel leaves data intact
+  and successful import removes only that owner's record. Never import ownerless `spliteasy.profile`.
+  Original server `createdAt` replaces the device first-visit date. Theme/palette remain device-wide.
 
 - **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
   synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
@@ -236,7 +238,7 @@ Auth routes remain full-bleed with a named Appearance control.
 
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
-- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`.
+- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR, defaultUSD). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
 - **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER).
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
@@ -456,3 +458,9 @@ Alignment execution authorization (2026-10-19): user requested proceeding with t
 
 
 PR #95–#97 review remediation (2026-10-19): user authorized fixing comments and merging into dev. Add/Enter now waits for roster retries; settings shows raw bilateral obligations and blocks net-zero departures consistently. Independent Standards/Spec delta reviews found zero remaining issues. Backend230, combined frontend220 on Node22, formatting/build and88-request packaged HTTP rehearsal passed; owned HTTP resources cleaned up. Contract has134 validated refs and includes companion implementations before merging. Final exact-head CI and #96-before-#97 order gate integration. Evidence: `docs/reviews/2026-10-19-alignment/review-remediation.md`. No main/release action is included.
+
+
+- [x] Alignment A01 server-owned profile (2026-10-19) — authenticated GET/PATCH `/api/me` persists name, unverified phone, avatar and default currency; exposes original registration date and keeps email read-only. Fresh profile responses update auth presentation without changing identity/token; synchronous session resets, HTTP cancellation and generation guards isolate account switches and repeated logins. Account-owned device preferences require explicit import; cancellation preserves their local data, ownerless data is never imported. V10 is additive and preserves existing users/money/created_at; old binaries tolerate retained columns, but rolling back the UI/API hides newly saved preferences. Keep V10 applied and retain data; dropping columns destroys preferences. Deploy V10 before E01 V11 (or both in one release); never rewrite migration history. Verification/evidence: `docs/reviews/2026-10-19-alignment/a01-profile.md`. No merge/deployment by this worker.
+
+
+- [x] A01 review follow-up (2026-10-19) — render accepted `/api/me` email in both read-only profile modes, retaining forbidden email PATCH mutation and unchanged stored auth identity. Rendered red→green covers mismatched cached/server email; an import→component-recreation regression did not reproduce the proposed stale prompt, and failed import/cancel preserve owned local data. Node22 frontend226, full-source Prettier and production build pass; backend unchanged from234 verified tests. Root owns final migration/browser rerun. No push/merge/deployment by this worker.

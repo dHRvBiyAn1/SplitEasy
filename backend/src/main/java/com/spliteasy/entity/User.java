@@ -17,6 +17,7 @@ import org.hibernate.annotations.UuidGenerator;
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA only
 @Table(name = "users")
+@org.hibernate.annotations.DynamicUpdate
 public class User {
 
   @Id
@@ -35,6 +36,15 @@ public class User {
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  @Column(nullable = false, length = 50)
+  private String phone = "";
+
+  @Column(name = "avatar_color", nullable = false, length = 7)
+  private String avatarColor = "#12A57E";
+
+  @Column(name = "preferred_currency", nullable = false, length = 3)
+  private String preferredCurrency = "USD";
 
   public User(String email, String passwordHash, String displayName) {
     this.email = email;
