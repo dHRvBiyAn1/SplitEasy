@@ -66,6 +66,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
 | GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
+| GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
 | GET/POST | `/groups/{g}/payments` | settle-up history / record |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
@@ -100,7 +101,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   so a non-member gets 403 even for a nonexistent group (API never reveals existence). Followed by
   Group/Expense/Balance/Payment services.
 - **Group authz is flat, with one exception**: any member can view, rename, change settings, add
-  members, remove a settled member, and **edit/delete any expense** (matches Splitwise). The
+  members, remove a settled member, and **edit/delete expenses subject to the historical-participant guard**. The
   exception is **deleting the group — creator only** (`groups.created_by` is the closest thing to an
   admin; there is no role column). The creator can also neither be removed nor leave, so a group
   can't end up with nobody able to delete it.
@@ -108,9 +109,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   overlapping partial edits preserve omitted fields. Same-field edits have no version check: the
   last committed dirty write wins; assigning the loaded value is a no-op. PATCH responses reflect
   the transaction's loaded entity; use a fresh GET to observe other concurrent commits.
-- **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
-  **net in the group** is non-zero, so no debt is orphaned. The net comes from
-  `BalanceService.computeBalances` — never a second aggregation.
+- **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero group net and no nonzero bilateral obligation, even in simplified mode. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. This is conservative containment until F02 projection/correction work.
+- **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
 - **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
@@ -125,8 +125,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   avoid overflow. POST/PUT reject invalid splits before changing expense or participant rows.
 - **Expense edit = full-replace PUT** (reuses `CreateExpenseRequest`): shares recomputed via the same
   strategy path; participants cleared and **flushed before re-insert** (unique `(expense_id,user_id)`).
-  **Delete = hard delete** (204; FK-cascade removes participants). Balances re-aggregate, so edits/deletes
-  reflect automatically — no special-casing.
+  **Delete = hard delete** (204; FK-cascade removes participants), guarded when old financial participants are inactive. Rejected PUT/DELETE returns409 without changing expense/shares/payments; re-adding those people explicitly permits correction. Balances re-aggregate on accepted changes.
 - **Detected concurrent writes**: Spring `OptimisticLockingFailureException` (including translated
   Hibernate stale-row failures) maps to **409** with reload/review guidance. Transactions roll back;
   clients never automatically retry the edit. No version/ETag contract guards stale separate GET/PUTs.
@@ -150,6 +149,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 ## Frontend Conventions
 
+- **Member departure controls**: settings require both net balances and raw bilateral obligations to load before enabling removal/leave; zero net with obligations is “even overall”, and counterparties/amounts stay visible in either simplification mode. Refresh failures disable removal/leave even when the old group is retained.
 - **Profile identity is read-only until real account endpoints exist**: render the authenticated name/email without local identity-edit controls. Phone/avatar/currency remain account-owned device preferences; state that currency preference does not change or convert recorded money.
 - **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
 - **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
@@ -246,11 +246,12 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   computed via a fixed number of aggregate `GROUP BY` queries (never a per-expense loop). Because shares sum to
   amounts, **group balances always sum to zero** (test invariant) — holds with expenses + payments mixed.
   **Overpayment allowed** (net-per-person model; flips sign past zero).
-- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, both public pairwise
+- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, public pairwise
   methods, dashboard and simplification set isolation at their transaction boundaries. Any existing outer
-  transaction must own that isolation too (`GroupService.removeMember` includes the settled-balance guard);
-  an inner `REQUIRED` transaction cannot upgrade its caller. Read-only alone is insufficient. Concurrency
-  regressions use real committed writes between aggregates, without a test-managed reader transaction.
+  read transaction must own that isolation too; an inner `REQUIRED` transaction cannot upgrade its caller.
+  Guarded financial writes instead own READ COMMITTED plus the shared group-row lock, which prevents other
+  application financial writers from changing the inputs mid-check. Read-only alone is insufficient.
+  Snapshot/race regressions use real commits and PostgreSQL blocking without a test-managed request transaction.
 - **Three views, one source of truth** (persisted expense/payment rows): (1) `BalanceService` net-per-member;
   (2) `DebtSimplificationService` greedy transfer suggestions; (3) `PairwiseBalanceService` who-owes-whom-to-me per
   counterparty (drives dashboard cards, People list, settle-up, balance pills). Pairwise is **not netted across
@@ -353,6 +354,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Consistent derived balance snapshots (2026-10-15, #38) — `fix/38-balance-snapshots`: PostgreSQL repeatable-read boundaries cover balances, pairwise, dashboard/activity, simplification and the member-removal guard. Thirteen deterministic regressions coordinate real expense/payment commits (12 behavioral failures before the fix); backend121, frontend57, formatting/build, deployment12, ShellCheck/Actionlint passed. Isolated private Caddy/backend/PostgreSQL HTTP ledger and restart-persistence smoke passed; no schema change, merge to main or deployment.
 - [x] Split overflow validation (#37, 2026-10-15) — bounded exact/percentage values, overflow-safe BigInteger sums and percentage arithmetic before shared POST/PUT persistence; preserves the 1e12 amount cap and deterministic payer remainder. Regression-first strategy/API coverage includes adversarial long inputs, unchanged rejected writes, and zero/full boundary shares. Backend125/frontend57, formatting/production build, deployment12 and ShellCheck/Actionlint passed; disposable Caddy/backend/PostgreSQL HTTP checks confirmed 24 rejected POST/PUT requests leave accounting unchanged, valid boundaries/remainder/zero-sum balances, and persistence after container recreation.
 
+- [x] Alignment F01 historical ledger (2026-10-19) — retained historical financial principals without access, blocked net-zero/bilateral departure and unsafe former-participant expense changes, and serialized group financial mutations with post-wait membership checks. Regression-first real PostgreSQL tests cover both lock orders, all waiting mutation callers and group deletion; backend229/frontend187, formatting/build passed. Separate HTTP/review evidence is recorded in `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema migration, automatic repair, optimistic stale-form guarantee, S4/F02 fix, merge or deployment.
+
 Release preparation (2026-10-15): issues #37/#38/#45 integrated through PRs #66/#67/#68 into dev. Synchronized already-released main history into dev to resolve the project-memory conflict and keep the release PR limited to the three P1 fixes. Issue branches target dev; tested releases use dev→main. No schema changes. Production deployment occurs only after the release PR is merged.
 
 UI redesign planning (2026-10-16): isolated `feat/ui-redesign` from fetched `origin/dev` 597fc93. Audit/research at `docs/reviews/2026-10-15-ui-redesign/`, proposed spec/roadmap in `docs/superpowers/`, and four standalone editable concepts plus cursor options at `docs/concepts/ui-redesign/gallery.html`. Taste Skill redesign + UI UX Pro Max were inspected/applied. All artifacts are proposals; no application source, dependency, API, schema, commit, push or deployment change. Review direction/spec/plan before implementation; feature PR targets dev.
@@ -433,3 +436,6 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 - [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
 
 P2 integration and release preparation (2026-10-18): user authorized merging PRs #72–#93 into dev, combined final checks, then a release PR to main. All 22 exact heads retained; released main history synchronized with no tree change. Shared exception/auth/test conflicts preserve both fixes. Combined backend207/frontend187/deployment12, formatting, production build, ShellCheck/Actionlint and synthetic Chromium dashboard/split checks pass; independent integration review found no blockers. Evidence: `docs/reviews/2026-10-18-p2/integration.md`. Dev CI gates release PR creation; main merge and production deployment remain unauthorized.
+
+
+- [x] PR #96 departure UI review follow-up (2026-10-19) — member-only raw group obligations read uses batched pair aggregates and historical identity resolution; settings gates self/other/creator removal and leave on zero net plus no bilateral debt in either simplify mode, shows each counterparty/amount, and fails closed on pending/failed refreshes. Public HTTP/rendered regressions reproduced 404/enabled-removal before the fix; backend230/frontend193 (Node22), Spotless/Prettier and production builds passed. Evidence: `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema/dependency change, push, merge or deployment by this worker.

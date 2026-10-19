@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
 import { PersonBalance } from '../dashboard/dashboard.models';
 import { centsToDisplay } from '../expenses/expense.service';
-import { GroupBalancesResponse } from './balance.models';
+import { DirectObligation, GroupBalancesResponse } from './balance.models';
 
 @Injectable({ providedIn: 'root' })
 export class BalanceService {
@@ -11,6 +11,10 @@ export class BalanceService {
 
   getBalances(groupId: string): Observable<GroupBalancesResponse> {
     return this.api.get<GroupBalancesResponse>(`/groups/${groupId}/balances`);
+  }
+
+  getObligations(groupId: string): Observable<DirectObligation[]> {
+    return this.api.get<DirectObligation[]>(`/groups/${groupId}/balances/obligations`);
   }
 
   /** Pairwise "who owes whom, to me" for the group (positive = they owe you). */

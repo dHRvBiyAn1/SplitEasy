@@ -7,9 +7,7 @@ import com.spliteasy.entity.Payment;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
-import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.GroupMembershipRepository;
-import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserRepository;
 import java.util.HashSet;
@@ -31,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentService {
 
   private final PaymentRepository paymentRepository;
-  private final GroupRepository groupRepository;
+  private final GroupWriteGuard groupWriteGuard;
   private final GroupMembershipRepository membershipRepository;
   private final UserRepository userRepository;
   private final MembershipGuard membershipGuard;
@@ -39,18 +37,13 @@ public class PaymentService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PaymentResponse recordPayment(
       UUID requesterId, UUID groupId, RecordPaymentRequest request) {
-    membershipGuard.requireMember(groupId, requesterId);
+    Group group = groupWriteGuard.lockForMember(groupId, requesterId);
     if (request.operationId() != null) {
       var existing =
           paymentRepository.findByGroupIdAndRecordedByAndOperationId(
               groupId, requesterId, request.operationId());
       if (existing.isPresent()) return replay(existing.get(), request);
     }
-    Group group =
-        groupRepository
-            .findById(groupId)
-            .orElseThrow(() -> new NotFoundException("Group not found"));
-
     UUID payerId = request.payerUserId();
     UUID payeeId = request.payeeUserId();
     if (payerId.equals(payeeId)) {

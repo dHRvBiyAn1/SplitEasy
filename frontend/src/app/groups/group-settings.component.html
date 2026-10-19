@@ -148,7 +148,11 @@
             [class.dc-amount--owes]="netOf(m.id) < 0"
             [class.dc-amount--settled]="netOf(m.id) === 0"
           >
-            @if (netOf(m.id) === 0) {
+            @if (!financialsReady()) {
+              unavailable
+            } @else if (netOf(m.id) === 0 && obligationsOf(m.id).length) {
+              even overall
+            } @else if (netOf(m.id) === 0) {
               settled
             } @else {
               {{ netOf(m.id) > 0 ? '+' : '−' }}${{
@@ -182,6 +186,16 @@
         @if (blockedReason(m.id)) {
           <p class="mrow__why">{{ blockedReason(m.id) }} — can't be removed yet</p>
         }
+        @for (debt of obligationsOf(m.id); track debt.user.id) {
+          <p class="mrow__why">
+            {{ debt.netCents > 0 ? 'Is owed' : 'Owes' }} ${{
+              display(debt.netCents < 0 ? -debt.netCents : debt.netCents)
+            }}
+            {{ debt.netCents > 0 ? 'by' : 'to' }} {{ debt.user.displayName }} ({{
+              debt.user.email
+            }})
+          </p>
+        }
       }
     </section>
 
@@ -193,7 +207,8 @@
           <span class="grow__label">Simplify debts</span>
           <span class="grow__sub">
             Settle up uses a greedy suggestion to clear this group's net balances. Turn it off to
-            settle every pairwise balance directly, person by person.
+            settle every pairwise balance directly, person by person. Leaving or removing a member
+            always requires settling their bilateral obligations.
           </span>
         </span>
         <button
@@ -222,6 +237,11 @@
           <span class="grow__sub">
             @if (isCreator()) {
               You created this group — delete it instead of leaving.
+            } @else if (!financialsReady()) {
+              Balances and obligations are unavailable. Reload settings before leaving.
+            } @else if (obligationsOf(meId()).length) {
+              Settle the obligations listed above with each person before leaving, even when
+              Simplify debts is on.
             } @else if (myNet() !== 0) {
               Settle your balance first: you {{ myNet() > 0 ? 'are owed' : 'owe' }} ${{
                 display(myNet() < 0 ? -myNet() : myNet())
@@ -239,7 +259,7 @@
               type="button"
               class="dc-btn-outline gconfirm__yes"
               (click)="leaveGroup()"
-              [disabled]="busy()"
+              [disabled]="busy() || !canLeave()"
             >
               Yes, leave
             </button>

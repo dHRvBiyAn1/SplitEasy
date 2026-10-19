@@ -8,7 +8,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { BalanceService, describeBalance } from '../balances/balance.service';
-import { MemberBalance } from '../balances/balance.models';
+import { DirectObligation, MemberBalance } from '../balances/balance.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { centsToDisplay } from '../expenses/expense.service';
 import { ModalService } from '../modals/modal.service';
@@ -20,8 +20,8 @@ type Confirming = 'leave' | 'delete' | null;
 
 /**
  * Group settings, opened from the gear in the group header. Renders inside the app shell, so
- * the sidebar stays put. Member balances come from the shared /balances endpoint — the same
- * numbers the group page shows — and gate who can be removed and whether you can leave.
+ * the sidebar stays put. Net balances and raw bilateral obligations together gate member
+ * removal and leaving, independently of the simplify-debts setting.
  */
 @Component({
   selector: 'app-group-settings',
@@ -58,6 +58,8 @@ export class GroupSettingsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
   protected readonly memberBalances = signal<MemberBalance[]>([]);
+  protected readonly obligations = signal<DirectObligation[]>([]);
+  protected readonly financialsReady = signal(false);
 
   /** Inline rename: the pencil swaps the heading for this field and becomes a save button. */
   protected readonly editingName = signal(false);
@@ -74,7 +76,7 @@ export class GroupSettingsComponent implements OnInit {
   /** Only the creator owns the group, so only they may delete it. */
   protected readonly isCreator = computed(() => this.group()?.createdBy.id === this.meId());
   protected readonly myNet = computed(() => this.netOf(this.meId()));
-  protected readonly canLeave = computed(() => !this.isCreator() && this.myNet() === 0);
+  protected readonly canLeave = computed(() => this.blockedReason(this.meId()) === null);
 
   constructor() {
     // A modal action (add member) refreshes the dashboard; re-read so the list stays in step.
@@ -113,24 +115,30 @@ export class GroupSettingsComponent implements OnInit {
 
   private reload(): void {
     this.loadRequest?.unsubscribe();
+    this.financialsReady.set(false);
+    this.memberBalances.set([]);
+    this.obligations.set([]);
     this.loading.set(true);
     this.error.set(null);
     this.loadRequest = this.scoped(
       forkJoin({
         group: this.groups.getGroup(this.groupId),
         balances: this.balances.getBalances(this.groupId),
+        obligations: this.balances.getObligations(this.groupId),
       }),
     ).subscribe({
       next: (res) => {
         this.group.set(res.group);
         this.memberBalances.set(res.balances.balances);
+        this.obligations.set(res.obligations);
+        this.financialsReady.set(true);
         this.loading.set(false);
       },
       error: (err) => {
         this.error.set(
           err?.status === 403
             ? 'You are not a member of this group.'
-            : 'Could not load this group and its balances.',
+            : 'Could not load this group, its balances and obligations.',
         );
         this.loading.set(false);
       },
@@ -142,8 +150,21 @@ export class GroupSettingsComponent implements OnInit {
     return this.memberBalances().find((b) => b.user.id === userId)?.netCents ?? 0;
   }
 
+  /** A member's raw counterparties, including people who have left the group. */
+  obligationsOf(userId: string) {
+    return this.obligations()
+      .filter((debt) => debt.from.id === userId || debt.to.id === userId)
+      .map((debt) => ({
+        user: debt.from.id === userId ? debt.to : debt.from,
+        netCents: debt.from.id === userId ? -debt.amountCents : debt.amountCents,
+      }));
+  }
+
   /** Why this member can't be removed, or null when they can be. */
   blockedReason(userId: string): string | null {
+    if (!this.financialsReady()) {
+      return 'Balances and obligations are unavailable';
+    }
     if (this.group()?.createdBy.id === userId) {
       return 'Created this group';
     }
@@ -153,6 +174,9 @@ export class GroupSettingsComponent implements OnInit {
     }
     if (net < 0) {
       return `Owes $${this.display(-net)}`;
+    }
+    if (this.obligationsOf(userId).length) {
+      return 'Has outstanding obligations';
     }
     return null;
   }

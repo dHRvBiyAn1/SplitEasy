@@ -33,8 +33,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,7 @@ import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -63,6 +67,7 @@ class BalanceSnapshotIntegrationTest extends AbstractIntegrationTest {
   @Autowired PaymentService paymentService;
   @Autowired PairwiseBalanceService pairwiseService;
   @Autowired PlatformTransactionManager transactionManager;
+  @Autowired JdbcTemplate jdbc;
 
   private final AtomicBoolean writeStarted = new AtomicBoolean();
   private final AtomicBoolean writeCommitted = new AtomicBoolean();
@@ -221,20 +226,60 @@ class BalanceSnapshotIntegrationTest extends AbstractIntegrationTest {
     Fixture f = fixture();
     expense(f, f.groupId(), f.bob().user().id(), 600);
     // Bob is owed 400 before this atomic commit and 100 afterwards, never zero.
-    doAnswer(
-            afterReadCommit(
-                () -> {
-                  payment(f, f.bob().user().id(), f.owner().user().id(), 100);
-                  payment(f, f.owner().user().id(), f.bob().user().id(), 400);
-                }))
-        .when(paymentRepository)
-        .sumPaidByGroup(f.groupId());
-
-    mockMvc
-        .perform(
-            delete("/api/groups/" + f.groupId() + "/members/" + f.bob().user().id())
-                .header(HttpHeaders.AUTHORIZATION, bearer(f.owner().accessToken())))
-        .andExpect(status().isConflict());
+    CountDownLatch paymentsWritten = new CountDownLatch(1);
+    CountDownLatch commitPayments = new CountDownLatch(1);
+    AtomicInteger writerPid = new AtomicInteger();
+    try (var requests = Executors.newFixedThreadPool(2)) {
+      var write =
+          requests.submit(
+              () -> {
+                new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(
+                        ignored -> {
+                          payment(f, f.bob().user().id(), f.owner().user().id(), 100);
+                          payment(f, f.owner().user().id(), f.bob().user().id(), 400);
+                          writerPid.set(
+                              jdbc.queryForObject("select pg_backend_pid()", Integer.class));
+                          paymentsWritten.countDown();
+                          try {
+                            assertThat(commitPayments.await(20, TimeUnit.SECONDS)).isTrue();
+                          } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(e);
+                          }
+                        });
+                writeCommitted.set(true);
+              });
+      java.util.concurrent.Future<org.springframework.test.web.servlet.MvcResult> removal = null;
+      try {
+        assertThat(paymentsWritten.await(20, TimeUnit.SECONDS)).isTrue();
+        removal =
+            requests.submit(
+                () ->
+                    mockMvc
+                        .perform(
+                            delete("/api/groups/" + f.groupId() + "/members/" + f.bob().user().id())
+                                .header(HttpHeaders.AUTHORIZATION, bearer(f.owner().accessToken())))
+                        .andReturn());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        boolean blocked;
+        do {
+          blocked =
+              Boolean.TRUE.equals(
+                  jdbc.queryForObject(
+                      "select exists(select 1 from pg_stat_activity where ? = any(pg_blocking_pids(pid)))",
+                      Boolean.class,
+                      writerPid.get()));
+          if (blocked) break;
+          Thread.yield();
+        } while (System.nanoTime() < deadline);
+        assertThat(blocked).as("removal waits for the atomic payment commit").isTrue();
+      } finally {
+        commitPayments.countDown();
+      }
+      write.get(20, TimeUnit.SECONDS);
+      assertThat(removal.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(409);
+    }
 
     assertThat(writeCommitted).isTrue();
     assertThat(membershipRepository.existsByGroupIdAndUserId(f.groupId(), f.bob().user().id()))

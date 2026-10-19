@@ -37,6 +37,16 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
       UUID requesterId,
       UUID operationId);
 
+  /** Recorded payments, grouped by payer and payee across the whole group. */
+  @Query(
+      """
+      select p.payer.id as fromId, p.payee.id as toId, sum(p.amountCents) as totalCents
+      from Payment p
+      where p.group.id = :groupId and p.payer.id <> p.payee.id
+      group by p.payer.id, p.payee.id
+      """)
+  List<PairAmount> sumPaidByPair(@Param("groupId") UUID groupId);
+
   /** Total paid out per payer across a group's settle-up payments (one aggregate query). */
   @Query(
       """

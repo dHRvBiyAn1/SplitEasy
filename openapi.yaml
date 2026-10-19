@@ -318,9 +318,12 @@ paths:
       operationId: removeMember
       summary: Remove a member — or leave the group
       description: |
-        Removes `memberId` from the group; when `memberId` is the caller this is a
-        "leave". Blocked with 409 while the member's net balance is non-zero (no debt
-        may be orphaned). The creator can neither be removed nor leave.
+        Removes memberId from the active roster; when memberId is the caller this is a
+        leave. Removal returns 409 while the person has a non-zero group net or any non-
+        zero bilateral obligation, including obligations to historical participants.
+        This conservative guard applies in both group modes until obligation projection
+        is unified. The creator can neither be removed nor leave. Historical financial
+        participation remains in balance calculations and does not grant access.
       tags: [Groups]
       responses:
         "204":
@@ -331,8 +334,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
-          description: Member still has a non-zero balance (or is the creator)
-
+          description: Open net or bilateral obligations, or the target is the creator
   /api/groups/{groupId}/expenses:
     parameters:
       - $ref: "#/components/parameters/GroupIdParam"
@@ -441,9 +443,15 @@ paths:
       operationId: updateExpense
       summary: Update an expense (full replace)
       description: |
-        Full-replace edit reusing the create payload. Shares are recomputed through
-        the same split strategy; balances re-aggregate automatically. Any member may
-        edit any expense.
+        Full-replace edit reusing the create payload and split strategy. Any active
+        member may edit an expense, but the old persisted payer and every old share
+        participant must still be active; otherwise 409 instructs re-adding former
+        participants first. Financial mutations serialize per group. Detected
+        persistence write conflicts also return 409 with reload guidance; no version,
+        ETag or If-Match precondition protects a stale form. Omitted/null splitType
+        defaults to EQUAL, participantUserIds null/empty selects all active members for
+        EQUAL, category defaults to OTHER and spentOn defaults to today; omitted fields
+        are not retained from the old expense.
       tags: [Expenses]
       requestBody:
         required: true
@@ -466,10 +474,19 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Former participant referenced, or detected persistence write conflict
     delete:
       operationId: deleteExpense
       summary: Delete an expense
-      description: Hard-deletes the expense and its participant shares (FK cascade).
+      description: |
+        Hard-deletes the expense and its participant shares (FK cascade). If its
+        recorded payer or any share participant is no longer active, returns 409 with
+        instructions to re-add former participants before changing history. No expense,
+        share or payment is changed by a rejected deletion. Financial mutations
+        serialize per group; detected persistence write conflicts return 409. There is
+        no version or stale-form precondition.
       tags: [Expenses]
       responses:
         "204":
@@ -480,6 +497,9 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Former participant referenced, or detected persistence write conflict
 
   /api/groups/{groupId}/balances:
     parameters:
@@ -488,9 +508,11 @@ paths:
       operationId: getBalances
       summary: Get net-per-member balances
       description: |
-        Each member's net position in integer cents (positive = owed, negative =
-        owes, 0 = settled). Derived on read from expenses and payments; the nets
-        always sum to zero.
+        Every active member and historical financial participant is included in the
+        derived integer-cent ledger, even after leaving the active roster. Positive
+        means owed, negative means owes and zero means settled. Expenses and payments
+        conserve money, so the complete returned group nets sum to zero. Historical
+        participation does not grant group access.
       tags: [Balances]
       responses:
         "200":
@@ -511,9 +533,12 @@ paths:
       operationId: getMyBalances
       summary: Get pairwise balances to me
       description: |
-        Per-counterparty net with the caller (positive = they owe you, negative =
-        you owe them). Not netted across people: "Dan owes you $50" and "you owe
-        Sofia $50" can both appear. The pairwise nets sum to the caller's net.
+        Direct pairwise balances from the requesting active member to financial
+        counterparties, including former members referenced by expense shares or
+        payments. Positive means the counterparty owes the caller; negative means the
+        caller owes them. Non-zero results feed group and dashboard debt views. These
+        direct obligations can differ from net-derived simplified suggestions; unifying
+        those views is separate F02 work.
       tags: [Balances]
       responses:
         "200":
