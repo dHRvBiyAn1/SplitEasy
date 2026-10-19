@@ -14,12 +14,7 @@
           autocomplete="off"
           (keydown.enter)="$event.preventDefault(); add()"
         />
-        <button
-          type="button"
-          class="dc-btn-accent"
-          (click)="add()"
-          [disabled]="!email.value.trim() || saving()"
-        >
+        <button type="button" class="dc-btn-accent" (click)="add()" [disabled]="!canAdd()">
           Add
         </button>
       </div>

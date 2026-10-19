@@ -124,3 +124,34 @@ operation-ID scenarios also passed; no page errors or document overflow. Output 
 with per-viewport JSON and screenshots in `review-browser/` under the existing evidence directory.
 All browser APIs remain intercepted; backend source is unchanged, so the existing **207-test backend**
 evidence above was retained without another backend run. No push, merge, deployment or new issue.
+
+
+## PR #95 follow-up: serialize roster retry and member addition
+
+Review of candidate `20c6810` found that Add and Enter could dispatch a member POST while the
+explicit roster retry GET was pending. Both responses wrote the same roster/error state, allowing a
+late GET to erase the added member or show a load error after a successful addition. A shared
+`canAdd()` predicate now gates the rendered button and the action while roster loading or saving;
+`retryMembers()` already blocks loading during a write. No overlapping GET/POST can start from either
+UI entry point. The existing ability to add by email after a completed failed read remains intact.
+Session-version guards, request cancellation, mutation pending/closure and dashboard refresh are unchanged.
+
+At the user-approved rendered Angular/controlled HTTP seam, the first regression dispatched Enter
+and clicked Add during a held retry GET. Before the fix it failed because a POST was observed
+(`review-member-retry-red.log`); after the shared gate it passed (`review-member-retry-green.log`).
+Coverage also checks initial loading, retained email, successful retry → enabled Add → rendered added
+member, and failed retry → visible error/restored controls → another successful retry → Enter submission.
+No timers or internal service mocks are used.
+
+Final-content verification with Node 24.19.0:
+
+- `cd frontend && npm test -- --watch=false --include=src/app/modals/add-member-modal.component.spec.ts --include=src/app/modals/pending-interactions.spec.ts --include=src/app/core/auth/session-isolation.spec.ts`:
+  **34/34 passed** (`review-member-retry-focused.log`).
+- `cd frontend && npm test -- --watch=false`: **214 tests, 30 files passed** (`review-member-retry-full.log`).
+- `cd frontend && npx prettier --check 'src/**/*.{ts,html,scss,json}'`: passed (`review-member-retry-prettier.log`).
+- `cd frontend && npm run build`: production build passed (`review-member-retry-build.log`).
+- `git diff --check`: passed.
+
+Logs remain under `/workspace/issue-context/alignment-implementation/F03/`. Backend source is unchanged;
+no new backend run or browser rehearsal was performed for this small concurrency guard. The earlier
+backend/browser evidence remains scoped as above. No push, merge, deployment or review-thread action.

@@ -86,12 +86,14 @@ export class AddMemberModalComponent {
     this.modal.requestClose();
   }
 
+  canAdd(): boolean {
+    return !!this.email.value.trim() && !!this.groupId && !this.saving() && !this.membersLoading();
+  }
+
   add(): void {
     if (this.session.version !== this.sessionVersion) return;
+    if (!this.groupId || !this.canAdd()) return;
     const email = this.email.value.trim();
-    if (!email || !this.groupId || this.saving()) {
-      return;
-    }
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.error.set(null);
