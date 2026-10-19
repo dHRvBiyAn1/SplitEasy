@@ -540,7 +540,8 @@ paths:
       description: |
         Every active member and historical financial participant is included in the
         derived integer-cent ledger, even after leaving the active roster. Positive
-        means owed, negative means owes and zero means settled. Expenses and payments
+        means owed, negative means owes and zero means no aggregate net. A zero net
+        can still have offsetting direct obligations that block removal. Expenses and payments
         conserve money, so the complete returned group nets sum to zero. Historical
         participation does not grant group access.
       tags: [Balances]
@@ -579,6 +580,36 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PersonBalance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/balances/obligations:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getGroupObligations
+      summary: Get direct obligations across the group
+      description: |
+        Returns each nonzero bilateral debt once: from owes to amountCents.
+        Opposing obligations within the same pair are netted; debts through other
+        people are not simplified. Results are independent of simplifyDebts and
+        include historical financial counterparties without granting them access.
+        An active member with any incident obligation cannot leave or be removed,
+        even when their aggregate group net is zero. Group settings uses this read
+        to explain blockers; removal rechecks the current ledger transactionally.
+        An empty array means no direct obligations remain.
+      tags: [Balances]
+      responses:
+        "200":
+          description: Current direct bilateral obligations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DirectObligation"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1013,7 +1044,7 @@ components:
         netCents:
           type: integer
           format: int64
-          description: Net position in cents; positive = owed, negative = owes, 0 = settled
+          description: Net position in cents; positive = owed, negative = owes, 0 = no aggregate net (direct debts may remain)
 
     GroupBalancesResponse:
       type: object
@@ -1055,6 +1086,20 @@ components:
           type: integer
           format: int64
           description: Positive = they owe you; negative = you owe them
+
+    DirectObligation:
+      type: object
+      description: A current direct debt — from owes to the positive amountCents
+      required: [from, to, amountCents]
+      properties:
+        from:
+          $ref: "#/components/schemas/UserSummary"
+        to:
+          $ref: "#/components/schemas/UserSummary"
+        amountCents:
+          type: integer
+          format: int64
+          minimum: 1
 
     SuggestedTransaction:
       type: object

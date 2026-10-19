@@ -1,6 +1,6 @@
 # F04 current API contract review
 
-Baseline: `d0ea1b7a7711d9f4350c964a3c5dbbdc88c4a9ca` (`origin/dev`). Baseline HTTP observations below describe the released source. The final contract also includes the companion F01 historical-ledger/lifecycle behavior; merge this documentation with or after that code PR. F03 changes user interactions without adding profile endpoints. No remote PR has been merged by this work.
+Baseline: `d0ea1b7a7711d9f4350c964a3c5dbbdc88c4a9ca` (the implementation base). Baseline HTTP observations below describe the released source. The final contract also includes the companion F01 historical-ledger/lifecycle behavior; merge this documentation with or after PR #96. F03 changes user interactions without adding profile endpoints. The user subsequently authorized resolving review comments and merging PRs #95–#97 into dev; the contract PR is last in that sequence.
 
 | Area | Source and evidence | Contract correction |
 | --- | --- | --- |
@@ -15,6 +15,10 @@ Baseline: `d0ea1b7a7711d9f4350c964a3c5dbbdc88c4a9ca` (`origin/dev`). Baseline HT
 Companion F01 contract reconciliation: balances/pairwise results include historical financial principals; removal needs zero net and no bilateral obligations; editing/deleting an expense whose old payer or share participants are inactive returns409 with re-add guidance. Group financial writes use READ COMMITTED and a database group-row lock with membership recheck; public aggregate reads keep REPEATABLE READ. F03 leaves identity read-only, retains device-only preferences, and protects pending mutation feedback without adding server profile/currency/session endpoints. S4 direct-versus-simplified obligation coherence remains assigned to F02.
 
 ## Documentation verification
+
+Review follow-up: PR #96 adds `GET /groups/{groupId}/balances/obligations` for settings to explain bilateral removal blockers. The response contains each nonzero direct debt once as `{from, to, amountCents}`, including historical counterparties, independent of `simplifyDebts`. The contract distinguishes this current ledger from greedy suggestions and clarifies that a zero aggregate net does not imply no direct debts. Removal still rechecks the ledger transactionally; the read is not a removal guarantee. The endpoint has no financial write or projection-mode side effect. Review finding on integration order is resolved by merging PR #96 before #97, rather than publishing unimplemented promises.
+
+The updated document passes duplicate-key parsing, all **134 internal references**, the official OpenAPI 3.1 schema, and the unchanged 81-row CSV/JSON backlog validator. The checks below retain the original pre-review evidence.
 
 - PyYAML parsed `openapi.yaml` with duplicate-key rejection.
 - All 128 internal OpenAPI references resolved after companion-contract reconciliation.

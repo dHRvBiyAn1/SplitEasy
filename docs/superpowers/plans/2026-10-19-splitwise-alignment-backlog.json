@@ -1,6 +1,6 @@
 {
   "plan_date": "2026-10-19",
-  "status": "proposed-planning-only",
+  "status": "implementation-in-progress",
   "baseline_release": "v0.1.0",
   "maximum_parallel_workstreams": 3,
   "first_batch": [
@@ -60,7 +60,10 @@
       "size": "S",
       "model": "gpt-6-luna",
       "reasoning": "medium",
-      "depends_on": [],
+      "depends_on": [
+        "F01",
+        "F03"
+      ],
       "status": "pr_ready",
       "conditional": false,
       "branch": "docs/alignment-f04-contract",
