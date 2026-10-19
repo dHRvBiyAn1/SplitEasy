@@ -103,6 +103,7 @@
 
     @if (error()) {
       <p class="gset__error" role="alert">{{ error() }}</p>
+      <button type="button" class="dc-btn-outline" (click)="retry()">Reload group</button>
     }
 
     <!-- Members -->
@@ -317,5 +318,6 @@
     </section>
   } @else {
     <p class="gset__error" role="alert">{{ error() ?? "Couldn't load this group." }}</p>
+    <button type="button" class="dc-btn-outline" (click)="retry()">Reload group</button>
   }
 </div>

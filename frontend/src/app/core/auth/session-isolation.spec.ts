@@ -302,7 +302,7 @@ describe('account session isolation', () => {
     dashboard.refresh();
     requests.expectOne('/api/dashboard').flush(bobDashboard);
 
-    aliceRequest.flush(aliceDashboard);
+    expect(aliceRequest.cancelled).toBe(true);
     expect(dashboard.data()).toEqual(bobDashboard);
     expect(auth.user()).toEqual(bob.user);
   });
@@ -315,7 +315,7 @@ describe('account session isolation', () => {
     dashboard.ensureLoaded();
     const bobRequest = requests.expectOne('/api/dashboard');
 
-    aliceRequest.flush({}, { status, statusText: 'Old request failed' });
+    expect(aliceRequest.cancelled, `old ${status} response must be cancelled`).toBe(true);
     expect(auth.user()).toEqual(bob.user);
     expect(dashboard.data()).toBeNull();
     expect(dashboard.loading()).toBe(true);
@@ -333,7 +333,7 @@ describe('account session isolation', () => {
       dashboard.refresh();
       requests.expectOne('/api/dashboard').flush(bobDashboard);
 
-      aliceRequest.flush({}, { status, statusText: 'Old request failed' });
+      expect(aliceRequest.cancelled, `old ${status} response must be cancelled`).toBe(true);
       expect(auth.user()).toEqual(bob.user);
       expect(dashboard.data()).toEqual(bobDashboard);
       expect(dashboard.loading()).toBe(false);

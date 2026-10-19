@@ -23,6 +23,23 @@ describe('overview refresh presentation', () => {
     }),
   );
   afterEach(() => TestBed.inject(HttpTestingController).verify());
+  it('coalesces foreground reads while preserving pending ownership and revalidates cached data', () => {
+    const dashboard = TestBed.inject(DashboardService);
+    const http = TestBed.inject(HttpTestingController);
+    dashboard.ensureLoaded();
+    const initial = http.expectOne('/api/dashboard');
+    dashboard.revalidate();
+    dashboard.revalidate();
+    http.expectNone('/api/dashboard');
+    expect(initial.cancelled).toBe(false);
+    initial.flush(empty);
+    dashboard.revalidate();
+    const fresh = http.expectOne('/api/dashboard');
+    dashboard.revalidate();
+    http.expectNone('/api/dashboard');
+    fresh.flush({ ...empty, groupCount: 3 });
+    expect(dashboard.data()?.groupCount).toBe(3);
+  });
   it('keeps trusted data visible when a refresh fails', () => {
     const dashboard = TestBed.inject(DashboardService),
       http = TestBed.inject(HttpTestingController);
@@ -65,7 +82,22 @@ describe('overview refresh presentation', () => {
     expect(dashboard.loading()).toBe(false);
     expect(dashboard.error()).toBe(false);
   });
-  it('never restores the previous account cache from a late failed refresh', () => {
+  it('cancels pending overview requests at a session boundary without finishing the next account read', () => {
+    const dashboard = TestBed.inject(DashboardService);
+    const http = TestBed.inject(HttpTestingController);
+    dashboard.refresh();
+    const old = http.expectOne('/api/dashboard');
+    TestBed.inject(SessionService).reset();
+    expect(old.cancelled).toBe(true);
+    dashboard.revalidate();
+    const current = http.expectOne('/api/dashboard');
+    expect(dashboard.data()).toBeNull();
+    expect(dashboard.loading()).toBe(true);
+    current.flush({ ...empty, groupCount: 2 });
+    expect(dashboard.data()?.groupCount).toBe(2);
+    expect(dashboard.loading()).toBe(false);
+  });
+  it('clears previous account data and errors when cancelling its refresh', () => {
     const dashboard = TestBed.inject(DashboardService),
       http = TestBed.inject(HttpTestingController);
     dashboard.ensureLoaded();
@@ -73,7 +105,7 @@ describe('overview refresh presentation', () => {
     dashboard.refresh();
     const pending = http.expectOne('/api/dashboard');
     TestBed.inject(SessionService).reset();
-    pending.flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(pending.cancelled).toBe(true);
     expect(dashboard.data()).toBeNull();
     expect(dashboard.error()).toBe(false);
   });

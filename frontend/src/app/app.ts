@@ -1,5 +1,6 @@
 import {
   Component,
+  HostListener,
   afterNextRender,
   computed,
   effect,
@@ -46,6 +47,8 @@ export class App {
   protected readonly modal = inject(ModalService);
   private readonly router = inject(Router);
   protected readonly user = this.auth.user;
+  protected readonly overviewLoading = this.dashboard.loading;
+  protected readonly overviewUnavailable = this.dashboard.error;
   protected readonly groups = computed(() => this.dashboard.data()?.groups ?? []);
   protected readonly staleOverview = computed(
     () => this.dashboard.error() && this.dashboard.data() !== null,
@@ -83,6 +86,7 @@ export class App {
       .subscribe((e) => {
         this.currentUrl.set(e.urlAfterRedirects);
         this.groupsOpen.set(false);
+        if (this.showShell()) this.dashboard.revalidate();
       });
     inject(SessionService)
       .changes.pipe(takeUntilDestroyed())
@@ -95,6 +99,14 @@ export class App {
     });
     afterNextRender(() => this.ribbon.init());
   }
+  @HostListener('window:focus')
+  @HostListener('document:visibilitychange')
+  revalidateVisible(): void {
+    if (document.visibilityState === 'visible' && this.showShell()) {
+      this.dashboard.revalidate();
+    }
+  }
+
   skipToMain(event: Event): void {
     event.preventDefault();
     const main = document.getElementById('main-content');
