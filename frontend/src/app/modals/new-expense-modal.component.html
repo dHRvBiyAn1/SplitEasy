@@ -162,14 +162,21 @@
       </div>
 
       @if (!ready() && !error()) {
-        <p role="status">Loading expense details…</p>
+        <p role="status">Loading group members and expense…</p>
+      }
+      @if (loadFailed()) {
+        <button type="button" class="dc-btn-outline" (click)="retryMembers()">
+          Retry members and expense
+        </button>
       }
       @if (error()) {
         <p class="mform__error" role="alert">{{ error() }}</p>
       }
 
       <div class="mform__foot">
-        <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
+        <p class="running" aria-live="polite" aria-atomic="true" [class.running--ok]="splitValid()">
+          {{ runningLabel() }}
+        </p>
         <div class="mform__actions">
           <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
           <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>

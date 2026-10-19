@@ -73,6 +73,8 @@ export class GroupDetailComponent implements OnInit {
   protected readonly expandedId = signal<string | null>(null);
   protected readonly detail = signal<ExpenseResponse | null>(null);
   protected readonly detailLoading = signal(false);
+  protected readonly detailError = signal<string | null>(null);
+  protected readonly deleteError = signal<string | null>(null);
   protected readonly deletingId = signal<string | null>(null);
   /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
   private detailRequest?: Subscription;
@@ -140,6 +142,8 @@ export class GroupDetailComponent implements OnInit {
     this.loadRequest?.unsubscribe();
     this.detailRequest?.unsubscribe();
     this.detailCache.clear();
+    this.detailError.set(null);
+    this.deleteError.set(null);
     this.expandedId.set(null);
     this.detail.set(null);
     this.detailLoading.set(false);
@@ -184,6 +188,8 @@ export class GroupDetailComponent implements OnInit {
   /** Expand a row to show its split, or collapse it if it's already open. */
   toggleExpand(e: ExpenseSummary): void {
     this.detailRequest?.unsubscribe();
+    this.detailError.set(null);
+    this.deleteError.set(null);
     if (this.expandedId() === e.id) {
       this.expandedId.set(null);
       this.detail.set(null);
@@ -206,8 +212,18 @@ export class GroupDetailComponent implements OnInit {
         }
         this.detailLoading.set(false);
       },
-      error: () => this.detailLoading.set(false),
+      error: () => {
+        this.detailLoading.set(false);
+        this.detailError.set('Could not load this expense.');
+      },
     });
+  }
+
+  retryDetail(): void {
+    const expense = this.expenses().find((e) => e.id === this.expandedId());
+    if (!expense || this.detailLoading()) return;
+    this.expandedId.set(null);
+    this.toggleExpand(expense);
   }
 
   editExpense(e: ExpenseSummary): void {
@@ -221,6 +237,7 @@ export class GroupDetailComponent implements OnInit {
     if (!confirm(`Delete "${e.description}"? This can't be undone.`)) {
       return;
     }
+    this.deleteError.set(null);
     this.deletingId.set(e.id);
     this.scoped(this.expensesApi.deleteExpense(this.groupId, e.id)).subscribe({
       next: () => {
@@ -229,7 +246,12 @@ export class GroupDetailComponent implements OnInit {
         this.deletingId.set(null);
         this.dashboard.refresh(); // effect() re-pulls this group's expenses + balances
       },
-      error: () => this.deletingId.set(null),
+      error: (err) => {
+        this.deletingId.set(null);
+        this.deleteError.set(
+          err?.error?.message ?? 'Could not delete this expense. Please try again.',
+        );
+      },
     });
   }
 
@@ -296,6 +318,14 @@ export class GroupDetailComponent implements OnInit {
     return new Date(iso + 'T00:00:00')
       .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       .toUpperCase();
+  }
+
+  fullDate(iso: string): string {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
 
   dayNum(iso: string): string {

@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef, Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { takeUntil } from 'rxjs';
 import { avatarTint } from '../core/avatar';
@@ -25,6 +26,8 @@ export class AddMemberModalComponent {
   private readonly dashboard = inject(DashboardService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
+  private readonly sessionVersion = this.session.version;
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly groupId = this.modal.addMemberGroupId();
   protected readonly groupName = signal('');
@@ -32,17 +35,37 @@ export class AddMemberModalComponent {
   protected readonly email = new FormControl('', { nonNullable: true });
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly membersLoading = signal(false);
+  protected readonly membersFailed = signal(false);
 
   constructor() {
-    if (this.groupId) {
-      this.groups
-        .getGroup(this.groupId)
-        .pipe(takeUntil(this.session.changes))
-        .subscribe((g) => {
+    this.destroyRef.onDestroy(() => {
+      if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
+    });
+    this.retryMembers();
+  }
+
+  retryMembers(): void {
+    if (this.session.version !== this.sessionVersion) return;
+    if (!this.groupId || this.membersLoading() || this.saving()) return;
+    this.membersLoading.set(true);
+    this.membersFailed.set(false);
+    this.error.set(null);
+    this.groups
+      .getGroup(this.groupId)
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (g) => {
           this.groupName.set(g.name);
           this.members.set(g.members);
-        });
-    }
+          this.membersLoading.set(false);
+        },
+        error: () => {
+          this.membersLoading.set(false);
+          this.membersFailed.set(true);
+          this.error.set('Could not load group members.');
+        },
+      });
   }
 
   initials(name: string): string {
@@ -59,29 +82,34 @@ export class AddMemberModalComponent {
   }
 
   close(): void {
-    this.modal.close();
+    if (this.session.version !== this.sessionVersion) return;
+    this.modal.requestClose();
   }
 
   add(): void {
+    if (this.session.version !== this.sessionVersion) return;
     const email = this.email.value.trim();
     if (!email || !this.groupId || this.saving()) {
       return;
     }
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     this.error.set(null);
     this.groups
       .addMember(this.groupId, email)
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (g) => {
           this.members.set(g.members);
           this.email.reset();
           this.saving.set(false);
+          this.modal.setMutationPending(false);
           this.dashboard.refresh();
         },
         error: (err) => {
           this.error.set(err?.error?.message ?? 'Could not add that member.');
           this.saving.set(false);
+          this.modal.setMutationPending(false);
         },
       });
   }

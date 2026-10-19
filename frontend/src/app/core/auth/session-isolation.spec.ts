@@ -14,6 +14,7 @@ import { AddMemberModalComponent } from '../../modals/add-member-modal.component
 import { SettleUpModalComponent } from '../../modals/settle-up-modal.component';
 import { AuthResponse } from './auth.models';
 import { authInterceptor } from './auth.interceptor';
+import { ProfileService } from '../profile.service';
 import { AuthService } from './auth.service';
 
 const alice: AuthResponse = {
@@ -355,11 +356,11 @@ describe('account session isolation', () => {
     expect(navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
   });
 
-  it('keeps the current session’s cache and modal when editing profile labels', () => {
+  it('keeps the current session’s cache and modal when editing device preferences', () => {
     dashboard.ensureLoaded();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
     modal.openGroup();
-    auth.updateProfile({ displayName: 'Alice updated' });
+    TestBed.inject(ProfileService).update({ phone: '+1 234' });
     dashboard.ensureLoaded();
     requests.expectNone('/api/dashboard');
     expect(dashboard.data()).toEqual(aliceDashboard);

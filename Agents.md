@@ -150,6 +150,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 ## Frontend Conventions
 
+- **Profile identity is read-only until real account endpoints exist**: render the authenticated name/email without local identity-edit controls. Phone/avatar/currency remain account-owned device preferences; state that currency preference does not change or convert recorded money.
+- **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
+- **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
+
 - **Expense group ownership**: each member-load callback must match the current selection generation
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
   member/detail loads. Existing expense edits keep their original group in both UI and component actions.
@@ -293,6 +297,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   no lint errors, include a "Testing" section with end-to-end evidence.
 
 ## Progress Log
+
+- [x] Alignment F03 interactions (2026-10-19) — removed local name/login-email mutation, clarified device-only preferences, exposed detail/delete/load errors with deliberate draft-preserving retries, guarded pending dialog closure across all four mutation dialogs, and completed settlement identity/totals/date accessibility. Regression-first frontend210/backend207, formatting and production build passed; built-app Chromium at1280/390px verified keyboard/retry/pending/payment-operation reuse with intercepted APIs. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. Separate PR to dev; no merge/deployment or claim of real profile/currency implementation.
 
 *(One line per shipped feature, oldest → newest.)*
 

@@ -30,6 +30,14 @@
       <p class="mform__error" role="alert">{{ error() }}</p>
     }
 
+    @if (membersLoading()) {
+      <p role="status">Loading group members…</p>
+    }
+    @if (membersFailed()) {
+      <button type="button" class="dc-btn-outline retry-members" (click)="retryMembers()">
+        Retry members
+      </button>
+    }
     <div class="mform__field">
       <span class="dc-field-label">Already in this group</span>
       <div class="chips">

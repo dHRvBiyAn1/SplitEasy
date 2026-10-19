@@ -1,3 +1,4 @@
+import { ModalService } from './modal.service';
 import { CdkTrapFocus } from '@angular/cdk/a11y';
 import {
   afterEveryRender,
@@ -25,6 +26,12 @@ export class ModalShellComponent {
   readonly closed = output<void>();
   readonly headingId = `modal-heading-${++nextDialogId}`;
 
+  protected readonly modal = inject(ModalService);
+
+  requestClose(): void {
+    if (!this.modal.mutationPending()) this.closed.emit();
+  }
+
   private readonly trap = viewChild(CdkTrapFocus);
 
   constructor() {
@@ -50,6 +57,6 @@ export class ModalShellComponent {
   @HostListener('document:keydown.escape', ['$event'])
   onEscape(event: Event): void {
     event.preventDefault();
-    this.closed.emit();
+    this.requestClose();
   }
 }
