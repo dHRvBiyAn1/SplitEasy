@@ -40,6 +40,7 @@ public class GroupService {
   private final BalanceService balanceService;
 
   private final PairwiseBalanceService pairwiseBalanceService;
+  private final ObligationProjectionService projection;
 
   @Transactional
   public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
@@ -97,13 +98,29 @@ public class GroupService {
    * Partial update of the group's settings (name / type / simplify-debts). Any member may edit,
    * matching the flat authorization elsewhere; a null field is left untouched.
    */
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public GroupResponse updateGroup(UUID requesterId, UUID groupId, UpdateGroupRequest request) {
     membershipGuard.requireMember(groupId, requesterId);
     Group group =
-        groupRepository
-            .findById(groupId)
-            .orElseThrow(() -> new NotFoundException("Group not found"));
+        request.simplifyDebts() != null
+            ? groupWriteGuard.lockForMember(groupId, requesterId)
+            : groupRepository
+                .findById(groupId)
+                .orElseThrow(() -> new NotFoundException("Group not found"));
+
+    if (request.simplifyDebts() != null && request.simplifyDebts() != group.isSimplifyDebts()) {
+      var active =
+          membershipRepository.findByGroupIdFetchUser(groupId).stream()
+              .map(m -> m.getUser().getId())
+              .collect(java.util.stream.Collectors.toSet());
+      boolean formerExposure =
+          projection.snapshot(requesterId, groupId, request.simplifyDebts()).stream()
+              .anyMatch(d -> !active.contains(d.from().id()) || !active.contains(d.to().id()));
+      if (formerExposure) {
+        throw new ConflictException(
+            "Re-add former participants and repair their obligations before changing debt mode");
+      }
+    }
 
     if (request.name() != null) {
       String name = request.name().trim();
@@ -124,7 +141,7 @@ public class GroupService {
 
   /**
    * Removes a member — or the requester themselves, which is "leave group". Blocked while the
-   * member still has a non-zero net or bilateral obligation in the group. The creator can't be
+   * member still has a non-zero net or current-mode obligation in the group. The creator can't be
    * removed or leave: they own the group and delete it instead.
    */
   // The group lock keeps financial inputs stable while nested aggregate reads join this write.

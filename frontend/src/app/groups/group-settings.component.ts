@@ -20,8 +20,8 @@ type Confirming = 'leave' | 'delete' | null;
 
 /**
  * Group settings, opened from the gear in the group header. Renders inside the app shell, so
- * the sidebar stays put. Net balances and raw bilateral obligations together gate member
- * removal and leaving, independently of the simplify-debts setting.
+ * the sidebar stays put. Net balances and current-mode obligations together gate member
+ * removal and leaving. Raw history remains unchanged when the mode changes.
  */
 @Component({
   selector: 'app-group-settings',
@@ -124,7 +124,7 @@ export class GroupSettingsComponent implements OnInit {
       forkJoin({
         group: this.groups.getGroup(this.groupId),
         balances: this.balances.getBalances(this.groupId),
-        obligations: this.balances.getObligations(this.groupId),
+        obligations: this.balances.getCurrentObligations(this.groupId),
       }),
     ).subscribe({
       next: (res) => {
@@ -150,7 +150,7 @@ export class GroupSettingsComponent implements OnInit {
     return this.memberBalances().find((b) => b.user.id === userId)?.netCents ?? 0;
   }
 
-  /** A member's raw counterparties, including people who have left the group. */
+  /** A member's current-mode counterparties, including people who have left the group. */
   obligationsOf(userId: string) {
     return this.obligations()
       .filter((debt) => debt.from.id === userId || debt.to.id === userId)
@@ -252,7 +252,8 @@ export class GroupSettingsComponent implements OnInit {
       next: (updated) => {
         this.group.set(updated);
         this.savingSimplify.set(false);
-        // Settle-up reads this flag off the dashboard payload, so refresh it too.
+        // Recheck eligibility immediately; the dashboard refresh may fail independently.
+        this.reload();
         this.dashboard.refresh();
       },
       error: (err) => {

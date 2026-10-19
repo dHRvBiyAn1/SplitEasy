@@ -10,4 +10,5 @@ export interface SuggestedTransaction {
 export interface SimplifiedDebtsResponse {
   groupId: string;
   transactions: SuggestedTransaction[];
+  warning?: string | null;
 }

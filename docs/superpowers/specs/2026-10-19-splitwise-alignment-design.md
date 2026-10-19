@@ -1,6 +1,6 @@
 # Splitwise alignment: proposed design and delivery scope
 
-Date: 19 October 2026. Status: **implementation authorized; first batch in progress**. Baseline: released `v0.1.0` (`aa287fb`), identical source tree to inspected `d0ea1b7`. Read with the [implementation roadmap](../plans/2026-10-19-splitwise-alignment.md) and [first-batch plan](../plans/2026-10-19-splitwise-alignment-foundation.md).
+Date: 19 October 2026. Status: **first batch merged; F02/A01/E01 implementation authorized and in progress**. Baseline: released `v0.1.0` (`aa287fb`), identical source tree to inspected `d0ea1b7`. Read with the [implementation roadmap](../plans/2026-10-19-splitwise-alignment.md) and [first-batch plan](../plans/2026-10-19-splitwise-alignment-foundation.md).
 
 Workflow: [Matt Pocock's skills](../../agents/engineering-workflow.md), selected by the user to replace Superpowers. The existing document directory is retained for stable links.
 
@@ -17,7 +17,7 @@ Planning assumptions: retain the responsive Angular web product and current depl
 - Java 21, Spring Boot 4.1, PostgreSQL 16/Flyway, Angular 21 standalone components/signals, Vitest; CI Node 22.
 - Maximum three concurrent implementation workstreams. No Astra; Sol reasoning must not exceed high. Models and branches are specified per work package.
 - Branch from the latest checked `origin/dev`; implementation PRs target `dev`. Integrate and verify shared changes before starting dependent branches. Release promotion is a separate `dev` to `main` PR.
-- The user authorized implementation on 19 October 2026, including separate branches and PRs to dev. Current work is the dependency-ready first batch F01/F03/F04. Merge, production deployment, new remote issues and paid/provider setup remain separate actions requiring applicable authorization.
+- The user authorized implementation on 19 October 2026, including separate branches and PRs to dev. F01/F03/F04 merged in PRs #95–#97 with verified dev CI. The user explicitly requested F02/A01/E01 next; these branches share verified dev `337858d8197d9228d80a03dfcc7d3aef654b4e04` and end at reviewed PRs to dev. Merge, production deployment, new remote issues and paid/provider setup remain separate actions requiring applicable authorization.
 - Keep UUID identities, DTO boundaries, `MembershipGuard`, `Emails.normalize`, and 403-before-404 for unauthorized group access. Financial participation never grants group access.
 - Keep derived balances, integer minor-unit arithmetic, the current 1_000_000_000_000 per-entry bound, overflow-safe validation, and consistent financial read snapshots. Never add floats or stored mutable balance totals.
 - Keep current flat group editing permissions and creator-only group deletion until a documented lifecycle change; do not add roles solely for parity.

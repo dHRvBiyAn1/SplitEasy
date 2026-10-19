@@ -74,6 +74,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
 | GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
+| GET | `/groups/{g}/balances/current-obligations` | canonical debts for the selected mode; settings departure eligibility |
 | GET/POST | `/groups/{g}/payments` | settle-up history / record |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
@@ -116,8 +117,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   overlapping partial edits preserve omitted fields. Same-field edits have no version check: the
   last committed dirty write wins; assigning the loaded value is a no-op. PATCH responses reflect
   the transaction's loaded entity; use a fresh GET to observe other concurrent commits.
-- **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero group net and no nonzero bilateral obligation, even in simplified mode. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. This is conservative containment until F02 projection/correction work.
-- **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
+- **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero group net and no incident canonical obligation for the selected mode. Direct mode retains offsetting pair debts; simplified mode allows zero-net intermediaries to leave. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. Historical correction still requires explicit re-add; no history is silently rewritten.
+- **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations, non-null mode PATCHes and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
+- **Canonical obligations**: `ObligationProjectionService` selects direct pair netting or deterministic greedy net matching (`NetSettlementCalculator`, amount then UUID ties). Pairwise, dashboard/People/headlines/actions and departure checks share this projection. Net balances and recorded history are unchanged. Mode PATCH locks/reauthorizes with financial writes and rejects target obligations involving former participants with 409 re-add/repair guidance. Net-derived `/debt-simplification` remains a preview with an explicit nullable direct-mode warning; an empty preview does not establish direct settlement. Settlement UI uses canonical dashboard rows without a second preview fetch.
 - **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
@@ -168,7 +170,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 ## Frontend Conventions
 
-- **Member departure controls**: settings require both net balances and raw bilateral obligations to load before enabling removal/leave; zero net with obligations is “even overall”, and counterparties/amounts stay visible in either simplification mode. Refresh failures disable removal/leave even when the old group is retained.
+- **Member departure controls**: settings require both net balances and canonical `/balances/current-obligations` to load before enabling removal/leave; zero net with direct obligations is “even overall”, while simplified zero-net intermediaries can depart. `/balances/obligations` retains its raw contract. Refresh failures disable removal/leave even when the old group is retained.
 - **Profile identity/preferences are server-owned**: GET/PATCH `/api/me` edits name, unverified phone, avatar and default currency. Email stays read-only. Fresh responses update shell/profile display name without replacing ID/email/token. Currency preference never changes recorded money.
 - **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
 - **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
@@ -255,7 +257,7 @@ Auth routes remain full-bleed with a named Appearance control.
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
 - **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR, defaultUSD). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
-- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER).
+- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
   `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
@@ -276,17 +278,20 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   Guarded financial writes instead own READ COMMITTED plus the shared group-row lock, which prevents other
   application financial writers from changing the inputs mid-check. Read-only alone is insufficient.
   Snapshot/race regressions use real commits and PostgreSQL blocking without a test-managed request transaction.
-- **Three views, one source of truth** (persisted expense/payment rows): (1) `BalanceService` net-per-member;
-  (2) `DebtSimplificationService` greedy transfer suggestions; (3) `PairwiseBalanceService` who-owes-whom-to-me per
-  counterparty (drives dashboard cards, People list, settle-up, balance pills). Pairwise is **not netted across
-  people** (can show "Dan owes you $50" and "you owe Sofia $50" at once); pairwise nets sum to the member's net.
+- **Three views, one source of truth** (persisted expense/payment rows): `BalanceService` returns unchanged
+  net-per-member balances; `DebtSimplificationService` returns a net-derived preview; `ObligationProjectionService`
+  selects direct pair debts or deterministic net matching for the group mode. `PairwiseBalanceService` maps those
+  obligations to viewer signs for dashboard cards, People, settlement and balance pills. Direct mode can show
+  "Dan owes you $50" and "you owe Sofia $50" at once; simplified mode omits zero-net intermediaries. Viewer sums
+  equal the member's unchanged net in either mode.
 - **`GET /api/dashboard`** assembles one payload: cross-group totals (`totalNetCents = owed − owe`), per-group
   cards, aggregated people, per-group `Settlement[]`, and a merged recent-activity feed (expenses + payments,
   newest first, capped 15) with per-item `viewerDeltaCents` (+lent / −borrowed; 0 for settlements).
 - **Debt simplification** is read-only over balances (reuses `BalanceService.computeBalances`, inherits 403):
-  greedy max-creditor/max-debtor match, ≤N−1 transfers, excludes zero balances, no leftover cents. Acting on a
-  suggestion records a normal `Payment`. Frontend seeds the settle-up form via the **`SettlePrefill`** union
-  (`{kind:'balance'}` vs `{kind:'transaction', payerUserId, payeeUserId, amountCents}`).
+  deterministic max-creditor/max-debtor match with UUID ties, ≤N−1 transfers, excludes zero balances, no leftover
+  cents. The direct-mode warning explains that this preview may leave offsetting pair obligations. Acting on a
+  suggestion records a normal `Payment`. Frontend seeds settle-up from canonical dashboard `Settlement` rows
+  through `ModalService.settlePrefill`; it does not fetch or match a second preview.
 - **Split-type semantics** (default EQUAL): UNEQUAL carries `splits` in **cents** (must sum to `amountCents`);
   PERCENTAGE carries `splits` in **basis points** (sum10000); WEIGHTS carries positive whole units
   (floor(total×weight/sum), payer absorbs remainder); ADJUSTMENTS carries signed cents added to equal
@@ -304,9 +309,6 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 - **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. This is the current explicit session contract; rotating refresh/revocation requires a separate implementation (see `docs/security/session-lifecycle.md`).
 - **Register reveals email existence** (409 on duplicate) — fine for now; revisit if enumeration matters.
-- **Simplified settle-up is fetched per group** — `/debt-simplification` derives transfers from one
-  group's balances, so the settle-up modal fans out one request per in-scope group
-  (`DebtService.getSimplifiedDebtsForGroups`). Batch server-side if users ever join many groups.
 - **Simplify-debts is a group setting, not a view toggle** (`groups.simplify_debts`, V8, default on).
   Settle up has no switch of its own: it reads each group's flag, so a dashboard-level settle-up can
   mix simplified and direct rows. The flag rides on the dashboard payload
@@ -483,3 +485,4 @@ PR #95–#97 review remediation (2026-10-19): user authorized fixing comments an
 
 - [x] A01 review follow-up (2026-10-19) — render accepted `/api/me` email in both read-only profile modes, retaining forbidden email PATCH mutation and unchanged stored auth identity. Rendered red→green covers mismatched cached/server email; an import→component-recreation regression did not reproduce the proposed stale prompt, and failed import/cancel preserve owned local data. Node22 frontend226, full-source Prettier and production build pass; backend unchanged from234 verified tests. Root owns final migration/browser rerun. No push/merge/deployment by this worker.
 - [x] Alignment E01 split intent (2026-10-19) — persist original equal/exact/percentage/weight/adjustment inputs alongside final shares, retain zero participants, restore intent on edit and recompute percentage/weight amount changes; signed adjustments sum0 over deterministic equal allocation with nonnegative final shares. V11 nullable split_value safely degrades legacy/old-writer percentages to exact shares without inference; A01 V10 must deploy before V11, and new enum writes limit rollback. Critical red→green HTTP/rendered loops; full backend241/frontend230, Spotless/Prettier/production build, controlled-HTTP Chromium1280/320 pass. Evidence: `docs/reviews/2026-10-19-alignment/e01-split-intent.md`. Candidate only; independent review, populated migration verification and PR gates remain parent-owned; no push/merge/deployment.
+- [x] Alignment F02 canonical obligations (2026-10-19) — one selected-mode projection and deterministic UUID-tied calculator align /mine, dashboard/People/headlines/actions and departure eligibility; raw obligations/history remain unchanged. Simplified zero-net intermediaries can leave; mode changes serialize with financial/member writes and reject former-participant exposure with re-add/repair guidance. Net previews warn about direct offsets; modal uses canonical dashboard rows. Regression-first HTTP/PostgreSQL and rendered Angular, backend240/frontend220, Spotless/Prettier, production builds and official OpenAPI139-ref validation passed. Evidence: `docs/reviews/2026-10-19-alignment/f02-projection.md`. No schema/currency/auth/editor change, browser claim, push, merge or deployment by this worker; independent review and packaged rehearsal remain root-owned.

@@ -202,13 +202,18 @@
     <!-- Advanced -->
     <section class="gcard">
       <h2 class="gcard__title">Advanced settings</h2>
+      <p class="grow__sub">
+        {{ g.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}
+        govern balances, settlement and who can leave. Raw expenses and payments stay unchanged.
+      </p>
       <div class="grow">
         <span class="grow__text">
           <span class="grow__label">Simplify debts</span>
           <span class="grow__sub">
-            Settle up uses a greedy suggestion to clear this group's net balances. Turn it off to
-            settle every pairwise balance directly, person by person. Leaving or removing a member
-            always requires settling their bilateral obligations.
+            Simplified mode matches net debtors and creditors, so an even intermediary can leave.
+            Direct mode keeps each pair's debts, including offsetting amounts across people.
+            Changing modes never rewrites history; re-add former participants before a change that
+            exposes their obligations.
           </span>
         </span>
         <button
@@ -240,8 +245,7 @@
             } @else if (!financialsReady()) {
               Balances and obligations are unavailable. Reload settings before leaving.
             } @else if (obligationsOf(meId()).length) {
-              Settle the obligations listed above with each person before leaving, even when
-              Simplify debts is on.
+              Settle the obligations listed above in the current mode before leaving.
             } @else if (myNet() !== 0) {
               Settle your balance first: you {{ myNet() > 0 ? 'are owed' : 'owe' }} ${{
                 display(myNet() < 0 ? -myNet() : myNet())

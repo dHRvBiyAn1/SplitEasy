@@ -17,6 +17,11 @@ export class BalanceService {
     return this.api.get<DirectObligation[]>(`/groups/${groupId}/balances/obligations`);
   }
 
+  /** Canonical debts for the selected group mode, including departure blockers. */
+  getCurrentObligations(groupId: string): Observable<DirectObligation[]> {
+    return this.api.get<DirectObligation[]>(`/groups/${groupId}/balances/current-obligations`);
+  }
+
   /** Pairwise "who owes whom, to me" for the group (positive = they owe you). */
   getMyBalances(groupId: string): Observable<PersonBalance[]> {
     return this.api.get<PersonBalance[]>(`/groups/${groupId}/balances/mine`);

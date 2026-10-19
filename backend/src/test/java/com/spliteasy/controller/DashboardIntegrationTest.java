@@ -68,6 +68,14 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
     String g = createGroup(alice.accessToken(), new CreateGroupRequest("Trip", GroupType.TRIP));
     addMember(alice.accessToken(), g, "dash-b@example.com");
     addMember(alice.accessToken(), g, "dash-c@example.com");
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/groups/" + g)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"simplifyDebts\":false}")
+                .header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
+        .andExpect(status().isOk());
 
     AuthResponse bob = login("dash-b@example.com", "password123");
     // Alice pays 300 split with Carol (150 each) → Carol owes Alice 150.

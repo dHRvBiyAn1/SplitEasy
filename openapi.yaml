@@ -221,7 +221,9 @@ paths:
         One payload for the shell and landing page: cross-group totals, per-group
         cards, people netted across groups, per-group settlements, and a merged
         recent-activity feed capped at 15. Headline owed/owe totals sum the per-group
-        counterparty balances before people are netted across groups. Activity is
+        counterparty balances before people are netted across groups. Each group's
+        counterparties use its selected direct/simplified obligation projection, shared
+        with /balances/mine and settlement actions. Activity is
         ordered by expense spentOn date or payment recorded date, newest first; it is
         a current ledger snapshot, not a chronological event log.
       tags: [Dashboard]
@@ -303,6 +305,10 @@ paths:
       description: |
         Partial update (rename / group type / simplify-debts). Every field is
         optional; omitted and null fields are left untouched. Any member may update.
+        A non-null simplifyDebts takes the same group row lock as financial/member writes
+        and reauthorizes after waiting. Changed modes only project history; they never
+        rewrite expenses or payments. A mode whose actionable obligations involve a former
+        participant returns 409 with re-add/repair guidance, rolling back the entire PATCH.
       tags: [Groups]
       requestBody:
         required: true
@@ -326,6 +332,9 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Target debt mode exposes former-participant obligations; re-add and repair first
     delete:
       operationId: deleteGroup
       summary: Delete a group
@@ -397,10 +406,10 @@ paths:
       summary: Remove a member — or leave the group
       description: |
         Removes memberId from the active roster; when memberId is the caller this is a
-        leave. Removal returns 409 while the person has a non-zero group net or any non-
-        zero bilateral obligation, including obligations to historical participants.
-        This conservative guard applies in both group modes until obligation projection
-        is unified. The creator can neither be removed nor leave. Historical financial
+        leave. Removal returns 409 while the person has a non-zero group net or an
+        incident obligation in the selected group mode. Direct mode keeps offsetting
+        bilateral debts; simplified mode permits zero-net intermediaries to depart.
+        The creator can neither be removed nor leave. Historical financial
         participation remains in balance calculations and does not grant access.
       tags: [Groups]
       responses:
@@ -412,7 +421,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
-          description: Open net or bilateral obligations, or the target is the creator
+          description: Open net or current-mode obligations, or the target is the creator
   /api/groups/{groupId}/expenses:
     parameters:
       - $ref: "#/components/parameters/GroupIdParam"
@@ -589,7 +598,7 @@ paths:
         Every active member and historical financial participant is included in the
         derived integer-cent ledger, even after leaving the active roster. Positive
         means owed, negative means owes and zero means no aggregate net. A zero net
-        can still have offsetting direct obligations that block removal. Expenses and payments
+        can still have offsetting direct obligations that block removal in direct mode. Expenses and payments
         conserve money, so the complete returned group nets sum to zero. Historical
         participation does not grant group access.
       tags: [Balances]
@@ -612,12 +621,12 @@ paths:
       operationId: getMyBalances
       summary: Get pairwise balances to me
       description: |
-        Direct pairwise balances from the requesting active member to financial
-        counterparties, including former members referenced by expense shares or
-        payments. Positive means the counterparty owes the caller; negative means the
-        caller owes them. Non-zero results feed group and dashboard debt views. These
-        direct obligations can differ from net-derived simplified suggestions; unifying
-        those views is separate F02 work.
+        Counterparties from the canonical projection for the group's simplifyDebts mode,
+        including historical financial participants. Direct mode nets within each pair;
+        simplified mode matches net debtors and creditors with stable UUID ties.
+        Positive means the counterparty owes the caller; negative means the caller owes
+        them. These same obligations feed group/dashboard/People/settlement and departure
+        eligibility. The sum equals the caller's unchanged net balance in either mode.
       tags: [Balances]
       responses:
         "200":
@@ -644,14 +653,43 @@ paths:
         Opposing obligations within the same pair are netted; debts through other
         people are not simplified. Results are independent of simplifyDebts and
         include historical financial counterparties without granting them access.
-        An active member with any incident obligation cannot leave or be removed,
-        even when their aggregate group net is zero. Group settings uses this read
-        to explain blockers; removal rechecks the current ledger transactionally.
+        This raw read explains recorded pair relationships; it does not determine
+        departure eligibility in simplified mode. Use current-obligations for the selected
+        mode. Removal rechecks the selected projection transactionally.
         An empty array means no direct obligations remain.
       tags: [Balances]
       responses:
         "200":
           description: Current direct bilateral obligations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DirectObligation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/groups/{groupId}/balances/current-obligations:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getCurrentGroupObligations
+      summary: Get selected-mode obligations across the group
+      description: |
+        Canonical directed debts for the group's selected mode: from owes to amountCents.
+        Direct mode nets each recorded pair. Simplified mode greedily matches largest
+        net debtor/creditor amounts, breaking ties by UUID, and omits zero-net intermediaries.
+        Each obligation is positive. Active and historical financial participants are included
+        without granting former participants access. Settings uses this read for removal/leave
+        blockers together with group net balances; mutations recheck under the group lock.
+        Raw history remains available at obligations and never changes when toggling modes.
+      tags: [Balances]
+      responses:
+        "200":
+          description: Current-mode obligations
           content:
             application/json:
               schema:
@@ -732,11 +770,14 @@ paths:
       operationId: getSimplifiedDebts
       summary: Get greedy settle-up suggestion
       description: |
-        Read-only: a valid set of transfers (at most N−1) that settles the whole
-        group, derived greedily (max creditor ↔ max debtor) from current balances.
+        Read-only: a valid set of transfers (at most N−1) that settles the group net
+        balances, derived greedily (max creditor ↔ max debtor) with UUID tie-breaking.
         This algorithm does not guarantee a globally minimal number of transfers.
         Zero balances are excluded and integer cents work out exactly. Acting on a
-        suggestion just records a normal payment.
+        suggestion just records a normal payment. In direct mode, the response warning
+        explains that this net-derived preview may leave offsetting direct obligations;
+        an empty preview does not mean all direct obligations are settled. In simplified
+        mode it matches the canonical obligations and warning is null.
       tags: [Debt Simplification]
       responses:
         "200":
@@ -924,7 +965,7 @@ components:
           anyOf:
             - type: boolean
             - type: "null"
-          description: Whether settle-up uses greedy debt simplification
+          description: Selects greedy net obligations (true) or direct pair obligations (false) for all debt views and departure eligibility
 
     AddMemberRequest:
       type: object
@@ -1199,7 +1240,7 @@ components:
 
     DirectObligation:
       type: object
-      description: A current direct debt — from owes to the positive amountCents
+      description: A directed debt — from owes to the positive amountCents; mode is defined by the endpoint
       required: [from, to, amountCents]
       properties:
         from:
@@ -1235,6 +1276,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SuggestedTransaction"
+
+        warning:
+          type: [string, "null"]
+          description: Direct-mode warning that net-derived transfers may leave offsetting obligations; null in simplified mode
 
     RecordPaymentRequest:
       type: object
@@ -1283,7 +1328,7 @@ components:
 
     DashboardGroup:
       type: object
-      description: One group card on the dashboard, from the caller's perspective
+      description: One group card using selected-mode obligations, from the caller's perspective
       required: [id, name, type, memberCount, totalSpentCents, youAreOwedCents, youOweCents, netCents, simplifyDebts]
       properties:
         id:
