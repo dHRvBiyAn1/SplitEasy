@@ -1,15 +1,15 @@
 package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.PersonBalance;
-import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.repository.ExpenseParticipantRepository;
-import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +38,7 @@ public class PairwiseBalanceService {
 
   private final ExpenseParticipantRepository participantRepository;
   private final PaymentRepository paymentRepository;
-  private final GroupMembershipRepository membershipRepository;
+  private final FinancialParticipantService financialParticipants;
   private final MembershipGuard membershipGuard;
 
   /** Guarded entry point for a single group (enforces membership → 403). */
@@ -52,7 +52,7 @@ public class PairwiseBalanceService {
    * Unguarded compute — callers that already resolved the user's own groups (e.g. the dashboard)
    * skip the redundant membership check. Returns every counterparty with a non-zero balance,
    * ordered by magnitude (largest first) then name. An existing caller transaction must also use
-   * REPEATABLE_READ so the aggregates share its snapshot (see DashboardService).
+   * REPEATABLE_READ for a read snapshot (see DashboardService); guarded writes hold the group lock.
    */
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<PersonBalance> compute(UUID requesterId, UUID groupId) {
@@ -62,19 +62,21 @@ public class PairwiseBalanceService {
     Map<UUID, Long> paidMe =
         toMap(paymentRepository.sumReceivedByUserFromEach(groupId, requesterId));
 
-    // Every current member (except me) so a counterparty appears even if only payments exist.
-    return membershipRepository.findByGroupIdFetchUser(groupId).stream()
-        .map(m -> m.getUser())
-        .filter(u -> !u.getId().equals(requesterId))
+    Set<UUID> ledgerIds = new HashSet<>(owedToMe.keySet());
+    ledgerIds.addAll(iOwe.keySet());
+    ledgerIds.addAll(iPaid.keySet());
+    ledgerIds.addAll(paidMe.keySet());
+    return financialParticipants.resolve(groupId, ledgerIds).values().stream()
+        .filter(u -> !u.id().equals(requesterId))
         .map(
             u -> {
-              UUID id = u.getId();
+              UUID id = u.id();
               long net =
                   owedToMe.getOrDefault(id, 0L)
                       - iOwe.getOrDefault(id, 0L)
                       + iPaid.getOrDefault(id, 0L)
                       - paidMe.getOrDefault(id, 0L);
-              return new PersonBalance(UserSummary.from(u), net);
+              return new PersonBalance(u, net);
             })
         .filter(pb -> pb.netCents() != 0)
         .sorted(
