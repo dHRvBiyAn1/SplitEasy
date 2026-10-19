@@ -64,7 +64,7 @@
       <dl class="pcard__rows">
         <div class="prow2">
           <dt class="dc-field-label">Email</dt>
-          <dd>{{ user()?.email }}</dd>
+          <dd>{{ loaded()?.email ?? user()?.email }}</dd>
         </div>
         <div class="prow2">
           <dt class="dc-field-label">Phone</dt>
@@ -87,7 +87,7 @@
           </div>
         </div>
 
-        <p>{{ user()?.email }} (email is read-only)</p>
+        <p>{{ loaded()?.email ?? user()?.email }} (email is read-only)</p>
         <label class="pfield"
           ><span class="dc-field-label">Name</span
           ><input

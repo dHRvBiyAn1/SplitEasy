@@ -103,6 +103,31 @@ describe('server profile request ownership and errors', () => {
   });
   afterEach(() => http.verify());
 
+  it('renders accepted server email in view and edit modes without allowing an email mutation', () => {
+    const fixture = TestBed.createComponent(ProfileComponent);
+    fixture.detectChanges();
+    const fresh = { ...profile(), email: 'current@example.net' };
+    http.expectOne('/api/me').flush(fresh);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('dl').textContent).toContain('current@example.net');
+    expect(fixture.nativeElement.querySelector('dl').textContent).not.toContain(
+      'alice@example.com',
+    );
+    fixture.nativeElement.querySelector('.pcard__edit').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('form').textContent).toContain(
+      'current@example.net',
+    );
+    expect(fixture.nativeElement.querySelector('input[type=email]')).toBeNull();
+    fixture.nativeElement.querySelector('button[type=submit]').click();
+    const save = http.expectOne('/api/me');
+    expect(save.request.body.email).toBeUndefined();
+    save.flush(fresh);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('dl').textContent).toContain('current@example.net');
+    expect(auth.user()?.email).toBe('alice@example.com');
+  });
+
   it('shows refresh failures and retries; failed saves retain the name draft until explicit retry', () => {
     const fixture = TestBed.createComponent(ProfileComponent);
     fixture.detectChanges();
@@ -227,7 +252,16 @@ describe('server profile request ownership and errors', () => {
       avatarColor: '#3F7BD9',
       preferredCurrency: 'INR',
     });
-    request.flush({
+    request.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role=alert]').textContent).toContain(
+      'could not be saved',
+    );
+    expect(localStorage.getItem('spliteasy.profile.alice')).toBe(JSON.stringify(legacy));
+    importButton.click();
+    const retry = http.expectOne('/api/me');
+    expect(retry.request.body).toEqual(request.request.body);
+    retry.flush({
       ...profile(),
       phone: legacy.phone,
       avatarColor: legacy.avatarColor,
@@ -238,5 +272,11 @@ describe('server profile request ownership and errors', () => {
     expect(fixture.nativeElement.textContent).toContain('Member since February 2020');
     expect(localStorage.getItem('spliteasy.profile.alice')).toBeNull();
     expect(localStorage.getItem('spliteasy.profile.bob')).not.toBeNull();
+    fixture.destroy();
+    const reopened = TestBed.createComponent(ProfileComponent);
+    reopened.detectChanges();
+    expect(reopened.nativeElement.textContent).toContain('Alice private phone');
+    expect(reopened.nativeElement.textContent).not.toContain('Import device preferences');
+    http.expectNone('/api/me');
   });
 });
