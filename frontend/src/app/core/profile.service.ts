@@ -1,73 +1,161 @@
-import { Injectable, inject, linkedSignal } from '@angular/core';
+import {
+  DestroyRef,
+  Injectable,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  untracked,
+} from '@angular/core';
+import { takeUntil } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth/auth.service';
+import { SessionService } from './auth/session.service';
+import { ApiService } from './api/api.service';
 
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR';
-
-export const CURRENCY_SYMBOL: Record<Currency, string> = {
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  INR: '₹',
-};
-
-/** Avatar swatches (from the profile mock) — reused for the profile + sidebar avatar. */
+export const CURRENCY_SYMBOL: Record<Currency, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹' };
 export const AVATAR_COLORS = ['#12A57E', '#D96D3F', '#3F7BD9', '#C25B84', '#D9A03F'];
-
-interface ProfilePrefs {
+export interface CurrentProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  phone: string;
+  avatarColor: string;
+  preferredCurrency: Currency;
+  createdAt: string;
+}
+export type ProfilePatch = Partial<
+  Pick<CurrentProfile, 'displayName' | 'phone' | 'avatarColor' | 'preferredCurrency'>
+>;
+interface LegacyPrefs {
   phone: string;
   currency: Currency;
   avatarColor: string;
-  joinedAt: string; // ISO — first time the profile was initialised on this device
 }
-
+interface State {
+  data: CurrentProfile | null;
+  loading: boolean;
+  saving: boolean;
+  error: string;
+}
 const KEY = 'spliteasy.profile';
 
-/**
- * Client-side profile preferences the backend doesn't model yet (phone, display currency, avatar
- * color). Persisted per immutable account ID to localStorage; name/email live on the auth user.
- * Preferences remain client-side only.
- */
+/** Server-owned profile. Every request belongs to both an account and a login generation. */
 @Injectable({ providedIn: 'root' })
 export class ProfileService {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
-  // Reset on identity changes before any read or write, without waiting for an effect.
-  private readonly _prefs = linkedSignal({
-    source: () => this.auth.user()?.id ?? null,
-    computation: (userId) => this.read(userId),
+  private readonly session = inject(SessionService);
+  private readonly api = inject(ApiService);
+  private readonly owner = computed(
+    () => `${this.session.currentVersion()}:${this.auth.user()?.id ?? ''}`,
+  );
+  private generation = 0;
+  private readonly state = linkedSignal({
+    source: this.owner,
+    computation: (): State => ({ data: null, loading: false, saving: false, error: '' }),
   });
-  readonly prefs = this._prefs.asReadonly();
+  readonly data = computed(() => this.state().data);
+  readonly loading = computed(() => this.state().loading);
+  readonly saving = computed(() => this.state().saving);
+  readonly error = computed(() => this.state().error);
+  readonly prefs = computed(() => ({
+    phone: this.data()?.phone ?? '',
+    currency: this.data()?.preferredCurrency ?? 'USD',
+    avatarColor: this.data()?.avatarColor ?? AVATAR_COLORS[0],
+    joinedAt: this.data()?.createdAt ?? '',
+  }));
+  readonly legacyPrefs = computed(() => {
+    this.owner();
+    return this.readLegacy(this.auth.user()?.id);
+  });
 
   constructor() {
-    // The legacy key has no owner: migrating its personal fields could expose another account.
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(KEY); // Ownerless data must never be imported.
+    effect(() => {
+      this.owner();
+      untracked(() => this.refresh());
+    });
   }
 
-  update(patch: Partial<ProfilePrefs>): void {
-    const userId = this.auth.user()?.id;
-    if (!userId) return;
-    const next = { ...this._prefs(), ...patch };
-    this._prefs.set(next);
-    localStorage.setItem(`${KEY}.${userId}`, JSON.stringify(next));
+  refresh(): void {
+    if (!this.auth.user()) return;
+    this.request('get');
   }
 
-  private read(userId: string | null): ProfilePrefs {
-    const defaults: ProfilePrefs = {
-      phone: '',
-      currency: 'USD',
-      avatarColor: AVATAR_COLORS[0],
-      joinedAt: new Date().toISOString(),
-    };
-    if (!userId) return defaults;
-    const key = `${KEY}.${userId}`;
+  update(patch: ProfilePatch, onSaved?: () => void): void {
+    if (!this.auth.user() || this.saving()) return;
+    this.request('patch', patch, onSaved);
+  }
+
+  importLegacy(onSaved?: () => void): void {
+    const legacy = this.legacyPrefs();
+    const id = this.auth.user()?.id;
+    if (!legacy || !id) return;
+    this.update(
+      { phone: legacy.phone, avatarColor: legacy.avatarColor, preferredCurrency: legacy.currency },
+      () => {
+        localStorage.removeItem(`${KEY}.${id}`);
+        onSaved?.();
+      },
+    );
+  }
+
+  private request(method: 'get' | 'patch', patch?: ProfilePatch, onSaved?: () => void): void {
+    const owner = this.owner();
+    const id = this.auth.user()!.id;
+    const version = this.session.version;
+    const generation = ++this.generation;
+    const current = () => owner === this.owner() && generation === this.generation;
+    this.state.update((state) => ({
+      ...state,
+      loading: method === 'get',
+      saving: method === 'patch',
+      error: '',
+    }));
+    const request =
+      method === 'get'
+        ? this.api.get<CurrentProfile>('/me')
+        : this.api.patch<CurrentProfile>('/me', patch);
+    request.pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (data) => {
+        if (!current() || data.id !== id) return;
+        this.state.set({ data, loading: false, saving: false, error: '' });
+        this.auth.applyProfileName(id, version, data.displayName);
+        onSaved?.();
+      },
+      error: () => {
+        if (!current()) return;
+        this.state.update((state) => ({
+          ...state,
+          loading: false,
+          saving: false,
+          error:
+            method === 'get'
+              ? 'Profile unavailable. Try again.'
+              : 'Profile could not be saved. Your changes are still here. Try again.',
+        }));
+      },
+    });
+  }
+
+  private readLegacy(id: string | undefined): LegacyPrefs | null {
+    if (!id) return null;
     try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        return { ...defaults, ...(JSON.parse(raw) as Partial<ProfilePrefs>) };
-      }
+      const raw = localStorage.getItem(`${KEY}.${id}`);
+      if (!raw) return null;
+      const value = JSON.parse(raw) as LegacyPrefs;
+      if (
+        typeof value.phone !== 'string' ||
+        value.phone.length > 50 ||
+        !['USD', 'EUR', 'GBP', 'INR'].includes(value.currency) ||
+        !AVATAR_COLORS.includes(value.avatarColor)
+      )
+        return null;
+      return { phone: value.phone, currency: value.currency, avatarColor: value.avatarColor };
     } catch {
-      // fall through to defaults
+      return null;
     }
-    localStorage.setItem(key, JSON.stringify(defaults));
-    return defaults;
   }
 }

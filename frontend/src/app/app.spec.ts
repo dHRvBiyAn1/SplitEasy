@@ -50,6 +50,15 @@ describe('App', () => {
     signIn();
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({
+      id: 'u1',
+      email: 'a@b.com',
+      displayName: 'Fresh Alex',
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     // The shell effect pulls the dashboard payload for the sidebar group balances.
     const req = httpTesting.expectOne('/api/dashboard');
     req.flush({
@@ -67,12 +76,21 @@ describe('App', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.brand')?.textContent).toContain('SplitEasy');
-    expect(compiled.querySelector('.account-name')?.textContent).toContain('Alex Rivera');
+    expect(compiled.querySelector('.account-name')?.textContent).toContain('Fresh Alex');
   });
   it('settles after an initial dashboard failure until the user retries', () => {
     signIn();
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({
+      id: 'u1',
+      email: 'a@b.com',
+      displayName: 'Alex Rivera',
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     httpTesting.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges();
     httpTesting.expectNone('/api/dashboard');
@@ -81,6 +99,15 @@ describe('App', () => {
     signIn();
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({
+      id: 'u1',
+      email: 'a@b.com',
+      displayName: 'Alex Rivera',
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     httpTesting.expectOne('/api/dashboard').flush({
       totalNetCents: 0,
       owedCents: 0,
