@@ -115,8 +115,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   last committed dirty write wins; assigning the loaded value is a no-op. PATCH responses reflect
   the transaction's loaded entity; use a fresh GET to observe other concurrent commits.
 - **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
-  **net in the group** is non-zero, so no debt is orphaned. The net comes from
-  `BalanceService.computeBalances` — never a second aggregation.
+  **net in the group** is non-zero. The net comes from `BalanceService.computeBalances` — never a
+  second aggregation. This baseline net-only guard does not prevent removal of a net-zero intermediary
+  with bilateral debts, or historical edits reopening a departed person's debt; F01 addresses those
+  audited lifecycle defects separately.
 - **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
@@ -277,7 +279,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Known Gaps / TODOs
 
-- **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. Add before real deploy.
+- **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. This is the current explicit session contract; rotating refresh/revocation requires a separate implementation (see `docs/security/session-lifecycle.md`).
 - **Register reveals email existence** (409 on duplicate) — fine for now; revisit if enumeration matters.
 - **Simplified settle-up is fetched per group** — `/debt-simplification` derives transfers from one
   group's balances, so the settle-up modal fans out one request per in-scope group
@@ -289,7 +291,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   modal keeps reading the cached value.
 - **Profile prefs are client-side only** (PR #23, #53) — phone/currency/avatar-color per account in
   localStorage; theme/palette per device. "First seen here" = first-visit month. No profile-update
-  endpoint or signup-date column yet.
+  endpoint yet; `User.createdAt` already stores registration time but is not exposed by the current
+  profile/auth summary contract. Do not add a duplicate signup-date column.
 
 ## Git Workflow
 
@@ -434,3 +437,7 @@ P2 integration and release preparation (2026-10-18): user authorized merging PRs
 Splitwise alignment planning (2026-10-19): proposed design in `docs/superpowers/specs/2026-10-19-splitwise-alignment-design.md`, roadmap and first-batch execution plan in `docs/superpowers/plans/2026-10-19-splitwise-alignment*.md`, and CSV/JSON delivery map for all 81 audited features. Thirty-eight work packages prioritize financial lifecycle/projection correctness, then core foundations/social/history/offline, then Pro and conditional integrations. First batch is F01/F03/F04 with at most three streams, no Astra and Sol reasoning at most high. Planning only; no application implementation, commit, push or deployment. The audit's v0.1.0 baseline and current defects are evidence for proposed work, not shipped fixes.
 
 Engineering workflow selection (2026-10-19): user replaced Superpowers with `mattpocock/skills`. Ten upstream skill directories copied unchanged to ignored project-local `.agents/skills/` at commit `49dd158d1076134a641b33efb035946536778336`, retaining MIT license and hash manifest. Repo setup and override rules are in `docs/agents/`; alignment headers now use this workflow. No global plugin registration, application implementation, commit, push or remote changes.
+
+Alignment execution authorization (2026-10-19): user requested proceeding with the plan, confirming the documented HTTP/PostgreSQL, rendered Angular and browser test seams. F01/F03/F04 run on separate dev-based branches; commits/push/PRs to dev are in scope, while merge and production deployment remain separate. Owner also confirmed all existing amounts are USD: C01 may backfill USD later; no current transaction schema/data changed. Current inspected release is `v0.1.0` at `aa287fb` (the earlier P2 preparation note predates its authorized merge/tag).
+
+- [x] Alignment F04 API contract (2026-10-19) — documented keyed payment replays/conflicts, auth429/Retry-After, narrow overlapping-write conflict scope, OAS3.1 null/default/integer/bounds semantics, greedy wording, activity ordering, gross/net overview and nonuniform error boundaries. Official OAS3.1 schema, duplicate-key rejection and127 internal refs passed. Owned baseline-JAR HTTP confirmed missing/null primitive split values400, explicit0 valid, fractionalamount400, nullable reference defaults and null PATCH no-ops; no application behavior changed. Evidence: `docs/reviews/2026-10-19-alignment/f04-contract.md`. F01/F03 behavior reconciliation follows their integration; no merge/deployment.
