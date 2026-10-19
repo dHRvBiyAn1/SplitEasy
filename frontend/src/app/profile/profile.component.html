@@ -1,6 +1,46 @@
 <div class="profile">
   <h1 class="profile__title">Profile</h1>
 
+  @if (loading()) {
+    <p role="status">Loading profile…</p>
+  }
+  @if (error()) {
+    <p role="alert">{{ error() }}</p>
+  }
+  @if (!editing()) {
+    <button
+      type="button"
+      class="dc-btn-outline"
+      [disabled]="loading() || saving()"
+      (click)="refresh()"
+    >
+      Refresh profile
+    </button>
+  }
+  @if (legacyPrefs() && !importDismissed()) {
+    <section class="pcard">
+      <p>
+        Preferences saved for this account on this device are available. Importing replaces your
+        saved phone, avatar and currency preferences.
+      </p>
+      <button
+        type="button"
+        class="dc-btn-outline"
+        [disabled]="!loaded() || loading() || saving() || editing()"
+        (click)="importLegacy()"
+      >
+        Import device preferences
+      </button>
+      <button
+        type="button"
+        class="dc-btn-outline"
+        [disabled]="saving()"
+        (click)="importDismissed.set(true)"
+      >
+        Keep server preferences
+      </button>
+    </section>
+  }
   <section class="pcard">
     @if (!editing()) {
       <div class="pcard__head">
@@ -9,17 +49,22 @@
         }}</span>
         <div class="pcard__id">
           <h2 class="pcard__name">{{ user()?.displayName }}</h2>
-          <p class="pcard__since">First seen here {{ memberSince() }}</p>
+          <p class="pcard__since">Member since {{ memberSince() }}</p>
         </div>
-        <button type="button" class="dc-btn-outline pcard__edit" (click)="startEdit()">
-          <span aria-hidden="true">✎</span> Edit device preferences
+        <button
+          type="button"
+          class="dc-btn-outline pcard__edit"
+          [disabled]="!loaded() || loading() || saving()"
+          (click)="startEdit()"
+        >
+          <span aria-hidden="true">✎</span> Edit profile
         </button>
       </div>
 
       <dl class="pcard__rows">
         <div class="prow2">
           <dt class="dc-field-label">Email</dt>
-          <dd>{{ user()?.email }}</dd>
+          <dd>{{ loaded()?.email ?? user()?.email }}</dd>
         </div>
         <div class="prow2">
           <dt class="dc-field-label">Phone</dt>
@@ -38,11 +83,21 @@
           }}</span>
           <div class="pcard__id">
             <h2 class="pcard__name">{{ user()?.displayName }}</h2>
-            <p class="pcard__since">First seen here {{ memberSince() }}</p>
+            <p class="pcard__since">Member since {{ memberSince() }}</p>
           </div>
         </div>
 
-        <p>{{ user()?.email }}</p>
+        <p>{{ loaded()?.email ?? user()?.email }} (email is read-only)</p>
+        <label class="pfield"
+          ><span class="dc-field-label">Name</span
+          ><input
+            class="dc-field"
+            [formControl]="name"
+            autocomplete="name"
+            [readOnly]="saving()"
+            maxlength="100"
+            required
+        /></label>
 
         <label class="pfield">
           <span class="dc-field-label">Phone</span>
@@ -50,6 +105,8 @@
             class="dc-field"
             [formControl]="phone"
             autocomplete="tel"
+            [readOnly]="saving()"
+            maxlength="50"
             placeholder="+1 (555) 000-0000"
           />
         </label>
@@ -63,6 +120,7 @@
                 class="chip"
                 [class.chip--on]="currency() === c"
                 [attr.aria-pressed]="currency() === c"
+                [disabled]="saving()"
                 (click)="currency.set(c)"
               >
                 {{ c }}
@@ -81,6 +139,7 @@
                 [class.swatch--on]="avatarColor() === col"
                 [attr.aria-pressed]="avatarColor() === col"
                 [style.background]="col"
+                [disabled]="saving()"
                 (click)="avatarColor.set(col)"
                 [attr.aria-label]="'Avatar color ' + col"
               ></button>
@@ -89,8 +148,16 @@
         </div>
 
         <div class="pform__actions">
-          <button type="button" class="dc-btn-outline" (click)="cancel()">Cancel</button>
-          <button type="submit" class="dc-btn-accent">Save changes</button>
+          <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="cancel()">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="dc-btn-accent"
+            [disabled]="saving() || name.invalid || !name.value.trim()"
+          >
+            {{ saving() ? 'Saving…' : 'Save changes' }}
+          </button>
         </div>
       </form>
     }
@@ -101,8 +168,8 @@
     <app-appearance-panel />
   </section>
   <p class="profile__note">
-    Phone, avatar and currency preferences are saved on this device. Currency preferences do not
-    change or convert recorded amounts.
+    Name, phone, avatar and currency preferences are saved to your account. Phone is unverified
+    contact information. Currency preferences do not change or convert recorded amounts.
   </p>
 
   <button type="button" class="dc-btn-outline profile__signout" (click)="signOut()">
