@@ -116,6 +116,20 @@
           >
             Percent
           </button>
+          <button
+            type="button"
+            [attr.aria-pressed]="splitType() === 'WEIGHTS'"
+            (click)="splitType.set('WEIGHTS')"
+          >
+            Weights
+          </button>
+          <button
+            type="button"
+            [attr.aria-pressed]="splitType() === 'ADJUSTMENTS'"
+            (click)="splitType.set('ADJUSTMENTS')"
+          >
+            Adjustments
+          </button>
         </div>
 
         <div class="prows">
@@ -140,24 +154,40 @@
                   aria-describedby="ne-split-precision"
                   [attr.aria-label]="
                     memberLabel(m) +
-                    (splitType() === 'PERCENTAGE'
-                      ? ' share in percent'
-                      : ' exact amount in dollars')
+                    (splitType() === 'ADJUSTMENTS'
+                      ? ' adjustment in signed dollars'
+                      : splitType() === 'WEIGHTS'
+                        ? ' weight in whole units'
+                        : splitType() === 'PERCENTAGE'
+                          ? ' share in percent'
+                          : ' exact amount in dollars')
                   "
                   type="number"
-                  step="any"
-                  min="0"
+                  [attr.step]="splitType() === 'WEIGHTS' ? '1' : 'any'"
+                  [attr.min]="
+                    splitType() === 'ADJUSTMENTS' ? null : splitType() === 'WEIGHTS' ? '1' : '0'
+                  "
                   inputmode="decimal"
                   [value]="values()[m.id] || ''"
                   (input)="setValue(m.id, $any($event.target).value)"
-                  [placeholder]="splitType() === 'PERCENTAGE' ? '%' : '$'"
+                  [placeholder]="
+                    splitType() === 'WEIGHTS' ? 'units' : splitType() === 'PERCENTAGE' ? '%' : '$'
+                  "
                 />
               }
             </div>
           }
         </div>
         @if (splitType() !== 'EQUAL') {
-          <p class="mform__hint" id="ne-split-precision">Each share rounds to 2 decimal places.</p>
+          <p class="mform__hint" id="ne-split-precision">
+            {{
+              splitType() === 'ADJUSTMENTS'
+                ? 'Add signed dollar adjustments to equal shares over the entered participants. Adjustments must total $0.00; final shares cannot be negative. Blank excludes; enter 0 to include without adjustment. Each adjustment rounds to 2 decimal places.'
+                : splitType() === 'WEIGHTS'
+                  ? 'Use positive whole units, such as 1 and 2. Blank excludes a participant.'
+                  : 'Each share rounds to 2 decimal places. Blank excludes; 0 keeps a participant.'
+            }}
+          </p>
         }
       </div>
 

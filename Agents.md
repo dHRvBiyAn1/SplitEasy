@@ -64,6 +64,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 |---|---|---|
 | POST | `/auth/register`, `/auth/login` | issue access token |
 | GET | `/health` | liveness |
+| GET/PATCH | `/me` | current server-owned name/contact/default preferences; email read-only |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
 | GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
@@ -122,7 +123,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
 - **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
   `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
-- **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`PercentageSplitStrategy`
+- **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`Percentage`/`Weights`/`AdjustmentsSplitStrategy`
   `@Component`s selected via `Map<SplitType, SplitStrategy>` in `ExpenseService` — **no switch on type**.
   New types implement the interface. Build inputs via `SplitContext.forEqual(...)` / `.forSplits(...)`
   factories (never the raw ctor). `100%` = `TOTAL_BASIS_POINTS = 10_000`. Rounding
@@ -130,7 +131,19 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   id-sorted participant); shares always sum to the total. Exact inputs must be `0..amountCents`;
   percentage inputs must be `0..10_000`. Strategies validate bounds and sum with `BigInteger`
   before computing shares; percentage multiplication uses quotient/remainder arithmetic to
-  avoid overflow. POST/PUT reject invalid splits before changing expense or participant rows.
+  avoid overflow. Weights use positive integer units (1..1e12), with `BigInteger` multiplication/division
+  and the same remainder rule. Adjustments are signed cents (±1e12) added to the deterministic EQUAL
+  allocation over the explicitly listed split participants; their `BigInteger` sum must be zero and
+  all final shares nonnegative. POST/PUT reject invalid splits before changing expense or participant rows.
+- **Original expense split intent** (V11): retain `expense_participants.split_value` alongside final
+  `share_cents`, including explicit zero inputs/final shares. EQUAL stores1 and returns
+  `participantUserIds`; custom modes return original typed `splits` plus `splitType`. Never reconstruct
+  percentages or weights from rounded shares. V11 converts legacy PERCENTAGE to UNEQUAL exact shares;
+  nullable `split_value` permits old-writer inserts, which read as UNEQUAL exact shares if any non-equal
+  intent is missing. Existing EQUAL participant sets are recoverable. Deploy A01 V10 before E01 V11
+  (same batch release or V10 first); never rely on out-of-order migrations. After WEIGHTS/ADJUSTMENTS
+  writes, the old binary cannot read those enum values: rollback needs a forward fix or reviewed data
+  conversion/restore. Old code editing known percentages can discard intent and safely degrades to exact.
 - **Expense edit = full-replace PUT** (reuses `CreateExpenseRequest`): shares recomputed via the same
   strategy path; participants cleared and **flushed before re-insert** (unique `(expense_id,user_id)`).
   **Delete = hard delete** (204; FK-cascade removes participants), guarded when old financial participants are inactive. Rejected PUT/DELETE returns409 without changing expense/shares/payments; re-adding those people explicitly permits correction. Balances re-aggregate on accepted changes.
@@ -158,7 +171,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 ## Frontend Conventions
 
 - **Member departure controls**: settings require both net balances and canonical `/balances/current-obligations` to load before enabling removal/leave; zero net with direct obligations is “even overall”, while simplified zero-net intermediaries can depart. `/balances/obligations` retains its raw contract. Refresh failures disable removal/leave even when the old group is retained.
-- **Profile identity is read-only until real account endpoints exist**: render the authenticated name/email without local identity-edit controls. Phone/avatar/currency remain account-owned device preferences; state that currency preference does not change or convert recorded money.
+- **Profile identity/preferences are server-owned**: GET/PATCH `/api/me` edits name, unverified phone, avatar and default currency. Email stays read-only. Fresh responses update shell/profile display name without replacing ID/email/token. Currency preference never changes recorded money.
 - **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
 - **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
 
@@ -166,11 +179,12 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
   member/detail loads. Existing expense edits keep their original group in both UI and component actions.
 
-- **Profile preferences belong to immutable auth user IDs**: phone, display currency, avatar color and
-  first-visit date use `spliteasy.profile.<userId>`. Linked signals synchronously reload/reset saved prefs
-  and profile edit state when identity changes, including before an immediate save. The ownerless legacy
-  `spliteasy.profile` key is discarded without migration; users re-enter those personal fields. Theme and
-  palette intentionally remain device-wide.
+- **Profile requests belong to immutable IDs and session versions**: linked signals reset loaded profile,
+  pending/error and edit state synchronously, including repeat login to the same account. Cancel HTTP with
+  `takeUntil(session.changes)` and guard callback generations. Keep Auth→Profile dependency absent.
+  `spliteasy.profile.<userId>` is retained only as an explicit owned import source; cancel leaves data intact
+  and successful import removes only that owner's record. Never import ownerless `spliteasy.profile`.
+  Original server `createdAt` replaces the device first-visit date. Theme/palette remain device-wide.
 
 - **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
   synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
@@ -178,12 +192,16 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   request; each refresh advances it so only the newest request owns data, error and loading. Protected
   401 logout/redirect must match the initiating session version (even if a new login returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
   after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
-- **Custom expense splits**: cache the normalized outgoing cents/basis-point list and reuse it for
-  the live total, validation and POST/PUT; reject negative/nonfinite/unsafe values before zero omission.
-  Round each share to the nearest hundredth with existing conversion helpers and explain this in the form.
+- **Custom expense splits**: cache the normalized outgoing original-input list and reuse it for the
+  live total, validation and POST/PUT. Blank excludes; explicit zero retains a participant. Restore
+  original inputs on edit (legacy responses without intent use exact shares); never add other group
+  members. Reject nonfinite/unsafe/out-of-bound inputs; only ADJUSTMENTS accepts negatives. Dollar and
+  percentage inputs round to the nearest hundredth with existing helpers; weights require positive
+  whole units. Adjustment validation mirrors Java UUID signed high/low ordering when the payer is
+  excluded, so one-cent equal remainders and amount changes match the server.
 
 - Financial member controls use full display name plus email for accessible identity (including duplicate names),
-  numeric split labels name dollars or percent, and selection buttons expose `aria-pressed`.
+  numeric split labels name dollars, percent, whole weight units or signed adjustment dollars, and selection buttons expose `aria-pressed`.
 
 - **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Browser reload/cross-tab loses the identity; consult history after an uncertain response.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
@@ -238,15 +256,15 @@ Auth routes remain full-bleed with a named Appearance control.
 
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
-- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`.
+- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR, defaultUSD). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
 - **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
-  `split_type` (V4: `EQUAL/UNEQUAL/PERCENTAGE`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
-- **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0). Unique `(expense_id,user_id)`.
+  `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
+- **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0); V11 nullable `split_value` BIGINT for original typed input (EQUAL1, exact cents, basis points, weight units, signed adjustment cents). Unique `(expense_id,user_id)`.
 - **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
 
-User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All three split types store into the **same `share_cents`** column (no per-type storage), and each expense's shares sum exactly to its amount.
+User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All five split types store final owed amounts in the **same `share_cents`** column, alongside original typed `split_value`, and each expense's shares sum exactly to its amount.
 
 ## Balances & Splits (the math)
 
@@ -275,14 +293,16 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   suggestion records a normal `Payment`. Frontend seeds settle-up from canonical dashboard `Settlement` rows
   through `ModalService.settlePrefill`; it does not fetch or match a second preview.
 - **Split-type semantics** (default EQUAL): UNEQUAL carries `splits` in **cents** (must sum to `amountCents`);
-  PERCENTAGE carries `splits` in **basis points** (must sum to 10000). Bad sums → 400 with a clear message,
-  never 500. Frontend converts via `dollarsToCents`/`percentToBasisPoints` and gates submit on a live total.
+  PERCENTAGE carries `splits` in **basis points** (sum10000); WEIGHTS carries positive whole units
+  (floor(total×weight/sum), payer absorbs remainder); ADJUSTMENTS carries signed cents added to equal
+  allocation across the listed split users (sum0, nonnegative final shares). Bad values/totals →400.
+  Frontend gates submit on the actual serialized inputs, including after an amount change.
 
 ## Domain Rules
 
 - Monetary amounts are integer cents — never float. JSON integer fields reject floating-point tokens
   through `spring.jackson.deserialization.accept-float-as-int=false` before DTO validation; split
-  values are integer cents (UNEQUAL) or basis points (PERCENTAGE).
+  values are exact cents (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed cents (ADJUSTMENTS).
 - Every split sums exactly to the expense total; rounding remainder handled deterministically (payer absorbs).
 
 ## Known Gaps / TODOs
@@ -460,4 +480,9 @@ Alignment execution authorization (2026-10-19): user requested proceeding with t
 PR #95–#97 review remediation (2026-10-19): user authorized fixing comments and merging into dev. Add/Enter now waits for roster retries; settings shows raw bilateral obligations and blocks net-zero departures consistently. Independent Standards/Spec delta reviews found zero remaining issues. Backend230, combined frontend220 on Node22, formatting/build and88-request packaged HTTP rehearsal passed; owned HTTP resources cleaned up. Contract has134 validated refs and includes companion implementations before merging. Final exact-head CI and #96-before-#97 order gate integration. Evidence: `docs/reviews/2026-10-19-alignment/review-remediation.md`. No main/release action is included.
 
 
+- [x] Alignment A01 server-owned profile (2026-10-19) — authenticated GET/PATCH `/api/me` persists name, unverified phone, avatar and default currency; exposes original registration date and keeps email read-only. Fresh profile responses update auth presentation without changing identity/token; synchronous session resets, HTTP cancellation and generation guards isolate account switches and repeated logins. Account-owned device preferences require explicit import; cancellation preserves their local data, ownerless data is never imported. V10 is additive and preserves existing users/money/created_at; old binaries tolerate retained columns, but rolling back the UI/API hides newly saved preferences. Keep V10 applied and retain data; dropping columns destroys preferences. Deploy V10 before E01 V11 (or both in one release); never rewrite migration history. Verification/evidence: `docs/reviews/2026-10-19-alignment/a01-profile.md`. No merge/deployment by this worker.
+
+
+- [x] A01 review follow-up (2026-10-19) — render accepted `/api/me` email in both read-only profile modes, retaining forbidden email PATCH mutation and unchanged stored auth identity. Rendered red→green covers mismatched cached/server email; an import→component-recreation regression did not reproduce the proposed stale prompt, and failed import/cancel preserve owned local data. Node22 frontend226, full-source Prettier and production build pass; backend unchanged from234 verified tests. Root owns final migration/browser rerun. No push/merge/deployment by this worker.
+- [x] Alignment E01 split intent (2026-10-19) — persist original equal/exact/percentage/weight/adjustment inputs alongside final shares, retain zero participants, restore intent on edit and recompute percentage/weight amount changes; signed adjustments sum0 over deterministic equal allocation with nonnegative final shares. V11 nullable split_value safely degrades legacy/old-writer percentages to exact shares without inference; A01 V10 must deploy before V11, and new enum writes limit rollback. Critical red→green HTTP/rendered loops; full backend241/frontend230, Spotless/Prettier/production build, controlled-HTTP Chromium1280/320 pass. Evidence: `docs/reviews/2026-10-19-alignment/e01-split-intent.md`. Candidate only; independent review, populated migration verification and PR gates remain parent-owned; no push/merge/deployment.
 - [x] Alignment F02 canonical obligations (2026-10-19) — one selected-mode projection and deterministic UUID-tied calculator align /mine, dashboard/People/headlines/actions and departure eligibility; raw obligations/history remain unchanged. Simplified zero-net intermediaries can leave; mode changes serialize with financial/member writes and reject former-participant exposure with re-add/repair guidance. Net previews warn about direct offsets; modal uses canonical dashboard rows. Regression-first HTTP/PostgreSQL and rendered Angular, backend240/frontend220, Spotless/Prettier, production builds and official OpenAPI139-ref validation passed. Evidence: `docs/reviews/2026-10-19-alignment/f02-projection.md`. No schema/currency/auth/editor change, browser claim, push, merge or deployment by this worker; independent review and packaged rehearsal remain root-owned.

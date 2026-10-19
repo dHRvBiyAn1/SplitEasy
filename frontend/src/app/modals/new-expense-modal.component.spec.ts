@@ -645,10 +645,14 @@ describe('serialized expense split validation', () => {
       expect(submit(fixture).splits!.map((s) => s.value)).toEqual([3333, 3333, 3334]);
     });
 
-    it(`omits zero ${type} shares, including values rounded to zero`, () => {
+    it(`retains explicitly entered zero ${type} inputs, including values rounded to zero`, () => {
       const { fixture } = open(type, ['100', '0', '0.001']);
       expect(fixture.componentInstance.splitValid()).toBe(true);
-      expect(submit(fixture).splits).toEqual([{ userId: me.id, value: 10000 }]);
+      expect(submit(fixture).splits).toEqual([
+        { userId: me.id, value: 10000 },
+        { userId: other.id, value: 0 },
+        { userId: third.id, value: 0 },
+      ]);
     });
 
     it(`rounds each ${type} share to the nearest hundredth before validating and sending`, () => {
@@ -676,5 +680,300 @@ describe('serialized expense split validation', () => {
       { userId: me.id, value: 333 },
       { userId: other.id, value: 667 },
     ]);
+  });
+});
+
+describe('original split intent in the rendered editor', () => {
+  let http: HttpTestingController;
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [NewExpenseModalComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: { user: signal(me) } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => http.verify());
+
+  it('keeps original 50/50 percentages for a one-cent expense and recalculates after an amount change', () => {
+    TestBed.inject(ModalService).openExpense(group.id, expense.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
+    http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
+      ...expense,
+      amountCents: 1,
+      splitType: 'PERCENTAGE',
+      splits: [
+        { userId: me.id, value: 5000 },
+        { userId: other.id, value: 5000 },
+      ],
+      participants: [
+        { user: me, shareCents: 1 },
+        { user: other, shareCents: 0 },
+      ],
+    });
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    expect(root.querySelectorAll('.seg button')[2].getAttribute('aria-pressed')).toBe('true');
+    expect([...root.querySelectorAll<HTMLInputElement>('.prow__val')].map((i) => i.value)).toEqual([
+      '50.00',
+      '50.00',
+      '',
+    ]);
+    const amount = root.querySelector<HTMLInputElement>('#ne-amt')!;
+    amount.value = '1';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(false);
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const save = http.expectOne({
+      method: 'PUT',
+      url: `/api/groups/${group.id}/expenses/${expense.id}`,
+    });
+    expect(save.request.body).toMatchObject({
+      amountCents: 100,
+      splitType: 'PERCENTAGE',
+      splits: [
+        { userId: me.id, value: 5000 },
+        { userId: other.id, value: 5000 },
+      ],
+    });
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
+  });
+  it('preserves an original zero percentage participant without adding other group members', () => {
+    TestBed.inject(ModalService).openExpense(group.id, expense.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
+    http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
+      ...expense,
+      splitType: 'PERCENTAGE',
+      splits: [
+        { userId: me.id, value: 10000 },
+        { userId: other.id, value: 0 },
+      ],
+      participants: [
+        { user: me, shareCents: 1000 },
+        { user: other, shareCents: 0 },
+      ],
+    });
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const save = http.expectOne({
+      method: 'PUT',
+      url: `/api/groups/${group.id}/expenses/${expense.id}`,
+    });
+    expect(save.request.body.splits).toEqual([
+      { userId: me.id, value: 10000 },
+      { userId: other.id, value: 0 },
+    ]);
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
+  });
+
+  it('accepts positive integer weights and serializes units without dollar conversion', () => {
+    TestBed.inject(ModalService).openExpense(group.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    for (const [selector, value] of [
+      ['#ne-desc', 'Weighted'],
+      ['#ne-amt', '0.05'],
+    ]) {
+      const input = root.querySelector<HTMLInputElement>(selector)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    [...root.querySelectorAll<HTMLButtonElement>('.seg button')]
+      .find((b) => b.textContent?.trim() === 'Weights')!
+      .click();
+    fixture.detectChanges();
+    const inputs = root.querySelectorAll<HTMLInputElement>('.prow__val');
+    expect(inputs[0].getAttribute('aria-label')).toContain('weight in whole units');
+    for (const [i, value] of ['1', '2'].entries()) {
+      inputs[i].value = value;
+      inputs[i].dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(false);
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const save = http.expectOne({ method: 'POST', url: `/api/groups/${group.id}/expenses` });
+    expect(save.request.body).toMatchObject({
+      splitType: 'WEIGHTS',
+      amountCents: 5,
+      splits: [
+        { userId: me.id, value: 1 },
+        { userId: other.id, value: 2 },
+      ],
+    });
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
+  });
+
+  it('edits original signed adjustments and blocks an amount that would create negative shares', () => {
+    TestBed.inject(ModalService).openExpense(group.id, expense.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
+    http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
+      ...expense,
+      amountCents: 200,
+      splitType: 'ADJUSTMENTS',
+      splits: [
+        { userId: me.id, value: -50 },
+        { userId: other.id, value: 50 },
+      ],
+      participants: [
+        { user: me, shareCents: 50 },
+        { user: other, shareCents: 150 },
+      ],
+    });
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    const selected = root.querySelector<HTMLButtonElement>('.seg button[aria-pressed=true]')!;
+    expect(selected.textContent?.trim()).toBe('Adjustments');
+    const inputs = root.querySelectorAll<HTMLInputElement>('.prow__val');
+    expect(inputs[0].value).toBe('-0.50');
+    expect(inputs[0].getAttribute('aria-label')).toContain('adjustment in signed dollars');
+    const amount = root.querySelector<HTMLInputElement>('#ne-amt')!;
+    amount.value = '0.50';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(true);
+    expect(root.querySelector('.running')!.textContent).toContain('nonnegative');
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    http.expectNone((r) => r.method === 'PUT');
+    amount.value = '2';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(false);
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const save = http.expectOne({
+      method: 'PUT',
+      url: `/api/groups/${group.id}/expenses/${expense.id}`,
+    });
+    expect(save.request.body).toMatchObject({
+      splitType: 'ADJUSTMENTS',
+      splits: [
+        { userId: me.id, value: -50 },
+        { userId: other.id, value: 50 },
+      ],
+    });
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
+  });
+
+  it.each(['0', '-1', '1.5', '1000000000001'])(
+    'blocks an invalid weight %s before POST',
+    (invalid) => {
+      TestBed.inject(ModalService).openExpense(group.id);
+      const fixture = TestBed.createComponent(NewExpenseModalComponent);
+      http.expectOne(`/api/groups/${group.id}`).flush(group);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      for (const [selector, value] of [
+        ['#ne-desc', 'Weighted'],
+        ['#ne-amt', '1'],
+      ]) {
+        const input = root.querySelector<HTMLInputElement>(selector)!;
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      [...root.querySelectorAll<HTMLButtonElement>('.seg button')]
+        .find((b) => b.textContent?.trim() === 'Weights')!
+        .click();
+      fixture.detectChanges();
+      const input = root.querySelector<HTMLInputElement>('.prow__val')!;
+      input.value = invalid;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+      expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(true);
+      root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+      http.expectNone((r) => r.method === 'POST');
+    },
+  );
+
+  it('restores whole weights on edit and reuses them when the amount changes', () => {
+    TestBed.inject(ModalService).openExpense(group.id, expense.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
+    http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
+      ...expense,
+      amountCents: 5,
+      splitType: 'WEIGHTS',
+      splits: [
+        { userId: me.id, value: 1 },
+        { userId: other.id, value: 2 },
+      ],
+      participants: [
+        { user: me, shareCents: 2 },
+        { user: other, shareCents: 3 },
+      ],
+    });
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    expect([...root.querySelectorAll<HTMLInputElement>('.prow__val')].map((i) => i.value)).toEqual([
+      '1',
+      '2',
+      '',
+    ]);
+    const amount = root.querySelector<HTMLInputElement>('#ne-amt')!;
+    amount.value = '0.10';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const save = http.expectOne({
+      method: 'PUT',
+      url: `/api/groups/${group.id}/expenses/${expense.id}`,
+    });
+    expect(save.request.body).toMatchObject({
+      splitType: 'WEIGHTS',
+      amountCents: 10,
+      splits: [
+        { userId: me.id, value: 1 },
+        { userId: other.id, value: 2 },
+      ],
+    });
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
+  });
+
+  it('matches the server UUID remainder recipient for signed one-cent adjustments with payer excluded', () => {
+    const low = { ...other, id: '00000000-0000-0000-0000-000000000001' };
+    const high = { ...third, id: '80000000-0000-0000-0000-000000000002' };
+    TestBed.inject(ModalService).openExpense(group.id, expense.id);
+    const fixture = TestBed.createComponent(NewExpenseModalComponent);
+    http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, low, high] });
+    http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
+      ...expense,
+      amountCents: 1,
+      splitType: 'ADJUSTMENTS',
+      splits: [
+        { userId: low.id, value: 1 },
+        { userId: high.id, value: -1 },
+      ],
+      participants: [
+        { user: low, shareCents: 1 },
+        { user: high, shareCents: 0 },
+      ],
+    });
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(false);
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    const save = http.expectOne({
+      method: 'PUT',
+      url: `/api/groups/${group.id}/expenses/${expense.id}`,
+    });
+    expect(save.request.body.splits).toEqual([
+      { userId: low.id, value: 1 },
+      { userId: high.id, value: -1 },
+    ]);
+    save.flush(expense);
+    http.expectOne('/api/dashboard').flush(emptyOverview);
   });
 });

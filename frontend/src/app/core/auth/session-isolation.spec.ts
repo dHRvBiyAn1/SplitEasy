@@ -169,6 +169,13 @@ describe('account session isolation', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     fixture.detectChanges();
     fixture.nativeElement.querySelector('.mobile-nav [data-nav=groups]').click();
     fixture.detectChanges();
@@ -183,6 +190,13 @@ describe('account session isolation', () => {
 
     login();
     fixture.detectChanges();
+    requests.expectOne('/api/me').flush({
+      ...bob.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     const bobRequest = requests.expectOne('/api/dashboard');
     expect(bobRequest.request.headers.get('Authorization')).toBe('Bearer bob-token');
     bobRequest.flush(bobDashboard);
@@ -239,6 +253,13 @@ describe('account session isolation', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     modal.openGroup();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-new-group-modal')).not.toBeNull();
@@ -348,11 +369,27 @@ describe('account session isolation', () => {
     expect(navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
   });
 
-  it('keeps the current session’s cache and modal when editing device preferences', () => {
+  it('keeps the current session’s cache and modal when updating server preferences', () => {
     dashboard.ensureLoaded();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
     modal.openGroup();
-    TestBed.inject(ProfileService).update({ phone: '+1 234' });
+    const profile = TestBed.inject(ProfileService);
+    TestBed.tick();
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
+    profile.update({ phone: '+1 234' });
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '+1 234',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     dashboard.ensureLoaded();
     requests.expectNone('/api/dashboard');
     expect(dashboard.data()).toEqual(aliceDashboard);

@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthResponse } from './auth/auth.models';
 import { AuthService } from './auth/auth.service';
-import { AVATAR_COLORS, ProfileService } from './profile.service';
+import { AVATAR_COLORS, CurrentProfile, ProfileService } from './profile.service';
 import { ThemeService } from './theme.service';
 import { ProfileComponent } from '../profile/profile.component';
 
@@ -29,6 +29,45 @@ describe('account-owned profile preferences', () => {
   let auth: AuthService;
   let profile: ProfileService;
   let requests: HttpTestingController;
+  let server: Record<string, CurrentProfile>;
+  function fresh(response: AuthResponse): CurrentProfile {
+    return {
+      ...response.user,
+      phone: '',
+      preferredCurrency: 'USD',
+      avatarColor: AVATAR_COLORS[0],
+      createdAt: response.user.id === 'alice-id' ? '2020-01-01T00:00:00Z' : '2021-01-01T00:00:00Z',
+    };
+  }
+  function load(response: AuthResponse): void {
+    TestBed.tick();
+    requests.expectOne('/api/me').flush((server[response.user.id] ??= fresh(response)));
+  }
+  function update(patch: {
+    phone?: string;
+    currency?: 'USD' | 'EUR' | 'GBP' | 'INR';
+    avatarColor?: string;
+  }): void {
+    const id = auth.user()?.id;
+    profile.update({
+      phone: patch.phone,
+      preferredCurrency: patch.currency,
+      avatarColor: patch.avatarColor,
+    });
+    if (!id) {
+      requests.expectNone('/api/me');
+      return;
+    }
+    const request = requests.expectOne('/api/me');
+    expect(request.request.method).toBe('PATCH');
+    server[id] = {
+      ...server[id],
+      ...Object.fromEntries(
+        Object.entries(request.request.body).filter(([, value]) => value !== undefined),
+      ),
+    };
+    request.flush(server[id]);
+  }
 
   function boot(): void {
     TestBed.configureTestingModule({
@@ -43,17 +82,19 @@ describe('account-owned profile preferences', () => {
     if (register) auth.register({ ...response.user, password: 'test-password' }).subscribe();
     else auth.login({ email: response.user.email, password: 'test-password' }).subscribe();
     requests.expectOne(`/api/auth/${register ? 'register' : 'login'}`).flush(response);
+    load(response);
   }
 
   beforeEach(() => {
     localStorage.clear();
+    server = {};
     boot();
   });
   afterEach(() => requests.verify());
 
   it('isolates A to B to A synchronously and preserves each account across a real injector reload', () => {
     login(alice);
-    profile.update(alicePrefs);
+    update(alicePrefs);
     auth.logout();
     expect(profile.prefs().phone).toBe('');
     login(bob);
@@ -63,32 +104,37 @@ describe('account-owned profile preferences', () => {
       avatarColor: AVATAR_COLORS[0],
     });
     expect(profile.prefs().joinedAt).not.toBe(alicePrefs.joinedAt);
-    profile.update({ phone: '+1 0000000000', currency: 'EUR', avatarColor: AVATAR_COLORS[1] });
+    update({ phone: '+1 0000000000', currency: 'EUR', avatarColor: AVATAR_COLORS[1] });
     const bobPrefs = profile.prefs();
     login(alice);
-    expect(profile.prefs()).toEqual(alicePrefs);
+    expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });
     requests.verify();
     TestBed.resetTestingModule();
     boot();
+    load(alice);
     expect(auth.user()?.id).toBe(alice.user.id);
-    expect(profile.prefs()).toEqual(alicePrefs);
+    expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });
     login(bob);
     expect(profile.prefs()).toEqual(bobPrefs);
   });
 
   it('uses the new identity for an immediate partial write before any render or preference read', () => {
     login(alice);
-    profile.update(alicePrefs);
-    login(bob);
-    profile.update({ currency: 'GBP' });
+    update(alicePrefs);
+    auth.login({ email: bob.user.email, password: 'test-password' }).subscribe();
+    requests.expectOne('/api/auth/login').flush(bob);
+    expect(profile.prefs().phone).toBe('');
+    server[bob.user.id] = fresh(bob);
+    update({ currency: 'GBP' });
+    load(bob);
     expect(profile.prefs()).toMatchObject({ phone: '', currency: 'GBP' });
     login(alice);
-    expect(profile.prefs()).toEqual(alicePrefs);
+    expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });
   });
 
   it('starts a newly registered account with its own defaults', () => {
     login(alice);
-    profile.update(alicePrefs);
+    update(alicePrefs);
     login(bob, true);
     expect(profile.prefs()).toMatchObject({
       phone: '',
@@ -96,14 +142,14 @@ describe('account-owned profile preferences', () => {
       avatarColor: AVATAR_COLORS[0],
     });
     login(alice);
-    expect(profile.prefs()).toEqual(alicePrefs);
+    expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });
   });
 
-  it('keeps preferences when mutable name and email change', () => {
+  it('keeps server preferences when the same account logs in again', () => {
     login(alice);
-    profile.update(alicePrefs);
+    update(alicePrefs);
     login({ ...alice, user: { ...alice.user, displayName: 'New name', email: 'new@example.com' } });
-    expect(profile.prefs()).toEqual(alicePrefs);
+    expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });
   });
 
   it('discards ownerless legacy fields without changing device appearance', () => {
@@ -127,7 +173,7 @@ describe('account-owned profile preferences', () => {
   });
 
   it('does not persist unauthenticated profile changes into the next account', () => {
-    profile.update(alicePrefs);
+    update(alicePrefs);
     login(bob);
     expect(profile.prefs().phone).toBe('');
     expect(localStorage.getItem('spliteasy.profile')).toBeNull();
@@ -135,7 +181,7 @@ describe('account-owned profile preferences', () => {
 
   it('closes an old account’s profile draft and ignores its stale submit on identity change', () => {
     login(alice);
-    profile.update(alicePrefs);
+    update(alicePrefs);
     const fixture = TestBed.createComponent(ProfileComponent);
     fixture.detectChanges();
     fixture.componentInstance.startEdit();
