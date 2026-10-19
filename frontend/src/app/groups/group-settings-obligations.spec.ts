@@ -43,9 +43,9 @@ describe('group settings bilateral obligations', () => {
   });
 
   it.each([
-    { role: 'self', viewer: bob, creator: alice, simplifyDebts: true },
-    { role: 'other member', viewer: alice, creator: alice, simplifyDebts: true },
-    { role: 'creator', viewer: bob, creator: bob, simplifyDebts: true },
+    { role: 'self', viewer: bob, creator: alice, simplifyDebts: false },
+    { role: 'other member', viewer: alice, creator: alice, simplifyDebts: false },
+    { role: 'creator', viewer: bob, creator: bob, simplifyDebts: false },
     { role: 'self without simplification', viewer: bob, creator: alice, simplifyDebts: false },
   ])(
     'blocks net-zero $role with both counterparties visible',
@@ -64,7 +64,7 @@ describe('group settings bilateral obligations', () => {
         ],
       });
       // Matching, rather than requiring, lets the old screen reproduce its unsafe enabled controls.
-      http.match('/api/groups/g/balances/obligations').forEach((r) =>
+      http.match('/api/groups/g/balances/current-obligations').forEach((r) =>
         r.flush([
           { from: alice, to: bob, amountCents: 1000 },
           { from: bob, to: carol, amountCents: 1000 },
@@ -87,6 +87,48 @@ describe('group settings bilateral obligations', () => {
     },
   );
 
+  it('lets the simplified zero-net intermediary leave using current-mode obligations', () => {
+    const fixture = TestBed.createComponent(GroupSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/groups/g').flush(group);
+    http.expectOne('/api/groups/g/balances').flush({
+      balances: [
+        { user: alice, netCents: -1000 },
+        { user: bob, netCents: 0 },
+        { user: carol, netCents: 1000 },
+        { user: dan, netCents: 0 },
+      ],
+    });
+    // Old code consumes raw debts and wrongly blocks Bob. The canonical read omits him.
+    http.match('/api/groups/g/balances/obligations').forEach((r) =>
+      r.flush([
+        { from: alice, to: bob, amountCents: 1000 },
+        { from: bob, to: carol, amountCents: 1000 },
+      ]),
+    );
+    http
+      .match('/api/groups/g/balances/current-obligations')
+      .forEach((r) => r.flush([{ from: alice, to: carol, amountCents: 1000 }]));
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Remove Bob"]')!.disabled).toBe(
+      false,
+    );
+    const leave = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Leave group',
+    )!;
+    expect(leave.disabled).toBe(false);
+    expect(root.textContent).toContain('Simplified obligations');
+    leave.click();
+    fixture.detectChanges();
+    Array.from(root.querySelectorAll('button'))
+      .find((b) => b.textContent?.trim() === 'Yes, leave')!
+      .click();
+    const request = http.expectOne('/api/groups/g/members/bob');
+    expect(request.request.method).toBe('DELETE');
+    request.flush({ message: 'Reload' }, { status: 409, statusText: 'Conflict' });
+  });
+
   it('permits settled members to be removed and to leave, while protecting the creator', () => {
     const fixture = TestBed.createComponent(GroupSettingsComponent);
     fixture.detectChanges();
@@ -94,7 +136,7 @@ describe('group settings bilateral obligations', () => {
     http
       .expectOne('/api/groups/g/balances')
       .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
-    http.expectOne('/api/groups/g/balances/obligations').flush([]);
+    http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;
     expect(root.querySelector<HTMLButtonElement>('[aria-label="Remove Alice"]')!.disabled).toBe(
@@ -127,7 +169,7 @@ describe('group settings bilateral obligations', () => {
     http
       .expectOne('/api/groups/g/balances')
       .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
-    http.expectOne('/api/groups/g/balances/obligations').flush([]);
+    http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;
     Array.from(root.querySelectorAll('button'))
@@ -141,7 +183,7 @@ describe('group settings bilateral obligations', () => {
     fixture.detectChanges();
     http.expectOne('/api/groups/g').flush(group);
     http.expectOne('/api/groups/g/balances').flush({ balances: [] });
-    const obligations = http.expectOne('/api/groups/g/balances/obligations');
+    const obligations = http.expectOne('/api/groups/g/balances/current-obligations');
     fixture.detectChanges();
     expect(root.querySelector('[role="status"]')).not.toBeNull();
     expect(root.textContent).not.toContain('settled');

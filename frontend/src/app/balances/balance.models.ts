@@ -11,7 +11,7 @@ export interface GroupBalancesResponse {
   balances: MemberBalance[];
 }
 
-/** Raw bilateral debt: from owes to; never a simplified transfer suggestion. */
+/** Directed debt: from owes to. The endpoint defines raw or selected-mode interpretation. */
 export interface DirectObligation {
   from: UserSummary;
   to: UserSummary;

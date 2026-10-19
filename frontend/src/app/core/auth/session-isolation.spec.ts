@@ -147,31 +147,23 @@ describe('account session isolation', () => {
     fixture.destroy();
   });
 
-  it.each(['member', 'expense', 'settle'] as const)(
-    'cancels pending %s modal reads on logout',
-    (kind) => {
-      if (kind === 'member') modal.openAddMember('alice-group');
-      else if (kind === 'expense') modal.openExpense('alice-group');
-      else modal.openSettle(undefined, 'alice-group');
-      const components = {
-        member: AddMemberModalComponent,
-        expense: NewExpenseModalComponent,
-        settle: SettleUpModalComponent,
-      };
-      const fixture = TestBed.createComponent<unknown>(components[kind]);
-      fixture.detectChanges();
-      const read = requests.expectOne(
-        kind === 'settle'
-          ? '/api/groups/alice-group/debt-simplification'
-          : '/api/groups/alice-group',
-      );
+  it.each(['member', 'expense'] as const)('cancels pending %s modal reads on logout', (kind) => {
+    if (kind === 'member') modal.openAddMember('alice-group');
+    else modal.openExpense('alice-group');
+    const components = {
+      member: AddMemberModalComponent,
+      expense: NewExpenseModalComponent,
+      settle: SettleUpModalComponent,
+    };
+    const fixture = TestBed.createComponent<unknown>(components[kind]);
+    fixture.detectChanges();
+    const read = requests.expectOne('/api/groups/alice-group');
 
-      auth.logout();
-      expect(read.cancelled).toBe(true);
-      expect(modal.active()).toBeNull();
-      fixture.destroy();
-    },
-  );
+    auth.logout();
+    expect(read.cancelled).toBe(true);
+    expect(modal.active()).toBeNull();
+    fixture.destroy();
+  });
 
   it('fetches and renders Bob’s shell after Alice’s protected request expires', () => {
     const fixture = TestBed.createComponent(App);

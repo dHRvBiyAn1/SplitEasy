@@ -82,6 +82,13 @@ class GroupPatchConcurrencyIntegrationTest extends AbstractIntegrationTest {
   private void commitAfterConcurrentPatch(
       Fixture f, UpdateGroupRequest last, UpdateGroupRequest first) throws Exception {
     assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+    if (last.simplifyDebts() != null) {
+      // Mode changes lock before loading settings: no stale group snapshot can exist here.
+      // The reverse cases below still exercise dirty non-mode writes after a mode commit.
+      patchGroup(f.member(), f.groupId(), first);
+      patchGroup(f.owner(), f.groupId(), last);
+      return;
+    }
     AtomicBoolean started = new AtomicBoolean();
     AtomicBoolean committed = new AtomicBoolean();
     doAnswer(

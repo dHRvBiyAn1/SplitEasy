@@ -42,23 +42,27 @@
     <div class="simplify-bar" [class.simplify-bar--on]="allSimplified()">
       <span class="simplify-bar__text">
         <span class="simplify-bar__title">
-          {{ allSimplified() ? 'Suggested transfers' : 'All balances' }}
+          {{ allSimplified() ? 'Simplified obligations' : 'Current obligations' }}
         </span>
         <span class="simplify-bar__sub">
-          @if (saved() > 0) {
-            {{ saved() }} fewer {{ saved() === 1 ? 'payment' : 'payments' }} than settling every
-            pairwise balance directly · change this in group settings
+          @if (allSimplified()) {
+            Net debtors pay net creditors · raw history stays unchanged
           } @else {
-            Set per group under Advanced settings
+            Direct mode keeps debts with each person, including offsetting amounts. A net-derived
+            preview may leave offsetting direct obligations.
           }
         </span>
       </span>
     </div>
 
-    @if (loadingSimplified()) {
-      <div class="dc-loading" role="status" aria-label="Loading suggested transfers"></div>
+    @if (loading()) {
+      <div class="dc-loading" role="status" aria-label="Loading current obligations"></div>
+    } @else if (loadFailed()) {
+      <p class="mform__error" role="alert">
+        Current obligations are unavailable. Reload the dashboard.
+      </p>
     } @else if (settlements().length === 0) {
-      <p class="mempty">You're all settled up. Nothing to pay.</p>
+      <p class="mempty">No current-mode obligations for you.</p>
     } @else {
       <div class="slist">
         @for (s of settlements(); track s.groupId + s.counterparty.id) {

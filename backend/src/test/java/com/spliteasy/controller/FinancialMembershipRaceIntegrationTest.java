@@ -201,7 +201,8 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
         "deleteExpense",
         "payment",
         "addMember",
-        "removeMember"
+        "removeMember",
+        "mode"
       })
   void selfLeaveRevokesAnAlreadyWaitingRequestersWrite(String mutation) throws Exception {
     Fixture f = fixture();
@@ -239,6 +240,10 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
                   new RecordPaymentRequest(f.a().user().id(), c.user().id(), 1000));
           case "addMember" -> jsonPost(path(f, "/members"), new AddMemberRequest(d.user().email()));
           case "removeMember" -> delete(path(f, "/members/" + c.user().id()));
+          case "mode" ->
+              patch(path(f, ""))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"simplifyDebts\":false}");
           default -> throw new IllegalArgumentException(mutation);
         };
     CountDownLatch removing = new CountDownLatch(1);
@@ -270,6 +275,108 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
     assertThat(read(f, "", GroupResponse.class).members())
         .extracting(u -> u.id())
         .containsExactlyInAnyOrder(f.a().user().id(), c.user().id());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void modeAndSimplifiedIntermediaryDepartureSerializeInBothOrders(boolean modeFirst)
+      throws Exception {
+    Fixture f = fixture();
+    var c = register(UUID.randomUUID() + "-c@example.com", "password123", "Carol");
+    body(
+        auth(jsonPost(path(f, "/members"), new AddMemberRequest(c.user().email())), f.a()),
+        200,
+        GroupResponse.class);
+    body(
+        auth(
+            jsonPost(
+                path(f, "/expenses"),
+                new CreateExpenseRequest(
+                    "A owes B", 1000, f.b().user().id(), List.of(f.a().user().id()))),
+            f.a()),
+        201,
+        ExpenseResponse.class);
+    body(
+        auth(
+            jsonPost(
+                path(f, "/expenses"),
+                new CreateExpenseRequest(
+                    "B owes C", 1000, c.user().id(), List.of(f.b().user().id()))),
+            f.a()),
+        201,
+        ExpenseResponse.class);
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicInteger blocker = new AtomicInteger();
+    doAnswer(holdAfterQuery(locked, release, blocker))
+        .when(groupRepository)
+        .findByIdForUpdate(f.groupId());
+    MockHttpServletRequestBuilder mode =
+        auth(
+            patch(path(f, ""))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"simplifyDebts\":false}"),
+            f.a());
+    MockHttpServletRequestBuilder leave =
+        auth(delete(path(f, "/members/" + f.b().user().id())), f.b());
+    try (var requests = Executors.newFixedThreadPool(2)) {
+      var first = requests.submit(() -> mockMvc.perform(modeFirst ? mode : leave).andReturn());
+      java.util.concurrent.Future<MvcResult> second = null;
+      try {
+        assertThat(locked.await(20, TimeUnit.SECONDS)).isTrue();
+        second = requests.submit(() -> mockMvc.perform(modeFirst ? leave : mode).andReturn());
+        awaitBlockedBy(blocker.get());
+      } finally {
+        release.countDown();
+      }
+      assertThat(first.get(20, TimeUnit.SECONDS).getResponse().getStatus())
+          .isEqualTo(modeFirst ? 200 : 204);
+      assertThat(second.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(409);
+    }
+    GroupResponse group = read(f, "", GroupResponse.class);
+    assertThat(group.simplifyDebts()).isEqualTo(!modeFirst);
+    assertThat(group.members()).hasSize(modeFirst ? 3 : 2);
+    assertThat(read(f, "/expenses", Object[].class)).hasSize(2);
+    assertThat(read(f, "/payments", Object[].class)).isEmpty();
+    assertThat(read(f, "/balances/obligations", Object[].class)).hasSize(2);
+    assertThat(read(f, "/balances/current-obligations", Object[].class)).hasSize(modeFirst ? 2 : 1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void modeWaitsForFinancialWritesBeforeProjectingTheirCommit(boolean payment) throws Exception {
+    Fixture f = fixture();
+    CountDownLatch validated = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicInteger blocker = new AtomicInteger();
+    doAnswer(holdAfterQuery(validated, release, blocker)).when(userRepository).findAllById(any());
+    try (var requests = Executors.newFixedThreadPool(2)) {
+      var write =
+          requests.submit(() -> mockMvc.perform(auth(financial(f, payment), f.a())).andReturn());
+      java.util.concurrent.Future<MvcResult> mode = null;
+      try {
+        assertThat(validated.await(20, TimeUnit.SECONDS)).isTrue();
+        mode =
+            requests.submit(
+                () ->
+                    mockMvc
+                        .perform(
+                            auth(
+                                patch(path(f, ""))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{\"simplifyDebts\":false}"),
+                                f.a()))
+                        .andReturn());
+        awaitBlockedBy(blocker.get());
+      } finally {
+        release.countDown();
+      }
+      assertThat(write.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(201);
+      assertThat(mode.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+    }
+    assertThat(read(f, "", GroupResponse.class).simplifyDebts()).isFalse();
+    assertThat(read(f, payment ? "/payments" : "/expenses", Object[].class)).hasSize(1);
+    assertThat(read(f, "/balances/current-obligations", Object[].class)).hasSize(1);
   }
 
   @Test

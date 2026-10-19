@@ -97,6 +97,7 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
               "/balances",
               "/balances/mine",
               "/balances/obligations",
+              "/balances/current-obligations",
               "/payments",
               "/expenses")) {
         mockMvc
@@ -131,6 +132,14 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
   @Test
   void netZeroIntermediaryCannotLeaveWithOutstandingBilateralObligations() throws Exception {
     Fixture f = fixture();
+    body(
+        auth(
+            patch(path(f, ""))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"simplifyDebts\":false}"),
+            f.a()),
+        200,
+        GroupResponse.class);
     AuthResponse c = register(UUID.randomUUID() + "-c@example.com", "password123", "Carol");
     body(
         auth(jsonPost(path(f, "/members"), new AddMemberRequest(c.user().email())), f.a()),

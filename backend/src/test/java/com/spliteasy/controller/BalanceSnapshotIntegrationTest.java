@@ -325,7 +325,7 @@ class BalanceSnapshotIntegrationTest extends AbstractIntegrationTest {
                     extraWrite.run();
                   }))
           .when(paymentRepository)
-          .sumPaidByUserToEach(f.groupId(), f.owner().user().id());
+          .sumPaidByPair(f.groupId());
     } else {
       doAnswer(
               afterReadCommit(
@@ -344,7 +344,7 @@ class BalanceSnapshotIntegrationTest extends AbstractIntegrationTest {
                     extraWrite.run();
                   }))
           .when(participantRepository)
-          .sumOwedToUser(f.groupId(), f.owner().user().id());
+          .sumOwedByPair(f.groupId());
     }
   }
 
@@ -384,6 +384,10 @@ class BalanceSnapshotIntegrationTest extends AbstractIntegrationTest {
         groupService.createGroup(owner.user().id(), new CreateGroupRequest("Snapshot")).id();
     groupService.addMember(owner.user().id(), groupId, bob.user().email());
     groupService.addMember(owner.user().id(), groupId, carol.user().email());
+    groupService.updateGroup(
+        owner.user().id(),
+        groupId,
+        new com.spliteasy.dto.group.UpdateGroupRequest(null, null, false));
     return groupId;
   }
 
