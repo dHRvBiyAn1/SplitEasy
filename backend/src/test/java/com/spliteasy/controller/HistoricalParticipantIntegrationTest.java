@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.spliteasy.AbstractIntegrationTest;
 import com.spliteasy.dto.auth.AuthResponse;
+import com.spliteasy.dto.balance.DirectObligation;
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.PersonBalance;
 import com.spliteasy.dto.expense.CreateExpenseRequest;
@@ -37,6 +38,8 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
     expense(f, 2000, f.a(), List.of(f.a().user().id(), f.b().user().id()));
     oldRemove(f);
     assertBalances(f, Map.of(f.a().user().id(), 1000L, f.b().user().id(), -1000L));
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class))
+        .containsExactly(new DirectObligation(f.b().user(), f.a().user(), 1000));
     assertThat(Arrays.asList(read(f, "/balances/mine", PersonBalance[].class)))
         .singleElement()
         .satisfies(
@@ -70,6 +73,8 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
     Fixture f = fixture();
     payment(f);
     oldRemove(f);
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class))
+        .containsExactly(new DirectObligation(f.a().user(), f.b().user(), 1000));
     assertBalances(f, Map.of(f.a().user().id(), -1000L, f.b().user().id(), 1000L));
     assertThat(Arrays.asList(read(f, "/balances/mine", PersonBalance[].class)))
         .singleElement()
@@ -86,7 +91,14 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
     expense(f, 2000, f.a(), List.of(f.a().user().id(), f.b().user().id()));
     oldRemove(f);
     for (UUID group : List.of(f.groupId(), UUID.randomUUID())) {
-      for (String suffix : List.of("", "/balances", "/balances/mine", "/payments", "/expenses")) {
+      for (String suffix :
+          List.of(
+              "",
+              "/balances",
+              "/balances/mine",
+              "/balances/obligations",
+              "/payments",
+              "/expenses")) {
         mockMvc
             .perform(auth(get("/api/groups/" + group + suffix), f.b()))
             .andExpect(status().isForbidden());
@@ -131,6 +143,10 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
     assertThat(body(auth(get(path(f, "/balances/mine")), f.b()), 200, PersonBalance[].class))
         .extracting(p -> p.netCents())
         .containsExactlyInAnyOrder(1000L, -1000L);
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class))
+        .containsExactlyInAnyOrder(
+            new DirectObligation(f.a().user(), f.b().user(), 1000),
+            new DirectObligation(f.b().user(), c.user(), 1000));
     mockMvc
         .perform(auth(delete(path(f, "/members/" + f.b().user().id())), f.a()))
         .andExpect(status().isConflict());
@@ -142,6 +158,33 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
     assertThat(read(f, "/expenses/" + second.id(), ExpenseResponse.class)).isEqualTo(second);
     assertThat(read(f, "/payments", Object[].class)).isEmpty();
     assertBalances(f, expected);
+  }
+
+  @Test
+  void rawObligationsNetOppositeExpensesAndPaymentsWithoutSelfOrZeroEdges() throws Exception {
+    Fixture f = fixture();
+    expense(f, 1000, f.a(), List.of(f.b().user().id()));
+    expense(f, 300, f.b(), List.of(f.a().user().id()));
+    expense(f, 900, f.a(), List.of(f.a().user().id()));
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class))
+        .containsExactly(new DirectObligation(f.b().user(), f.a().user(), 700));
+    // Overpayment reverses the remaining obligation, rather than dropping that pair.
+    payment(f);
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class))
+        .containsExactly(new DirectObligation(f.a().user(), f.b().user(), 300));
+    body(
+        auth(
+            jsonPost(
+                path(f, "/payments"),
+                new RecordPaymentRequest(f.a().user().id(), f.b().user().id(), 300)),
+            f.a()),
+        201,
+        Object.class);
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class)).isEmpty();
+    mockMvc
+        .perform(auth(delete(path(f, "/members/" + f.b().user().id())), f.b()))
+        .andExpect(status().isNoContent());
+    assertThat(read(f, "/balances/obligations", DirectObligation[].class)).isEmpty();
   }
 
   @Test

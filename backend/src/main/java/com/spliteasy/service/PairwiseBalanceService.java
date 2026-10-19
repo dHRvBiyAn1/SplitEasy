@@ -1,10 +1,13 @@
 package com.spliteasy.service;
 
+import com.spliteasy.dto.balance.DirectObligation;
 import com.spliteasy.dto.balance.PersonBalance;
 import com.spliteasy.repository.ExpenseParticipantRepository;
+import com.spliteasy.repository.PairAmount;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +50,46 @@ public class PairwiseBalanceService {
     membershipGuard.requireMember(groupId, requesterId);
     return compute(requesterId, groupId);
   }
+
+  /** Every raw bilateral obligation, independent of the group's simplify-debts setting. */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<DirectObligation> obligations(UUID requesterId, UUID groupId) {
+    membershipGuard.requireMember(groupId, requesterId);
+    Map<Pair, Long> amounts = new HashMap<>();
+    addPairs(amounts, participantRepository.sumOwedByPair(groupId), 1);
+    addPairs(amounts, paymentRepository.sumPaidByPair(groupId), -1);
+    Set<UUID> ledgerIds = new HashSet<>();
+    amounts
+        .keySet()
+        .forEach(
+            pair -> {
+              ledgerIds.add(pair.from());
+              ledgerIds.add(pair.to());
+            });
+    var people = financialParticipants.resolve(groupId, ledgerIds);
+    return amounts.entrySet().stream()
+        .filter(entry -> entry.getValue() > 0)
+        .map(
+            entry ->
+                new DirectObligation(
+                    people.get(entry.getKey().from()),
+                    people.get(entry.getKey().to()),
+                    entry.getValue()))
+        .sorted(
+            Comparator.comparing((DirectObligation debt) -> debt.from().id())
+                .thenComparing(debt -> debt.to().id()))
+        .toList();
+  }
+
+  private void addPairs(Map<Pair, Long> amounts, List<PairAmount> rows, int sign) {
+    for (PairAmount row : rows) {
+      long amount = row.getTotalCents() * sign;
+      amounts.merge(new Pair(row.getFromId(), row.getToId()), amount, Long::sum);
+      amounts.merge(new Pair(row.getToId(), row.getFromId()), -amount, Long::sum);
+    }
+  }
+
+  private record Pair(UUID from, UUID to) {}
 
   /**
    * Unguarded compute — callers that already resolved the user's own groups (e.g. the dashboard)

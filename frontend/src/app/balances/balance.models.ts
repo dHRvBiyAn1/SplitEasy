@@ -10,3 +10,10 @@ export interface GroupBalancesResponse {
   groupId: string;
   balances: MemberBalance[];
 }
+
+/** Raw bilateral debt: from owes to; never a simplified transfer suggestion. */
+export interface DirectObligation {
+  from: UserSummary;
+  to: UserSummary;
+  amountCents: number;
+}
