@@ -42,6 +42,10 @@ public class ExpenseParticipant {
   @Column(name = "share_cents", nullable = false)
   private long shareCents;
 
+  /** Original typed input; null means an older writer did not retain split intent. */
+  @Column(name = "split_value")
+  private Long splitValue;
+
   public ExpenseParticipant(Expense expense, User user, long shareCents) {
     this.expense = expense;
     this.user = user;

@@ -1,7 +1,7 @@
 import { UserSummary } from '../core/auth/auth.models';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
 
-export type SplitType = 'EQUAL' | 'UNEQUAL' | 'PERCENTAGE';
+export type SplitType = 'EQUAL' | 'UNEQUAL' | 'PERCENTAGE' | 'WEIGHTS' | 'ADJUSTMENTS';
 
 export interface SplitShare {
   user: UserSummary;
@@ -18,6 +18,10 @@ export interface ExpenseResponse {
   spentOn: string;
   paidBy: UserSummary;
   participants: SplitShare[];
+  /** Original equal participant set; older responses may omit intent. */
+  participantUserIds?: string[] | null;
+  /** Original typed inputs, distinct from final rounded shares. */
+  splits?: SplitInput[] | null;
   createdAt: string;
 }
 
@@ -34,7 +38,7 @@ export interface ExpenseSummary {
   createdAt: string;
 }
 
-/** value = cents (UNEQUAL) or basis points (PERCENTAGE). */
+/** Original cents (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed adjustment cents. */
 export interface SplitInput {
   userId: string;
   value: number;

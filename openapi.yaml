@@ -712,7 +712,7 @@ components:
     SplitType:
       type: string
       description: How an expense's total is divided among its participants
-      enum: [EQUAL, UNEQUAL, PERCENTAGE]
+      enum: [EQUAL, UNEQUAL, PERCENTAGE, WEIGHTS, ADJUSTMENTS]
 
     ExpenseCategory:
       type: string
@@ -896,10 +896,17 @@ components:
     SplitInput:
       type: object
       description: |
-        One participant's split value for UNEQUAL/PERCENTAGE expenses.
-        `value` is cents (UNEQUAL) or basis points, i.e. hundredths of a percent
-        (PERCENTAGE). It must be between 0 and 1,000,000,000,000 inclusive. A
-        missing `value` is rejected during JSON deserialization.
+        Original per-participant input, distinct from final rounded shares. `value` is
+        exact cents (UNEQUAL, 0..total), basis points (PERCENTAGE, 0..10000),
+        positive integer units (WEIGHTS, 1..1000000000000), or signed cents
+        (ADJUSTMENTS, -1000000000000..1000000000000). Exact amounts sum to total;
+        percentages sum to 10000. Weights allocate floor(total * weight / sum(weights)),
+        then the payer absorbs the remainder, or the first participant in Java UUID
+        order if the payer is excluded. Adjustments add signed cents to that same
+        deterministic EQUAL allocation over the explicitly listed split participants;
+        adjustments must sum to zero and every final share must be nonnegative.
+        Explicit zero inputs remain participants. A missing/null/fractional `value`
+        is rejected during JSON deserialization.
       required: [userId, value]
       properties:
         userId:
@@ -908,7 +915,7 @@ components:
         value:
           type: integer
           format: int64
-          minimum: 0
+          minimum: -1000000000000
           maximum: 1000000000000
 
     CreateExpenseRequest:
@@ -947,7 +954,7 @@ components:
               items:
                 $ref: "#/components/schemas/SplitInput"
             - type: "null"
-          description: UNEQUAL/PERCENTAGE only — per-participant value (see SplitInput)
+          description: Required nonempty list for all non-EQUAL types; unique group-member user IDs (see SplitInput)
         category:
           anyOf:
             - $ref: "#/components/schemas/ExpenseCategory"
@@ -973,7 +980,7 @@ components:
 
     ExpenseResponse:
       type: object
-      required: [id, groupId, description, amountCents, splitType, category, spentOn, paidBy, participants, createdAt]
+      required: [id, groupId, description, amountCents, splitType, category, spentOn, paidBy, participants, participantUserIds, splits, createdAt]
       properties:
         id:
           type: string
@@ -999,6 +1006,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SplitShare"
+          description: Final owed cents, including zero-valued participants
+        participantUserIds:
+          anyOf:
+            - type: array
+              items:
+                type: string
+                format: uuid
+            - type: "null"
+          description: Original participant set for EQUAL; null for other types
+        splits:
+          anyOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/SplitInput"
+            - type: "null"
+          description: |
+            Original typed inputs for non-EQUAL types; null for EQUAL. Use these
+            on full-replace PUT; never reconstruct percentages/weights from rounded shares.
+            Legacy non-equal inputs were not retained: V11 converts old PERCENTAGE
+            expenses to UNEQUAL exact shares. Missing intent from older writers is
+            likewise returned as UNEQUAL exact shares. Legacy EQUAL sets are recoverable.
         createdAt:
           type: string
           format: date-time

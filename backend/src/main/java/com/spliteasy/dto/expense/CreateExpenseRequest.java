@@ -15,7 +15,7 @@ import java.util.UUID;
 /**
  * @param participantUserIds EQUAL only: subset of members (null/empty = all members)
  * @param splitType null defaults to EQUAL (back-compat)
- * @param splits UNEQUAL/PERCENTAGE only: per-participant value (cents or basis points)
+ * @param splits all non-EQUAL types: original per-participant values (see {@link SplitInput})
  * @param category null defaults to {@link ExpenseCategory#OTHER}
  * @param spentOn null defaults to today
  */
