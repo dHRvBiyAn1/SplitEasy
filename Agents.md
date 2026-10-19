@@ -3,6 +3,12 @@
 Project living memory. **Read before a task; update after one** — especially
 Conventions, Data Model, and the Progress Log (append one line per shipped feature).
 
+## Agent skills
+
+Use **Matt Pocock's skills instead of Superpowers**, as selected by the user. Before planning, implementation, debugging or review, read [the engineering workflow](docs/agents/engineering-workflow.md); project-local skills live in `.agents/skills/`. Keep Ponytail's simplicity guidance. This repository's instruction file is `Agents.md`; update it without creating a second differently cased file.
+
+Issues use [GitHub](docs/agents/issue-tracker.md); domain documentation uses [a single context](docs/agents/domain.md). Keep at most three active worker threads, no Astra and Sol reasoning at most high. Work branches start from `dev` and PRs target `dev`.
+
 ## Overview
 
 Expense-splitting web app: users create groups, add expenses split among members
@@ -276,7 +282,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Known Gaps / TODOs
 
-- **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. Add before real deploy.
+- **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. This is the current explicit session contract; rotating refresh/revocation requires a separate implementation (see `docs/security/session-lifecycle.md`).
 - **Register reveals email existence** (409 on duplicate) — fine for now; revisit if enumeration matters.
 - **Simplified settle-up is fetched per group** — `/debt-simplification` derives transfers from one
   group's balances, so the settle-up modal fans out one request per in-scope group
@@ -288,7 +294,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   modal keeps reading the cached value.
 - **Profile prefs are client-side only** (PR #23, #53) — phone/currency/avatar-color per account in
   localStorage; theme/palette per device. "First seen here" = first-visit month. No profile-update
-  endpoint or signup-date column yet.
+  endpoint yet; `User.createdAt` already stores registration time but is not exposed by the current
+  profile/auth summary contract. Do not add a duplicate signup-date column.
 
 ## Git Workflow
 
@@ -437,5 +444,15 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 
 P2 integration and release preparation (2026-10-18): user authorized merging PRs #72–#93 into dev, combined final checks, then a release PR to main. All 22 exact heads retained; released main history synchronized with no tree change. Shared exception/auth/test conflicts preserve both fixes. Combined backend207/frontend187/deployment12, formatting, production build, ShellCheck/Actionlint and synthetic Chromium dashboard/split checks pass; independent integration review found no blockers. Evidence: `docs/reviews/2026-10-18-p2/integration.md`. Dev CI gates release PR creation; main merge and production deployment remain unauthorized.
 
+Splitwise alignment planning (2026-10-19): proposed design in `docs/superpowers/specs/2026-10-19-splitwise-alignment-design.md`, roadmap and first-batch execution plan in `docs/superpowers/plans/2026-10-19-splitwise-alignment*.md`, and CSV/JSON delivery map for all 81 audited features. Thirty-eight work packages prioritize financial lifecycle/projection correctness, then core foundations/social/history/offline, then Pro and conditional integrations. First batch is F01/F03/F04 with at most three streams, no Astra and Sol reasoning at most high. Planning only; no application implementation, commit, push or deployment. The audit's v0.1.0 baseline and current defects are evidence for proposed work, not shipped fixes.
+
+Engineering workflow selection (2026-10-19): user replaced Superpowers with `mattpocock/skills`. Ten upstream skill directories copied unchanged to ignored project-local `.agents/skills/` at commit `49dd158d1076134a641b33efb035946536778336`, retaining MIT license and hash manifest. Repo setup and override rules are in `docs/agents/`; alignment headers now use this workflow. No global plugin registration, application implementation, commit, push or remote changes.
+
+Alignment execution authorization (2026-10-19): user requested proceeding with the plan, confirming the documented HTTP/PostgreSQL, rendered Angular and browser test seams. F01/F03/F04 run on separate dev-based branches; commits/push/PRs to dev are in scope, while merge and production deployment remain separate. Owner also confirmed all existing amounts are USD: C01 may backfill USD later; no current transaction schema/data changed. Current inspected release is `v0.1.0` at `aa287fb` (the earlier P2 preparation note predates its authorized merge/tag).
+
+- [x] Alignment F04 API contract (2026-10-19) — documented keyed payment replays/conflicts, auth429/Retry-After, narrow overlapping-write conflict scope, OAS3.1 null/default/integer/bounds semantics, greedy wording, activity ordering, gross/net overview and nonuniform error boundaries. Official OAS3.1 schema, duplicate-key rejection and128 internal refs passed. Owned baseline-JAR HTTP confirmed missing/null primitive split values400, explicit0 valid, fractionalamount400, nullable reference defaults and null PATCH no-ops; no application behavior changed. Evidence: `docs/reviews/2026-10-19-alignment/f04-contract.md`. Companion F01/F03 behavior is documented; this documentation must integrate with or after those changes. No merge/deployment.
 
 - [x] PR #96 departure UI review follow-up (2026-10-19) — member-only raw group obligations read uses batched pair aggregates and historical identity resolution; settings gates self/other/creator removal and leave on zero net plus no bilateral debt in either simplify mode, shows each counterparty/amount, and fails closed on pending/failed refreshes. Public HTTP/rendered regressions reproduced 404/enabled-removal before the fix; backend230/frontend193 (Node22), Spotless/Prettier and production builds passed. Evidence: `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema/dependency change, push, merge or deployment by this worker.
+
+
+PR #95–#97 review remediation (2026-10-19): user authorized fixing comments and merging into dev. Add/Enter now waits for roster retries; settings shows raw bilateral obligations and blocks net-zero departures consistently. Independent Standards/Spec delta reviews found zero remaining issues. Backend230, combined frontend220 on Node22, formatting/build and88-request packaged HTTP rehearsal passed; owned HTTP resources cleaned up. Contract has134 validated refs and includes companion implementations before merging. Final exact-head CI and #96-before-#97 order gate integration. Evidence: `docs/reviews/2026-10-19-alignment/review-remediation.md`. No main/release action is included.

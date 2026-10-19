@@ -18,13 +18,19 @@ info:
     nor leave.
 
     ## Money
-    All monetary values are **integer cents** (`long`), never floats. Amounts are
-    capped at `1_000_000_000_000` cents ($10B). For expense shares, `100%` = 10,000
-    basis points. Balances are derived on read and always sum to zero per group.
+    Current monetary values are **USD integer cents** (`long`), never floats; there is
+    no per-transaction currency field or automatic conversion. Amounts are capped at
+    `1_000_000_000_000` cents ($10B). For expense shares, `100%` = 10,000
+    basis points. Integer request fields require JSON integer tokens; fractional JSON
+    numbers are rejected. Balances are derived on read over active members and
+    historical financial participants; the complete group ledger sums to zero.
+    Financial participation does not grant group access.
 
     ## Error format
-    Errors return the `Error` schema with HTTP status in both the status code and the
-    body (`status`, `error`, `message`, `timestamp`).
+    Errors handled by the application advice use the `Error` body with HTTP status
+    in both the status code and the body (`status`, `error`, `message`, `timestamp`).
+    Spring Security filter responses and some framework-level parsing/path errors can
+    use different bodies; `Error` is not guaranteed for every non-2xx response.
   version: 1.0.0
   contact:
     name: SplitEasy
@@ -50,7 +56,7 @@ tags:
   - name: Payments
     description: Settle-up payments between members
   - name: Debt Simplification
-    description: Minimal-transaction settle-up suggestions (read-only)
+    description: Greedy settle-up suggestions (read-only; not guaranteed globally minimal)
   - name: Dashboard
     description: Aggregated payload for the shell and landing page
 
@@ -85,8 +91,20 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
         "409":
-          $ref: "#/components/responses/Conflict"
           description: Email is already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Authentication attempt limit reached; retry after the indicated delay
+          headers:
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/auth/login:
     post:
@@ -122,6 +140,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429":
+          description: Authentication attempt limit reached; retry after the indicated delay
+          headers:
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/health:
     get:
@@ -144,8 +171,11 @@ paths:
       summary: Get aggregated dashboard payload
       description: |
         One payload for the shell and landing page: cross-group totals, per-group
-        cards, aggregated people, per-group settlements, and a merged recent-activity
-        feed (expenses + payments, newest first, capped at 15).
+        cards, people netted across groups, per-group settlements, and a merged
+        recent-activity feed capped at 15. Headline owed/owe totals sum the per-group
+        counterparty balances before people are netted across groups. Activity is
+        ordered by expense spentOn date or payment recorded date, newest first; it is
+        a current ledger snapshot, not a chronological event log.
       tags: [Dashboard]
       responses:
         "200":
@@ -224,7 +254,7 @@ paths:
       summary: Update group settings
       description: |
         Partial update (rename / group type / simplify-debts). Every field is
-        optional; null fields are left untouched. Any member may update.
+        optional; omitted and null fields are left untouched. Any member may update.
       tags: [Groups]
       requestBody:
         required: true
@@ -342,7 +372,7 @@ paths:
       operationId: listExpenses
       summary: List expense summaries
       description: |
-        Month-ordered list of expenses in the group, newest first, each with the
+        Spent-date-ordered list of expenses in the group, newest first, each with the
         caller's `viewerDeltaCents` (positive = lent, negative = borrowed).
       tags: [Expenses]
       responses:
@@ -510,7 +540,8 @@ paths:
       description: |
         Every active member and historical financial participant is included in the
         derived integer-cent ledger, even after leaving the active roster. Positive
-        means owed, negative means owes and zero means settled. Expenses and payments
+        means owed, negative means owes and zero means no aggregate net. A zero net
+        can still have offsetting direct obligations that block removal. Expenses and payments
         conserve money, so the complete returned group nets sum to zero. Historical
         participation does not grant group access.
       tags: [Balances]
@@ -554,6 +585,36 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/groups/{groupId}/balances/obligations:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
+    get:
+      operationId: getGroupObligations
+      summary: Get direct obligations across the group
+      description: |
+        Returns each nonzero bilateral debt once: from owes to amountCents.
+        Opposing obligations within the same pair are netted; debts through other
+        people are not simplified. Results are independent of simplifyDebts and
+        include historical financial counterparties without granting them access.
+        An active member with any incident obligation cannot leave or be removed,
+        even when their aggregate group net is zero. Group settings uses this read
+        to explain blockers; removal rechecks the current ledger transactionally.
+        An empty array means no direct obligations remain.
+      tags: [Balances]
+      responses:
+        "200":
+          description: Current direct bilateral obligations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DirectObligation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/groups/{groupId}/payments:
     parameters:
       - $ref: "#/components/parameters/GroupIdParam"
@@ -581,7 +642,12 @@ paths:
       description: |
         Records a direct transfer `payer → payee` in the group. The payer must
         differ from the payee; both must be members. Overpayments are allowed (the
-        net-per-person model just flips sign).
+        net-per-person model just flips sign). Optional `operationId` keys the
+        operation by authenticated requester, group, and UUID. Repeating the same
+        key with identical payment data returns the original HTTP 201 response;
+        changing payer, payee, or amount for that key returns 409. Omitted or null
+        operationId keeps legacy additive behavior and creates a new payment each
+        time. Membership is checked on every request, including a replay.
       tags: [Payments]
       requestBody:
         required: true
@@ -593,6 +659,7 @@ paths:
               payerUserId: 550e8400-e29b-41d4-a716-446655440001
               payeeUserId: 550e8400-e29b-41d4-a716-446655440000
               amountCents: 5000
+              operationId: 550e8400-e29b-41d4-a716-446655440002
       responses:
         "201":
           description: Payment recorded
@@ -606,17 +673,21 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Operation ID was previously used for a different payment
 
   /api/groups/{groupId}/debt-simplification:
     parameters:
       - $ref: "#/components/parameters/GroupIdParam"
     get:
       operationId: getSimplifiedDebts
-      summary: Get minimal settle-up suggestion
+      summary: Get greedy settle-up suggestion
       description: |
-        Read-only: a minimal set of transfers (≤ N−1) that settles the whole group,
-        derived greedily (max creditor ↔ max debtor) from current balances. Zero
-        balances are excluded and cents always work out exactly. Acting on a
+        Read-only: a valid set of transfers (at most N−1) that settles the whole
+        group, derived greedily (max creditor ↔ max debtor) from current balances.
+        This algorithm does not guarantee a globally minimal number of transfers.
+        Zero balances are excluded and integer cents work out exactly. Acting on a
         suggestion just records a normal payment.
       tags: [Debt Simplification]
       responses:
@@ -664,7 +735,10 @@ components:
 
     Error:
       type: object
-      description: Standard error body from the global exception handler
+      description: |
+        Error body used by application-handled domain and validation responses.
+        Spring Security filter responses and some framework-level parsing/path errors
+        can use a different body.
       required: [timestamp, status, error, message]
       properties:
         timestamp:
@@ -745,22 +819,30 @@ components:
           type: string
           maxLength: 100
         type:
-          $ref: "#/components/schemas/GroupType"
+          anyOf:
+            - $ref: "#/components/schemas/GroupType"
+            - type: "null"
           description: Null defaults to OTHER
 
     UpdateGroupRequest:
       type: object
-      description: Every field optional; a null field is left untouched
+      description: Every field optional; omitted or null fields are left untouched
       properties:
         name:
-          type: string
-          minLength: 1
-          maxLength: 100
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 100
+            - type: "null"
         type:
-          $ref: "#/components/schemas/GroupType"
+          anyOf:
+            - $ref: "#/components/schemas/GroupType"
+            - type: "null"
         simplifyDebts:
-          type: boolean
-          description: Whether settle-up suggests the minimal set of payments
+          anyOf:
+            - type: boolean
+            - type: "null"
+          description: Whether settle-up uses greedy debt simplification
 
     AddMemberRequest:
       type: object
@@ -816,7 +898,8 @@ components:
       description: |
         One participant's split value for UNEQUAL/PERCENTAGE expenses.
         `value` is cents (UNEQUAL) or basis points, i.e. hundredths of a percent
-        (PERCENTAGE). Must be non-negative.
+        (PERCENTAGE). It must be between 0 and 1,000,000,000,000 inclusive. A
+        missing `value` is rejected during JSON deserialization.
       required: [userId, value]
       properties:
         userId:
@@ -826,6 +909,7 @@ components:
           type: integer
           format: int64
           minimum: 0
+          maximum: 1000000000000
 
     CreateExpenseRequest:
       type: object
@@ -845,25 +929,35 @@ components:
           format: uuid
           description: The member who paid; must be a group member
         participantUserIds:
-          type: array
+          anyOf:
+            - type: array
+              items:
+                type: string
+                format: uuid
+            - type: "null"
           description: EQUAL only — subset of members; null/empty = all members
-          items:
-            type: string
-            format: uuid
         splitType:
-          $ref: "#/components/schemas/SplitType"
+          anyOf:
+            - $ref: "#/components/schemas/SplitType"
+            - type: "null"
           description: Null defaults to EQUAL
         splits:
-          type: array
+          anyOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/SplitInput"
+            - type: "null"
           description: UNEQUAL/PERCENTAGE only — per-participant value (see SplitInput)
-          items:
-            $ref: "#/components/schemas/SplitInput"
         category:
-          $ref: "#/components/schemas/ExpenseCategory"
+          anyOf:
+            - $ref: "#/components/schemas/ExpenseCategory"
+            - type: "null"
           description: Null defaults to OTHER
         spentOn:
-          type: string
-          format: date
+          anyOf:
+            - type: string
+              format: date
+            - type: "null"
           description: The date the money was actually spent; null defaults to today
 
     SplitShare:
@@ -950,7 +1044,7 @@ components:
         netCents:
           type: integer
           format: int64
-          description: Net position in cents; positive = owed, negative = owes, 0 = settled
+          description: Net position in cents; positive = owed, negative = owes, 0 = no aggregate net (direct debts may remain)
 
     GroupBalancesResponse:
       type: object
@@ -993,6 +1087,20 @@ components:
           format: int64
           description: Positive = they owe you; negative = you owe them
 
+    DirectObligation:
+      type: object
+      description: A current direct debt — from owes to the positive amountCents
+      required: [from, to, amountCents]
+      properties:
+        from:
+          $ref: "#/components/schemas/UserSummary"
+        to:
+          $ref: "#/components/schemas/UserSummary"
+        amountCents:
+          type: integer
+          format: int64
+          minimum: 1
+
     SuggestedTransaction:
       type: object
       description: One suggested transfer — `from` (a debtor) pays `to` (a creditor)
@@ -1034,6 +1142,16 @@ components:
           minimum: 1
           maximum: 1000000000000
           description: Payment amount in integer cents (≤ $10B)
+        operationId:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: "null"
+          description: |
+            Optional retry identity. Null or omitted means each request records a
+            separate payment. A supplied UUID is scoped to the authenticated
+            requester and group; exact replays return the original result, while
+            changed payer/payee/amount conflicts with 409.
 
     PaymentResponse:
       type: object
@@ -1106,8 +1224,9 @@ components:
           $ref: "#/components/schemas/UserSummary"
           description: Expense payer, or payment payer
         counterparty:
-          allOf:
+          anyOf:
             - $ref: "#/components/schemas/UserSummary"
+            - type: "null"
           description: PAYMENT only — who received; null for EXPENSE
         amountCents:
           type: integer
@@ -1119,8 +1238,9 @@ components:
             EXPENSE: positive = you lent, negative = you borrowed, 0 = not involved.
             PAYMENT: always 0 (settlements render neutral)
         category:
-          allOf:
+          anyOf:
             - $ref: "#/components/schemas/ExpenseCategory"
+            - type: "null"
           description: EXPENSE only; null for PAYMENT
         date:
           type: string
@@ -1164,7 +1284,10 @@ components:
             $ref: "#/components/schemas/DashboardGroup"
         people:
           type: array
-          description: People-aggregated owed/owe data
+          description: |
+            Net per person across groups. Opposing debts to the same person in
+            different groups can cancel here, while headline owed/owe totals sum
+            group counterparties before this cross-group netting.
           items:
             $ref: "#/components/schemas/PersonBalance"
         settlements:
@@ -1174,7 +1297,10 @@ components:
             $ref: "#/components/schemas/Settlement"
         activity:
           type: array
-          description: Merged expenses + payments feed, newest first, capped at 15
+          description: |
+            Merged expenses + payments snapshot, capped at 15 and ordered by expense
+            spentOn date or payment recorded date, newest first. This is not an event
+            log and does not represent when an expense was created or edited.
           items:
             $ref: "#/components/schemas/ActivityItem"
 
@@ -1188,20 +1314,22 @@ components:
         type: string
         format: uuid
 
+  headers:
+    RetryAfter:
+      description: Seconds to wait before retrying the authentication request; CORS exposes this header to browser clients
+      schema:
+        type: string
+        pattern: '^[1-9][0-9]{0,3}$'
+
   responses:
     BadRequest:
-      description: Invalid request (validation failure, bad split sums, amount over cap)
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+      description: |
+        Invalid request (validation failure, bad split sums, amount over cap). The
+        application error body is used for handled validation errors; malformed JSON
+        or other framework-level request failures may have a different body.
 
     Unauthorized:
-      description: Missing, malformed, or expired Bearer token
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+      description: Missing, malformed, or expired Bearer token; body is security-filter-specific
 
     Forbidden:
       description: Not a member of this group (also returned for non-existent groups)
