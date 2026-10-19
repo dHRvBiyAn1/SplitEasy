@@ -129,10 +129,14 @@
                   (click)="toggleExpand(e)"
                   [attr.aria-expanded]="expandedId() === e.id"
                 >
-                  <span class="xrow__date" aria-hidden="true">
+                  <time
+                    class="xrow__date"
+                    [attr.datetime]="e.spentOn"
+                    [attr.aria-label]="fullDate(e.spentOn)"
+                  >
                     <span class="xrow__mon">{{ dayMon(e.spentOn) }}</span>
                     <span class="xrow__day">{{ dayNum(e.spentOn) }}</span>
-                  </span>
+                  </time>
                   <span class="xrow__ico" aria-hidden="true">{{ categoryGlyph(e.category) }}</span>
                   <span class="xrow__text">
                     <span class="xrow__title">{{ e.description }}</span>
@@ -155,10 +159,22 @@
                   </span>
                 </button>
 
+                @if (deleteError(); as failure) {
+                  @if (failure.expenseId === e.id) {
+                    <p role="alert">
+                      Could not delete "{{ e.description }}". {{ failure.message }}
+                    </p>
+                  }
+                }
                 @if (expandedId() === e.id) {
                   <div class="xdetail">
                     @if (detailLoading()) {
                       <div class="dc-loading" role="status" aria-label="Loading details"></div>
+                    } @else if (detailError()) {
+                      <p role="alert">{{ detailError() }}</p>
+                      <button type="button" class="dc-btn-outline" (click)="retryDetail()">
+                        Retry expense
+                      </button>
                     } @else if (detail(); as d) {
                       <div class="xdetail__line xdetail__line--paid">
                         <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>

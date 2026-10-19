@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { SessionService } from '../core/auth/session.service';
 import { AuthService } from '../core/auth/auth.service';
 import { DashboardResponse } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
@@ -201,6 +202,94 @@ describe('expense modal group ownership and overview availability', () => {
     expect(button(root, 'Save expense').disabled).toBe(true);
     submit(root);
     http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('retries failed current-group membership deliberately without losing typed money or description', () => {
+    const fixture = openForm();
+    const root: HTMLElement = fixture.nativeElement;
+    http.expectOne(`/api/groups/${group.id}`).flush({}, { status: 503, statusText: 'Unavailable' });
+    fillAmount(root);
+    fixture.detectChanges();
+    button(root, 'Retry members and expense').click();
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#ne-desc')!.value).toBe('Lunch');
+    expect(root.querySelector<HTMLInputElement>('#ne-amt')!.value).toBe('12');
+    expect(button(root, 'Save expense').disabled).toBe(false);
+    http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('keeps a dispatched expense open through Escape, backdrop and both close controls until failure', () => {
+    const fixture = openForm();
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    fillAmount(root);
+    submit(root);
+    fixture.detectChanges();
+    const save = http.expectOne({ method: 'POST', url: `/api/groups/${group.id}/expenses` });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    root.querySelector<HTMLElement>('.mdl-backdrop')!.click();
+    root.querySelector<HTMLButtonElement>('.mdl-close')!.click();
+    button(root, 'Cancel').click();
+    expect(modal.active()).toBe('expense');
+    expect(root.textContent).toContain('Saving. Please wait.');
+    save.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#ne-desc')!.value).toBe('Lunch');
+    root.querySelector<HTMLButtonElement>('.mdl-close')!.click();
+    expect(modal.active()).toBeNull();
+  });
+
+  it('politely announces the running split total after edits', () => {
+    const fixture = openForm();
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    fillAmount(root);
+    fixture.detectChanges();
+    expect(root.querySelector('.running')?.getAttribute('aria-live')).toBe('polite');
+    expect(root.querySelector('.running')?.textContent).toContain('Split equally among 2');
+  });
+
+  it('keeps an edit draft when failed prefill is retried', () => {
+    const fixture = openForm(true);
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    http
+      .expectOne(`/api/groups/${group.id}/expenses/${expense.id}`)
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    fillAmount(root);
+    button(root, 'Retry members and expense').click();
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    http
+      .expectOne(`/api/groups/${group.id}/expenses/${expense.id}`)
+      .flush({ ...expense, description: 'Old server description', amountCents: 9900 });
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#ne-desc')!.value).toBe('Lunch');
+    expect(root.querySelector<HTMLInputElement>('#ne-amt')!.value).toBe('12');
+  });
+
+  it('cannot submit or retry an old account draft before its closed view is destroyed', () => {
+    const fixture = openForm();
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    fixture.detectChanges();
+    fillAmount(fixture.nativeElement);
+    TestBed.inject(SessionService).reset();
+    fixture.componentInstance.save();
+    http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('distinguishes required member loading from an empty roster', () => {
+    const fixture = openForm();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role=status]')?.textContent).toContain(
+      'Loading group members and expense',
+    );
+    http.expectOne(`/api/groups/${group.id}`).flush(group);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role=status]')).toBeNull();
   });
 
   it('ignores an older same-group response after A to B to A', () => {

@@ -12,7 +12,7 @@
           <p class="pcard__since">First seen here {{ memberSince() }}</p>
         </div>
         <button type="button" class="dc-btn-outline pcard__edit" (click)="startEdit()">
-          <span aria-hidden="true">✎</span> Edit
+          <span aria-hidden="true">✎</span> Edit device preferences
         </button>
       </div>
 
@@ -42,15 +42,7 @@
           </div>
         </div>
 
-        <label class="pfield">
-          <span class="dc-field-label">Full name</span>
-          <input class="dc-field" [formControl]="name" autocomplete="name" />
-        </label>
-
-        <label class="pfield">
-          <span class="dc-field-label">Email</span>
-          <input class="dc-field" type="email" [formControl]="email" autocomplete="email" />
-        </label>
+        <p>{{ user()?.email }}</p>
 
         <label class="pfield">
           <span class="dc-field-label">Phone</span>
@@ -108,7 +100,10 @@
     <h2>Make it yours.</h2>
     <app-appearance-panel />
   </section>
-  <p class="profile__note">Profile edits and preferences are saved on this device.</p>
+  <p class="profile__note">
+    Phone, avatar and currency preferences are saved on this device. Currency preferences do not
+    change or convert recorded amounts.
+  </p>
 
   <button type="button" class="dc-btn-outline profile__signout" (click)="signOut()">
     <span aria-hidden="true">⇥</span> Sign out

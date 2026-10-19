@@ -13,6 +13,17 @@ export type ModalKind = 'group' | 'expense' | 'settle' | 'member' | 'appearance'
 @Injectable({ providedIn: 'root' })
 export class ModalService {
   readonly active = signal<ModalKind>(null);
+  private readonly pending = signal(false);
+  readonly mutationPending = this.pending.asReadonly();
+
+  setMutationPending(pending: boolean): void {
+    this.pending.set(pending);
+  }
+
+  requestClose(): void {
+    if (!this.pending()) this.close();
+  }
+
   /** Preselected group for the expense modal (e.g. opened from a group's detail page). */
   readonly expenseGroupId = signal<string | null>(null);
   /** Expense being edited (null = creating a new one). */
@@ -56,6 +67,7 @@ export class ModalService {
   }
 
   close(): void {
+    this.pending.set(false);
     this.active.set(null);
     this.expenseGroupId.set(null);
     this.editExpenseId.set(null);

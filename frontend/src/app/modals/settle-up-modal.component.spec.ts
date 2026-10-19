@@ -87,11 +87,40 @@ describe('SettleUpModalComponent', () => {
     modal.openSettle();
   });
 
+  it('identifies duplicate names by full name and email in each payment choice', async () => {
+    data.set({
+      ...dashboardData,
+      groups: dashboardData.groups.map((g) => ({ ...g, simplifyDebts: false })),
+      settlements: [
+        {
+          groupId: 'g1',
+          groupName: 'Home',
+          counterparty: { ...priya, displayName: 'Alex Chen' },
+          netCents: 1000,
+        },
+        {
+          groupId: 'g1',
+          groupName: 'Home',
+          counterparty: { ...dan, displayName: 'Alex Chen' },
+          netCents: -1000,
+        },
+      ],
+    });
+    await render();
+    expect(rows()[0].textContent).toContain('Alex Chen (p@ex.com)');
+    expect(rows()[1].textContent).toContain('Alex Chen (d@ex.com)');
+    rows()[1].click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.settle-confirm__label').textContent).toContain(
+      'Alex Chen (d@ex.com)',
+    );
+  });
+
   it('shows suggested payments when the group asks to simplify', async () => {
     await render();
 
     expect(rows()).toHaveLength(1);
-    expect(rows()[0].textContent).toContain('Priya owes you');
+    expect(rows()[0].textContent).toContain('Priya Shah (p@ex.com) owes you');
     expect(rows()[0].textContent).toContain('30.00');
   });
 
@@ -118,8 +147,8 @@ describe('SettleUpModalComponent', () => {
 
     expect(fixture.nativeElement.querySelector('.simplify-toggle')).toBeNull();
     expect(rows()).toHaveLength(2);
-    expect(fixture.nativeElement.textContent).toContain('Priya owes you');
-    expect(fixture.nativeElement.textContent).toContain('You owe Dan');
+    expect(fixture.nativeElement.textContent).toContain('Priya Shah (p@ex.com) owes you');
+    expect(fixture.nativeElement.textContent).toContain('You owe Dan Kim (d@ex.com)');
   });
 
   it('simplifies only the opened group when launched from a group page', async () => {

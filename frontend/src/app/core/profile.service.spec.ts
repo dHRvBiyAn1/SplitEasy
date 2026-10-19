@@ -102,7 +102,7 @@ describe('account-owned profile preferences', () => {
   it('keeps preferences when mutable name and email change', () => {
     login(alice);
     profile.update(alicePrefs);
-    auth.updateProfile({ displayName: 'New name', email: 'new@example.com' });
+    login({ ...alice, user: { ...alice.user, displayName: 'New name', email: 'new@example.com' } });
     expect(profile.prefs()).toEqual(alicePrefs);
   });
 
