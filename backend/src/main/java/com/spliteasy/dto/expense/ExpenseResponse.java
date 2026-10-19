@@ -18,4 +18,6 @@ public record ExpenseResponse(
     LocalDate spentOn,
     UserSummary paidBy,
     List<SplitShare> participants,
+    List<UUID> participantUserIds,
+    List<SplitInput> splits,
     Instant createdAt) {}

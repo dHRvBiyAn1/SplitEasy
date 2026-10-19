@@ -157,7 +157,11 @@ public class ExpenseService {
 
   /** Everything needed to write an expense's split — computed once, reused by create and update. */
   private record ComputedSplit(
-      SplitType splitType, UUID payerId, List<Share> shares, Map<UUID, User> usersById) {}
+      SplitType splitType,
+      UUID payerId,
+      List<Share> shares,
+      Map<UUID, User> usersById,
+      Map<UUID, Long> inputs) {}
 
   /** Validates payer/participants (membership) and computes shares via the split strategy. */
   private ComputedSplit computeSplit(UUID groupId, CreateExpenseRequest request) {
@@ -182,7 +186,12 @@ public class ExpenseService {
     }
     List<Share> shares = strategies.get(splitType).split(ctx);
     Map<UUID, User> usersById = loadUsers(shares.stream().map(Share::userId).toList(), payerId);
-    return new ComputedSplit(splitType, payerId, shares, usersById);
+    Map<UUID, Long> inputs =
+        splitType == SplitType.EQUAL
+            ? shares.stream().collect(Collectors.toMap(Share::userId, share -> 1L))
+            : ctx.splits().stream()
+                .collect(Collectors.toMap(SplitInput::userId, SplitInput::value));
+    return new ComputedSplit(splitType, payerId, shares, usersById, inputs);
   }
 
   private ExpenseCategory categoryOf(CreateExpenseRequest request) {
@@ -195,7 +204,9 @@ public class ExpenseService {
 
   private void addShares(Expense expense, ComputedSplit split) {
     for (Share share : split.shares()) {
-      expense.addParticipant(split.usersById().get(share.userId()), share.shareCents());
+      expense
+          .addParticipant(split.usersById().get(share.userId()), share.shareCents())
+          .setSplitValue(split.inputs().get(share.userId()));
     }
   }
 
@@ -298,16 +309,36 @@ public class ExpenseService {
             .map(p -> new SplitShare(UserSummary.from(p.getUser()), p.getShareCents()))
             .sorted(Comparator.comparing(s -> s.user().displayName()))
             .toList();
+    // Old writers cannot retain non-equal intent. Expose safe exact editing, never infer ratios.
+    boolean equal = expense.getSplitType() == SplitType.EQUAL;
+    boolean unknownIntent =
+        expense.getParticipants().stream().anyMatch(p -> p.getSplitValue() == null);
+    SplitType type = !equal && unknownIntent ? SplitType.UNEQUAL : expense.getSplitType();
+    List<SplitInput> inputs =
+        equal
+            ? null
+            : expense.getParticipants().stream()
+                .map(
+                    p ->
+                        new SplitInput(
+                            p.getUser().getId(),
+                            unknownIntent ? p.getShareCents() : p.getSplitValue()))
+                .sorted(Comparator.comparing(SplitInput::userId))
+                .toList();
     return new ExpenseResponse(
         expense.getId(),
         expense.getGroup().getId(),
         expense.getDescription(),
         expense.getAmountCents(),
-        expense.getSplitType(),
+        type,
         expense.getCategory(),
         expense.getSpentOn(),
         UserSummary.from(expense.getPaidBy()),
         shares,
+        equal
+            ? expense.getParticipants().stream().map(p -> p.getUser().getId()).sorted().toList()
+            : null,
+        inputs,
         expense.getCreatedAt());
   }
 }

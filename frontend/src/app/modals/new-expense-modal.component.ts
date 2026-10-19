@@ -15,12 +15,10 @@ import {
   TOTAL_BASIS_POINTS,
 } from '../expenses/expense.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { CreateExpenseRequest, SplitInput } from '../expenses/expense.models';
+import { CreateExpenseRequest, SplitInput, SplitType } from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
-
-type SplitType = 'EQUAL' | 'UNEQUAL' | 'PERCENTAGE';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
   { value: 'FOOD_DRINK', label: 'Food & drink', ico: '☕' },
@@ -66,20 +64,32 @@ export class NewExpenseModalComponent {
   protected readonly paidBy = signal<string>('');
   protected readonly splitType = signal<SplitType>('EQUAL');
 
-  /** EQUAL: member ids included. UNEQUAL/PERCENTAGE: raw per-member input strings. */
+  /** EQUAL: member ids included. Custom modes: raw per-member input strings; blank excludes. */
   protected readonly included = signal<Set<string>>(new Set());
   protected readonly values = signal<Record<string, string>>({});
-  /** Round each nonnegative finite input to the nearest cent/basis point once.
-   * Keep the same positive shares for the running total, save gate and request. */
+  /** Normalize once for the running total, save gate and request; retain explicit zeros. */
   private readonly serializedSplits = computed<SplitInput[] | null>(() => {
-    const convert = this.splitType() === 'PERCENTAGE' ? percentToBasisPoints : dollarsToCents;
+    const type = this.splitType();
+    const convert =
+      type === 'WEIGHTS'
+        ? (n: number) => n
+        : type === 'PERCENTAGE'
+          ? percentToBasisPoints
+          : dollarsToCents;
     const values = this.values();
     const splits: SplitInput[] = [];
     for (const member of this.members()) {
       const raw = Number(values[member.id] ?? 0);
       const value = convert(raw);
-      if (!Number.isFinite(raw) || raw < 0 || !Number.isSafeInteger(value)) return null;
-      if (value > 0) splits.push({ userId: member.id, value });
+      if (
+        !Number.isFinite(raw) ||
+        (type !== 'ADJUSTMENTS' && raw < 0) ||
+        !Number.isSafeInteger(value) ||
+        Math.abs(value) > 1_000_000_000_000
+      )
+        return null;
+      if (type === 'WEIGHTS' && (values[member.id]?.trim() ?? '') !== '' && value < 1) return null;
+      if ((values[member.id]?.trim() ?? '') !== '') splits.push({ userId: member.id, value });
     }
     return splits;
   });
@@ -170,8 +180,7 @@ export class NewExpenseModalComponent {
       });
   }
 
-  /** Load an existing expense into the form. Any custom split is re-edited as exact
-   * amounts (UNEQUAL) — lossless and always valid, so we never reconstruct percentages. */
+  /** Restore original inputs; old responses without intent are safely edited as exact shares. */
   private prefillFromExpense(groupId: string, expenseId: string, version: number): void {
     this.expenses
       .getExpense(groupId, expenseId)
@@ -184,15 +193,19 @@ export class NewExpenseModalComponent {
           if (!this.date.dirty) this.date.setValue(e.spentOn);
           this.category.set(e.category);
           this.paidBy.set(e.paidBy.id);
-          this.included.set(new Set(e.participants.map((p) => p.user.id)));
+          this.included.set(new Set(e.participantUserIds ?? e.participants.map((p) => p.user.id)));
           if (e.splitType === 'EQUAL') {
             this.splitType.set('EQUAL');
             this.values.set({});
           } else {
-            this.splitType.set('UNEQUAL');
+            this.splitType.set(e.splits ? e.splitType : 'UNEQUAL');
             const vals: Record<string, string> = {};
-            for (const p of e.participants) {
-              vals[p.user.id] = this.display(p.shareCents);
+            if (e.splits) {
+              for (const input of e.splits)
+                vals[input.userId] =
+                  e.splitType === 'WEIGHTS' ? String(input.value) : this.display(input.value);
+            } else {
+              for (const p of e.participants) vals[p.user.id] = this.display(p.shareCents);
             }
             this.values.set(vals);
           }
@@ -253,6 +266,17 @@ export class NewExpenseModalComponent {
     if (this.splitType() === 'EQUAL') {
       return `Split equally among ${this.included().size}`;
     }
+    if (this.splitType() === 'ADJUSTMENTS') {
+      return this.adjustmentsValid()
+        ? 'Adjustments total $0.00; final shares nonnegative'
+        : 'Adjustments must total $0.00 and leave final shares nonnegative';
+    }
+    if (this.splitType() === 'WEIGHTS') {
+      const splits = this.serializedSplits();
+      return splits
+        ? `${splits.reduce((sum, s) => sum + BigInt(s.value), 0n)} weight units`
+        : 'Enter positive whole weight units';
+    }
     const total = this.assignedTotal();
     if (total === undefined) return 'Enter valid nonnegative shares';
     if (this.splitType() === 'PERCENTAGE') {
@@ -266,6 +290,8 @@ export class NewExpenseModalComponent {
     if (this.splitType() === 'EQUAL') {
       return this.included().size >= 1;
     }
+    if (this.splitType() === 'ADJUSTMENTS') return this.adjustmentsValid();
+    if (this.splitType() === 'WEIGHTS') return (this.serializedSplits()?.length ?? 0) > 0;
     const total = this.assignedTotal();
     if (total === undefined || !Number.isSafeInteger(total)) return false;
     if (this.splitType() === 'PERCENTAGE') {
@@ -274,12 +300,39 @@ export class NewExpenseModalComponent {
     return this.amountCents() > 0 && total === this.amountCents();
   }
 
+  private adjustmentsValid(): boolean {
+    const splits = this.serializedSplits();
+    const amount = this.amountCents();
+    if (!splits?.length || !Number.isSafeInteger(amount) || amount <= 0) return false;
+    if (splits.reduce((sum, s) => sum + BigInt(s.value), 0n) !== 0n) return false;
+    const base = Math.floor(amount / splits.length);
+    const remainder = amount % splits.length;
+    const recipient = splits.some((s) => s.userId === this.paidBy())
+      ? this.paidBy()
+      : [...splits].sort((a, b) => this.compareUuid(a.userId, b.userId))[0].userId;
+    return splits.every((s) => base + (s.userId === recipient ? remainder : 0) + s.value >= 0);
+  }
+
+  /** Match java.util.UUID's signed high/low ordering for the existing remainder policy. */
+  private compareUuid(a: string, b: string): number {
+    const left = a.replaceAll('-', '');
+    const right = b.replaceAll('-', '');
+    for (const offset of [0, 16]) {
+      const x = BigInt.asIntN(64, BigInt(`0x${left.slice(offset, offset + 16)}`));
+      const y = BigInt.asIntN(64, BigInt(`0x${right.slice(offset, offset + 16)}`));
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  }
+
   canSave(): boolean {
     return (
       !!this.groupId() &&
       this.ready() &&
       this.description.valid &&
+      Number.isSafeInteger(this.amountCents()) &&
       this.amountCents() > 0 &&
+      this.amountCents() <= 1_000_000_000_000 &&
       !!this.paidBy() &&
       this.splitValid() &&
       !this.saving()
