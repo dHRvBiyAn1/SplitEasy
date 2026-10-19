@@ -1883,5 +1883,10 @@
     ],
     "dev_head": "e5b219773e54f890e56358f2a57de28f56d4bdff",
     "ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39294891734"
+  },
+  "sender_decision": {
+    "choice": "Native SMTP Configuration",
+    "owner_confirmed": "2026-10-19",
+    "delivery_status": "Implementation uses standard SMTP and owned local capture; production sender settings not supplied."
   }
 }
