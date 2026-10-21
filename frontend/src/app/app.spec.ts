@@ -1,7 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
+import { AccountActionComponent } from './auth/account-action.component';
 import { App } from './app';
 import { storeTestSession } from './core/auth/auth-test-fixture';
 
@@ -16,7 +17,11 @@ describe('App', () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([{ path: 'account-action', component: AccountActionComponent }]),
+      ],
     }).compileComponents();
     httpTesting = TestBed.inject(HttpTestingController);
   });
@@ -152,5 +157,32 @@ describe('App', () => {
       .flush({ groups: [], people: [], settlements: [], activity: [] });
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.account-name')?.textContent).toContain('Blair');
+  });
+  it('retains an explicit mailbox confirmation when the signed-in shell changes to the public route', async () => {
+    signIn();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({ id: 'u1', displayName: 'Alex Rivera' });
+    httpTesting
+      .expectOne('/api/dashboard')
+      .flush({ groups: [], people: [], settlements: [], activity: [] });
+    history.replaceState(
+      {},
+      '',
+      '/account-action#action=email-verification&token=' + 'a'.repeat(43),
+    );
+    await TestBed.inject(Router).navigateByUrl(
+      '/account-action#action=email-verification&token=' + 'a'.repeat(43),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const button = Array.from(
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((b) => b.textContent?.trim() === 'Verify email');
+    expect(button).toBeTruthy();
+    expect(location.hash).toBe('');
+    httpTesting.expectNone((r) => r.method === 'POST');
+    history.replaceState({}, '', '/');
   });
 });
