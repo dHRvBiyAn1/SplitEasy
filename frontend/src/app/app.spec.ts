@@ -128,4 +128,29 @@ describe('App', () => {
     expect(expense?.getAttribute('aria-current')).toBeNull();
     expect(dock?.querySelector('[data-nav="overview"]')?.getAttribute('aria-current')).toBe('page');
   });
+  it('loads the new account overview after a cross-tab switch without navigation or focus', () => {
+    signIn();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({ id: 'u1', displayName: 'Alex Rivera' });
+    httpTesting
+      .expectOne('/api/dashboard')
+      .flush({ groups: [], people: [], settlements: [], activity: [] });
+    fixture.detectChanges();
+    storeTestSession({ id: 'u2', email: 'b@example.test', displayName: 'Blair' });
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'spliteasy.user',
+        storageArea: localStorage,
+        newValue: localStorage.getItem('spliteasy.user'),
+      }),
+    );
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({ id: 'u2', displayName: 'Blair' });
+    httpTesting
+      .expectOne('/api/dashboard')
+      .flush({ groups: [], people: [], settlements: [], activity: [] });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.account-name')?.textContent).toContain('Blair');
+  });
 });

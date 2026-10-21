@@ -84,10 +84,10 @@ export class App {
         this.currentUrl.set(e.urlAfterRedirects);
         this.groupsOpen.set(false);
       });
-    inject(SessionService)
-      .changes.pipe(takeUntilDestroyed())
-      .subscribe(() => this.groupsOpen.set(false));
+    const session = inject(SessionService);
+    session.changes.pipe(takeUntilDestroyed()).subscribe(() => this.groupsOpen.set(false));
     effect(() => {
+      session.currentVersion();
       if (this.showShell()) untracked(() => this.dashboard.ensureLoaded());
     });
     effect(() => {
