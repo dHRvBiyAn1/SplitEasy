@@ -1,10 +1,10 @@
-# A02 backend account lifecycle evidence — 21 October 2026
+# A02 account lifecycle evidence — 21 October 2026
 
 Base: `e5b219773e54f890e56358f2a57de28f56d4bdff` (`dev`). Execution design:
 [2026-10-19-alignment-a02.md](../../superpowers/plans/2026-10-19-alignment-a02.md).
 Contract/operator limits: [account recovery](../../security/account-recovery.md).
-This records the backend checkpoint; frontend, independent review, packaged
-SMTP/populated-upgrade/browser rehearsal and final PR gates are coordinated by root.
+Backend checkpoint evidence is followed below by the frontend and root review
+results. The final batch integration report records the combined acceptance gate.
 
 ## Result and scope
 
@@ -94,3 +94,81 @@ re-login. Prefer a forward fix. SMTP acceptance does not prove inbox delivery,
 there is no durable outbox/retry, and process-local abuse budgets must become shared
 before multiple API instances. No merge, push, production promotion or deploy was
 performed by this worker.
+
+## Frontend and review remediation
+
+Public forgot-password preserves delivery-neutral messaging and retryable drafts.
+Mailbox reset/verification/replacement pages remove URL fragments synchronously,
+retain tokens only in component memory and require explicit submit. Profile
+security uses server verification state and current-password proof; pending email
+keeps the old login until new-mailbox confirmation. Success/session/destruction
+clear secrets. Existing AuthService/ProfileService own concrete HTTP commands;
+components retain UI/session cancellation. Invalid submits focus the sole field or
+a linked multi-field summary. No additional session framework/dependency exists.
+
+AuthService caches a coherent token/user pair, compares JWT subject only for
+presentation coherence, and resets owned work on cross-tab credential changes.
+API signature/issuer/expiry/credential-version validation stays authoritative.
+Partial pairs clear local state without erasing newer shared credentials; stale
+logout/profile callbacks cannot erase an unseen newer login. A public A mailbox
+action does not blindly log out or mark a currently signed-in B account verified.
+
+Independent backend Standards and Spec reviews each found zero material issues.
+Final UI review found two documented Standards breaches (resource ownership and
+invalid-submit focus) and one Spec P2 (cross-tab replacement cleared reads but did
+not initialize B). Rendered red→green regressions now cover all three corrections;
+separate remediation reviews report zero remaining hard/material findings. A small
+fixed-action presentation switch smell was retained as a nonblocking judgement
+call rather than introducing a dispatch framework.
+
+Real browser rehearsal found that conditional shell/public router outlets
+recreated the fragment-cleared mailbox component for signed-in users. A rendered
+regression reproduced the missing confirmation button; one stable router outlet
+preserves the explicit in-memory form across shell changes. The shell effect now
+tracks the existing session generation so A→B refreshes B even when authenticated
+visibility stays true. Integrated navigation/focus/coalescing and write ownership
+remain unchanged. Same-route mailbox re-entry receives an additional native
+hashchange regression and real browser replay in the final integration report.
+
+Backend-only root rehearsal already passed35 real HTTP responses using the native
+SMTP loopback sink, including reset, verification, pending/confirmed email,
+password change, token replay/purpose, revocation and legacy-token behavior.
+Tokens were absent from server logs. The populated combined upgrade preserves
+identity/profile/money/split intent through V12 then V13. All resources are owned
+and disposable; SMTP acceptance in this sink is not production inbox delivery.
+
+
+### Final router and UI checks
+
+Actual BrowserPlatformLocation plus Angular Router reproduced restoration of a
+mailbox fragment after the native hash handler had removed it. NavigationEnd now
+scrubs the URL again without reparsing or clearing the explicit form, password or
+pending action. The real same-tab browser scenario remains unchanged; this is a
+source fix rather than a weakened rehearsal. Rendered red→green covers the real
+Router/location boundary, in addition to native re-entry/session cancellation.
+
+At `ea09931a93b4b82a7d336a3702662ef62af79a52`, standalone full Node22 frontend
+**261 tests /35 files**, full-source Prettier and production build pass (no warning
+in standalone A02). Final separate Standards and Spec delta reviews report zero
+remaining hard/material findings. Full combined preview `d9534486` passes
+**287 tests /37 files**, formatting and production build; its501.19kB initial bundle
+has a non-fatal1.19kB warning above the500kB warning budget. Backend source remains
+identical to the combined280-test verification at `dd087d4`; no backend rerun is
+claimed for UI-only changes. External UI logs39–43 retain the final actual-Router
+red/green and full checks. The following integration report records final real
+mailbox/browser outcomes and the migration/rollback gates.
+
+
+## Final owned browser acceptance
+
+Final combined preview `53820d6` passes all three packages at1280/390 using the
+real JAR/Pg and non-forwarding local SMTP sink:59 bootstrap/migration/HTTP responses
+plus all six package/viewport flows. A02 observes58 responses and all seven account
+stages per viewport, including same-tab link reopening and preservation of an
+unrelated B session. No page errors or horizontal overflow. The mobile long-email
+status correction is two scoped CSS properties; source/rendered behavior is
+otherwise unchanged and the final combined287 tests pass. The owned app/Pg and
+other test resources were cleaned up. Full evidence and limits:
+[third-batch integration](third-batch-integration.md) and
+[separate review axes](third-batch-independent-review.md). PR CI remains an
+independent exact-head gate; no merge or production delivery/deployment is claimed.
