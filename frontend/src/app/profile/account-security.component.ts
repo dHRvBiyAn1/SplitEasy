@@ -212,6 +212,8 @@ import { SessionService } from '../core/auth/session.service';
       padding: var(--sp-6);
       display: grid;
       gap: var(--sp-4);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
     .security form,
     .security label {
