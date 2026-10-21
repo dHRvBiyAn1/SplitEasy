@@ -62,8 +62,14 @@ predict. Eight screenshots, zero page errors/overflow; owned app/Pg/static serve
 cleaned up. External evidence: `batch3/E02/real-browser-acceptance.json` and
 `REAL-BROWSER-HANDOFF.md` (24 launcher,97 browser,12 independent HTTP responses).
 
-A02's coherent persisted token/user presentation contract required updating three
+A02's coherent persisted token/user presentation contract required updating four
 E02 test fixture files to use the same JWT-shaped helper; behavior assertions are
 unchanged. Full standalone Node22 suite remains **246 tests /34 files**. The
 combined E02/H06/A02 source also passed279 tests before final review remediation.
 No production delivery, deployment or merge is claimed.
+
+The final combined check exposed one additional group-dialog fixture relying on
+a previous test’s persisted token. Its setup now clears localStorage and installs
+a coherent owned session; all five dialog outcomes and full standalone246 pass.
+This last change is test-only and leaves the browser/JAR application identities
+unchanged.
