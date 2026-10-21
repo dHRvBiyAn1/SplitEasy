@@ -1,0 +1,162 @@
+import { takeUntil } from 'rxjs';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { newPasswordValidators } from './password-validation';
+import { AuthService } from '../core/auth/auth.service';
+import { SessionService } from '../core/auth/session.service';
+import { ProfileService } from '../core/profile.service';
+import { ApiService } from '../core/api/api.service';
+
+@Component({
+  selector: 'app-account-action',
+  imports: [ReactiveFormsModule, RouterLink],
+  styleUrl: './auth.scss',
+  template: `<div class="auth__panel">
+    <main class="auth__form-wrap">
+      <h1 class="dc-display auth__title">
+        {{
+          action() === 'password-reset'
+            ? 'Reset your password'
+            : action() === 'email-change'
+              ? 'Confirm email change'
+              : 'Verify email'
+        }}
+      </h1>
+      @if (message()) {
+        <p role="status">{{ message() }}</p>
+      }
+      @if (error()) {
+        <p class="auth__error" role="alert">{{ error() }}</p>
+      }
+      @if (valid() && !message()) {
+        <form class="auth__form" (submit)="$event.preventDefault(); submit()" novalidate>
+          @if (action() === 'password-reset') {
+            <label class="auth__field"
+              ><span class="dc-field-label">New password</span
+              ><input
+                class="dc-field"
+                type="password"
+                autocomplete="new-password"
+                [formControl]="password"
+                [attr.aria-invalid]="password.touched && password.invalid"
+                aria-describedby="reset-password-hint"
+            /></label>
+            <p id="reset-password-hint">Use at least 8 characters and at most 72 UTF-8 bytes.</p>
+          }
+          <button type="submit" class="dc-btn-accent" [disabled]="pending()">
+            {{
+              pending()
+                ? 'Saving…'
+                : action() === 'password-reset'
+                  ? 'Reset password'
+                  : action() === 'email-change'
+                    ? 'Confirm email change'
+                    : 'Verify email'
+            }}
+          </button>
+        </form>
+      }
+      <p class="auth__switch">
+        <a routerLink="/login">Log in</a> ·
+        <a routerLink="/forgot-password">Request a new reset link</a> ·
+        <a routerLink="/profile">Account security and verification</a>
+      </p>
+    </main>
+  </div>`,
+})
+export class AccountActionComponent {
+  private readonly auth = inject(AuthService);
+  private readonly session = inject(SessionService);
+  private readonly profile = inject(ProfileService);
+  private readonly api = inject(ApiService);
+  private readonly destroyRef = inject(DestroyRef);
+  private token = '';
+  protected readonly action = signal('');
+  protected readonly valid = signal(false);
+  protected readonly password = new FormControl('', {
+    nonNullable: true,
+    validators: newPasswordValidators,
+  });
+  protected readonly pending = signal(false);
+  protected readonly error = signal('');
+  protected readonly message = signal('');
+  constructor() {
+    const fragment = new URLSearchParams(location.hash.slice(1));
+    history.replaceState(history.state, '', location.pathname + location.search);
+    const token = fragment.get('token') ?? '';
+    if (
+      fragment.getAll('action').length === 1 &&
+      fragment.getAll('token').length === 1 &&
+      ['password-reset', 'email-verification', 'email-change'].includes(
+        fragment.get('action') ?? '',
+      ) &&
+      /^[A-Za-z0-9_-]{43}$/.test(token)
+    ) {
+      this.token = token;
+      this.action.set(fragment.get('action')!);
+      this.valid.set(true);
+    } else this.error.set('Reopen the link from your email, or request a new link.');
+    this.session.changes.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.token = '';
+      this.password.reset();
+      this.valid.set(false);
+      this.pending.set(false);
+      if (!this.message())
+        this.error.set('Your session changed. Reopen the link from your email to continue.');
+    });
+    this.destroyRef.onDestroy(() => {
+      this.token = '';
+      this.password.reset();
+    });
+  }
+  submit(): void {
+    if (!this.valid() || this.pending()) return;
+    if (this.action() === 'password-reset' && this.password.invalid) {
+      this.password.markAsTouched();
+      return;
+    }
+    this.error.set('');
+    this.pending.set(true);
+    const id = this.auth.user()?.id;
+    const version = this.session.version;
+    const reset = this.action() === 'password-reset';
+    this.api
+      .post<void>(
+        reset
+          ? '/auth/password-resets'
+          : this.action() === 'email-change'
+            ? '/auth/email-change-confirmations'
+            : '/auth/email-verifications',
+        reset ? { token: this.token, password: this.password.value } : { token: this.token },
+      )
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.token = '';
+          this.password.reset();
+          this.pending.set(false);
+          if (id && this.auth.user()?.id === id && this.session.version === version)
+            this.profile.refresh();
+          this.message.set(
+            reset
+              ? 'Password reset. Log in with your new password.'
+              : this.action() === 'email-change'
+                ? 'Email changed. Log in with your new email.'
+                : 'Email verified.',
+          );
+        },
+        error: (err) => {
+          this.pending.set(false);
+          this.error.set(
+            err.status === 429
+              ? 'Too many attempts. Please wait before trying again.'
+              : err.status === 400
+                ? 'This link is invalid or expired. Request a new link.'
+                : 'Temporarily unavailable. Please try again later.',
+          );
+        },
+      });
+  }
+}

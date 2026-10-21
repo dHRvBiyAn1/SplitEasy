@@ -19,6 +19,7 @@ export const AVATAR_COLORS = ['#12A57E', '#D96D3F', '#3F7BD9', '#C25B84', '#D9A0
 export interface CurrentProfile {
   id: string;
   email: string;
+  emailVerified: boolean;
   displayName: string;
   phone: string;
   avatarColor: string;

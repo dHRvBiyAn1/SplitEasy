@@ -3,16 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
-
-const USER_KEY = 'spliteasy.user';
-const TOKEN_KEY = 'spliteasy.accessToken';
+import { storeTestSession } from './core/auth/auth-test-fixture';
 
 function signIn(): void {
-  localStorage.setItem(TOKEN_KEY, 'test-token');
-  localStorage.setItem(
-    USER_KEY,
-    JSON.stringify({ id: 'u1', email: 'a@b.com', displayName: 'Alex Rivera' }),
-  );
+  storeTestSession({ id: 'u1', email: 'a@b.com', displayName: 'Alex Rivera' });
 }
 
 describe('App', () => {

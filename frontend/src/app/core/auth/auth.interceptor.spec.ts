@@ -1,3 +1,4 @@
+import { storeTestSession, testJwt } from './auth-test-fixture';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -13,6 +14,7 @@ describe('authInterceptor', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    storeTestSession({ id: 'u1', email: 'alice@example.com', displayName: 'Alice' });
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -28,15 +30,13 @@ describe('authInterceptor', () => {
   afterEach(() => httpTesting.verify());
 
   it('attaches the bearer token to API calls', () => {
-    localStorage.setItem('spliteasy.accessToken', 'jwt-token');
     http.get('/api/groups').subscribe();
     const req = httpTesting.expectOne('/api/groups');
-    expect(req.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer ' + testJwt('u1'));
     req.flush([]);
   });
 
   it('does not attach a token to auth endpoints', () => {
-    localStorage.setItem('spliteasy.accessToken', 'jwt-token');
     http.post('/api/auth/login', {}).subscribe();
     const req = httpTesting.expectOne('/api/auth/login');
     expect(req.request.headers.has('Authorization')).toBe(false);
@@ -46,7 +46,6 @@ describe('authInterceptor', () => {
   it.each(['/api-admin', '/api/../outside', 'https://untrusted.example/api/groups'])(
     'does not disclose a token or log out for an unrelated request: %s',
     (url) => {
-      localStorage.setItem('spliteasy.accessToken', 'jwt-token');
       const logout = vi.spyOn(auth, 'logout');
       http.get(url).subscribe({ error: () => {} });
       const req = httpTesting.expectOne(url);
@@ -57,7 +56,6 @@ describe('authInterceptor', () => {
   );
 
   it('preserves the session when registration fails with 401', () => {
-    localStorage.setItem('spliteasy.accessToken', 'jwt-token');
     const logout = vi.spyOn(auth, 'logout');
     http.post('/api/auth/register', {}).subscribe({ error: () => {} });
     const req = httpTesting.expectOne('/api/auth/register');
@@ -67,7 +65,6 @@ describe('authInterceptor', () => {
   });
 
   it('logs out and redirects to /login on 401', () => {
-    localStorage.setItem('spliteasy.accessToken', 'jwt-token');
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const logout = vi.spyOn(auth, 'logout');

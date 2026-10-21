@@ -1,3 +1,4 @@
+import { storeTestSession, testJwt } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -93,7 +94,7 @@ describe('authentication presentation', () => {
 
   for (const component of [LoginComponent, RegisterComponent]) {
     it(`shows a friendly retry notice for ${component.name} without changing session state`, () => {
-      localStorage.setItem('spliteasy.accessToken', 'existing-session');
+      storeTestSession({ id: 'alice', email: 'alice@example.com', displayName: 'Alice' });
       const f = TestBed.createComponent<LoginComponent | RegisterComponent>(component);
       f.detectChanges();
       for (const [selector, value] of [
@@ -122,7 +123,7 @@ describe('authentication presentation', () => {
         'Too many attempts. Please wait before trying again.',
       );
       expect(f.nativeElement.querySelector('button[type="submit"]').disabled).toBe(false);
-      expect(localStorage.getItem('spliteasy.accessToken')).toBe('existing-session');
+      expect(localStorage.getItem('spliteasy.accessToken')).toBe(testJwt('alice'));
     });
   }
 });

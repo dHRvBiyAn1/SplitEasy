@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
 
@@ -15,6 +15,10 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  protected readonly securityNotice =
+    inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === 'password-changed'
+      ? 'Password changed. Log in with your new password.'
+      : '';
   protected readonly passwordVisible = signal(false);
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);

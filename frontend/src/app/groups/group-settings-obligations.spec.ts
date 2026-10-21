@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -25,7 +26,7 @@ describe('group settings bilateral obligations', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('spliteasy.user', JSON.stringify(bob));
+    storeTestSession(bob);
     TestBed.configureTestingModule({
       imports: [GroupSettingsComponent],
       providers: [
@@ -50,7 +51,7 @@ describe('group settings bilateral obligations', () => {
   ])(
     'blocks net-zero $role with both counterparties visible',
     ({ viewer, creator, simplifyDebts }) => {
-      localStorage.setItem('spliteasy.user', JSON.stringify(viewer));
+      storeTestSession(viewer);
       const fixture = TestBed.createComponent(GroupSettingsComponent);
       fixture.detectChanges();
       http.expectOne('/api/groups/g').flush({ ...group, createdBy: creator, simplifyDebts });
