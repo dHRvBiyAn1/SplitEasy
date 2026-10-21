@@ -151,6 +151,31 @@ describe('visible expense failures', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Delete expense');
   });
+  it('clears retained expense feedback across group route generations A to B to A', () => {
+    const fixture = open();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fixture.nativeElement.querySelector('.xdetail__del').click();
+    http
+      .expectOne('/api/groups/a/expenses/e')
+      .flush({ message: 'Old deletion conflict' }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Old deletion conflict');
+    params.next(convertToParamMap({ id: 'b' }));
+    http.expectOne('/api/groups/b').flush({ id: 'b', name: 'Trip', type: 'TRIP', members: [user] });
+    http.expectOne('/api/groups/b/balances/mine').flush([]);
+    http.expectOne('/api/groups/b/expenses').flush([]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Old deletion conflict');
+    params.next(convertToParamMap({ id: 'a' }));
+    http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
+    http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/expenses').flush([expense]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Dinner');
+    expect(fixture.nativeElement.querySelector('[role=alert]')).toBeNull();
+  });
   it('offers an explicit current-expense retry after detail failure', () => {
     const fixture = open();
     http

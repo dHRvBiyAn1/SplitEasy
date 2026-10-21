@@ -133,6 +133,8 @@ export class GroupDetailComponent implements OnInit {
       this.group.set(null);
       this.myBalances.set([]);
       this.expenses.set([]);
+      this.detailError.set(null);
+      this.deleteError.set(null);
       this.deletingId.set(null);
       this.groupId = id;
       this.loading.set(true);
