@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -18,10 +19,8 @@ describe('new group member results', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
-    localStorage.setItem(
-      'spliteasy.user',
-      JSON.stringify({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' }),
-    );
+    localStorage.clear();
+    storeTestSession({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' });
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
