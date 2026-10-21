@@ -20,4 +20,5 @@ public record ExpenseResponse(
     List<SplitShare> participants,
     List<UUID> participantUserIds,
     List<SplitInput> splits,
-    Instant createdAt) {}
+    Instant createdAt,
+    long version) {}

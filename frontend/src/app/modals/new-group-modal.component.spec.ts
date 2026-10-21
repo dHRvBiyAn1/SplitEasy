@@ -17,6 +17,11 @@ describe('new group member results', () => {
   let refresh: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.setItem(
+      'spliteasy.user',
+      JSON.stringify({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' }),
+    );
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });

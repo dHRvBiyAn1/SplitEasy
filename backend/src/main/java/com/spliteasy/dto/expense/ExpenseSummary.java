@@ -19,4 +19,5 @@ public record ExpenseSummary(
     ExpenseCategory category,
     LocalDate spentOn,
     long viewerDeltaCents,
-    Instant createdAt) {}
+    Instant createdAt,
+    long version) {}

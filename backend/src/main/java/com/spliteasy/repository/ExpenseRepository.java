@@ -19,6 +19,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
       """
             select e.id as id,
                    e.description as description,
+                   e.version as version,
                    e.amountCents as amountCents,
                    e.category as category,
                    e.spentOn as spentOn,
@@ -95,6 +96,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
   /** Projection backing {@link #findSummariesByGroupId(UUID)}. */
   interface ExpenseSummaryView {
+    long getVersion();
+
     UUID getId();
 
     String getDescription();

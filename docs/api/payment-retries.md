@@ -31,13 +31,16 @@ DO NOTHING`, then read and compare the winning payment in READ COMMITTED. A lose
 waits for the winning insert without raising a uniqueness error or reading from
 an aborted transaction. No balance state is stored or separately updated.
 
-The Angular payment service retains one pending operation in memory. It reuses
-its UUID for an identical submitted group/payer/payee/amount through network or
-server errors, RxJS resubscription, and closing/reopening the settlement modal.
-A successful response, different submitted intent, or account-session reset
-clears/replaces the pending identity. Session reset also cancels pending HTTP.
-A browser reload/tab change loses this in-memory identity; after an uncertain
-response, inspect payment history before recreating a payment in a new tab or
-reloaded page. Changing intent after an uncertain response may also represent a
-second payment: the first operation might already have committed. No automatic
-retry, durable queue, or cross-tab coordination is introduced.
+The Angular payment service persists one account-owned pending operation in this tab's
+sessionStorage before dispatch. An identical submitted group/payer/payee/amount reuses
+its UUID through network/server errors, RxJS resubscription, modal reopen, and reload.
+Reload restores the partial amount and counterparty without sending automatically.
+A successful response removes only its matching identity; account-session reset clears
+this tab's pending identities and cancels pending HTTP.
+
+Changed uncertain intent is blocked until the user explicitly acknowledges that the
+previous payment may already have been recorded and chooses to start a separate
+payment. Storage failure blocks dispatch with actionable feedback. Other tabs have
+independent sessionStorage; inspect history before recreating an uncertain payment
+there. No automatic retry or offline dispatch queue is introduced. The shared browser
+contract and rollout details are in [retry-safe writes](retry-safe-writes.md).

@@ -16,6 +16,7 @@ describe('mutation close policy across the rendered global dialogs', () => {
   let modal: ModalService;
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     localStorage.setItem('spliteasy.user', JSON.stringify(alice));
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],

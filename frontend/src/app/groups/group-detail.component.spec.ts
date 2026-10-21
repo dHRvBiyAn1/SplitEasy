@@ -8,6 +8,7 @@ import { GroupDetailComponent } from './group-detail.component';
 const user = { id: 'me', displayName: 'Ada', email: 'ada@example.test' };
 const expense = {
   id: 'e',
+  version: 0,
   description: 'Dinner',
   amountCents: 2000,
   paidBy: user,
@@ -64,7 +65,7 @@ describe('visible expense failures', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
     http
-      .expectOne('/api/groups/a/expenses/e')
+      .expectOne({ method: 'DELETE', url: '/api/groups/a/expenses/e?expectedVersion=0' })
       .flush(
         { message: 'Re-add former participants before changing this expense.' },
         { status: 409, statusText: 'Conflict' },
@@ -84,7 +85,10 @@ describe('visible expense failures', () => {
     fixture.detectChanges();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
-    const deletion = http.expectOne('/api/groups/a/expenses/e');
+    const deletion = http.expectOne({
+      method: 'DELETE',
+      url: '/api/groups/a/expenses/e?expectedVersion=0',
+    });
     (fixture.nativeElement.querySelector('.xrow') as HTMLButtonElement).click();
     fixture.detectChanges();
     deletion.flush(
@@ -105,7 +109,10 @@ describe('visible expense failures', () => {
     fixture.detectChanges();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
-    const deletion = http.expectOne('/api/groups/a/expenses/e');
+    const deletion = http.expectOne({
+      method: 'DELETE',
+      url: '/api/groups/a/expenses/e?expectedVersion=0',
+    });
     (fixture.nativeElement.querySelectorAll('.xrow')[1] as HTMLButtonElement).click();
     http.expectOne('/api/groups/a/expenses/second').flush(secondExpense);
     deletion.flush(
@@ -128,7 +135,7 @@ describe('visible expense failures', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     (fixture.nativeElement.querySelector('.xdetail__del') as HTMLButtonElement).click();
     http
-      .expectOne('/api/groups/a/expenses/e')
+      .expectOne({ method: 'DELETE', url: '/api/groups/a/expenses/e?expectedVersion=0' })
       .flush(null, { status: 204, statusText: 'No Content' });
     http.expectOne('/api/dashboard').flush({
       totalNetCents: 0,
