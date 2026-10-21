@@ -158,7 +158,10 @@ describe('visible expense failures', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fixture.nativeElement.querySelector('.xdetail__del').click();
     http
-      .expectOne('/api/groups/a/expenses/e')
+      .expectOne(
+        (request) =>
+          request.method === 'DELETE' && request.url.split('?')[0] === '/api/groups/a/expenses/e',
+      )
       .flush({ message: 'Old deletion conflict' }, { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Old deletion conflict');
