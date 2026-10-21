@@ -54,6 +54,22 @@ export class AuthService {
       .pipe(tap((res) => this.persist(res)));
   }
 
+  requestPasswordReset(email: string): Observable<void> {
+    return this.api.post<void>('/auth/password-reset-requests', { email });
+  }
+
+  resetPassword(token: string, password: string): Observable<void> {
+    return this.api.post<void>('/auth/password-resets', { token, password });
+  }
+
+  verifyEmail(token: string): Observable<void> {
+    return this.api.post<void>('/auth/email-verifications', { token });
+  }
+
+  confirmEmailChange(token: string): Observable<void> {
+    return this.api.post<void>('/auth/email-change-confirmations', { token });
+  }
+
   logout(): void {
     const current = this.currentSession();
     this.session.reset();

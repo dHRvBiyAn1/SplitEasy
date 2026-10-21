@@ -44,6 +44,69 @@ describe('profile account security', () => {
     http.expectOne('/api/auth/login').flush({ accessToken: 'alice-token', user });
   });
   afterEach(() => http.verify());
+  it('focuses linked password errors, lets each link focus its field and focuses the remaining single error', () => {
+    const f = TestBed.createComponent(ProfileComponent);
+    f.detectChanges();
+    http.expectOne('/api/me').flush(profile);
+    f.detectChanges();
+    button(f.nativeElement, 'Change password').click();
+    f.detectChanges();
+    const submit = () =>
+      f.nativeElement
+        .querySelector('#password-change-form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    button(f.nativeElement, 'Save password').focus();
+    submit();
+    f.detectChanges();
+    const summary = f.nativeElement.querySelector('#password-errors');
+    expect(summary).not.toBeNull();
+    expect(document.activeElement).toBe(summary);
+    const links = summary.querySelectorAll('a');
+    expect(links.length).toBe(2);
+    links[0].click();
+    expect(document.activeElement).toBe(
+      f.nativeElement.querySelector('#security-current-password'),
+    );
+    links[1].click();
+    expect(document.activeElement).toBe(f.nativeElement.querySelector('#security-new-password'));
+    input(f.nativeElement, '#security-current-password', 'password');
+    submit();
+    f.detectChanges();
+    expect(document.activeElement).toBe(f.nativeElement.querySelector('#security-new-password'));
+    expect(f.nativeElement.querySelector('#password-errors')).toBeNull();
+    http.expectNone('/api/me/password');
+  });
+  it('focuses linked email-change errors and the remaining invalid field without submitting', () => {
+    const f = TestBed.createComponent(ProfileComponent);
+    f.detectChanges();
+    http.expectOne('/api/me').flush(profile);
+    f.detectChanges();
+    button(f.nativeElement, 'Change email').click();
+    f.detectChanges();
+    const submit = () =>
+      f.nativeElement
+        .querySelector('#email-change-form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    button(f.nativeElement, 'Request email change').focus();
+    submit();
+    f.detectChanges();
+    const summary = f.nativeElement.querySelector('#email-errors');
+    expect(summary).not.toBeNull();
+    expect(document.activeElement).toBe(summary);
+    const links = summary.querySelectorAll('a');
+    expect(links.length).toBe(2);
+    links[0].click();
+    expect(document.activeElement).toBe(f.nativeElement.querySelector('#email-current-password'));
+    links[1].click();
+    expect(document.activeElement).toBe(f.nativeElement.querySelector('#security-new-email'));
+    input(f.nativeElement, '#security-new-email', 'new@example.com');
+    submit();
+    f.detectChanges();
+    expect(document.activeElement).toBe(f.nativeElement.querySelector('#email-current-password'));
+    expect(f.nativeElement.querySelector('#email-errors')).toBeNull();
+    http.expectNone('/api/me/email-change-requests');
+  });
+
   it('shows server-owned verification state and explicitly requests verification without pretending delivery or success', () => {
     const f = TestBed.createComponent(ProfileComponent);
     f.detectChanges();

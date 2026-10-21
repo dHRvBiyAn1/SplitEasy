@@ -1,8 +1,8 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService } from '../core/api/api.service';
+import { AuthService } from '../core/auth/auth.service';
 import { AuthHeroComponent } from './auth-hero.component';
 
 @Component({
@@ -44,7 +44,8 @@ import { AuthHeroComponent } from './auth-hero.component';
   </div>`,
 })
 export class ForgotPasswordComponent {
-  private readonly api = inject(ApiService);
+  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly email = new FormControl('', {
     nonNullable: true,
@@ -56,14 +57,15 @@ export class ForgotPasswordComponent {
   submit(): void {
     if (this.email.invalid) {
       this.email.markAsTouched();
+      this.element.nativeElement.querySelector<HTMLInputElement>('input')?.focus();
       return;
     }
     if (this.pending()) return;
     this.pending.set(true);
     this.error.set('');
     this.message.set('');
-    this.api
-      .post<void>('/auth/password-reset-requests', { email: this.email.value.trim() })
+    this.auth
+      .requestPasswordReset(this.email.value.trim())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {

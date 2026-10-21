@@ -2,10 +2,16 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { newPasswordValidators, passwordBytes } from '../auth/password-validation';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  ElementRef,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { takeUntil } from 'rxjs';
-import { ApiService } from '../core/api/api.service';
 import { ProfileService } from '../core/profile.service';
 import { SessionService } from '../core/auth/session.service';
 
@@ -53,6 +59,37 @@ import { SessionService } from '../core/auth/session.service';
         (ngSubmit)="changePassword()"
         novalidate
       >
+        @if (
+          passwordForm.controls.currentPassword.touched &&
+          passwordForm.controls.currentPassword.invalid &&
+          passwordForm.controls.password.touched &&
+          passwordForm.controls.password.invalid
+        ) {
+          <div
+            id="password-errors"
+            tabindex="-1"
+            role="alert"
+            aria-labelledby="password-errors-title"
+          >
+            <p id="password-errors-title">Check these password fields:</p>
+            <ul>
+              <li>
+                <a
+                  href="#security-current-password"
+                  (click)="$event.preventDefault(); focusTarget('security-current-password')"
+                  >Enter your current password (at most 72 UTF-8 bytes).</a
+                >
+              </li>
+              <li>
+                <a
+                  href="#security-new-password"
+                  (click)="$event.preventDefault(); focusTarget('security-new-password')"
+                  >Use a new password of at least 8 characters and at most 72 UTF-8 bytes.</a
+                >
+              </li>
+            </ul>
+          </div>
+        }
         <label
           ><span class="dc-field-label">Current password</span
           ><input
@@ -96,6 +133,32 @@ import { SessionService } from '../core/auth/session.service';
     }
     @if (mode() === 'email') {
       <form id="email-change-form" [formGroup]="emailForm" (ngSubmit)="changeEmail()" novalidate>
+        @if (
+          emailForm.controls.currentPassword.touched &&
+          emailForm.controls.currentPassword.invalid &&
+          emailForm.controls.email.touched &&
+          emailForm.controls.email.invalid
+        ) {
+          <div id="email-errors" tabindex="-1" role="alert" aria-labelledby="email-errors-title">
+            <p id="email-errors-title">Check these email-change fields:</p>
+            <ul>
+              <li>
+                <a
+                  href="#email-current-password"
+                  (click)="$event.preventDefault(); focusTarget('email-current-password')"
+                  >Enter your current password (at most 72 UTF-8 bytes).</a
+                >
+              </li>
+              <li>
+                <a
+                  href="#security-new-email"
+                  (click)="$event.preventDefault(); focusTarget('security-new-email')"
+                  >Enter a valid new email address of at most 254 characters.</a
+                >
+              </li>
+            </ul>
+          </div>
+        }
         <label
           ><span class="dc-field-label">Current password</span
           ><input
@@ -167,11 +230,12 @@ import { SessionService } from '../core/auth/session.service';
   `,
 })
 export class AccountSecurityComponent {
+  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly profile = inject(ProfileService);
-  private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ownerId = this.auth.user()?.id;
@@ -208,17 +272,29 @@ export class AccountSecurityComponent {
     this.emailForm.reset();
     this.mode.set('');
   }
+  focusTarget(id: string): void {
+    if (this.ownsSession())
+      this.element.nativeElement.querySelector<HTMLElement>('#' + id)?.focus();
+  }
   changePassword(): void {
     if (!this.ownsSession() || this.pending()) return;
     if (this.passwordForm.invalid) {
       this.passwordForm.markAllAsTouched();
+      this.changeDetector.detectChanges();
+      this.focusTarget(
+        this.passwordForm.controls.currentPassword.invalid
+          ? this.passwordForm.controls.password.invalid
+            ? 'password-errors'
+            : 'security-current-password'
+          : 'security-new-password',
+      );
       return;
     }
     this.pending.set(true);
     this.error.set('');
     this.message.set('');
-    this.api
-      .post<void>('/me/password', this.passwordForm.getRawValue())
+    this.profile
+      .changePassword(this.passwordForm.getRawValue())
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
@@ -238,14 +314,22 @@ export class AccountSecurityComponent {
     if (!this.ownsSession() || this.pending()) return;
     if (this.emailForm.invalid) {
       this.emailForm.markAllAsTouched();
+      this.changeDetector.detectChanges();
+      this.focusTarget(
+        this.emailForm.controls.currentPassword.invalid
+          ? this.emailForm.controls.email.invalid
+            ? 'email-errors'
+            : 'email-current-password'
+          : 'security-new-email',
+      );
       return;
     }
     const { currentPassword, email } = this.emailForm.getRawValue();
     this.pending.set(true);
     this.error.set('');
     this.message.set('');
-    this.api
-      .post<void>('/me/email-change-requests', { currentPassword, email: email.trim() })
+    this.profile
+      .requestEmailChange({ currentPassword, email: email.trim() })
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
@@ -281,8 +365,8 @@ export class AccountSecurityComponent {
     this.pending.set(true);
     this.error.set('');
     this.message.set('');
-    this.api
-      .post<void>('/me/email-verification-requests', {})
+    this.profile
+      .requestEmailVerification()
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {

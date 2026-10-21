@@ -7,7 +7,7 @@ import {
   linkedSignal,
   untracked,
 } from '@angular/core';
-import { takeUntil } from 'rxjs';
+import { Observable, takeUntil } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
@@ -88,6 +88,18 @@ export class ProfileService {
   update(patch: ProfilePatch, onSaved?: () => void): void {
     if (!this.auth.user() || this.saving()) return;
     this.request('patch', patch, onSaved);
+  }
+
+  requestEmailVerification(): Observable<void> {
+    return this.api.post<void>('/me/email-verification-requests', {});
+  }
+
+  changePassword(request: { currentPassword: string; password: string }): Observable<void> {
+    return this.api.post<void>('/me/password', request);
+  }
+
+  requestEmailChange(request: { currentPassword: string; email: string }): Observable<void> {
+    return this.api.post<void>('/me/email-change-requests', request);
   }
 
   importLegacy(onSaved?: () => void): void {

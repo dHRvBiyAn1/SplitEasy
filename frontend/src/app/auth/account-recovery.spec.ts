@@ -20,6 +20,23 @@ describe('public account recovery', () => {
     });
   });
   afterEach(() => TestBed.inject(HttpTestingController).verify());
+  it('focuses the invalid recovery email and explains the error without submitting', async () => {
+    const route = routes.find((route) => route.path === 'forgot-password')!;
+    const f = TestBed.createComponent((await route.loadComponent!()) as typeof LoginComponent);
+    f.detectChanges();
+    const email = f.nativeElement.querySelector('input[type=email]');
+    f.nativeElement.querySelector('button[type=submit]').focus();
+    f.nativeElement
+      .querySelector('form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    f.detectChanges();
+    expect(document.activeElement).toBe(email);
+    expect(email.getAttribute('aria-invalid')).toBe('true');
+    expect(f.nativeElement.querySelector('#recovery-email-hint')?.textContent).toContain(
+      'valid email',
+    );
+    TestBed.inject(HttpTestingController).expectNone('/api/auth/password-reset-requests');
+  });
   it('offers a public forgot-password route from login and gives the same delivery-neutral result', async () => {
     const login = TestBed.createComponent(LoginComponent);
     login.detectChanges();
@@ -67,6 +84,25 @@ describe('public account recovery', () => {
       .flush({}, { status: 503, statusText: 'Unavailable' });
     f.detectChanges();
     expect(f.nativeElement.textContent).toContain('Email is temporarily unavailable');
+  });
+
+  it('focuses an invalid reset password and keeps its validation guidance available without submitting', async () => {
+    history.replaceState({}, '', '/account-action#action=password-reset&token=' + 'a'.repeat(43));
+    const route = routes.find((route) => route.path === 'account-action')!;
+    const f = TestBed.createComponent((await route.loadComponent!()) as typeof LoginComponent);
+    f.detectChanges();
+    const password = f.nativeElement.querySelector('input[type=password]');
+    f.nativeElement.querySelector('button[type=submit]').focus();
+    f.nativeElement
+      .querySelector('form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    f.detectChanges();
+    expect(document.activeElement).toBe(password);
+    expect(password.getAttribute('aria-invalid')).toBe('true');
+    expect(f.nativeElement.querySelector('#reset-password-hint')?.textContent).toContain(
+      '72 UTF-8 bytes',
+    );
+    TestBed.inject(HttpTestingController).expectNone('/api/auth/password-resets');
   });
 
   it('consumes the reset fragment immediately and changes the password only after explicit submit', async () => {
