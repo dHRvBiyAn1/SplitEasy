@@ -25,6 +25,7 @@ payments and greedy debt-simplification suggestions. Balances are
   plain semantic HTML.
 - **Auth**: Spring Security + JWT (HS256, symmetric) via `oauth2-resource-server`. Access
   tokens only (1h), intended re-login on expiry; client logout does not revoke tokens.
+  Password reset/change and confirmed email change revoke prior tokens through per-request persisted credential-version checks.
   Contract and future requirements: [session lifecycle](docs/security/session-lifecycle.md).
 
 ## Run & Test
@@ -101,7 +102,9 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **UUID PKs** everywhere (`@UuidGenerator`, app-side so it works under `validate`; Postgres `uuid`).
 - **Auth abuse limits**: login 30/IP/5min and 5/(normalized email, IP)/5min; registration 20/IP/hour (`APP_AUTH_REGISTRATION_LIMIT`). Atomic process-local fixed windows cap at 10k buckets; restart resets, share enforcement before multiple instances. Prod native Caddy/Tomcat forwarding relies on private Tunnel→Caddy→Java networks; direct dev ignores forwarded headers. See `docs/security/auth-abuse.md`; 429 includes CORS-exposed Retry-After and both forms retain session state.
 - **Auth**: tokens issued in `JwtService` (claims `sub`=user UUID, `email`, `displayName`),
-  validated by the resource-server filter (`NimbusJwtDecoder` in `SecurityConfig`). Read caller as
+  plus `credentialVersion`; validated by the resource-server filter (`NimbusJwtDecoder` in
+  `SecurityConfig`) against persisted current credential state on every protected request.
+  Legacy absent versions mean zero until the account changes credentials. Read caller as
   `@CurrentUserId UUID` (resolver in `config/`) — not raw `Jwt`. Passwords BCrypt.
 - **Reuse these, don't re-inline**: `MembershipGuard.requireMember(groupId,userId)` (the group-membership
   check → 403); `@CurrentUserId`; `Emails.normalize()` (trim+lowercase, canonical form for lookup/storage).
@@ -154,6 +157,16 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   `uq_<table>_<cols>`). Every FK column is indexed; **filter+sort paths get a composite
   `(filter_col, sort_col DESC…)`** whose leftmost prefix also serves the plain filter, so
   no redundant single-column index is kept alongside it (see V7 for expenses/payments).
+- **Account lifecycle**: V13 keeps existing users unverified and stores purpose-bound SHA-256
+  challenge hashes only. User-row locks serialize expiry/replay/replacement/credential writes;
+  reset lookup selects scalar UUID then locks and rechecks current email (never preload a stale
+  user entity before waiting). Sensitive credential changes invalidate all challenges and old
+  JWTs; verification alone does not. Native SMTP defaults disabled, requires trusted HTTPS
+  origin/authenticated TLS/hostname checks/bounded timeouts, and has only an explicit owned
+  loopback test exception. Public actual-send failures stay generic202 and roll back issuance;
+  global disabled/misconfigured delivery is uniform503. E02 V12 must precede V13 or ship together.
+  Keep schema on rollback; old auth binaries accept revoked JWTs, so use a forward fix or a
+  reviewed all-instance signing-key rotation before rollback. See `docs/security/account-recovery.md`.
 - **Logging**: backend uses **Log4j2** (pom excludes `spring-boot-starter-logging`, adds
   `spring-boot-starter-log4j2`); code logs via the SLF4J API using Lombok `@Slf4j`. Level
   convention — **DEBUG** flow detail (dev only), **INFO** business events (register/login,
@@ -486,3 +499,5 @@ PR #95–#97 review remediation (2026-10-19): user authorized fixing comments an
 - [x] A01 review follow-up (2026-10-19) — render accepted `/api/me` email in both read-only profile modes, retaining forbidden email PATCH mutation and unchanged stored auth identity. Rendered red→green covers mismatched cached/server email; an import→component-recreation regression did not reproduce the proposed stale prompt, and failed import/cancel preserve owned local data. Node22 frontend226, full-source Prettier and production build pass; backend unchanged from234 verified tests. Root owns final migration/browser rerun. No push/merge/deployment by this worker.
 - [x] Alignment E01 split intent (2026-10-19) — persist original equal/exact/percentage/weight/adjustment inputs alongside final shares, retain zero participants, restore intent on edit and recompute percentage/weight amount changes; signed adjustments sum0 over deterministic equal allocation with nonnegative final shares. V11 nullable split_value safely degrades legacy/old-writer percentages to exact shares without inference; A01 V10 must deploy before V11, and new enum writes limit rollback. Critical red→green HTTP/rendered loops; full backend241/frontend230, Spotless/Prettier/production build, controlled-HTTP Chromium1280/320 pass. Evidence: `docs/reviews/2026-10-19-alignment/e01-split-intent.md`. Candidate only; independent review, populated migration verification and PR gates remain parent-owned; no push/merge/deployment.
 - [x] Alignment F02 canonical obligations (2026-10-19) — one selected-mode projection and deterministic UUID-tied calculator align /mine, dashboard/People/headlines/actions and departure eligibility; raw obligations/history remain unchanged. Simplified zero-net intermediaries can leave; mode changes serialize with financial/member writes and reject former-participant exposure with re-add/repair guidance. Net previews warn about direct offsets; modal uses canonical dashboard rows. Regression-first HTTP/PostgreSQL and rendered Angular, backend240/frontend220, Spotless/Prettier, production builds and official OpenAPI139-ref validation passed. Evidence: `docs/reviews/2026-10-19-alignment/f02-projection.md`. No schema/currency/auth/editor change, browser claim, push, merge or deployment by this worker; independent review and packaged rehearsal remain root-owned.
+
+- [x] Alignment A02 backend checkpoint (2026-10-21) — purpose-bound hashed expiring one-use mailbox challenges support reset, verification and pending email replacement; current-password sensitive commands, scalar-UUID-before-user-lock reset lookup, PostgreSQL uniqueness, credential-version JWT revocation and BCrypt byte bounds hold at HTTP seams. Native SMTP selected but disabled until owned sender/TLS/HTTPS/egress configuration; public actual-send failures stay generic202 with rollback. V13 follows E02 V12; old binaries accept revoked JWTs, so forward-fix or rotate signing keys before reviewed rollback. Backend272/Spotless/package, Compose6 and official OpenAPI166-ref checks pass. Evidence: `docs/reviews/2026-10-19-alignment/a02-account-lifecycle.md`. Frontend/independent review/packaged/browser/final PR gates remain root-coordinated; no push/merge/deployment by this worker.

@@ -43,6 +43,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(body(HttpStatus.BAD_REQUEST, message));
   }
 
+  @ExceptionHandler(DeliveryUnavailableException.class)
+  public ResponseEntity<ErrorResponse> handleDeliveryUnavailable(DeliveryUnavailableException ex) {
+    return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+  }
+
   @ExceptionHandler(TooManyRequestsException.class)
   public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

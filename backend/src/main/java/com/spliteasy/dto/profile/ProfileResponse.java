@@ -7,6 +7,7 @@ import java.util.UUID;
 public record ProfileResponse(
     UUID id,
     String email,
+    boolean emailVerified,
     String displayName,
     String phone,
     String avatarColor,
@@ -16,6 +17,7 @@ public record ProfileResponse(
     return new ProfileResponse(
         user.getId(),
         user.getEmail(),
+        user.isEmailVerified(),
         user.getDisplayName(),
         user.getPhone(),
         user.getAvatarColor(),

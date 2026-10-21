@@ -45,6 +45,9 @@ public class AuthService {
 
   @Transactional(readOnly = true)
   public AuthResponse login(LoginRequest request) {
+    if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+      throw new BadCredentialsException("Invalid email or password");
+    }
     String email = Emails.normalize(request.email());
     log.debug("Login attempt for {}", email);
     User user =

@@ -39,6 +39,7 @@ public class JwtService {
             .issuedAt(now)
             .expiresAt(now.plusSeconds(expirationSeconds))
             .subject(user.getId().toString())
+            .claim("credentialVersion", user.getCredentialVersion())
             .claim("email", user.getEmail())
             .claim("displayName", user.getDisplayName())
             .build();
