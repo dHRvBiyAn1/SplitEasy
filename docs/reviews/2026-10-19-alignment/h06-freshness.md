@@ -45,3 +45,15 @@ No schema rollout or migration ordering requirement. Revert the frontend change 
 At application candidate `4421aab9ec0dfd1bc103855a36ccf7bc395a1b4b`, real production Angular and Chromium passed at1280 and390 pixels against an owned packaged V11 backend/PostgreSQL instance. A separate authenticated HTTP client created expenses; native foreground focus and router navigation refreshed the rendered history and selected expense. Each width produced17 reader API requests with no fixture data responses, page errors or horizontal overflow. Owned application, PostgreSQL container/volume and static server were cleaned up. Backend source is unchanged; the frozen V11 JAR SHA256 is `849acf18992c7c915a8a81659ad49127816fb709e3673919bef0464c54ea1aa5`.
 
 The initial browser attempt failed because Playwright's headless focus emulation kept every tab focused. An empty-page probe reproduced the missing events; disabling focus emulation after application navigation and on the away tab restored native blur/focus. No synthetic app events or production source changes were used for this correction. Root artifact: `/workspace/issue-context/alignment-implementation/batch3/H06/real-browser-diagnostic.json`; screenshots alongside it. Independent Standards/Spec review and final combined source checks remain separate gates.
+
+## Independent review and integrated checkpoint
+
+Independent Matt Pocock Standards and Spec reviews each reported **zero material
+findings** through `15ebc09`, including shared E02 GroupDetail hunks. The final
+DELETE regression matches path plus method while E02 independently asserts its
+expectedVersion query. No application semantics changed in that test adjustment.
+The combined E02/H06/A02 candidate passed279 frontend tests; the final batch
+integration report records subsequent A02 review remediation and acceptance.
+Native foreground/navigation browser acceptance was also repeated successfully
+with E02/A02 code in the real combined production build. Exact final PR-head CI
+is recorded by GitHub; no remote merge or deployment is claimed here.

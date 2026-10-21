@@ -230,7 +230,7 @@
         "E01",
         "F04"
       ],
-      "status": "in_progress",
+      "status": "reviewed",
       "conditional": false,
       "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
       "integration_state": "not_merged",
@@ -428,7 +428,7 @@
       "depends_on": [
         "F03"
       ],
-      "status": "in_progress",
+      "status": "reviewed",
       "conditional": false,
       "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
       "integration_state": "not_merged"
