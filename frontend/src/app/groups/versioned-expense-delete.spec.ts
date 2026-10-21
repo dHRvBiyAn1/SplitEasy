@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -14,7 +15,7 @@ describe('versioned expense deletion through the group route', () => {
   });
 
   it('sends the displayed version and retains the expense after a stale-delete conflict', async () => {
-    localStorage.setItem('spliteasy.user', JSON.stringify(user));
+    storeTestSession(user);
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),

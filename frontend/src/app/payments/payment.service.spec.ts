@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -10,10 +11,7 @@ describe('PaymentService', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
-    localStorage.setItem(
-      'spliteasy.user',
-      JSON.stringify({ id: 'u1', email: 'owner@example.test', displayName: 'Owner' }),
-    );
+    storeTestSession({ id: 'u1', email: 'owner@example.test', displayName: 'Owner' });
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });

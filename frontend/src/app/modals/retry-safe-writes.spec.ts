@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { appConfig } from '../app.config';
@@ -44,7 +45,7 @@ describe('retry-safe rendered writes', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('spliteasy.user', JSON.stringify(actor));
+    storeTestSession(actor);
     open();
   });
   afterEach(() => {
@@ -153,7 +154,7 @@ describe('retry-safe rendered writes', () => {
     profile.destroy();
     http.verify();
     TestBed.resetTestingModule();
-    localStorage.setItem('spliteasy.user', JSON.stringify(actor));
+    storeTestSession(actor);
     open();
     expect((fixture.nativeElement.querySelector('#ng-name') as HTMLInputElement).value).toBe('');
     fill('#ng-name', 'Original trip');
@@ -222,7 +223,7 @@ describe('retry-safe rendered expense drafts', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('spliteasy.user', JSON.stringify(actor));
+    storeTestSession(actor);
     open();
   });
   afterEach(() => {
@@ -321,7 +322,7 @@ describe('retry-safe rendered payment drafts', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('spliteasy.user', JSON.stringify(actor));
+    storeTestSession(actor);
     open();
   });
   afterEach(() => {
