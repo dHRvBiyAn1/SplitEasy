@@ -1,4 +1,5 @@
 import { AuthService } from '../core/auth/auth.service';
+import { SessionService } from '../core/auth/session.service';
 import { ProfileService } from '../core/profile.service';
 import { authInterceptor } from '../core/auth/auth.interceptor';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -300,6 +301,64 @@ describe('public account recovery', () => {
     expect(TestBed.inject(ProfileService).data()?.emailVerified).toBe(false);
     expect(auth.user()?.id).toBe('bob');
     expect(auth.getToken()).toBe('bob-token');
+  });
+
+  it('reopens a mailbox fragment after session cancellation and never replaces an already pending action', async () => {
+    history.replaceState({}, '', '/account-action#action=password-reset&token=' + 'a'.repeat(43));
+    const route = routes.find((route) => route.path === 'account-action')!;
+    const f = TestBed.createComponent((await route.loadComponent!()) as typeof LoginComponent);
+    f.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    const submit = () =>
+      f.nativeElement
+        .querySelector('form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const password = f.nativeElement.querySelector('input[type=password]');
+    password.value = 'old-password';
+    password.dispatchEvent(new Event('input'));
+    submit();
+    const cancelled = http.expectOne('/api/auth/password-resets');
+    TestBed.inject(SessionService).reset();
+    f.detectChanges();
+    expect(cancelled.cancelled).toBe(true);
+    expect(password.value).toBe('');
+    expect(f.nativeElement.querySelector('form')).toBeNull();
+    const reopen = (fragment: string) => {
+      const oldURL = location.href;
+      history.replaceState({}, '', '/account-action#' + fragment);
+      window.dispatchEvent(new HashChangeEvent('hashchange', { oldURL, newURL: location.href }));
+    };
+    reopen('action=password-reset&token=' + 'b'.repeat(43));
+    expect(location.hash).toBe('');
+    f.detectChanges();
+    expect(f.nativeElement.querySelector('button[type=submit]')?.textContent).toContain(
+      'Reset password',
+    );
+    const reopenedPassword = f.nativeElement.querySelector('input[type=password]');
+    expect(reopenedPassword.value).toBe('');
+    http.expectNone('/api/auth/password-resets');
+    reopenedPassword.value = 'new-password';
+    reopenedPassword.dispatchEvent(new Event('input'));
+    submit();
+    const pending = http.expectOne('/api/auth/password-resets');
+    expect(pending.request.body).toEqual({ token: 'b'.repeat(43), password: 'new-password' });
+    reopen('action=email-change&token=' + 'c'.repeat(43));
+    expect(location.hash).toBe('');
+    f.detectChanges();
+    expect(pending.cancelled).toBe(false);
+    expect(f.nativeElement.textContent).toContain('already pending');
+    http.expectNone('/api/auth/email-change-confirmations');
+    http.expectNone('/api/auth/password-resets');
+    pending.flush(null, { status: 204, statusText: 'No Content' });
+    f.detectChanges();
+    expect(f.nativeElement.textContent).toContain('Password reset. Log in with your new password.');
+    expect(f.nativeElement.textContent).not.toContain('already pending');
+    expect(reopenedPassword.value).toBe('');
+    expect(localStorage.length).toBe(0);
+    f.destroy();
+    reopen('action=email-change&token=' + 'c'.repeat(43));
+    expect(location.hash).not.toBe('');
+    history.replaceState({}, '', '/account-action');
   });
 
   it('cancels a mailbox reset and clears secrets when a newer account signs in', async () => {

@@ -82,8 +82,38 @@ export class AccountActionComponent {
   protected readonly error = signal('');
   protected readonly message = signal('');
   constructor() {
+    this.consumeFragment();
+    const reopen = () => this.consumeFragment();
+    window.addEventListener('hashchange', reopen);
+    this.session.changes.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.token = '';
+      this.password.reset();
+      this.valid.set(false);
+      this.pending.set(false);
+      if (!this.message())
+        this.error.set('Your session changed. Reopen the link from your email to continue.');
+    });
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('hashchange', reopen);
+      this.token = '';
+      this.password.reset();
+    });
+  }
+  private consumeFragment(): void {
     const fragment = new URLSearchParams(location.hash.slice(1));
     history.replaceState(history.state, '', location.pathname + location.search);
+    if (this.pending()) {
+      this.error.set(
+        'An account action is already pending. Wait for it to finish, then reopen your email link.',
+      );
+      return;
+    }
+    this.token = '';
+    this.password.reset();
+    this.action.set('');
+    this.valid.set(false);
+    this.message.set('');
+    this.error.set('');
     const token = fragment.get('token') ?? '';
     if (
       fragment.getAll('action').length === 1 &&
@@ -97,18 +127,6 @@ export class AccountActionComponent {
       this.action.set(fragment.get('action')!);
       this.valid.set(true);
     } else this.error.set('Reopen the link from your email, or request a new link.');
-    this.session.changes.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      this.token = '';
-      this.password.reset();
-      this.valid.set(false);
-      this.pending.set(false);
-      if (!this.message())
-        this.error.set('Your session changed. Reopen the link from your email to continue.');
-    });
-    this.destroyRef.onDestroy(() => {
-      this.token = '';
-      this.password.reset();
-    });
   }
   submit(): void {
     if (!this.valid() || this.pending()) return;
@@ -132,6 +150,7 @@ export class AccountActionComponent {
         this.token = '';
         this.password.reset();
         this.pending.set(false);
+        this.error.set('');
         if (id && this.auth.user()?.id === id && this.session.version === version)
           this.profile.refresh();
         this.message.set(
