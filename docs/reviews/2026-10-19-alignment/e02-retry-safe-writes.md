@@ -43,3 +43,27 @@ H06 integration-sensitive `GroupDetailComponent` hunks only validate the loaded 
 ## Root packaged migration/HTTP verification — 21 October 2026
 
 The independently copied final backend JAR SHA256 `b05fac9e1d048b445fe5ab58f7f77b2fa5a467a04de9a5f8cdd34d6953a23cac` passed32 real HTTP requests against owned PostgreSQL, including a populated V11→V12 upgrade with unchanged legacy identities, profiles, weights/shares and balances. Concurrent group/expense creates returned identical original201 responses; changed intent conflicted, stale PUT/DELETE preserved the winner, and original create replay after edit/deletion did not resurrect a resource. Child-only WEIGHTS1:2→2:4 retained final shares, advanced the exposed version and rejected the stale second edit. Owned application and database were removed. Artifact: `/workspace/issue-context/alignment-implementation/batch3/E02/final-http.json`. This source corresponds to implementation commit `eff12b4`; browser and independent review remain separate gates.
+
+## Final independent and browser acceptance
+
+Independent Matt Pocock Standards and Spec axes each reported **zero material
+findings** on the E02 candidate through `b91bc80`; both also inspected its merge
+with H06. Their reports are retained in the external batch3/reviews directory.
+
+Real production Angular/System Chromium against the final packaged JAR and owned
+PostgreSQL passed at **1280×900 and390×900**. Each viewport dropped a group and a
+percentage-expense response only after the real server returned201, reloaded the
+SPA, observed restored drafts with no automatic POST, blocked changed uncertain
+intent, and explicitly retried the identical body/operation ID. Independent HTTP
+reads confirmed exactly one resource. A separate writer then advanced an expense
+from version0 to2; the stale rendered editor received409 and retained its draft,
+while a fresh read retained the winner. Versions are opaque, not increments to
+predict. Eight screenshots, zero page errors/overflow; owned app/Pg/static server
+cleaned up. External evidence: `batch3/E02/real-browser-acceptance.json` and
+`REAL-BROWSER-HANDOFF.md` (24 launcher,97 browser,12 independent HTTP responses).
+
+A02's coherent persisted token/user presentation contract required updating three
+E02 test fixture files to use the same JWT-shaped helper; behavior assertions are
+unchanged. Full standalone Node22 suite remains **246 tests /34 files**. The
+combined E02/H06/A02 source also passed279 tests before final review remediation.
+No production delivery, deployment or merge is claimed.
