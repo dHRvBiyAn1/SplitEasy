@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
+import { APP_BASE_HREF, BrowserPlatformLocation, PlatformLocation } from '@angular/common';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AccountActionComponent } from './auth/account-action.component';
 import { App } from './app';
 import { storeTestSession } from './core/auth/auth-test-fixture';
+import { SessionService } from './core/auth/session.service';
 
 function signIn(): void {
   storeTestSession({ id: 'u1', email: 'a@b.com', displayName: 'Alex Rivera' });
@@ -20,6 +22,8 @@ describe('App', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: PlatformLocation, useClass: BrowserPlatformLocation },
+        { provide: APP_BASE_HREF, useValue: '/' },
         provideRouter([{ path: 'account-action', component: AccountActionComponent }]),
       ],
     }).compileComponents();
@@ -158,6 +162,48 @@ describe('App', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.account-name')?.textContent).toContain('Blair');
   });
+  it('keeps a reopened mailbox token out of real browser history after Router navigation completes', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const router = TestBed.inject(Router);
+    const first = '/account-action#action=password-reset&token=' + 'a'.repeat(43);
+    history.replaceState({}, '', first);
+    await router.navigateByUrl(first);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(location.hash).toBe('');
+    TestBed.inject(SessionService).reset();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-account-action form')).toBeNull();
+    const reopened = '/account-action#action=password-reset&token=' + 'b'.repeat(43);
+    const oldURL = location.href;
+    history.replaceState({}, '', reopened);
+    window.dispatchEvent(new HashChangeEvent('hashchange', { oldURL, newURL: location.href }));
+    expect(location.hash).toBe('');
+    fixture.detectChanges();
+    const password = fixture.nativeElement.querySelector('app-account-action input[type=password]');
+    expect(password).not.toBeNull();
+    password.value = 'new-password';
+    password.dispatchEvent(new Event('input'));
+    await router.navigateByUrl(reopened, { replaceUrl: true });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(location.hash).toBe('');
+    expect(password.value).toBe('new-password');
+    httpTesting.expectNone((request) => request.method === 'POST');
+    fixture.nativeElement
+      .querySelector('app-account-action form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const request = httpTesting.expectOne('/api/auth/password-resets');
+    expect(request.request.body).toEqual({ token: 'b'.repeat(43), password: 'new-password' });
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+    expect(password.value).toBe('');
+    expect(fixture.nativeElement.textContent).toContain('Password reset. Log in');
+    history.replaceState({}, '', '/');
+  });
+
   it('retains an explicit mailbox confirmation when the signed-in shell changes to the public route', async () => {
     signIn();
     const fixture = TestBed.createComponent(App);

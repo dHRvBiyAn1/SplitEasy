@@ -2,7 +2,7 @@ import { takeUntil } from 'rxjs';
 import { Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { newPasswordValidators } from './password-validation';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
@@ -70,6 +70,7 @@ export class AccountActionComponent {
   private readonly auth = inject(AuthService);
   private readonly session = inject(SessionService);
   private readonly profile = inject(ProfileService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private token = '';
   protected readonly action = signal('');
@@ -85,6 +86,11 @@ export class AccountActionComponent {
     this.consumeFragment();
     const reopen = () => this.consumeFragment();
     window.addEventListener('hashchange', reopen);
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
+      // Router completion can restore a fragment already consumed by the native hash handler.
+      if (event instanceof NavigationEnd && location.hash)
+        history.replaceState(history.state, '', location.pathname + location.search);
+    });
     this.session.changes.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.token = '';
       this.password.reset();
