@@ -85,6 +85,41 @@ describe('visible expense failures', () => {
       true,
     );
   });
+  it('keeps the selected receipt and its actionable detail error through an explicit group read retry', () => {
+    const fixture = open();
+    http
+      .expectOne('/api/groups/a/expenses/e')
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    TestBed.inject(DashboardService).revalidate();
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    const group = http.expectOne('/api/groups/a');
+    http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/expenses');
+    group.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    const retry = Array.from(
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.textContent?.trim() === 'Try again')!;
+    retry.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+    expect(fixture.nativeElement.textContent).toContain('Could not load this expense.');
+    http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
+    http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/expenses').flush([expense]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+    expect(fixture.nativeElement.textContent).toContain('Could not load this expense.');
+    fixture.nativeElement.querySelector('.xdetail .dc-btn-outline').click();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Delete expense');
+    expect(fixture.nativeElement.textContent).not.toContain('Could not load this expense.');
+  });
   it('hides previously loaded financial content when refreshed membership is denied', () => {
     const fixture = open();
     http.expectOne('/api/groups/a/expenses/e').flush(expense);

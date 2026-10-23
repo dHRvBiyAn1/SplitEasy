@@ -201,7 +201,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   retry(): void {
-    this.reload();
+    this.reload(false);
   }
 
   addExpense(): void {

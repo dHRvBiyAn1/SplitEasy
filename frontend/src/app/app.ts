@@ -114,7 +114,7 @@ export class App {
     main?.scrollIntoView({ block: 'start' });
   }
   retryOverview(): void {
-    this.dashboard.refresh();
+    this.dashboard.revalidate();
   }
   openExpense(): void {
     this.groupsOpen.set(false);

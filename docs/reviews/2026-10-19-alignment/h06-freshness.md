@@ -57,3 +57,32 @@ integration report records subsequent A02 review remediation and acceptance.
 Native foreground/navigation browser acceptance was also repeated successfully
 with E02/A02 code in the real combined production build. Exact final PR-head CI
 is recorded by GitHub; no remote merge or deployment is claimed here.
+
+
+## PR #102 explicit read retry review follow-up — 23 October 2026
+
+Group Try again now uses the existing non-forced reload, and shell/dashboard
+overview retry controls use revalidate(). Previously these read retries selected
+the mutation path, collapsing another active receipt and clearing its actionable
+detail feedback. Mutation refresh callers keep their forced invalidation. No
+backend, API, schema or dependency change.
+
+Rendered Angular with controlled HTTP locks down the selected receipt and detail
+error through group retry, including a successful explicit detail retry. The two
+overview controls retain the active receipt while reads are pending and display
+the refreshed $30.00 paid amount in that receipt after success. The predecessor
+group red (`20-group-retry-red.log`) contains one meaningful failure plus teardown
+cascades; `21-group-retry-green.log` passes 15/15. The initial overview red
+(`22-overview-retry-red.log`, repeated in 23) likewise has only the shell failure
+as meaningful evidence. Request draining before assertions isolates clean shell
+red 24 (one failing test), shell green 25 (1/1), then dashboard red 26 (1 fail, 1 pass).
+Both control fixes plus group retry pass 17/17 in `27-read-retries-green.log`.
+
+Final verification from frontend/: Node22 `ng test --watch=false` passes 33 files
+and 255/255 tests (`29-retry-full-tests.log`); full-source Prettier passes
+(`33-retry-prettier-final.log`, after its required second formatting pass);
+Node22 production build passes (`31-retry-production-build.log`); root
+`git diff --check` passes (`34-retry-diff-check.log`). A subsequent test-only
+formatting pass changes whitespace only. Root owns independent review and the
+real-browser transport-drop retry rehearsal. No push, remote review action,
+merge, preview edit or deployment by this worker.

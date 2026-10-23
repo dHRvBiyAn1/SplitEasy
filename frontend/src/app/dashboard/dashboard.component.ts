@@ -50,7 +50,7 @@ export class DashboardComponent {
   }
 
   retry(): void {
-    this.dashboard.refresh();
+    this.dashboard.revalidate();
   }
 
   greeting(): string {
