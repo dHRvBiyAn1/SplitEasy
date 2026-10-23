@@ -172,3 +172,35 @@ other test resources were cleaned up. Full evidence and limits:
 [third-batch integration](third-batch-integration.md) and
 [separate review axes](third-batch-independent-review.md). PR CI remains an
 independent exact-head gate; no merge or production delivery/deployment is claimed.
+
+## PR #103 P2 — claimed replacement address (23 October 2026)
+
+Review comment4338584096 identified the documented email-change confirmation409
+falling through to temporary-failure feedback. On baseline
+`f6b9ae8554f808dbaf473c846c80aac3277f5322`, one rendered Angular/controlled-HTTP
+regression reproduced “Temporarily unavailable” for an already registered target
+(1 failed/12 passed). The minimal fix handles409 only for email change, clears the
+in-memory challenge and removes its confirmation form. It explains that the
+address is already registered and directs a new email-change request with a
+different address through the existing Account security/profile link.429/503
+retry and400 invalid/expired handling remain unchanged.
+
+The same regression passes (13/13) and verifies explicit confirmation, fragment
+cleanup, unavailable form retries, no automatic follow-up POST/profile refresh,
+and preservation of an unrelated signed-in user's identity, token and storage.
+No API/backend, sender, migration, dependency or deployment change was needed.
+Full verification from `frontend/` on Node22:
+
+- `npm exec --yes --package=node@22 -- node node_modules/@angular/cli/bin/ng.js test --watch=false`
+  —262 tests/35 files pass.
+- `npm exec --yes --package=node@22 -- node node_modules/prettier/bin/prettier.cjs --check 'src/**/*.{ts,html,scss,json}'`
+  —all matched files pass.
+- `npm exec --yes --package=node@22 -- node node_modules/@angular/cli/bin/ng.js build --configuration production`
+  —passes,492.42kB initial bundle, no budget warning.
+
+Red/green runs use the test command with
+`--include=src/app/auth/account-recovery.spec.ts`. Logs:
+`/workspace/issue-context/alignment-implementation/batch3/A02/UI/pr103-p2-{red,green,full,prettier,build}.log`.
+No new backend or real-browser execution is claimed for this narrow UI correction;
+existing package integration evidence above remains separate. Root owns remote
+push, review reply/resolution, exact-head CI and integration; no merge or release.

@@ -261,6 +261,56 @@ describe('public account recovery', () => {
     expect(localStorage.length).toBe(0);
   });
 
+  it('stops retrying an email-change link when the address is already registered and guides a different request', async () => {
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+    auth.login({ email: 'bob@example.com', password: 'password' }).subscribe();
+    http.expectOne('/api/auth/login').flush({
+      accessToken: 'bob-token',
+      user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
+    });
+    const storedUser = localStorage.getItem('spliteasy.user');
+    history.replaceState({}, '', '/account-action#action=email-change&token=' + 'c'.repeat(43));
+    const route = routes.find((route) => route.path === 'account-action')!;
+    const f = TestBed.createComponent((await route.loadComponent!()) as typeof LoginComponent);
+    f.detectChanges();
+    http.expectOne('/api/me').flush({
+      id: 'bob',
+      displayName: 'Bob',
+      email: 'bob@example.com',
+      emailVerified: false,
+      phone: '',
+      preferredCurrency: 'USD',
+      avatarColor: '#12A57E',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
+    expect(location.hash).toBe('');
+    http.expectNone('/api/auth/email-change-confirmations');
+    const form = f.nativeElement.querySelector('form');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const request = http.expectOne('/api/auth/email-change-confirmations');
+    expect(request.request.body).toEqual({ token: 'c'.repeat(43) });
+    request.flush({}, { status: 409, statusText: 'Conflict' });
+    f.detectChanges();
+    expect(f.nativeElement.querySelector('[role=alert]')?.textContent).toContain(
+      'This email address is already registered',
+    );
+    expect(f.nativeElement.textContent).toContain(
+      'Request a new email change with a different address',
+    );
+    expect(f.nativeElement.querySelector('a[href="/profile"]')?.textContent).toContain(
+      'Account security',
+    );
+    expect(f.nativeElement.querySelector('form')).toBeNull();
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    http.expectNone('/api/auth/email-change-confirmations');
+    http.expectNone('/api/me');
+    expect(auth.user()?.email).toBe('bob@example.com');
+    expect(auth.getToken()).toBe('bob-token');
+    expect(localStorage.getItem('spliteasy.accessToken')).toBe('bob-token');
+    expect(localStorage.getItem('spliteasy.user')).toBe(storedUser);
+  });
+
   it('refreshes the signed-in profile after a mailbox action without marking a different account verified or logging it out', async () => {
     const auth = TestBed.inject(AuthService);
     const http = TestBed.inject(HttpTestingController);

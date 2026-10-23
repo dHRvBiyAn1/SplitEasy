@@ -169,6 +169,14 @@ export class AccountActionComponent {
       },
       error: (err) => {
         this.pending.set(false);
+        if (this.action() === 'email-change' && err.status === 409) {
+          this.token = '';
+          this.valid.set(false);
+          this.error.set(
+            'This email address is already registered. Request a new email change with a different address in Account security and verification.',
+          );
+          return;
+        }
         this.error.set(
           err.status === 429
             ? 'Too many attempts. Please wait before trying again.'
