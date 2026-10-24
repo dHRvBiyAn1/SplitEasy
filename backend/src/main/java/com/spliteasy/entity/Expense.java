@@ -45,6 +45,10 @@ public class Expense {
   private String description;
 
   /** Total amount in integer cents; always positive. */
+  @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+  @Column(nullable = false, length = 3)
+  private LedgerCurrency currency = LedgerCurrency.USD;
+
   @Column(name = "amount_cents", nullable = false)
   private long amountCents;
 
