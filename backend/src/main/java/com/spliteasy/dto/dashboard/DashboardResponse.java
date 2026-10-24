@@ -14,13 +14,14 @@ import java.util.List;
  * aggregated across groups.
  */
 public record DashboardResponse(
-    long totalNetCents,
-    long owedCents,
+    Long totalNetCents,
+    Long owedCents,
     int owedPeopleCount,
-    long oweCents,
+    Long oweCents,
     int owePeopleCount,
     int groupCount,
     List<DashboardGroup> groups,
     List<PersonBalance> people,
     List<Settlement> settlements,
-    List<ActivityItem> activity) {}
+    List<ActivityItem> activity,
+    List<CurrencyTotals> totals) {}

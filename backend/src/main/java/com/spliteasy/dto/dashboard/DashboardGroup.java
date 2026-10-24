@@ -12,9 +12,10 @@ public record DashboardGroup(
     String name,
     GroupType type,
     long memberCount,
-    long totalSpentCents,
-    long youAreOwedCents,
-    long youOweCents,
-    long netCents,
+    Long totalSpentCents,
+    Long youAreOwedCents,
+    Long youOweCents,
+    Long netCents,
     /** Group setting: settle-up uses suggested netted transfers for this group. */
-    boolean simplifyDebts) {}
+    boolean simplifyDebts,
+    java.util.List<GroupCurrencyTotals> totals) {}

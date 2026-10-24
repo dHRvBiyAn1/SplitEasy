@@ -20,6 +20,20 @@ public final class NetSettlementCalculator {
    * (never produce a $0 transaction). Returns transfers ordered by amount, largest first.
    */
   public static List<SuggestedTransaction> calculate(List<MemberBalance> balances) {
+    return balances.stream()
+        .collect(
+            java.util.stream.Collectors.groupingBy(
+                MemberBalance::currency,
+                java.util.TreeMap::new,
+                java.util.stream.Collectors.toList()))
+        .values()
+        .stream()
+        .flatMap(partition -> calculateCurrency(partition).stream())
+        .toList();
+  }
+
+  private static List<SuggestedTransaction> calculateCurrency(List<MemberBalance> balances) {
+    var currency = balances.getFirst().currency();
     // Max-heaps keyed by outstanding amount.
     PriorityQueue<Party> creditors =
         new PriorityQueue<>(
@@ -46,7 +60,7 @@ public final class NetSettlementCalculator {
       Party debtor = debtors.poll();
       long amount = Math.min(creditor.remaining(), debtor.remaining());
       // Debtor pays creditor (payer -> payee).
-      transactions.add(new SuggestedTransaction(debtor.user(), creditor.user(), amount));
+      transactions.add(new SuggestedTransaction(debtor.user(), creditor.user(), amount, currency));
 
       long creditorLeft = creditor.remaining() - amount;
       long debtorLeft = debtor.remaining() - amount;

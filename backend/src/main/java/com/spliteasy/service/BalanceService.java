@@ -50,37 +50,52 @@ public class BalanceService {
     membershipGuard.requireMember(groupId, requesterId);
     log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
 
-    Map<UUID, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
-    Map<UUID, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
-    Map<UUID, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
-    Map<UUID, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
-
-    Set<UUID> ledgerIds = new HashSet<>(paid.keySet());
-    ledgerIds.addAll(owed.keySet());
-    ledgerIds.addAll(settledOut.keySet());
-    ledgerIds.addAll(settledIn.keySet());
-
-    // Historical financial participation does not depend on current group access.
+    Map<CurrencyUser, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
+    Map<CurrencyUser, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
+    Set<CurrencyUser> keys = new HashSet<>(paid.keySet());
+    keys.addAll(owed.keySet());
+    keys.addAll(settledOut.keySet());
+    keys.addAll(settledIn.keySet());
+    Set<UUID> ledgerIds = keys.stream().map(CurrencyUser::userId).collect(Collectors.toSet());
+    var people = financialParticipants.resolve(groupId, ledgerIds);
+    var currencies = keys.stream().map(CurrencyUser::currency).collect(Collectors.toSet());
+    if (currencies.isEmpty()) currencies.add(com.spliteasy.entity.LedgerCurrency.USD);
     List<MemberBalance> balances =
-        financialParticipants.resolve(groupId, ledgerIds).values().stream()
-            .map(
-                user -> {
-                  UUID id = user.id();
-                  long net =
-                      paid.getOrDefault(id, 0L)
-                          - owed.getOrDefault(id, 0L)
-                          + settledOut.getOrDefault(id, 0L)
-                          - settledIn.getOrDefault(id, 0L);
-                  return new MemberBalance(user, net);
-                })
-            .sorted(Comparator.comparing((MemberBalance b) -> b.user().displayName()))
+        currencies.stream()
+            .sorted()
+            .flatMap(
+                currency ->
+                    people.values().stream()
+                        .map(
+                            user -> {
+                              var key = new CurrencyUser(currency, user.id());
+                              long net =
+                                  Math.subtractExact(
+                                      Math.addExact(
+                                          paid.getOrDefault(key, 0L),
+                                          settledOut.getOrDefault(key, 0L)),
+                                      Math.addExact(
+                                          owed.getOrDefault(key, 0L),
+                                          settledIn.getOrDefault(key, 0L)));
+                              return new MemberBalance(user, net, currency);
+                            }))
+            .sorted(
+                Comparator.comparing((MemberBalance b) -> b.currency())
+                    .thenComparing(b -> b.user().displayName()))
             .toList();
 
     return new GroupBalancesResponse(groupId, balances);
   }
 
-  private Map<UUID, Long> toMap(List<UserAmount> rows) {
+  private record CurrencyUser(com.spliteasy.entity.LedgerCurrency currency, UUID userId) {}
+
+  private Map<CurrencyUser, Long> toMap(List<UserAmount> rows) {
     return rows.stream()
-        .collect(Collectors.toMap(UserAmount::getUserId, UserAmount::getTotalCents));
+        .collect(
+            Collectors.toMap(
+                row -> new CurrencyUser(row.getCurrency(), row.getUserId()),
+                UserAmount::getTotalCents));
   }
 }

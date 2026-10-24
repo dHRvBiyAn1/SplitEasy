@@ -21,7 +21,7 @@ import java.util.UUID;
  */
 public record CreateExpenseRequest(
     @NotBlank @Size(max = 200) String description,
-    @Positive @Max(1_000_000_000_000L) long amountCents,
+    @Positive @Max(1_000_000_000_000L) Long amountCents,
     @NotNull UUID paidByUserId,
     List<UUID> participantUserIds,
     SplitType splitType,
@@ -29,7 +29,53 @@ public record CreateExpenseRequest(
     ExpenseCategory category,
     LocalDate spentOn,
     UUID operationId,
-    @jakarta.validation.constraints.PositiveOrZero Long expectedVersion) {
+    @jakarta.validation.constraints.PositiveOrZero Long expectedVersion,
+    @Positive @Max(1_000_000_000_000L) Long amountMinor,
+    com.spliteasy.entity.LedgerCurrency currency) {
+
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  @jakarta.validation.constraints.AssertTrue(
+      message = "Provide currency with amountMinor, or USD-only amountCents")
+  public boolean isMoneyValid() {
+    return amountMinor != null
+        ? currency != null && amountCents == null
+        : amountCents != null
+            && (currency == null || currency == com.spliteasy.entity.LedgerCurrency.USD);
+  }
+
+  public long resolvedAmountMinor() {
+    return amountMinor != null ? amountMinor : amountCents;
+  }
+
+  public com.spliteasy.entity.LedgerCurrency resolvedCurrency() {
+    return currency == null ? com.spliteasy.entity.LedgerCurrency.USD : currency;
+  }
+
+  public CreateExpenseRequest(
+      String description,
+      long amountCents,
+      UUID paidByUserId,
+      List<UUID> participantUserIds,
+      SplitType splitType,
+      List<SplitInput> splits,
+      ExpenseCategory category,
+      LocalDate spentOn,
+      UUID operationId,
+      Long expectedVersion) {
+    this(
+        description,
+        amountCents,
+        paidByUserId,
+        participantUserIds,
+        splitType,
+        splits,
+        category,
+        spentOn,
+        operationId,
+        expectedVersion,
+        null,
+        null);
+  }
 
   public CreateExpenseRequest(
       String description,

@@ -21,6 +21,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    e.description as description,
                    e.version as version,
                    e.amountCents as amountCents,
+                   e.currency as currency,
                    e.category as category,
                    e.spentOn as spentOn,
                    e.createdAt as createdAt,
@@ -36,8 +37,15 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
   List<ExpenseSummaryView> findSummariesByGroupId(@Param("groupId") UUID groupId);
 
   /** Total of every expense in a group, in cents (0 if none). Drives the "total spent" card. */
-  @Query("select coalesce(sum(e.amountCents), 0) from Expense e where e.group.id = :groupId")
-  long sumAmountByGroup(@Param("groupId") UUID groupId);
+  @Query(
+      "select e.currency as currency, sum(e.amountCents) as totalCents from Expense e where e.group.id = :groupId group by e.currency")
+  List<CurrencyAmount> sumAmountsByGroup(@Param("groupId") UUID groupId);
+
+  interface CurrencyAmount {
+    com.spliteasy.entity.LedgerCurrency getCurrency();
+
+    long getTotalCents();
+  }
 
   /**
    * Recent expenses across a set of groups (the user's groups) for the activity feed, newest
@@ -51,6 +59,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    g.name as groupName,
                    e.description as description,
                    e.amountCents as amountCents,
+                   e.currency as currency,
                    e.category as category,
                    e.spentOn as spentOn,
                    e.createdAt as createdAt,
@@ -87,10 +96,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
    */
   @Query(
       """
-            select e.paidBy.id as userId, sum(e.amountCents) as totalCents
+            select e.paidBy.id as userId, e.currency as currency, sum(e.amountCents) as totalCents
             from Expense e
             where e.group.id = :groupId
-            group by e.paidBy.id
+            group by e.paidBy.id, e.currency
             """)
   List<UserAmount> sumPaidByGroup(@Param("groupId") UUID groupId);
 
@@ -103,6 +112,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     String getDescription();
 
     long getAmountCents();
+
+    com.spliteasy.entity.LedgerCurrency getCurrency();
 
     com.spliteasy.entity.ExpenseCategory getCategory();
 
@@ -130,6 +141,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     String getDescription();
 
     long getAmountCents();
+
+    com.spliteasy.entity.LedgerCurrency getCurrency();
 
     com.spliteasy.entity.ExpenseCategory getCategory();
 

@@ -1,6 +1,23 @@
 package com.spliteasy.dto.balance;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.entity.LedgerCurrency;
 
-/** Directed debt: from owes to. The endpoint defines raw or selected-mode interpretation. */
-public record DirectObligation(UserSummary from, UserSummary to, long amountCents) {}
+public record DirectObligation(
+    UserSummary from, UserSummary to, long amountMinor, LedgerCurrency currency) {
+  public DirectObligation(UserSummary from, UserSummary to, long amountMinor) {
+    this(from, to, amountMinor, LedgerCurrency.USD);
+  }
+
+  @JsonIgnore
+  public long amountCents() {
+    return amountMinor;
+  }
+
+  @JsonProperty("amountCents")
+  public Long legacyCents() {
+    return currency == LedgerCurrency.USD ? amountMinor : null;
+  }
+}

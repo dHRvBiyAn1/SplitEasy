@@ -13,11 +13,32 @@ import java.util.UUID;
 public record ExpenseSummary(
     UUID id,
     String description,
-    long amountCents,
+    long amountMinor,
     UserSummary paidBy,
     long participantCount,
     ExpenseCategory category,
     LocalDate spentOn,
-    long viewerDeltaCents,
+    long viewerDeltaMinor,
     Instant createdAt,
-    long version) {}
+    long version,
+    com.spliteasy.entity.LedgerCurrency currency) {
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public long amountCents() {
+    return amountMinor;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("amountCents")
+  public Long legacyAmountCents() {
+    return currency == com.spliteasy.entity.LedgerCurrency.USD ? amountMinor : null;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public long viewerDeltaCents() {
+    return viewerDeltaMinor;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("viewerDeltaCents")
+  public Long legacyViewerdeltaCents() {
+    return currency == com.spliteasy.entity.LedgerCurrency.USD ? viewerDeltaMinor : null;
+  }
+}
