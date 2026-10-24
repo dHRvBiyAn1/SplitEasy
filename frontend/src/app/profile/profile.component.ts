@@ -1,3 +1,4 @@
+import { CURRENCIES } from '../shared/currency';
 import { AccountSecurityComponent } from './account-security.component';
 import { AppearancePanelComponent } from '../shared/appearance-panel.component';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
@@ -39,7 +40,9 @@ export class ProfileComponent {
     computation: () => false,
   });
 
-  protected readonly currencies: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
+  protected get currencies() {
+    return CURRENCIES;
+  }
   protected readonly avatarColors = AVATAR_COLORS;
 
   protected readonly phone = new FormControl('', { nonNullable: true });
@@ -73,7 +76,7 @@ export class ProfileComponent {
   }
 
   currencyLabel(c: Currency): string {
-    return `${c} (${CURRENCY_SYMBOL[c]})`;
+    return CURRENCY_SYMBOL[c] === c ? c : `${c} (${CURRENCY_SYMBOL[c]})`;
   }
 
   startEdit(): void {

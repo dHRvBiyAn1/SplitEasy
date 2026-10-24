@@ -1,3 +1,4 @@
+import { Currency, amountToMinor, minorToDisplay } from '../shared/currency';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
@@ -37,7 +38,7 @@ export class ExpenseService {
 
 /** Dollars (as typed by the user) → integer cents, avoiding binary-float drift. */
 export function dollarsToCents(dollars: number): number {
-  return Math.round(dollars * 100);
+  return amountToMinor(dollars, 'USD');
 }
 
 /** 100% expressed in basis points (hundredths of a percent) — the wire contract for splits. */
@@ -49,8 +50,6 @@ export function percentToBasisPoints(percent: number): number {
 }
 
 /** Integer cents → a display string like "12.34". */
-export function centsToDisplay(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(cents);
-  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+export function centsToDisplay(minor: number, currency: Currency = 'USD'): string {
+  return minorToDisplay(minor, currency);
 }

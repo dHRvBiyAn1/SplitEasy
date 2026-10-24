@@ -11,18 +11,19 @@ const user = { id: 'me', displayName: 'Ada', email: 'ada@example.test' };
 const expense = {
   id: 'e',
   description: 'Dinner',
-  amountCents: 2000,
+  amountMinor: 2000,
+  currency: 'USD' as const,
   paidBy: user,
   category: 'FOOD_DRINK',
   spentOn: '2026-10-16',
-  viewerDeltaCents: 0,
-  participants: [{ user, shareCents: 2000 }],
+  viewerDeltaMinor: 0,
+  participants: [{ user, shareMinor: 2000 }],
 };
 const overview = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 0,
   groups: [],
@@ -54,10 +55,10 @@ describe('overview read retry controls', () => {
     http.verify();
     localStorage.clear();
   });
-  function flushGroup(amountCents = 2000) {
+  function flushGroup(amountMinor = 2000) {
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
-    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountCents }]);
+    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountMinor }]);
   }
   it.each(['shell', 'dashboard'])(
     'keeps another rendered receipt selected while the %s overview retry reads',
@@ -104,7 +105,7 @@ describe('overview read retry controls', () => {
       http.expectOne('/api/dashboard').flush(overview);
       flushGroup(3000);
       const detailReads = http.match('/api/groups/a/expenses/e');
-      detailReads.forEach((request) => request.flush({ ...expense, amountCents: 3000 }));
+      detailReads.forEach((request) => request.flush({ ...expense, amountMinor: 3000 }));
       group.detectChanges();
       reader.detectChanges();
       expect(expandedDuringRetry).toBe('true');

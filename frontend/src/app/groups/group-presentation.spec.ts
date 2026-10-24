@@ -20,19 +20,20 @@ const group = (id: string) => ({
 const summary = {
   id: 'expense',
   description: 'Dinner',
-  amountCents: 9000,
+  amountMinor: 9000,
+  currency: 'USD' as const,
   paidBy: user,
   participantCount: 3,
   category: 'FOOD_DRINK',
   spentOn: '2026-10-16',
-  viewerDeltaCents: 6000,
+  viewerDeltaMinor: 6000,
   createdAt: '',
 };
 const overview = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 0,
   groups: [],
@@ -84,8 +85,8 @@ describe('group presentation ownership', () => {
     fixture.detectChanges();
     http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
     const balances = [
-      { user: { ...user, id: 'noor' }, netCents: 5000 },
-      { user: { ...user, id: 'luca' }, netCents: -5000 },
+      { user: { ...user, id: 'noor' }, netMinor: 5000 },
+      { user: { ...user, id: 'luca' }, netMinor: -5000 },
     ];
     http.match('/api/groups/a/balances/mine').forEach((r) => r.flush(balances));
     http.match('/api/groups/a/expenses').forEach((r) => r.flush([summary]));
@@ -158,7 +159,8 @@ describe('group presentation ownership', () => {
     http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
     const updated = {
       ...summary,
-      amountCents: 1203,
+      amountMinor: 1203,
+      currency: 'USD' as const,
       paidBy: { id: 'noor', displayName: 'Noor Kapoor', email: 'noor@example.test' },
     };
     http.match('/api/groups/a/expenses').forEach((r) => r.flush([updated]));
@@ -174,8 +176,8 @@ describe('group presentation ownership', () => {
       groupId: 'a',
       splitType: 'UNEQUAL',
       participants: [
-        { user: updated.paidBy, shareCents: 703 },
-        { user, shareCents: 500 },
+        { user: updated.paidBy, shareMinor: 703 },
+        { user, shareMinor: 500 },
       ],
     });
     fixture.detectChanges();

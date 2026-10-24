@@ -68,10 +68,10 @@ describe('App', () => {
     // The shell effect pulls the dashboard payload for the sidebar group balances.
     const req = httpTesting.expectOne('/api/dashboard');
     req.flush({
-      totalNetCents: 0,
-      owedCents: 0,
+      totalNetMinor: 0,
+      owedMinor: 0,
       owedPeopleCount: 0,
-      oweCents: 0,
+      oweMinor: 0,
       owePeopleCount: 0,
       groupCount: 0,
       groups: [],
@@ -98,10 +98,10 @@ describe('App', () => {
       createdAt: '2020-01-01T00:00:00Z',
     });
     const overview = {
-      totalNetCents: 0,
-      owedCents: 0,
+      totalNetMinor: 0,
+      owedMinor: 0,
       owedPeopleCount: 0,
-      oweCents: 0,
+      oweMinor: 0,
       owePeopleCount: 0,
       groupCount: 0,
       groups: [],
@@ -141,10 +141,10 @@ describe('App', () => {
       createdAt: '2020-01-01T00:00:00Z',
     });
     const overview = {
-      totalNetCents: 0,
-      owedCents: 0,
+      totalNetMinor: 0,
+      owedMinor: 0,
       owedPeopleCount: 0,
-      oweCents: 0,
+      oweMinor: 0,
       owePeopleCount: 0,
       groupCount: 0,
       groups: [],
@@ -210,10 +210,10 @@ describe('App', () => {
       createdAt: '2020-01-01T00:00:00Z',
     });
     httpTesting.expectOne('/api/dashboard').flush({
-      totalNetCents: 0,
-      owedCents: 0,
+      totalNetMinor: 0,
+      owedMinor: 0,
       owedPeopleCount: 0,
-      oweCents: 0,
+      oweMinor: 0,
       owePeopleCount: 0,
       groupCount: 0,
       groups: [],

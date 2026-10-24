@@ -29,12 +29,13 @@ describe('versioned expense deletion through the group route', () => {
       id: 'e',
       version: 3,
       description: 'Dinner',
-      amountCents: 1200,
+      amountMinor: 1200,
+      currency: 'USD' as const,
       paidBy: user,
       participantCount: 1,
       category: 'OTHER',
       spentOn: '2026-10-18',
-      viewerDeltaCents: 0,
+      viewerDeltaMinor: 0,
     };
     http.expectOne('/api/groups/g').flush({
       id: 'g',
@@ -52,7 +53,7 @@ describe('versioned expense deletion through the group route', () => {
       ...summary,
       groupId: 'g',
       splitType: 'EQUAL',
-      participants: [{ user, shareCents: 1200 }],
+      participants: [{ user, shareMinor: 1200 }],
     });
     harness.detectChanges();
     vi.spyOn(window, 'confirm').mockReturnValue(true);

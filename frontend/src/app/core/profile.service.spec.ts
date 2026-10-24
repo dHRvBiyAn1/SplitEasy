@@ -103,7 +103,7 @@ describe('account-owned profile preferences', () => {
     login(bob);
     expect(profile.prefs()).toMatchObject({
       phone: '',
-      currency: 'USD',
+      currency: 'USD' as const,
       avatarColor: AVATAR_COLORS[0],
     });
     expect(profile.prefs().joinedAt).not.toBe(alicePrefs.joinedAt);
@@ -141,7 +141,7 @@ describe('account-owned profile preferences', () => {
     login(bob, true);
     expect(profile.prefs()).toMatchObject({
       phone: '',
-      currency: 'USD',
+      currency: 'USD' as const,
       avatarColor: AVATAR_COLORS[0],
     });
     login(alice);
@@ -165,7 +165,7 @@ describe('account-owned profile preferences', () => {
     login(bob);
     expect(profile.prefs()).toMatchObject({
       phone: '',
-      currency: 'USD',
+      currency: 'USD' as const,
       avatarColor: AVATAR_COLORS[0],
     });
     expect(localStorage.getItem('spliteasy.profile')).toBeNull();

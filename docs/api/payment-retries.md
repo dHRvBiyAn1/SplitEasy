@@ -1,7 +1,7 @@
 # Payment operation IDs
 
 `POST /api/groups/{groupId}/payments` accepts an optional UUID `operationId` alongside
-`payerUserId`, `payeeUserId`, and integer `amountCents`. Generate one ID per intended
+`payerUserId`, `payeeUserId`, explicit `currency` and integer `amountMinor`. Legacy `amountCents` remains USD-only. See [denominated ledger](multi-currency-ledger.md). Generate one ID per intended
 payment and resend that same ID and payload after an uncertain response.
 
 The key is `(groupId, authenticated requesterId, operationId)`. The requester comes
@@ -14,7 +14,7 @@ For a valid request with an ID:
 - An identical retry returns HTTP 201 with the original payment ID, timestamp,
   payer, payee and amount; it inserts no second row and leaves balances unchanged.
   This also applies when retries race before the first insert commits.
-- Reusing the key with different payer, payee, or amount returns HTTP 409 without
+- Reusing the key with different payer, payee, currency or minor-unit amount returns HTTP 409 without
   changing the original payment. Normal request validation still applies.
 - Different IDs permit intentional equal payments. The same ID used by another
   authorized requester or in another group is an independent operation.
@@ -32,7 +32,7 @@ waits for the winning insert without raising a uniqueness error or reading from
 an aborted transaction. No balance state is stored or separately updated.
 
 The Angular payment service persists one account-owned pending operation in this tab's
-sessionStorage before dispatch. An identical submitted group/payer/payee/amount reuses
+sessionStorage before dispatch. An identical submitted group/payer/payee/currency/minor amount reuses
 its UUID through network/server errors, RxJS resubscription, modal reopen, and reload.
 Reload restores the partial amount and counterparty without sending automatically.
 A successful response removes only its matching identity; account-session reset clears

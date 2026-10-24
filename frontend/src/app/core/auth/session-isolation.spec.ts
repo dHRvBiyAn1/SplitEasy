@@ -30,10 +30,10 @@ const bob: AuthResponse = {
   user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
 };
 const aliceDashboard: DashboardResponse = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 1,
   groups: [
@@ -42,10 +42,10 @@ const aliceDashboard: DashboardResponse = {
       name: 'Alice private group',
       type: 'HOME',
       memberCount: 1,
-      totalSpentCents: 0,
-      youAreOwedCents: 0,
-      youOweCents: 0,
-      netCents: 0,
+      totalSpentMinor: 0,
+      youAreOwedMinor: 0,
+      youOweMinor: 0,
+      netMinor: 0,
       simplifyDebts: true,
     },
   ],
@@ -96,7 +96,16 @@ describe('account session isolation', () => {
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
 
-  afterEach(() => requests.verify());
+  afterEach(() => {
+    try {
+      // Standalone expense dialogs use USD while their optional profile read is unavailable.
+      for (const request of requests.match('/api/me'))
+        if (!request.cancelled) request.flush({}, { status: 503, statusText: 'Unavailable' });
+      requests.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
 
   function login(response: AuthResponse = bob): void {
     auth.login({ email: response.user.email, password: 'test-password' }).subscribe();
@@ -220,7 +229,7 @@ describe('account session isolation', () => {
           groupId: 'alice-group',
           groupName: 'Alice private group',
           counterparty: alice.user,
-          netCents: 100,
+          netMinor: 100,
         },
         'alice-group',
       );

@@ -20,20 +20,25 @@ info:
     nor leave.
 
     ## Money
-    Current monetary values are **USD integer cents** (`long`), never floats; there is
-    no per-transaction currency field or automatic conversion. Amounts are capped at
-    `1_000_000_000_000` cents ($10B). For expense shares, `100%` = 10,000
-    basis points. Integer request fields require JSON integer tokens; fractional JSON
-    numbers are rejected. Balances are derived on read over active members and
-    historical financial participants; the complete group ledger sums to zero.
-    Financial participation does not grant group access.
+    Every transaction has explicit currency and integer minor units: USD/EUR/GBP/INR exponent 2,
+    JPY 0, KWD 3. No FX conversion. New financial clients send `X-Ledger-Version: 2` and
+    `currency`+`amountMinor` (positive, at most 1e12); fractional JSON values are rejected.
+    Legacy `amountCents` input remains USD-only. Conflicting fields are400. Currency on an
+    existing expense is immutable. Shares/UNEQUAL/ADJUSTMENTS use transaction minor units;
+    percentages remain 10000 basis points and weights remain integer units.
+    Balances, People, obligations, settlement and spending/headlines partition by currency.
+    Dashboard/group `totals[]` are authoritative; transitional scalar/cents fields are null
+    for mixed/non-USD scopes. Legacy clients get409 instead of non-USD numbers interpreted
+    as dollars. Outputs exceeding the exact JavaScript integer range return409.
+    Balances derive from active and historical financial participants and sum to zero
+    separately for each denomination; financial participation does not grant group access.
 
     ## Error format
     Errors handled by the application advice use the `Error` body with HTTP status
     in both the status code and the body (`status`, `error`, `message`, `timestamp`).
     Spring Security filter responses and some framework-level parsing/path errors can
     use different bodies; `Error` is not guaranteed for every non-2xx response.
-  version: 1.0.0
+  version: 1.1.0
   contact:
     name: SplitEasy
   license:
@@ -68,6 +73,24 @@ security:
   - bearerAuth: []
 
 paths:
+  /api/currencies:
+    get:
+      operationId: listCurrencies
+      summary: Read the supported denomination catalogue
+      tags:
+      - Profile
+      responses:
+        '200':
+          description: Six supported codes with minor-unit exponents; requires authentication.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CurrencyInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/me:
     get:
       operationId: getCurrentProfile
@@ -366,25 +389,38 @@ paths:
     get:
       operationId: getDashboard
       summary: Get aggregated dashboard payload
-      description: |
-        One payload for the shell and landing page: cross-group totals, per-group
+      description: 'One payload for the shell and landing page: cross-group totals, per-group
+
         cards, people netted across groups, per-group settlements, and a merged
+
         recent-activity feed capped at 15. Headline owed/owe totals sum the per-group
-        counterparty balances before people are netted across groups. Each group's
+
+        counterparty balances before people are netted across groups. Each group''s
+
         counterparties use its selected direct/simplified obligation projection, shared
+
         with /balances/mine and settlement actions. Activity is
+
         ordered by expense spentOn date or payment recorded date, newest first; it is
+
         a current ledger snapshot, not a chronological event log.
-      tags: [Dashboard]
+
+        '
+      tags:
+      - Dashboard
       responses:
-        "200":
+        '200':
           description: Dashboard payload
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DashboardResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    parameters:
+    - $ref: '#/components/parameters/LedgerVersion'
 
   /api/groups:
     get:
@@ -583,395 +619,508 @@ paths:
           description: Open net or current-mode obligations, or the target is the creator
   /api/groups/{groupId}/expenses:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: listExpenses
       summary: List expense summaries
-      description: |
-        Spent-date-ordered list of expenses in the group, newest first, each with the
-        caller's `viewerDeltaCents` (positive = lent, negative = borrowed).
-      tags: [Expenses]
+      description: 'Spent-date-ordered list of expenses in the group, newest first, each with the
+
+        caller''s `viewerDeltaMinor` (positive = lent, negative = borrowed).
+
+        '
+      tags:
+      - Expenses
       responses:
-        "200":
+        '200':
           description: Expense summaries
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/ExpenseSummary"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                  $ref: '#/components/schemas/ExpenseSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
     post:
       operationId: createExpense
       summary: Create an expense
-      description: |
-        Creates an expense split among participants. Optional UUID operationId is scoped
+      description: 'Creates an expense split among participants. Optional UUID operationId is scoped
+
         to authenticated actor/group. Identical replay returns the immutable original201
+
         response even after edit/delete; changed intent returns409. Current membership
+
         is checked before replay. Missing/null ID retains legacy additive writes.
 
+
         - `splitType` null → EQUAL. For EQUAL, `participantUserIds` null/empty = all members.
-        - UNEQUAL: `splits` carries per-participant **cents** that must sum to `amountCents`.
+
+        - UNEQUAL: `splits` carries per-participant **minor units** that must sum to `amountMinor`.
+
         - PERCENTAGE: `splits` carries per-participant **basis points** that must sum to 10000.
+
         - Bad sums → 400 with a clear message (never 500).
-        - Shares always sum exactly to `amountCents`; the payer absorbs rounding remainders.
-      tags: [Expenses]
+
+        - Shares always sum exactly to `amountMinor`; the payer absorbs rounding remainders.
+
+        '
+      tags:
+      - Expenses
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateExpenseRequest"
+              $ref: '#/components/schemas/CreateExpenseRequest'
             examples:
               equal:
                 summary: Equal split among all members
                 value:
                   description: Dinner at Thai Place
-                  amountCents: 10000
                   paidByUserId: 550e8400-e29b-41d4-a716-446655440000
+                  amountMinor: 10000
+                  currency: USD
               percentage:
                 summary: Percentage split
                 value:
                   description: Apartment rent
-                  amountCents: 120000
                   paidByUserId: 550e8400-e29b-41d4-a716-446655440000
                   splitType: PERCENTAGE
                   category: RENT_HOME
-                  spentOn: "2026-08-01"
+                  spentOn: '2026-08-01'
                   splits:
-                    - userId: 550e8400-e29b-41d4-a716-446655440000
-                      value: 6000
-                    - userId: 550e8400-e29b-41d4-a716-446655440001
-                      value: 4000
+                  - userId: 550e8400-e29b-41d4-a716-446655440000
+                    value: 6000
+                  - userId: 550e8400-e29b-41d4-a716-446655440001
+                    value: 4000
+                  amountMinor: 120000
+                  currency: USD
       responses:
-        "201":
+        '201':
           description: Expense created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ExpenseResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-
-        "409":
-          $ref: "#/components/responses/Conflict"
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
           description: Operation ID reused for changed intent
 
   /api/groups/{groupId}/expenses/{expenseId}:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
-      - name: expenseId
-        in: path
-        required: true
-        description: The expense ID
-        schema:
-          type: string
-          format: uuid
+    - $ref: '#/components/parameters/GroupIdParam'
+    - name: expenseId
+      in: path
+      required: true
+      description: The expense ID
+      schema:
+        type: string
+        format: uuid
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: getExpense
       summary: Get expense detail
       description: Returns the expense with its per-participant share breakdown.
-      tags: [Expenses]
+      tags:
+      - Expenses
       responses:
-        "200":
+        '200':
           description: Expense detail
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ExpenseResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
+                $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
     put:
       operationId: updateExpense
       summary: Update an expense (full replace)
-      description: |
-        Full-replace edit reusing the create payload and split strategy. Any active
+      description: 'Full-replace edit reusing the create payload and split strategy. Any active
+
         member may edit an expense, but the old persisted payer and every old share
+
         participant must still be active; otherwise 409 instructs re-adding former
+
         participants first. Financial mutations serialize per group. Detected
+
         persistence write conflicts also return409. Submit expectedVersion from the
+
         detail response; mismatch409 preserves the winner. Missing versions are accepted
+
         only before app.expenses.version-required-from (default2026-11-19T00:00:00Z),
+
         then400 requires reload/upgrade. Never automatically retry a stale edit.
+
         Omitted/null splitType
+
         defaults to EQUAL, participantUserIds null/empty selects all active members for
+
         EQUAL, category defaults to OTHER and spentOn defaults to today; omitted fields
+
         are not retained from the old expense.
-      tags: [Expenses]
+
+
+        Currency is immutable. A changed denomination is400; create a separate expense instead.'
+      tags:
+      - Expenses
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateExpenseRequest"
+              $ref: '#/components/schemas/CreateExpenseRequest'
       responses:
-        "200":
+        '200':
           description: Updated expense
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ExpenseResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
           description: Former participant referenced, or detected persistence write conflict
     delete:
       operationId: deleteExpense
       summary: Delete an expense
-      description: |
-        Hard-deletes the expense and its participant shares (FK cascade). If its
+      description: 'Hard-deletes the expense and its participant shares (FK cascade). If its
+
         recorded payer or any share participant is no longer active, returns 409 with
+
         instructions to re-add former participants before changing history. No expense,
+
         share or payment is changed by a rejected deletion. Financial mutations
+
         serialize per group. Submit expectedVersion from the list/detail as a query
+
         parameter; mismatch409 preserves the expense. Missing versions are accepted
+
         only before the configured finite UTC deadline (default2026-11-19T00:00:00Z),
+
         then400 requires reload/upgrade.
-      tags: [Expenses]
+
+        '
+      tags:
+      - Expenses
       parameters:
-        - name: expectedVersion
-          in: query
-          required: false
-          description: Required by new clients; server enforces at the finite rollout deadline
-          schema:
-            type: integer
-            format: int64
-            minimum: 0
+      - name: expectedVersion
+        in: query
+        required: false
+        description: Required by new clients; server enforces at the finite rollout deadline
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
       responses:
-        "204":
+        '204':
           description: Expense deleted
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
           description: Former participant referenced, or detected persistence write conflict
 
   /api/groups/{groupId}/balances:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: getBalances
       summary: Get net-per-member balances
-      description: |
-        Every active member and historical financial participant is included in the
+      description: 'Every active member and historical financial participant is included in the
+
         derived integer-cent ledger, even after leaving the active roster. Positive
+
         means owed, negative means owes and zero means no aggregate net. A zero net
+
         can still have offsetting direct obligations that block removal in direct mode. Expenses and payments
+
         conserve money, so the complete returned group nets sum to zero. Historical
+
         participation does not grant group access.
-      tags: [Balances]
+
+        '
+      tags:
+      - Balances
       responses:
-        "200":
+        '200':
           description: Group balances
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GroupBalancesResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                $ref: '#/components/schemas/GroupBalancesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /api/groups/{groupId}/balances/mine:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: getMyBalances
       summary: Get pairwise balances to me
-      description: |
-        Counterparties from the canonical projection for the group's simplifyDebts mode,
+      description: 'Counterparties from the canonical projection for the group''s simplifyDebts mode,
+
         including historical financial participants. Direct mode nets within each pair;
+
         simplified mode matches net debtors and creditors with stable UUID ties.
+
         Positive means the counterparty owes the caller; negative means the caller owes
+
         them. These same obligations feed group/dashboard/People/settlement and departure
-        eligibility. The sum equals the caller's unchanged net balance in either mode.
-      tags: [Balances]
+
+        eligibility. The sum equals the caller''s unchanged net balance in either mode.
+
+        '
+      tags:
+      - Balances
       responses:
-        "200":
+        '200':
           description: Pairwise balances
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/PersonBalance"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                  $ref: '#/components/schemas/PersonBalance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /api/groups/{groupId}/balances/obligations:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: getGroupObligations
       summary: Get direct obligations across the group
-      description: |
-        Returns each nonzero bilateral debt once: from owes to amountCents.
+      description: 'Returns each nonzero bilateral debt once: from owes to amountMinor.
+
         Opposing obligations within the same pair are netted; debts through other
+
         people are not simplified. Results are independent of simplifyDebts and
+
         include historical financial counterparties without granting them access.
+
         This raw read explains recorded pair relationships; it does not determine
+
         departure eligibility in simplified mode. Use current-obligations for the selected
+
         mode. Removal rechecks the selected projection transactionally.
+
         An empty array means no direct obligations remain.
-      tags: [Balances]
+
+        '
+      tags:
+      - Balances
       responses:
-        "200":
+        '200':
           description: Current direct bilateral obligations
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/DirectObligation"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                  $ref: '#/components/schemas/DirectObligation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /api/groups/{groupId}/balances/current-obligations:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: getCurrentGroupObligations
       summary: Get selected-mode obligations across the group
-      description: |
-        Canonical directed debts for the group's selected mode: from owes to amountCents.
+      description: 'Canonical directed debts for the group''s selected mode: from owes to amountMinor.
+
         Direct mode nets each recorded pair. Simplified mode greedily matches largest
+
         net debtor/creditor amounts, breaking ties by UUID, and omits zero-net intermediaries.
+
         Each obligation is positive. Active and historical financial participants are included
+
         without granting former participants access. Settings uses this read for removal/leave
+
         blockers together with group net balances; mutations recheck under the group lock.
+
         Raw history remains available at obligations and never changes when toggling modes.
-      tags: [Balances]
+
+        '
+      tags:
+      - Balances
       responses:
-        "200":
+        '200':
           description: Current-mode obligations
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/DirectObligation"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                  $ref: '#/components/schemas/DirectObligation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /api/groups/{groupId}/payments:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: listPayments
       summary: List settle-up history
       description: Newest-first history of recorded payments in the group.
-      tags: [Payments]
+      tags:
+      - Payments
       responses:
-        "200":
+        '200':
           description: Payment history
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/PaymentResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                  $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
     post:
       operationId: recordPayment
       summary: Record a settle-up payment
-      description: |
-        Records a direct transfer `payer → payee` in the group. The payer must
+      description: 'Records a direct transfer `payer → payee` in the group. The payer must
+
         differ from the payee; both must be members. Overpayments are allowed (the
+
         net-per-person model just flips sign). Optional `operationId` keys the
+
         operation by authenticated requester, group, and UUID. Repeating the same
+
         key with identical payment data returns the original HTTP 201 response;
+
         changing payer, payee, or amount for that key returns 409. Omitted or null
+
         operationId keeps legacy additive behavior and creates a new payment each
+
         time. Membership is checked on every request, including a replay.
-      tags: [Payments]
+
+        '
+      tags:
+      - Payments
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RecordPaymentRequest"
+              $ref: '#/components/schemas/RecordPaymentRequest'
             example:
               payerUserId: 550e8400-e29b-41d4-a716-446655440001
               payeeUserId: 550e8400-e29b-41d4-a716-446655440000
-              amountCents: 5000
               operationId: 550e8400-e29b-41d4-a716-446655440002
+              amountMinor: 5000
+              currency: USD
       responses:
-        "201":
+        '201':
           description: Payment recorded
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaymentResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "409":
-          $ref: "#/components/responses/Conflict"
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
           description: Operation ID was previously used for a different payment
 
   /api/groups/{groupId}/debt-simplification:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
     get:
       operationId: getSimplifiedDebts
       summary: Get greedy settle-up suggestion
-      description: |
-        Read-only: a valid set of transfers (at most N−1) that settles the group net
+      description: 'Read-only: a valid set of transfers (at most N−1) that settles the group net
+
         balances, derived greedily (max creditor ↔ max debtor) with UUID tie-breaking.
+
         This algorithm does not guarantee a globally minimal number of transfers.
-        Zero balances are excluded and integer cents work out exactly. Acting on a
+
+        Zero balances are excluded and integer minor units work out exactly. Acting on a
+
         suggestion just records a normal payment. In direct mode, the response warning
+
         explains that this net-derived preview may leave offsetting direct obligations;
+
         an empty preview does not mean all direct obligations are settled. In simplified
+
         mode it matches the canonical obligations and warning is null.
-      tags: [Debt Simplification]
+
+        '
+      tags:
+      - Debt Simplification
       responses:
-        "200":
+        '200':
           description: Suggested transfers
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SimplifiedDebtsResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+                $ref: '#/components/schemas/SimplifiedDebtsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
 components:
   schemas:
@@ -992,39 +1141,81 @@ components:
 
     ProfileResponse:
       type: object
-      required: [id, email, emailVerified, displayName, phone, avatarColor, preferredCurrency, createdAt]
+      required:
+      - id
+      - email
+      - emailVerified
+      - displayName
+      - phone
+      - avatarColor
+      - preferredCurrency
+      - createdAt
       properties:
-        id: { type: string, format: uuid }
-        email: { type: string, format: email }
-        emailVerified: { type: boolean, description: Proven ownership of the current email; false for existing/registered unverified accounts }
-        displayName: { type: string, maxLength: 100 }
-        phone: { type: string, maxLength: 50, description: Unverified contact information }
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        emailVerified:
+          type: boolean
+          description: Proven ownership of the current email; false for existing/registered unverified accounts
+        displayName:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 50
+          description: Unverified contact information
         avatarColor:
           type: string
-          enum: ["#12A57E", "#D96D3F", "#3F7BD9", "#C25B84", "#D9A03F"]
-          default: "#12A57E"
+          enum:
+          - '#12A57E'
+          - '#D96D3F'
+          - '#3F7BD9'
+          - '#C25B84'
+          - '#D9A03F'
+          default: '#12A57E'
         preferredCurrency:
+          $ref: '#/components/schemas/Currency'
+        createdAt:
           type: string
-          enum: [USD, EUR, GBP, INR]
-          default: USD
-          description: Default preference only; does not denominate or convert recorded money
-        createdAt: { type: string, format: date-time, description: Original server registration date }
+          format: date-time
+          description: Original server registration date
+
     UpdateProfileRequest:
       type: object
       description: All properties optional. Null is a no-op. Unknown properties ignored.
       properties:
         displayName:
-          type: [string, "null"]
+          type:
+          - string
+          - 'null'
           maxLength: 100
-          pattern: '\S'
+          pattern: \S
           description: Must contain a non-whitespace character; trimmed before storage
-        phone: { type: [string, "null"], maxLength: 50, description: Trimmed; empty string clears unverified contact information }
+        phone:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+          description: Trimmed; empty string clears unverified contact information
         avatarColor:
-          type: [string, "null"]
-          enum: ["#12A57E", "#D96D3F", "#3F7BD9", "#C25B84", "#D9A03F", null]
+          type:
+          - string
+          - 'null'
+          enum:
+          - '#12A57E'
+          - '#D96D3F'
+          - '#3F7BD9'
+          - '#C25B84'
+          - '#D9A03F'
+          - null
         preferredCurrency:
-          type: [string, "null"]
-          enum: [USD, EUR, GBP, INR, null]
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+
     UserSummary:
       type: object
       description: Minimal user reference embedded in every resource
@@ -1233,19 +1424,32 @@ components:
 
     SplitInput:
       type: object
-      description: |
-        Original per-participant input, distinct from final rounded shares. `value` is
-        exact cents (UNEQUAL, 0..total), basis points (PERCENTAGE, 0..10000),
-        positive integer units (WEIGHTS, 1..1000000000000), or signed cents
+      description: 'Original per-participant input, distinct from final rounded shares. `value` is
+
+        exact transaction minor units (UNEQUAL, 0..total), basis points (PERCENTAGE, 0..10000),
+
+        positive integer units (WEIGHTS, 1..1000000000000), or signed transaction minor units
+
         (ADJUSTMENTS, -1000000000000..1000000000000). Exact amounts sum to total;
+
         percentages sum to 10000. Weights allocate floor(total * weight / sum(weights)),
+
         then the payer absorbs the remainder, or the first participant in Java UUID
-        order if the payer is excluded. Adjustments add signed cents to that same
+
+        order if the payer is excluded. Adjustments add signed transaction minor units to that same
+
         deterministic EQUAL allocation over the explicitly listed split participants;
+
         adjustments must sum to zero and every final share must be nonnegative.
+
         Explicit zero inputs remain participants. A missing/null/fractional `value`
+
         is rejected during JSON deserialization.
-      required: [userId, value]
+
+        '
+      required:
+      - userId
+      - value
       properties:
         userId:
           type: string
@@ -1258,76 +1462,161 @@ components:
 
     CreateExpenseRequest:
       type: object
-      required: [description, amountCents, paidByUserId]
+      required:
+      - description
+      - paidByUserId
       properties:
         expectedVersion:
-          type: [integer, "null"]
+          type:
+          - integer
+          - 'null'
           format: int64
           minimum: 0
-          description: PUT precondition; new clients always send the loaded version; required after finite rollout deadline
+          description: PUT precondition; new clients always send the loaded version; required after finite
+            rollout deadline
         operationId:
-          type: [string, "null"]
+          type:
+          - string
+          - 'null'
           format: uuid
           description: Optional scoped create identity; exact retries replay the original response
         description:
           type: string
           maxLength: 200
         amountCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
           minimum: 1
           maximum: 1000000000000
-          description: Total expense amount in integer cents (≤ $10B)
+          deprecated: true
+          description: Deprecated USD-only input. Use either this field or currency+amountMinor, never both.
         paidByUserId:
           type: string
           format: uuid
           description: The member who paid; must be a group member
         participantUserIds:
           anyOf:
-            - type: array
-              items:
-                type: string
-                format: uuid
-            - type: "null"
+          - type: array
+            items:
+              type: string
+              format: uuid
+          - type: 'null'
           description: EQUAL only — subset of members; null/empty = all members
         splitType:
           anyOf:
-            - $ref: "#/components/schemas/SplitType"
-            - type: "null"
+          - $ref: '#/components/schemas/SplitType'
+          - type: 'null'
           description: Null defaults to EQUAL
         splits:
           anyOf:
-            - type: array
-              items:
-                $ref: "#/components/schemas/SplitInput"
-            - type: "null"
+          - type: array
+            items:
+              $ref: '#/components/schemas/SplitInput'
+          - type: 'null'
           description: Required nonempty list for all non-EQUAL types; unique group-member user IDs (see SplitInput)
         category:
           anyOf:
-            - $ref: "#/components/schemas/ExpenseCategory"
-            - type: "null"
+          - $ref: '#/components/schemas/ExpenseCategory'
+          - type: 'null'
           description: Null defaults to OTHER
         spentOn:
           anyOf:
-            - type: string
-              format: date
-            - type: "null"
+          - type: string
+            format: date
+          - type: 'null'
           description: The date the money was actually spent; null defaults to today
+        amountMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+          description: Positive integer transaction minor units; currency is required. Fractional JSON values
+            are rejected.
+        currency:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          description: Required with amountMinor. Expense PUT cannot change the recorded currency.
+      oneOf:
+      - required:
+        - currency
+        - amountMinor
+        properties:
+          currency:
+            $ref: '#/components/schemas/Currency'
+          amountMinor:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 1000000000000
+          amountCents:
+            type: 'null'
+      - required:
+        - amountCents
+        properties:
+          amountCents:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 1000000000000
+          amountMinor:
+            type: 'null'
+          currency:
+            enum:
+            - USD
+            - null
 
     SplitShare:
       type: object
-      required: [user, shareCents]
+      required:
+      - user
+      - shareCents
+      - currency
+      - shareMinor
       properties:
         user:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         shareCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        shareMinor:
           type: integer
           format: int64
-          description: What this participant owes, in integer cents
+          minimum: 0
+          maximum: 9007199254740991
+          description: What this participant owes, in integer minor units
 
     ExpenseResponse:
       type: object
-      required: [id, groupId, description, amountCents, splitType, category, spentOn, paidBy, participants, participantUserIds, splits, createdAt, version]
+      required:
+      - id
+      - groupId
+      - description
+      - amountCents
+      - splitType
+      - category
+      - spentOn
+      - paidBy
+      - participants
+      - participantUserIds
+      - splits
+      - createdAt
+      - version
+      - currency
+      - amountMinor
       properties:
         version:
           type: integer
@@ -1343,49 +1632,83 @@ components:
         description:
           type: string
         amountCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
         splitType:
-          $ref: "#/components/schemas/SplitType"
+          $ref: '#/components/schemas/SplitType'
         category:
-          $ref: "#/components/schemas/ExpenseCategory"
+          $ref: '#/components/schemas/ExpenseCategory'
         spentOn:
           type: string
           format: date
         paidBy:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         participants:
           type: array
           items:
-            $ref: "#/components/schemas/SplitShare"
-          description: Final owed cents, including zero-valued participants
+            $ref: '#/components/schemas/SplitShare'
+          description: Persisted final minor-unit shares, including zero participants; shares inherit the
+            expense currency.
         participantUserIds:
           anyOf:
-            - type: array
-              items:
-                type: string
-                format: uuid
-            - type: "null"
+          - type: array
+            items:
+              type: string
+              format: uuid
+          - type: 'null'
           description: Original participant set for EQUAL; null for other types
         splits:
           anyOf:
-            - type: array
-              items:
-                $ref: "#/components/schemas/SplitInput"
-            - type: "null"
-          description: |
-            Original typed inputs for non-EQUAL types; null for EQUAL. Use these
+          - type: array
+            items:
+              $ref: '#/components/schemas/SplitInput'
+          - type: 'null'
+          description: 'Original typed inputs for non-EQUAL types; null for EQUAL. Use these
+
             on full-replace PUT; never reconstruct percentages/weights from rounded shares.
+
             Legacy non-equal inputs were not retained: V11 converts old PERCENTAGE
+
             expenses to UNEQUAL exact shares. Missing intent from older writers is
+
             likewise returned as UNEQUAL exact shares. Legacy EQUAL sets are recoverable.
+
+            '
         createdAt:
           type: string
           format: date-time
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Integer minor units in the explicit currency.
 
     ExpenseSummary:
       type: object
-      required: [id, description, amountCents, paidBy, participantCount, category, spentOn, viewerDeltaCents, createdAt, version]
+      required:
+      - id
+      - description
+      - amountCents
+      - paidBy
+      - participantCount
+      - category
+      - spentOn
+      - viewerDeltaCents
+      - createdAt
+      - version
+      - currency
+      - amountMinor
+      - viewerDeltaMinor
       properties:
         version:
           type: integer
@@ -1398,38 +1721,86 @@ components:
         description:
           type: string
         amountCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
         paidBy:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         participantCount:
           type: integer
           format: int64
         category:
-          $ref: "#/components/schemas/ExpenseCategory"
+          $ref: '#/components/schemas/ExpenseCategory'
         spentOn:
           type: string
           format: date
         viewerDeltaCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          description: |
-            The requesting member's net for this expense: positive = they lent
-            (paid more than their share), negative = they borrowed, 0 = not involved
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
         createdAt:
           type: string
           format: date-time
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Integer minor units in the explicit currency.
+        viewerDeltaMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          description: 'The requesting member''s net for this expense: positive = they lent
+
+            (paid more than their share), negative = they borrowed, 0 = not involved
+
+            '
 
     MemberBalance:
       type: object
-      required: [user, netCents]
+      required:
+      - user
+      - netCents
+      - currency
+      - netMinor
       properties:
         user:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         netCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        netMinor:
           type: integer
           format: int64
-          description: Net position in cents; positive = owed, negative = owes, 0 = no aggregate net (direct debts may remain)
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          description: Net position in minor units; positive = owed, negative = owes, 0 = no aggregate net
+            (direct debts may remain)
 
     GroupBalancesResponse:
       type: object
@@ -1445,20 +1816,45 @@ components:
 
     PersonBalance:
       type: object
-      description: A counterparty's net position with the requesting user
-      required: [user, netCents]
+      description: Counterparty net within one currency across shared groups; the same person may have several
+        currency rows.
+      required:
+      - user
+      - netCents
+      - currency
+      - netMinor
       properties:
         user:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         netCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        netMinor:
           type: integer
           format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
           description: Positive = they owe you; negative = you owe them
 
     Settlement:
       type: object
       description: One suggested settle-up between the caller and a counterparty in a group
-      required: [groupId, groupName, counterparty, netCents]
+      required:
+      - groupId
+      - groupName
+      - counterparty
+      - netCents
+      - currency
+      - netMinor
       properties:
         groupId:
           type: string
@@ -1466,38 +1862,92 @@ components:
         groupName:
           type: string
         counterparty:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         netCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        netMinor:
           type: integer
           format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
           description: Positive = they owe you; negative = you owe them
 
     DirectObligation:
       type: object
-      description: A directed debt — from owes to the positive amountCents; mode is defined by the endpoint
-      required: [from, to, amountCents]
+      description: 'Directed debt: from owes to amountMinor in currency. Raw or selected mode is defined by
+        the endpoint; unlike currencies are never netted.'
+      required:
+      - from
+      - to
+      - amountCents
+      - currency
+      - amountMinor
       properties:
         from:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         to:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         amountCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor:
           type: integer
           format: int64
           minimum: 1
+          maximum: 9007199254740991
+          description: Integer minor units in the explicit currency.
 
     SuggestedTransaction:
       type: object
       description: One suggested transfer — `from` (a debtor) pays `to` (a creditor)
-      required: [from, to, amountCents]
+      required:
+      - from
+      - to
+      - amountCents
+      - currency
+      - amountMinor
       properties:
         from:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         to:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         amountCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor:
           type: integer
           format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Integer minor units in the explicit currency.
 
     SimplifiedDebtsResponse:
       type: object
@@ -1517,7 +1967,9 @@ components:
 
     RecordPaymentRequest:
       type: object
-      required: [payerUserId, payeeUserId, amountCents]
+      required:
+      - payerUserId
+      - payeeUserId
       properties:
         payerUserId:
           type: string
@@ -1526,44 +1978,124 @@ components:
           type: string
           format: uuid
         amountCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
           minimum: 1
           maximum: 1000000000000
-          description: Payment amount in integer cents (≤ $10B)
+          deprecated: true
+          description: Deprecated USD-only input. Use either this field or currency+amountMinor, never both.
         operationId:
           anyOf:
-            - type: string
-              format: uuid
-            - type: "null"
-          description: |
-            Optional retry identity. Null or omitted means each request records a
-            separate payment. A supplied UUID is scoped to the authenticated
-            requester and group; exact replays return the original result, while
-            changed payer/payee/amount conflicts with 409.
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: "Optional retry identity. Null or omitted means each request records a\nseparate payment.\
+            \ A supplied UUID is scoped to the authenticated\nrequester and group; exact replays return the\
+            \ original result, while\nchanged payer/payee/amount conflicts with 409.\n Currency is part of\
+            \ the replay intent; a changed currency conflicts with409."
+        amountMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+          description: Positive integer transaction minor units; currency is required. Fractional JSON values
+            are rejected.
+        currency:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          description: Required with amountMinor. Expense PUT cannot change the recorded currency.
+      oneOf:
+      - required:
+        - currency
+        - amountMinor
+        properties:
+          currency:
+            $ref: '#/components/schemas/Currency'
+          amountMinor:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 1000000000000
+          amountCents:
+            type: 'null'
+      - required:
+        - amountCents
+        properties:
+          amountCents:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 1000000000000
+          amountMinor:
+            type: 'null'
+          currency:
+            enum:
+            - USD
+            - null
 
     PaymentResponse:
       type: object
-      required: [id, payer, payee, amountCents, createdAt]
+      required:
+      - id
+      - payer
+      - payee
+      - amountCents
+      - createdAt
+      - currency
+      - amountMinor
       properties:
         id:
           type: string
           format: uuid
         payer:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         payee:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         amountCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
         createdAt:
           type: string
           format: date-time
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Integer minor units in the explicit currency.
 
     DashboardGroup:
       type: object
       description: One group card using selected-mode obligations, from the caller's perspective
-      required: [id, name, type, memberCount, totalSpentCents, youAreOwedCents, youOweCents, netCents, simplifyDebts]
+      required:
+      - id
+      - name
+      - type
+      - memberCount
+      - totalSpentCents
+      - youAreOwedCents
+      - youOweCents
+      - netCents
+      - simplifyDebts
+      - totals
+      - totalSpentMinor
+      - youAreOwedMinor
+      - youOweMinor
+      - netMinor
       properties:
         id:
           type: string
@@ -1571,37 +2103,123 @@ components:
         name:
           type: string
         type:
-          $ref: "#/components/schemas/GroupType"
+          $ref: '#/components/schemas/GroupType'
         memberCount:
           type: integer
           format: int64
         totalSpentCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         youAreOwedCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         youOweCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         netCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          description: Always `youAreOwedCents - youOweCents`
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         simplifyDebts:
           type: boolean
+        totals:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupCurrencyTotals'
+          description: Authoritative per-currency rows. Never add rows of unlike currencies.
+        totalSpentMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
+        youAreOwedMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
+        youOweMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
+        netMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
 
     ActivityItem:
       type: object
       description: One entry in the cross-group recent-activity feed
-      required: [id, kind, groupId, groupName, description, actor, amountCents, viewerDeltaCents, date]
+      required:
+      - id
+      - kind
+      - groupId
+      - groupName
+      - description
+      - actor
+      - amountCents
+      - viewerDeltaCents
+      - date
+      - currency
+      - amountMinor
+      - viewerDeltaMinor
       properties:
         id:
           type: string
           format: uuid
         kind:
           type: string
-          enum: [EXPENSE, PAYMENT]
+          enum:
+          - EXPENSE
+          - PAYMENT
         groupId:
           type: string
           format: uuid
@@ -1610,59 +2228,110 @@ components:
         description:
           type: string
         actor:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
           description: Expense payer, or payment payer
         counterparty:
           anyOf:
-            - $ref: "#/components/schemas/UserSummary"
-            - type: "null"
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
           description: PAYMENT only — who received; null for EXPENSE
         amountCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
         viewerDeltaCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          description: |
-            EXPENSE: positive = you lent, negative = you borrowed, 0 = not involved.
-            PAYMENT: always 0 (settlements render neutral)
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
+            values.
         category:
           anyOf:
-            - $ref: "#/components/schemas/ExpenseCategory"
-            - type: "null"
+          - $ref: '#/components/schemas/ExpenseCategory'
+          - type: 'null'
           description: EXPENSE only; null for PAYMENT
         date:
           type: string
           format: date
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Integer minor units in the explicit currency.
+        viewerDeltaMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          description: 'EXPENSE: positive = you lent, negative = you borrowed, 0 = not involved.
+
+            PAYMENT: always 0 (settlements render neutral)
+
+            '
 
     DashboardResponse:
       type: object
       required:
-        - totalNetCents
-        - owedCents
-        - owedPeopleCount
-        - oweCents
-        - owePeopleCount
-        - groupCount
-        - groups
-        - people
-        - settlements
-        - activity
+      - totalNetCents
+      - owedCents
+      - owedPeopleCount
+      - oweCents
+      - owePeopleCount
+      - groupCount
+      - groups
+      - people
+      - settlements
+      - activity
+      - totals
+      - totalNetMinor
+      - owedMinor
+      - oweMinor
       properties:
         totalNetCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          description: Always `owedCents - oweCents`
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         owedCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          description: Sum of what people owe you across all groups
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         owedPeopleCount:
           type: integer
         oweCents:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          description: Sum of what you owe across all groups
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
         owePeopleCount:
           type: integer
         groupCount:
@@ -1670,30 +2339,173 @@ components:
         groups:
           type: array
           items:
-            $ref: "#/components/schemas/DashboardGroup"
+            $ref: '#/components/schemas/DashboardGroup'
         people:
           type: array
-          description: |
-            Net per person across groups. Opposing debts to the same person in
-            different groups can cancel here, while headline owed/owe totals sum
-            group counterparties before this cross-group netting.
+          description: Net per (person,currency) across groups. Opposing debts may cancel only within the
+            same currency; headline totals remain group-gross.
           items:
-            $ref: "#/components/schemas/PersonBalance"
+            $ref: '#/components/schemas/PersonBalance'
         settlements:
           type: array
-          description: Per-group, per-counterparty breakdown powering the settle-up modal
+          description: Per-group/per-counterparty/per-currency current obligations; settlement currency comes
+            from this row, never a preference.
           items:
-            $ref: "#/components/schemas/Settlement"
+            $ref: '#/components/schemas/Settlement'
         activity:
           type: array
-          description: |
-            Merged expenses + payments snapshot, capped at 15 and ordered by expense
+          description: 'Merged expenses + payments snapshot, capped at 15 and ordered by expense
+
             spentOn date or payment recorded date, newest first. This is not an event
+
             log and does not represent when an expense was created or edited.
+
+            '
           items:
-            $ref: "#/components/schemas/ActivityItem"
+            $ref: '#/components/schemas/ActivityItem'
+        totals:
+          type: array
+          items:
+            $ref: '#/components/schemas/CurrencyTotals'
+          description: Authoritative per-currency rows. Never add rows of unlike currencies.
+        totalNetMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
+        owedMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
+        oweMinor:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          deprecated: true
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
+            for all currencies.
+
+    Currency:
+      type: string
+      enum:
+      - USD
+      - EUR
+      - GBP
+      - INR
+      - JPY
+      - KWD
+      description: Supported transaction denomination. USD/EUR/GBP/INR use exponent 2; JPY 0; KWD 3. No conversion.
+
+    CurrencyInfo:
+      type: object
+      required:
+      - code
+      - minorUnitExponent
+      properties:
+        code:
+          $ref: '#/components/schemas/Currency'
+        minorUnitExponent:
+          type: integer
+          enum:
+          - 0
+          - 2
+          - 3
+
+    CurrencyTotals:
+      type: object
+      required:
+      - currency
+      - totalNetMinor
+      - owedMinor
+      - owedPeopleCount
+      - oweMinor
+      - owePeopleCount
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        totalNetMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        owedMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        owedPeopleCount:
+          type: integer
+          minimum: 0
+        oweMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        owePeopleCount:
+          type: integer
+          minimum: 0
+      description: Authoritative gross headline totals for one currency. Net = owed - owe; no FX or cross-currency
+        net.
+
+    GroupCurrencyTotals:
+      type: object
+      required:
+      - currency
+      - totalSpentMinor
+      - youAreOwedMinor
+      - youOweMinor
+      - netMinor
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        totalSpentMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        youAreOwedMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        youOweMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+        netMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      description: Authoritative spending/current-mode positions for one currency in a group.
 
   parameters:
+    LedgerVersion:
+      name: X-Ledger-Version
+      in: header
+      required: false
+      description: Send2 for explicit minor units/multiple currencies. Missing/other values keep USD-only
+        compatibility; non-USD financial reads/writes return409 upgrade guidance. Never mix old backend instances
+        after non-USD data is enabled.
+      schema:
+        type: string
+        enum:
+        - '2'
     GroupIdParam:
       name: groupId
       in: path

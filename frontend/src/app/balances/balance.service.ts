@@ -2,7 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
 import { PersonBalance } from '../dashboard/dashboard.models';
-import { centsToDisplay } from '../expenses/expense.service';
+import { Currency } from '../shared/currency';
+import { formatMoney } from '../shared/money.component';
 import { DirectObligation, GroupBalancesResponse } from './balance.models';
 
 @Injectable({ providedIn: 'root' })
@@ -29,10 +30,10 @@ export class BalanceService {
 }
 
 /** A human sentence for a member's net position, e.g. "is owed $12.50" / "owes $8.00" / "is settled up". */
-export function describeBalance(netCents: number): string {
-  if (netCents === 0) {
+export function describeBalance(netMinor: number, currency: Currency = 'USD'): string {
+  if (netMinor === 0) {
     return 'is settled up';
   }
-  const amount = `$${centsToDisplay(Math.abs(netCents))}`;
-  return netCents > 0 ? `is owed ${amount}` : `owes ${amount}`;
+  const amount = formatMoney(Math.abs(netMinor), false, currency);
+  return netMinor > 0 ? `is owed ${amount}` : `owes ${amount}`;
 }

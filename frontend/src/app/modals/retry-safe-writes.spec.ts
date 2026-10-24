@@ -13,6 +13,12 @@ import { NewGroupModalComponent } from './new-group-modal.component';
 
 @Component({ template: '' })
 class Destination {}
+// Expense-only fixtures keep the default USD draft while profile loading is unavailable.
+function settleProfileRead(http: HttpTestingController): void {
+  for (const request of http.match('/api/me'))
+    if (!request.cancelled) request.flush({}, { status: 503, statusText: 'Unavailable' });
+}
+
 const actor = { id: 'owner', email: 'owner@example.test', displayName: 'Owner' };
 
 describe('retry-safe rendered writes', () => {
@@ -49,9 +55,14 @@ describe('retry-safe rendered writes', () => {
     open();
   });
   afterEach(() => {
-    fixture.destroy();
-    http.verify();
-    sessionStorage.clear();
+    try {
+      settleProfileRead(http);
+      fixture.destroy();
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+      sessionStorage.clear();
+    }
   });
 
   it('restores an uncertain group draft and reuses its identity after a full application reload', () => {
@@ -152,6 +163,7 @@ describe('retry-safe rendered writes', () => {
     (profile.nativeElement.querySelector('.profile__signout') as HTMLButtonElement).click();
     await profile.whenStable();
     profile.destroy();
+    settleProfileRead(http);
     http.verify();
     TestBed.resetTestingModule();
     storeTestSession(actor);
@@ -227,9 +239,14 @@ describe('retry-safe rendered expense drafts', () => {
     open();
   });
   afterEach(() => {
-    fixture.destroy();
-    http.verify();
-    sessionStorage.clear();
+    try {
+      settleProfileRead(http);
+      fixture.destroy();
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+      sessionStorage.clear();
+    }
   });
 
   it('restores a lost-response expense draft and requires deliberate identical retry after reload', () => {
@@ -270,13 +287,14 @@ describe('retry-safe rendered expense drafts', () => {
       groupId: 'g',
       version: 4,
       description: 'Original',
-      amountCents: 1200,
+      amountMinor: 1200,
+      currency: 'USD' as const,
       paidBy: actor,
       splitType: 'EQUAL',
       category: 'OTHER',
       spentOn: '2026-10-18',
       participantUserIds: [actor.id],
-      participants: [{ user: actor, shareCents: 1200 }],
+      participants: [{ user: actor, shareMinor: 1200 }],
     });
     fixture.detectChanges();
     fill('#ne-desc', 'My typed correction');
@@ -304,7 +322,7 @@ describe('retry-safe rendered payment drafts', () => {
     groupId: 'g',
     groupName: 'Trip',
     counterparty: { id: 'friend', email: 'friend@example.test', displayName: 'Friend' },
-    netCents: -1000,
+    netMinor: -1000,
   };
   function open(prefill = true) {
     TestBed.configureTestingModule({
@@ -326,9 +344,14 @@ describe('retry-safe rendered payment drafts', () => {
     open();
   });
   afterEach(() => {
-    fixture.destroy();
-    http.verify();
-    sessionStorage.clear();
+    try {
+      settleProfileRead(http);
+      fixture.destroy();
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+      sessionStorage.clear();
+    }
   });
 
   it('restores a partial payment and its original identity across a complete reload without sending automatically', () => {
@@ -380,7 +403,8 @@ describe('retry-safe rendered payment drafts', () => {
       const separate = http.expectOne('/api/groups/g/payments');
       expect(separate.request.body).toEqual({
         ...original,
-        amountCents: 456,
+        amountMinor: 456,
+        currency: 'USD' as const,
         operationId: expect.any(String),
       });
       expect(separate.request.body.operationId).not.toBe(original.operationId);

@@ -1,9 +1,11 @@
+import { Currency } from '../shared/currency';
 import { UserSummary } from '../core/auth/auth.models';
 
 export interface MemberBalance {
   user: UserSummary;
-  /** Net position in integer cents. Positive = owed money; negative = owes money. */
-  netCents: number;
+  /** Net position in integer minor units. Positive = owed money; negative = owes money. */
+  netMinor: number;
+  currency?: Currency;
 }
 
 export interface GroupBalancesResponse {
@@ -15,5 +17,6 @@ export interface GroupBalancesResponse {
 export interface DirectObligation {
   from: UserSummary;
   to: UserSummary;
-  amountCents: number;
+  amountMinor: number;
+  currency?: Currency;
 }
