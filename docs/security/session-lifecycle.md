@@ -3,13 +3,15 @@
 SplitEasy intentionally requires re-login when an access token expires. Login and
 registration return an HS256 bearer access token and `expiresIn`; the default
 `app.jwt.expiration-seconds` is 3600 seconds (one hour). There is no silent renewal,
-refresh token, refresh/logout/revocation endpoint, or server-side session store.
+refresh token, refresh/logout endpoint, or server-side device session store.
 This is the current product contract; refresh remains a separate enhancement.
 
 ## Expiry and client logout
 
 The resource server verifies the HS256 signature, configured `app.jwt.issuer`, and
-token timestamps on protected requests. Spring Security's default timestamp
+token timestamps on protected requests. A02 additionally validates the persisted
+account credentialVersion on every protected request. Missing legacy version
+claims mean zero; malformed/negative versions and missing accounts are rejected. Spring Security's default timestamp
 validator permits 60 seconds of clock skew; the nominal one-hour lifetime is not
 an exact wall-clock cutoff. An expired or otherwise invalid bearer token receives
 401. These protected-route failures are produced by the Spring Security filter chain,
@@ -22,19 +24,23 @@ session cannot clear a subsequent login.
 Signing out calls `AuthService.logout()`: it synchronously resets account-scoped
 state and pending UI operations, removes the stored token/user, and clears the
 current identity. It does not contact the server or invalidate a copied token.
-A previously issued token remains usable until the server rejects its expiry
-(subject to clock skew). Another browser/device is not signed out. There is no
-per-session or account-wide immediate revocation guarantee. localStorage is
+A previously issued token remains usable until expiry (subject to clock skew)
+or a credential boundary. Password reset, authenticated password change and
+confirmed actual email change atomically increment credentialVersion, invalidating
+all older tokens after commit. Requests authenticated before commit may finish.
+Client logout itself does not increment this version or affect another device.
+Selective per-session revoke, refresh and logout-all UI remain A03 work. localStorage is
 accessible to same-origin JavaScript, so bearer-token theft through script
 compromise remains a risk; client cleanup cannot revoke stolen copies.
 
 ## Requirements before adding refresh or revocation
 
 Agree on and document these requirements before implementation; they are not
-capabilities of the current application:
+additional capabilities beyond A02 credential-boundary revocation:
 
 - Define which events revoke one session versus all account sessions, including
-  logout, credential changes, suspected theft and operator intervention. Specify
+  logout, suspected theft and operator intervention. A02 already revokes all old
+  credentials after password reset/change and confirmed email changes. Specify
   when access must stop, including requests already in flight and multi-instance
   deployments. Immediate access-token revocation requires server-side enforcement;
   revoking only refresh credentials leaves existing access tokens usable to expiry.
@@ -62,7 +68,12 @@ session revocation or a substitute for defining the requirements above.
 `JwtSecurityIntegrationTest` sends real signed tokens through the protected
 `GET /api/groups` filter chain with throwaway PostgreSQL: a valid control succeeds;
 expired, wrong-issuer, wrong-signature and same-key HS512 tokens each receive 401.
-The expiry case is outside clock-skew tolerance. Existing `AuthFlowIntegrationTest`
+The expiry case is outside clock-skew tolerance. A02 also checks malformed,
+negative, mismatched and explicitly null credential versions, invalid/missing
+accounts, legacy version-zero acceptance and revocation after a password change. Existing `AuthFlowIntegrationTest`
 covers login/registration and missing/malformed tokens. Frontend auth and
 session-isolation specs cover local cleanup, protected-request 401 handling and
 stale-session callbacks. These checks use no production data or credentials.
+
+A02 lifecycle details, SMTP configuration, one-use mailbox challenges and the
+security restriction on old-binary rollback are in [account recovery](account-recovery.md).

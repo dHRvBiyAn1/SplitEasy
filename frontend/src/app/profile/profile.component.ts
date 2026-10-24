@@ -1,3 +1,4 @@
+import { AccountSecurityComponent } from './account-security.component';
 import { AppearancePanelComponent } from '../shared/appearance-panel.component';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -8,7 +9,7 @@ import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../cor
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, AppearancePanelComponent],
+  imports: [ReactiveFormsModule, AppearancePanelComponent, AccountSecurityComponent],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })

@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -17,7 +18,7 @@ describe('mutation close policy across the rendered global dialogs', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('spliteasy.user', JSON.stringify(alice));
+    storeTestSession(alice);
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });

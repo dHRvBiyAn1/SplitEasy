@@ -1,3 +1,4 @@
+import { testJwt } from './auth-test-fixture';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -18,7 +19,7 @@ import { ProfileService } from '../profile.service';
 import { AuthService } from './auth.service';
 
 const alice: AuthResponse = {
-  accessToken: 'alice-token',
+  accessToken: testJwt('alice'),
   tokenType: 'Bearer',
   expiresIn: 3600,
   user: { id: 'alice', displayName: 'Alice', email: 'alice@example.com' },

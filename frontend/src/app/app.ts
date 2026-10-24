@@ -56,7 +56,7 @@ export class App {
   protected readonly groupsOpen = signal(false);
   private readonly currentUrl = signal(this.router.url);
   protected readonly isAuthRoute = computed(() =>
-    /^\/(login|register)(?:[/?#]|$)/.test(this.currentUrl()),
+    /^\/(login|register|forgot-password|account-action)(?:[/?#]|$)/.test(this.currentUrl()),
   );
   protected readonly showShell = computed(() => this.auth.isAuthenticated() && !this.isAuthRoute());
   protected readonly blocked = computed(() => !!this.modal.active() || this.groupsOpen());
@@ -88,10 +88,10 @@ export class App {
         this.groupsOpen.set(false);
         if (this.showShell()) this.dashboard.revalidate();
       });
-    inject(SessionService)
-      .changes.pipe(takeUntilDestroyed())
-      .subscribe(() => this.groupsOpen.set(false));
+    const session = inject(SessionService);
+    session.changes.pipe(takeUntilDestroyed()).subscribe(() => this.groupsOpen.set(false));
     effect(() => {
+      session.currentVersion();
       if (this.showShell()) untracked(() => this.dashboard.ensureLoaded());
     });
     effect(() => {

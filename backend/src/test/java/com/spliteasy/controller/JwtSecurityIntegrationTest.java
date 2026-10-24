@@ -28,14 +28,12 @@ class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
       "jwt-security-test-only-key-0000000000000000000000000000000000000000";
 
   private String userId;
+  private String email;
 
   @BeforeEach
   void registerUser() throws Exception {
-    userId =
-        register(UUID.randomUUID() + "@example.com", "password123", "JWT test")
-            .user()
-            .id()
-            .toString();
+    email = UUID.randomUUID() + "@example.com";
+    userId = register(email, "password123", "JWT test").user().id().toString();
   }
 
   @Test
@@ -117,6 +115,61 @@ class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
                             JWSAlgorithm.HS512,
                             SIGNING_KEY))))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void credentialClaimsFailClosedAndLegacyTokensStopWorkingAtCredentialChange() throws Exception {
+    String legacy = credentialToken(userId, null, false);
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(legacy)))
+        .andExpect(status().isOk());
+    for (Object invalid :
+        new Object[] {
+          -1, 1, "0", 0.5, true, java.util.List.of(0), java.util.Map.of("version", 0), null
+        }) {
+      mockMvc
+          .perform(
+              get("/api/me")
+                  .header("Authorization", bearer(credentialToken(userId, invalid, true))))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String invalidSubject : new String[] {"not-a-uuid", UUID.randomUUID().toString()}) {
+      mockMvc
+          .perform(
+              get("/api/me")
+                  .header("Authorization", bearer(credentialToken(invalidSubject, 0, true))))
+          .andExpect(status().isUnauthorized());
+    }
+    mockMvc
+        .perform(
+            jsonPost(
+                    "/api/me/password",
+                    java.util.Map.of(
+                        "currentPassword", "password123", "password", "jwtChangedPassword"))
+                .header("Authorization", bearer(legacy)))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(legacy)))
+        .andExpect(status().isUnauthorized());
+    var fresh = login(email, "jwtChangedPassword");
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(fresh.accessToken())))
+        .andExpect(status().isOk());
+  }
+
+  private String credentialToken(String subject, Object version, boolean includeVersion)
+      throws Exception {
+    var claims = new java.util.HashMap<String, Object>();
+    claims.put("iss", "spliteasy");
+    claims.put("sub", subject);
+    claims.put("iat", Instant.now().minusSeconds(30).getEpochSecond());
+    claims.put("exp", Instant.now().plusSeconds(300).getEpochSecond());
+    if (includeVersion) claims.put("credentialVersion", version);
+    var jwt =
+        new com.nimbusds.jose.JWSObject(
+            new JWSHeader(JWSAlgorithm.HS256), new com.nimbusds.jose.Payload(json(claims)));
+    jwt.sign(new MACSigner(SIGNING_KEY.getBytes(StandardCharsets.UTF_8)));
+    return jwt.serialize();
   }
 
   private String token(String issuer, Instant expiresAt, JWSAlgorithm algorithm, String key)

@@ -44,7 +44,20 @@
         ><button type="button" class="dc-btn-ghost" (click)="retryOverview()">Try again</button>
       </div>
     }
-    <main id="main-content" class="shell__main" tabindex="-1"><router-outlet /></main>
+  } @else {
+    <button
+      type="button"
+      class="auth-appearance dc-btn-outline"
+      aria-label="Appearance"
+      (click)="modal.openAppearance()"
+    >
+      <app-icon name="appearance" /><span>Appearance</span>
+    </button>
+  }
+  <main id="main-content" [class]="showShell() ? 'shell__main' : 'app-content'" tabindex="-1">
+    <router-outlet />
+  </main>
+  @if (showShell()) {
     <nav class="mobile-nav dc-glass" aria-label="Mobile and tablet navigation">
       <a
         routerLink="/dashboard"
@@ -75,16 +88,6 @@
         ><app-icon name="profile" /><span>Profile</span></a
       >
     </nav>
-  } @else {
-    <button
-      type="button"
-      class="auth-appearance dc-btn-outline"
-      aria-label="Appearance"
-      (click)="modal.openAppearance()"
-    >
-      <app-icon name="appearance" /><span>Appearance</span>
-    </button>
-    <main id="main-content" class="app-content" tabindex="-1"><router-outlet /></main>
   }
 </div>
 @if (groupsOpen() && showShell()) {

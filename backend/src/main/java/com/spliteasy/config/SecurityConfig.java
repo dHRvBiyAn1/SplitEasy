@@ -68,10 +68,39 @@ public class SecurityConfig {
   }
 
   @Bean
-  public JwtDecoder jwtDecoder() {
+  public JwtDecoder jwtDecoder(com.spliteasy.repository.UserRepository users) {
     NimbusJwtDecoder decoder =
         NimbusJwtDecoder.withSecretKey(jwtKey).macAlgorithm(MacAlgorithm.HS256).build();
-    decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+    org.springframework.security.oauth2.core.OAuth2TokenValidator<
+            org.springframework.security.oauth2.jwt.Jwt>
+        credentials =
+            jwt -> {
+              var failure =
+                  org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
+                      new org.springframework.security.oauth2.core.OAuth2Error(
+                          "invalid_token", "Access token is no longer valid", null));
+              try {
+                Object raw = jwt.getClaims().get("credentialVersion");
+                long version = 0;
+                if (jwt.getClaims().containsKey("credentialVersion")) {
+                  if (!(raw instanceof Integer || raw instanceof Long)) return failure;
+                  version = ((Number) raw).longValue();
+                  if (version < 0) return failure;
+                }
+                Long current =
+                    users
+                        .findCredentialVersion(java.util.UUID.fromString(jwt.getSubject()))
+                        .orElse(null);
+                return current != null && current.longValue() == version
+                    ? org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success()
+                    : failure;
+              } catch (RuntimeException ex) {
+                return failure;
+              }
+            };
+    decoder.setJwtValidator(
+        new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefaultWithIssuer(issuer), credentials));
     return decoder;
   }
 }

@@ -10,6 +10,9 @@
         <a routerLink="/register" class="auth__tab">Sign up</a>
       </nav>
 
+      @if (securityNotice) {
+        <p role="status">{{ securityNotice }}</p>
+      }
       @if (submitting()) {
         <div class="dc-loading" role="status" aria-label="Signing in"></div>
       }
@@ -67,6 +70,7 @@
         </button>
       </form>
 
+      <p class="auth__switch"><a routerLink="/forgot-password">Forgot password?</a></p>
       <p class="auth__switch">New to SplitEasy? <a routerLink="/register">Create an account</a></p>
     </div>
   </div>

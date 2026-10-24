@@ -23,6 +23,48 @@ public class AuthController {
   private final AuthService authService;
   private final AuthRateLimiter rateLimiter;
 
+  private final com.spliteasy.service.AccountLifecycleService accounts;
+
+  @PostMapping("/password-reset-requests")
+  public ResponseEntity<Void> requestReset(
+      @Valid @RequestBody com.spliteasy.dto.auth.RecoveryRequests.EmailRequest request,
+      HttpServletRequest http) {
+    rateLimiter.recovery(request.email(), http.getRemoteAddr());
+    try {
+      accounts.requestReset(request.email());
+    } catch (com.spliteasy.exception.MailDeliveryFailedException ex) {
+      // Generic acceptance preserves account privacy even when an actual send fails.
+    }
+    return ResponseEntity.accepted().build();
+  }
+
+  @PostMapping("/password-resets")
+  public ResponseEntity<Void> resetPassword(
+      @Valid @RequestBody com.spliteasy.dto.auth.RecoveryRequests.PasswordReset request,
+      HttpServletRequest http) {
+    rateLimiter.confirmation(http.getRemoteAddr());
+    accounts.resetPassword(request);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/email-verifications")
+  public ResponseEntity<Void> verifyEmail(
+      @Valid @RequestBody com.spliteasy.dto.auth.RecoveryRequests.TokenRequest request,
+      HttpServletRequest http) {
+    rateLimiter.confirmation(http.getRemoteAddr());
+    accounts.verifyEmail(request.token());
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/email-change-confirmations")
+  public ResponseEntity<Void> confirmEmailChange(
+      @Valid @RequestBody com.spliteasy.dto.auth.RecoveryRequests.TokenRequest request,
+      HttpServletRequest http) {
+    rateLimiter.confirmation(http.getRemoteAddr());
+    accounts.confirmEmailChange(request.token());
+    return ResponseEntity.noContent().build();
+  }
+
   @PostMapping("/register")
   public ResponseEntity<AuthResponse> register(
       @Valid @RequestBody RegisterRequest request, HttpServletRequest http) {

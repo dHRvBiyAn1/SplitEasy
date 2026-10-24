@@ -46,6 +46,12 @@ public class User {
   @Column(name = "preferred_currency", nullable = false, length = 3)
   private String preferredCurrency = "USD";
 
+  @Column(name = "email_verified", nullable = false)
+  private boolean emailVerified;
+
+  @Column(name = "credential_version", nullable = false)
+  private long credentialVersion;
+
   public User(String email, String passwordHash, String displayName) {
     this.email = email;
     this.passwordHash = passwordHash;

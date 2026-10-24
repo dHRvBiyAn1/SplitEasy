@@ -27,3 +27,18 @@ One synchronized in-memory map atomically checks and reserves both login scopes,
 Counters reset on process restart and are independent across instances. Keep the current single-instance deployment; introduce shared enforcement or an explicitly verified edge policy before horizontal scaling. Fixed windows also permit a burst spanning a window boundary. No new datastore, limiter dependency or schema migration is needed for the current deployment.
 
 The limiter adds no password, token, email or IP logging. It does not emit one warning per rejected attempt, avoiding an abuse-driven log flood. Existing successful authentication events and generic bad-credential logs remain unchanged. Metrics/alerting and broader account-enumeration policy are separate work: login errors stay generic; registration's existing 409 for duplicate email remains unchanged.
+
+## Account lifecycle (A02)
+
+Password-reset requests consume 20/IP/5min and 5/normalized email/5min, including
+unknown addresses and unavailable delivery. Confirmation commands share 30/IP/5min
+before challenge lookup. Authenticated verification/email-change/password commands
+share 20/IP/5min and 5/account/5min before database lookup/BCrypt. These use the same
+atomic capped 10000-bucket process-local limiter and 429/Retry-After behavior; share
+state before adding API instances. Rejected payload validation may return 400
+before attempt accounting, but cannot reach token lookup, mail or BCrypt.
+
+Public reset acceptance never guarantees account existence or final delivery.
+Disabled/misconfigured sender gives uniform 503; actual transport failures roll
+back issuance and preserve generic 202 for both known/unknown accounts. Full
+contract and SMTP configuration: [account recovery](account-recovery.md).

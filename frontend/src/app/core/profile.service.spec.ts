@@ -4,18 +4,20 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthResponse } from './auth/auth.models';
 import { AuthService } from './auth/auth.service';
+import { testJwt } from './auth/auth-test-fixture';
 import { AVATAR_COLORS, CurrentProfile, ProfileService } from './profile.service';
 import { ThemeService } from './theme.service';
 import { ProfileComponent } from '../profile/profile.component';
 
 const alice: AuthResponse = {
-  accessToken: 'alice-token',
+  accessToken: testJwt('alice-id'),
   tokenType: 'Bearer',
   expiresIn: 3600,
   user: { id: 'alice-id', email: 'alice@example.com', displayName: 'Alice' },
 };
 const bob: AuthResponse = {
   ...alice,
+  accessToken: testJwt('bob-id'),
   user: { id: 'bob-id', email: 'bob@example.com', displayName: 'Bob' },
 };
 const alicePrefs = {
@@ -33,6 +35,7 @@ describe('account-owned profile preferences', () => {
   function fresh(response: AuthResponse): CurrentProfile {
     return {
       ...response.user,
+      emailVerified: false,
       phone: '',
       preferredCurrency: 'USD',
       avatarColor: AVATAR_COLORS[0],

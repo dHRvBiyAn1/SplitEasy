@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -16,7 +17,7 @@ describe('canonical settlement actions', () => {
   });
 
   it('renders and records the same simplified obligation as the dashboard without a second preview', () => {
-    localStorage.setItem('spliteasy.user', JSON.stringify(me));
+    storeTestSession(me);
     TestBed.configureTestingModule({
       imports: [SettleUpModalComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -48,7 +49,7 @@ describe('canonical settlement actions', () => {
     http.verify();
   });
   it('shows offsetting direct debts and records the displayed incoming direction', () => {
-    localStorage.setItem('spliteasy.user', JSON.stringify(me));
+    storeTestSession(me);
     TestBed.configureTestingModule({
       imports: [SettleUpModalComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
