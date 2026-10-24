@@ -74,6 +74,79 @@ class CurrencyLedgerIntegrationTest extends AbstractIntegrationTest {
   org.springframework.jdbc.core.simple.JdbcClient jdbc;
 
   @Test
+  void totalsBeyondJavascriptSafeIntegerRangeFailInsteadOfReturningRoundedMoney() throws Exception {
+    var ledger = ledger("currency-large-history");
+    // A large valid history: every expense stays within the supported 1e12 transaction cap.
+    jdbc.sql(
+            "INSERT INTO expenses(id,group_id,description,amount_cents,paid_by,created_at,split_type) SELECT gen_random_uuid(),?,'Large USD history',CASE WHEN n=9009 THEN 1 ELSE 1000000000000 END,?,CURRENT_TIMESTAMP,'EQUAL' FROM generate_series(1,9009) n")
+        .params(java.util.UUID.fromString(ledger.groupId()), ledger.alice().user().id())
+        .update();
+    jdbc.sql(
+            "INSERT INTO expense_participants(id,expense_id,user_id,share_cents,split_value) SELECT gen_random_uuid(),id,paid_by,amount_cents,1 FROM expenses WHERE group_id=?")
+        .param(java.util.UUID.fromString(ledger.groupId()))
+        .update();
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/dashboard")
+                .header("X-Ledger-Version", "2")
+                .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken())))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void cataloguePreferenceSelectionDoesNotRelabelHistoricalKwdExpense() throws Exception {
+    var ledger = ledger("currency-preference");
+    expense(ledger, "KWD", 1234, ledger.alice().user().id());
+    var catalogueResult =
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/api/currencies")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken())))
+            .andExpect(status().isOk())
+            .andReturn();
+    var catalogue = new java.util.HashMap<String, Integer>();
+    for (var currency : objectMapper.readTree(catalogueResult.getResponse().getContentAsString()))
+      catalogue.put(currency.path("code").asText(), currency.path("minorUnitExponent").asInt());
+    assertThat(catalogue)
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of("USD", 2, "EUR", 2, "GBP", 2, "INR", 2, "JPY", 0, "KWD", 3));
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/me")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json(Map.of("preferredCurrency", "JPY")))
+                .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken())))
+        .andExpect(status().isOk());
+    var expenses = read(ledger, "/expenses");
+    assertThat(expenses.get(0).path("currency").asText()).isEqualTo("KWD");
+    assertThat(expenses.get(0).path("amountMinor").asLong()).isEqualTo(1234);
+  }
+
+  @Test
+  void fractionalMinorUnitsAreRejectedRatherThanTruncated() throws Exception {
+    var ledger = ledger("currency-fraction");
+    mockMvc
+        .perform(
+            jsonPost(
+                    "/api/groups/" + ledger.groupId() + "/expenses",
+                    Map.of(
+                        "description",
+                        "Fraction",
+                        "amountMinor",
+                        1234.5,
+                        "currency",
+                        "KWD",
+                        "paidByUserId",
+                        ledger.alice().user().id()))
+                .header("X-Ledger-Version", "2")
+                .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken())))
+        .andExpect(status().isBadRequest());
+    assertThat(read(ledger, "/expenses").size()).isZero();
+  }
+
+  @Test
   void legacyUsdCreateReceiptReplaysOriginalSnapshotAfterDeletionWithoutRewritingIt()
       throws Exception {
     var ledger = ledger("currency-legacy-receipt");

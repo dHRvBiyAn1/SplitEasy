@@ -9,4 +9,4 @@ public record UpdateProfileRequest(
         String displayName,
     @Size(max = 50) String phone,
     @Pattern(regexp = "#12A57E|#D96D3F|#3F7BD9|#C25B84|#D9A03F") String avatarColor,
-    @Pattern(regexp = "USD|EUR|GBP|INR") String preferredCurrency) {}
+    @Pattern(regexp = "USD|EUR|GBP|INR|JPY|KWD") String preferredCurrency) {}

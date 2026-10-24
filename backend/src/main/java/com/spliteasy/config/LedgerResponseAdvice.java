@@ -34,18 +34,41 @@ public class LedgerResponseAdvice implements ResponseBodyAdvice<Object> {
       Class<? extends HttpMessageConverter<?>> converter,
       ServerHttpRequest request,
       ServerHttpResponse response) {
-    if (body != null
-        && !"2".equals(request.getHeaders().getFirst(LedgerContract.HEADER))
-        && containsNonUsd(mapper.valueToTree(body)))
-      throw new ConflictException(LedgerContract.UPGRADE);
+    if (body != null) {
+      JsonNode json = mapper.valueToTree(body);
+      requireSafeIntegers(json);
+      if (!"2".equals(request.getHeaders().getFirst(LedgerContract.HEADER))
+          && containsNonUsd(json)) {
+        throw new ConflictException(LedgerContract.UPGRADE);
+      }
+    }
     return body;
+  }
+
+  private void requireSafeIntegers(JsonNode value) {
+    if (value.isObject()) {
+      for (var field : value.properties()) {
+        if (field.getKey().endsWith("Minor") && !field.getValue().isNull()) {
+          long amount = field.getValue().longValue();
+          if (!field.getValue().isIntegralNumber()
+              || amount < -9_007_199_254_740_991L
+              || amount > 9_007_199_254_740_991L) {
+            throw new ConflictException(
+                "This total exceeds the supported exact integer range. Use a smaller ledger scope.");
+          }
+        }
+      }
+    }
+    if (value.isArray() || value.isObject())
+      for (JsonNode child : value) requireSafeIntegers(child);
   }
 
   private boolean containsNonUsd(JsonNode value) {
     if (value.isObject()
         && value.hasNonNull("currency")
         && !"USD".equals(value.path("currency").asText())) return true;
-    if (value.isContainer()) for (JsonNode child : value) if (containsNonUsd(child)) return true;
+    if ((value.isArray() || value.isObject()))
+      for (JsonNode child : value) if (containsNonUsd(child)) return true;
     return false;
   }
 }

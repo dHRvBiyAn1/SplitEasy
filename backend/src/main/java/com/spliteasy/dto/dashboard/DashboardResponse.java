@@ -24,4 +24,19 @@ public record DashboardResponse(
     List<PersonBalance> people,
     List<Settlement> settlements,
     List<ActivityItem> activity,
-    List<CurrencyTotals> totals) {}
+    List<CurrencyTotals> totals) {
+  @com.fasterxml.jackson.annotation.JsonProperty("totalNetMinor")
+  public Long totalNetMinor() {
+    return totalNetCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("owedMinor")
+  public Long owedMinor() {
+    return owedCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("oweMinor")
+  public Long oweMinor() {
+    return oweCents;
+  }
+}
