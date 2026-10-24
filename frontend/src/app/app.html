@@ -106,7 +106,14 @@
         /></a>
       }
       @if (groups().length === 0) {
-        <p class="tray-empty">A trip, a home, a dinner club. Start your first group.</p>
+        @if (overviewLoading()) {
+          <p role="status">Loading groups…</p>
+        } @else if (overviewUnavailable()) {
+          <p role="alert">Groups are unavailable. Try loading your overview again.</p>
+          <button type="button" class="dc-btn-outline" (click)="retryOverview()">Try again</button>
+        } @else {
+          <p class="tray-empty">A trip, a home, a dinner club. Start your first group.</p>
+        }
       }
       <button
         type="button"

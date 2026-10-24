@@ -9,9 +9,9 @@
     "F04"
   ],
   "next_candidates": [
-    "F02",
-    "A01",
-    "E01"
+    "E02",
+    "A02",
+    "H06"
   ],
   "packages": [
     {
@@ -39,12 +39,13 @@
       "depends_on": [
         "F01"
       ],
-      "status": "pr_ready",
+      "status": "merged",
       "conditional": false,
       "branch": "bugfix/alignment-f02-obligation-projection",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
-      "integration_state": "not_merged",
-      "pull_request": 100
+      "integration_state": "merged_dev",
+      "pull_request": 100,
+      "merge_commit": "e5b219773e54f890e56358f2a57de28f56d4bdff"
     },
     {
       "id": "F03",
@@ -90,13 +91,14 @@
         "F03",
         "F04"
       ],
-      "status": "pr_ready",
+      "status": "merged",
       "conditional": false,
       "branch": "bugfix/alignment-a01-server-profile",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
-      "integration_state": "not_merged",
+      "integration_state": "merged_dev",
       "migration_version": "10",
-      "pull_request": 99
+      "pull_request": 99,
+      "merge_commit": "ccee0d171067332ce351890929a65df304aae38c"
     },
     {
       "id": "A02",
@@ -108,8 +110,13 @@
       "depends_on": [
         "A01"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "in_progress",
+      "conditional": false,
+      "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
+      "integration_state": "not_merged",
+      "migration_version": "13",
+      "migration_rollout_after": "E02 V12; promote both together or deploy V12 first",
+      "security_revision": "Credential-version validation revokes access tokens on password reset/change and confirmed email change; device sessions and refresh remain A03."
     },
     {
       "id": "A03",
@@ -202,14 +209,15 @@
       "depends_on": [
         "F01"
       ],
-      "status": "pr_ready",
+      "status": "merged",
       "conditional": false,
       "branch": "bugfix/alignment-e01-split-intent",
       "base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
-      "integration_state": "not_merged",
+      "integration_state": "merged_dev",
       "migration_version": "11",
       "migration_rollout_after": "A01 (V10); promote both migrations together or deploy V10 first",
-      "pull_request": 98
+      "pull_request": 98,
+      "merge_commit": "550f0d33785f8489015f27d97229e3c9d8939b4f"
     },
     {
       "id": "E02",
@@ -222,8 +230,11 @@
         "E01",
         "F04"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "reviewed",
+      "conditional": false,
+      "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
+      "integration_state": "not_merged",
+      "migration_version": "12"
     },
     {
       "id": "E03",
@@ -417,8 +428,10 @@
       "depends_on": [
         "F03"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "reviewed",
+      "conditional": false,
+      "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
+      "integration_state": "not_merged"
     },
     {
       "id": "H07",
@@ -1839,21 +1852,41 @@
     "rea": "retained for investigation"
   },
   "first_batch_delivery": {
-    "state": "reviewed_prs_ready",
+    "state": "merged_dev",
     "scope": "F01/F03/F04 only",
     "next_batch": [
       "F02",
       "A01",
       "E01"
     ],
-    "dependency_gate": "Required companion changes must land in dev before dependent branches start; no merge/deployment performed."
+    "dependency_gate": "F01/F03/F04 merged through PR95-97; final CI39226477137 passed."
   },
   "current_batch": [
-    "F02",
-    "A01",
-    "E01"
+    "E02",
+    "A02",
+    "H06"
   ],
-  "implementation_base_dev": "337858d8197d9228d80a03dfcc7d3aef654b4e04",
+  "implementation_base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
   "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
-  "current_batch_status": "pr_ready"
+  "current_batch_status": "implementation_in_progress",
+  "second_batch_delivery": {
+    "state": "merged_dev",
+    "packages": [
+      "F02",
+      "A01",
+      "E01"
+    ],
+    "pull_requests": [
+      100,
+      99,
+      98
+    ],
+    "dev_head": "e5b219773e54f890e56358f2a57de28f56d4bdff",
+    "ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39294891734"
+  },
+  "sender_decision": {
+    "choice": "Native SMTP Configuration",
+    "owner_confirmed": "2026-10-19",
+    "delivery_status": "Implementation uses standard SMTP and owned local capture; production sender settings not supplied."
+  }
 }

@@ -24,7 +24,10 @@ describe('App', () => {
         provideHttpClientTesting(),
         { provide: PlatformLocation, useClass: BrowserPlatformLocation },
         { provide: APP_BASE_HREF, useValue: '/' },
-        provideRouter([{ path: 'account-action', component: AccountActionComponent }]),
+        provideRouter([
+          { path: 'elsewhere', children: [] },
+          { path: 'account-action', component: AccountActionComponent },
+        ]),
       ],
     }).compileComponents();
     httpTesting = TestBed.inject(HttpTestingController);
@@ -80,6 +83,101 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.brand')?.textContent).toContain('SplitEasy');
     expect(compiled.querySelector('.account-name')?.textContent).toContain('Fresh Alex');
+  });
+  it('refreshes confirmed balances on focus and visibility without duplicating a pending read', () => {
+    signIn();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({
+      id: 'u1',
+      email: 'a@b.com',
+      displayName: 'Alex',
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
+    const overview = {
+      totalNetCents: 0,
+      owedCents: 0,
+      owedPeopleCount: 0,
+      oweCents: 0,
+      owePeopleCount: 0,
+      groupCount: 0,
+      groups: [],
+      people: [],
+      settlements: [],
+      activity: [],
+    };
+    httpTesting.expectOne('/api/dashboard').flush(overview);
+    window.dispatchEvent(new Event('focus'));
+    const refresh = httpTesting.expectOne('/api/dashboard');
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+    httpTesting.expectNone('/api/dashboard');
+    expect(refresh.cancelled).toBe(false);
+    refresh.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.refresh-notice')?.textContent).toContain(
+      'last loaded overview',
+    );
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+    httpTesting.expectNone('/api/dashboard');
+  });
+  it('revalidates the cached overview after navigation', async () => {
+    signIn();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({
+      id: 'u1',
+      email: 'a@b.com',
+      displayName: 'Alex',
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
+    const overview = {
+      totalNetCents: 0,
+      owedCents: 0,
+      owedPeopleCount: 0,
+      oweCents: 0,
+      owePeopleCount: 0,
+      groupCount: 0,
+      groups: [],
+      people: [],
+      settlements: [],
+      activity: [],
+    };
+    httpTesting.expectOne('/api/dashboard').flush(overview);
+    await TestBed.inject(Router).navigateByUrl('/elsewhere');
+    httpTesting.expectOne('/api/dashboard').flush(overview);
+  });
+  it('shows unavailable groups rather than an empty group claim after initial overview failure', () => {
+    signIn();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/me').flush({
+      id: 'u1',
+      email: 'a@b.com',
+      displayName: 'Alex',
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
+    httpTesting.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.nativeElement.querySelector('.mobile-nav [data-nav="groups"]').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.group-tray')?.textContent).toContain(
+      'Groups are unavailable',
+    );
+    expect(fixture.nativeElement.querySelector('.group-tray')?.textContent).not.toContain(
+      'Start your first group',
+    );
   });
   it('settles after an initial dashboard failure until the user retries', () => {
     signIn();

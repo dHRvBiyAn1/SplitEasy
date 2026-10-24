@@ -6,6 +6,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { GroupSettingsComponent } from './group-settings.component';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { SessionService } from '../core/auth/session.service';
 
 const alice = { id: 'alice', displayName: 'Alice', email: 'alice@example.test' };
 const bob = { id: 'bob', displayName: 'Bob', email: 'bob@example.test' };
@@ -163,6 +164,78 @@ describe('group settings bilateral obligations', () => {
     );
   });
 
+  it('rechecks departure eligibility even when the overview refresh fails', () => {
+    const fixture = TestBed.createComponent(GroupSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/groups/g').flush(group);
+    http
+      .expectOne('/api/groups/g/balances')
+      .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
+    http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
+    fixture.detectChanges();
+    TestBed.inject(DashboardService).revalidate();
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    http.expectOne('/api/groups/g').flush(group);
+    http.expectOne('/api/groups/g/balances').flush({ balances: [{ user: bob, netCents: -2000 }] });
+    http
+      .expectOne('/api/groups/g/balances/current-obligations')
+      .flush([{ from: bob, to: carol, amountCents: 2000 }]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label="Remove Bob"]')?.disabled).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Owes $20.00 to Carol');
+  });
+  it('offers an independent retry when initial group settings are unavailable', () => {
+    const fixture = TestBed.createComponent(GroupSettingsComponent);
+    fixture.detectChanges();
+    const pending = http.expectOne('/api/groups/g');
+    http.expectOne('/api/groups/g/balances');
+    http.expectOne('/api/groups/g/balances/current-obligations');
+    pending.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    const retry = Array.from(
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((b) => b.textContent?.trim() === 'Reload group');
+    expect(retry).toBeDefined();
+    retry!.click();
+    http.expectOne('/api/groups/g').flush(group);
+    http
+      .expectOne('/api/groups/g/balances')
+      .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
+    http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label="Remove Bob"]')?.disabled).toBe(false);
+    http.expectNone('/api/dashboard');
+  });
+  it('removes previously loaded settings after membership revalidation is denied', () => {
+    const fixture = TestBed.createComponent(GroupSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/groups/g').flush(group);
+    http.expectOne('/api/groups/g/balances').flush({ balances: [] });
+    http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
+    fixture.detectChanges();
+    TestBed.inject(DashboardService).revalidate();
+    const pending = http.expectOne('/api/groups/g');
+    http.expectOne('/api/groups/g/balances');
+    http.expectOne('/api/groups/g/balances/current-obligations');
+    pending.flush({}, { status: 403, statusText: 'Forbidden' });
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('You are not a member');
+    expect(fixture.nativeElement.querySelector('[aria-label="Remove Bob"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.gset__name')).toBeNull();
+  });
+  it('clears loaded settings synchronously at an account boundary', () => {
+    const fixture = TestBed.createComponent(GroupSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/groups/g').flush(group);
+    http.expectOne('/api/groups/g/balances').flush({ balances: [] });
+    http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
+    fixture.detectChanges();
+    TestBed.inject(SessionService).reset();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label="Remove Bob"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.gset__name')).toBeNull();
+  });
   it('fails closed after a refresh cannot load obligations, including an open leave confirmation', () => {
     const fixture = TestBed.createComponent(GroupSettingsComponent);
     fixture.detectChanges();
