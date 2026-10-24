@@ -9,6 +9,7 @@ export interface SplitShare {
 }
 
 export interface ExpenseResponse {
+  version?: number;
   id: string;
   groupId: string;
   description: string;
@@ -26,6 +27,7 @@ export interface ExpenseResponse {
 }
 
 export interface ExpenseSummary {
+  version?: number;
   id: string;
   description: string;
   amountCents: number;
@@ -45,6 +47,8 @@ export interface SplitInput {
 }
 
 export interface CreateExpenseRequest {
+  operationId?: string;
+  expectedVersion?: number;
   description: string;
   amountCents: number;
   paidByUserId: string;

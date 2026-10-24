@@ -406,7 +406,11 @@ paths:
     post:
       operationId: createGroup
       summary: Create a group
-      description: Creates a group; the caller is auto-inserted as its only member and creator.
+      description: |
+        Creates a group; the caller becomes its only member and creator. Optional UUID
+        operationId is scoped to the authenticated actor. Identical replay returns the
+        immutable original201 response; changed intent returns409. Replay requires
+        current membership in the original group. Missing/null ID is legacy additive.
       tags: [Groups]
       requestBody:
         required: true
@@ -428,6 +432,12 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Operation ID reused for changed intent
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/groups/{groupId}:
     parameters:
@@ -598,7 +608,10 @@ paths:
       operationId: createExpense
       summary: Create an expense
       description: |
-        Creates an expense split among participants.
+        Creates an expense split among participants. Optional UUID operationId is scoped
+        to authenticated actor/group. Identical replay returns the immutable original201
+        response even after edit/delete; changed intent returns409. Current membership
+        is checked before replay. Missing/null ID retains legacy additive writes.
 
         - `splitType` null → EQUAL. For EQUAL, `participantUserIds` null/empty = all members.
         - UNEQUAL: `splits` carries per-participant **cents** that must sum to `amountCents`.
@@ -647,6 +660,10 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+        "409":
+          $ref: "#/components/responses/Conflict"
+          description: Operation ID reused for changed intent
+
   /api/groups/{groupId}/expenses/{expenseId}:
     parameters:
       - $ref: "#/components/parameters/GroupIdParam"
@@ -683,8 +700,11 @@ paths:
         member may edit an expense, but the old persisted payer and every old share
         participant must still be active; otherwise 409 instructs re-adding former
         participants first. Financial mutations serialize per group. Detected
-        persistence write conflicts also return 409 with reload guidance; no version,
-        ETag or If-Match precondition protects a stale form. Omitted/null splitType
+        persistence write conflicts also return409. Submit expectedVersion from the
+        detail response; mismatch409 preserves the winner. Missing versions are accepted
+        only before app.expenses.version-required-from (default2026-11-19T00:00:00Z),
+        then400 requires reload/upgrade. Never automatically retry a stale edit.
+        Omitted/null splitType
         defaults to EQUAL, participantUserIds null/empty selects all active members for
         EQUAL, category defaults to OTHER and spentOn defaults to today; omitted fields
         are not retained from the old expense.
@@ -721,12 +741,25 @@ paths:
         recorded payer or any share participant is no longer active, returns 409 with
         instructions to re-add former participants before changing history. No expense,
         share or payment is changed by a rejected deletion. Financial mutations
-        serialize per group; detected persistence write conflicts return 409. There is
-        no version or stale-form precondition.
+        serialize per group. Submit expectedVersion from the list/detail as a query
+        parameter; mismatch409 preserves the expense. Missing versions are accepted
+        only before the configured finite UTC deadline (default2026-11-19T00:00:00Z),
+        then400 requires reload/upgrade.
       tags: [Expenses]
+      parameters:
+        - name: expectedVersion
+          in: query
+          required: false
+          description: Required by new clients; server enforces at the finite rollout deadline
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
       responses:
         "204":
           description: Expense deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1116,6 +1149,10 @@ components:
       type: object
       required: [name]
       properties:
+        operationId:
+          type: [string, "null"]
+          format: uuid
+          description: Optional scoped create identity; exact retries replay the original response
         name:
           type: string
           maxLength: 100
@@ -1223,6 +1260,15 @@ components:
       type: object
       required: [description, amountCents, paidByUserId]
       properties:
+        expectedVersion:
+          type: [integer, "null"]
+          format: int64
+          minimum: 0
+          description: PUT precondition; new clients always send the loaded version; required after finite rollout deadline
+        operationId:
+          type: [string, "null"]
+          format: uuid
+          description: Optional scoped create identity; exact retries replay the original response
         description:
           type: string
           maxLength: 200
@@ -1281,8 +1327,13 @@ components:
 
     ExpenseResponse:
       type: object
-      required: [id, groupId, description, amountCents, splitType, category, spentOn, paidBy, participants, participantUserIds, splits, createdAt]
+      required: [id, groupId, description, amountCents, splitType, category, spentOn, paidBy, participants, participantUserIds, splits, createdAt, version]
       properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque expectedVersion for financial edit/delete
         id:
           type: string
           format: uuid
@@ -1334,8 +1385,13 @@ components:
 
     ExpenseSummary:
       type: object
-      required: [id, description, amountCents, paidBy, participantCount, category, spentOn, viewerDeltaCents, createdAt]
+      required: [id, description, amountCents, paidBy, participantCount, category, spentOn, viewerDeltaCents, createdAt, version]
       properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque expectedVersion for financial edit/delete
         id:
           type: string
           format: uuid

@@ -17,8 +17,12 @@ export class GroupService {
     return this.api.get<GroupResponse>(`/groups/${id}`);
   }
 
-  createGroup(name: string, type?: GroupType): Observable<GroupResponse> {
-    return this.api.post<GroupResponse>('/groups', { name, type });
+  createGroup(name: string, type?: GroupType, operationId?: string): Observable<GroupResponse> {
+    return this.api.post<GroupResponse>('/groups', {
+      name,
+      type,
+      ...(operationId ? { operationId } : {}),
+    });
   }
 
   addMember(groupId: string, email: string): Observable<GroupResponse> {

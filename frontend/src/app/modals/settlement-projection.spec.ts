@@ -11,7 +11,10 @@ const me = { id: 'a', displayName: 'Alice', email: 'a@test.com' };
 const carol = { id: 'c', displayName: 'Carol', email: 'c@test.com' };
 
 describe('canonical settlement actions', () => {
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   it('renders and records the same simplified obligation as the dashboard without a second preview', () => {
     storeTestSession(me);
