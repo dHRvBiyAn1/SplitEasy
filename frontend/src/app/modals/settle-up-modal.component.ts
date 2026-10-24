@@ -6,6 +6,12 @@ import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
 import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
+import {
+  PendingWritesService,
+  PendingWriteError,
+  UNCERTAIN_WRITE,
+} from '../core/pending-writes.service';
+import { RecordPaymentRequest } from '../payments/payment.models';
 import { PaymentService } from '../payments/payment.service';
 import { avatarTint } from '../core/avatar';
 import { ModalService } from './modal.service';
@@ -19,6 +25,8 @@ import { ModalShellComponent } from './modal-shell.component';
 })
 export class SettleUpModalComponent {
   private readonly dashboard = inject(DashboardService);
+  private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly retryNotice = signal<string | null>(null);
   private readonly payments = inject(PaymentService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
@@ -52,6 +60,19 @@ export class SettleUpModalComponent {
     this.destroyRef.onDestroy(() => {
       if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
     });
+    try {
+      const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
+      if (pending?.draft) {
+        this.selected.set(pending.draft as Settlement);
+        this.amount.set(centsToDisplay(pending.request.amountCents));
+        this.retryNotice.set(UNCERTAIN_WRITE);
+        return;
+      }
+    } catch {
+      this.error.set(
+        'Cannot read the saved retry draft. Check history before starting a separate entry.',
+      );
+    }
     const prefill = this.modal.settlePrefill();
     if (prefill) {
       this.amount.set(centsToDisplay(Math.abs(prefill.netCents)));
@@ -128,7 +149,7 @@ export class SettleUpModalComponent {
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.payments
-      .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents })
+      .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents }, s)
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
@@ -136,10 +157,46 @@ export class SettleUpModalComponent {
           this.modal.close();
         },
         error: (err) => {
-          this.error.set(err?.error?.message ?? 'Could not record the payment.');
+          this.error.set(
+            err instanceof PendingWriteError
+              ? err.message
+              : (err?.error?.message ?? 'Could not record the payment.'),
+          );
+          this.retryNotice.set(UNCERTAIN_WRITE);
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
       });
+  }
+  retryOriginal(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    try {
+      const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
+      if (!pending?.draft) return;
+      this.selected.set(pending.draft as Settlement);
+      this.amount.set(centsToDisplay(pending.request.amountCents));
+      this.confirm();
+    } catch {
+      this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
+    }
+  }
+
+  abandonRetry(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    if (
+      !window.confirm(
+        'The previous payment may already have been recorded. Check payment history first. Start a separate payment anyway?',
+      )
+    )
+      return;
+    try {
+      this.pendingWrites.abandon('payment');
+      this.retryNotice.set(null);
+      this.error.set(null);
+    } catch {
+      this.error.set(
+        'Cannot clear the saved retry identity. Enable browser storage and try again.',
+      );
+    }
   }
 }

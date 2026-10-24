@@ -260,12 +260,19 @@ export class GroupDetailComponent implements OnInit {
     if (this.deletingId()) {
       return;
     }
+    if (!Number.isSafeInteger(e.version) || e.version! < 0) {
+      this.deleteError.set({
+        expenseId: e.id,
+        message: 'Reload or upgrade the app before deleting this expense safely.',
+      });
+      return;
+    }
     if (!confirm(`Delete "${e.description}"? This can't be undone.`)) {
       return;
     }
     this.deleteError.set(null);
     this.deletingId.set(e.id);
-    this.scoped(this.expensesApi.deleteExpense(this.groupId, e.id)).subscribe({
+    this.scoped(this.expensesApi.deleteExpense(this.groupId, e.id, e.version)).subscribe({
       next: () => {
         this.expandedId.set(null);
         this.detail.set(null);

@@ -152,11 +152,11 @@ describe('SettleUpModalComponent', () => {
     fixture.detectChanges();
     fixture.nativeElement.querySelector('.dc-btn-accent').click();
 
-    expect(recordPayment).toHaveBeenCalledWith('g1', {
-      payerUserId: priya.id, // she owes me, so she pays
-      payeeUserId: me.id,
-      amountCents: 1250,
-    });
+    expect(recordPayment).toHaveBeenCalledWith(
+      'g1',
+      { payerUserId: priya.id, payeeUserId: me.id, amountCents: 1250 },
+      { groupId: 'g1', groupName: 'Maple St. House', counterparty: priya, netCents: 3000 },
+    );
   });
 
   it('rejects a non-positive amount', async () => {

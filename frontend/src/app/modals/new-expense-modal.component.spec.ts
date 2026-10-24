@@ -23,7 +23,10 @@ const group: GroupResponse = {
   simplifyDebts: true,
   createdAt: '2026-10-17T00:00:00Z',
 };
+beforeEach(() => sessionStorage.clear());
+
 const expense: ExpenseResponse = {
+  version: 0,
   id: 'current-expense',
   groupId: group.id,
   description: 'Original lunch',

@@ -199,6 +199,20 @@
           Retry members and expense
         </button>
       }
+      @if (retryNotice()) {
+        <p role="status">{{ retryNotice() }}</p>
+        <button
+          type="button"
+          class="dc-btn-outline"
+          [disabled]="saving() || !ready()"
+          (click)="retryOriginal()"
+        >
+          Retry original expense
+        </button>
+        <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
+          Start a separate expense
+        </button>
+      }
       @if (error()) {
         <p class="mform__error" role="alert">{{ error() }}</p>
       }

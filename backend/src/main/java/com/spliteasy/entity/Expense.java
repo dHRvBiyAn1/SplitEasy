@@ -37,6 +37,10 @@ public class Expense {
   @JoinColumn(name = "group_id", nullable = false, updatable = false)
   private Group group;
 
+  @jakarta.persistence.Version
+  @Column(nullable = false)
+  private long version;
+
   @Column(nullable = false)
   private String description;
 

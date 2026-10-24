@@ -27,7 +27,31 @@ public record CreateExpenseRequest(
     SplitType splitType,
     @Valid List<@NotNull SplitInput> splits,
     ExpenseCategory category,
-    LocalDate spentOn) {
+    LocalDate spentOn,
+    UUID operationId,
+    @jakarta.validation.constraints.PositiveOrZero Long expectedVersion) {
+
+  public CreateExpenseRequest(
+      String description,
+      long amountCents,
+      UUID paidByUserId,
+      List<UUID> participantUserIds,
+      SplitType splitType,
+      List<SplitInput> splits,
+      ExpenseCategory category,
+      LocalDate spentOn) {
+    this(
+        description,
+        amountCents,
+        paidByUserId,
+        participantUserIds,
+        splitType,
+        splits,
+        category,
+        spentOn,
+        null,
+        null);
+  }
 
   /** Convenience for equal splits (and existing callers): no explicit splitType/splits/category. */
   public CreateExpenseRequest(

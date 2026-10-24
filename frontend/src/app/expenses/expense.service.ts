@@ -28,8 +28,10 @@ export class ExpenseService {
     return this.api.put<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}`, request);
   }
 
-  deleteExpense(groupId: string, expenseId: string): Observable<void> {
-    return this.api.delete<void>(`/groups/${groupId}/expenses/${expenseId}`);
+  deleteExpense(groupId: string, expenseId: string, expectedVersion?: number): Observable<void> {
+    return this.api.delete<void>(
+      `/groups/${groupId}/expenses/${expenseId}${expectedVersion === undefined ? '' : `?expectedVersion=${expectedVersion}`}`,
+    );
   }
 }
 
