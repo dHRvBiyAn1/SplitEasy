@@ -125,6 +125,9 @@ public class AccountLifecycleService {
 
   private void invalidateCredentials(User user) {
     user.setCredentialVersion(Math.incrementExact(user.getCredentialVersion()));
+    jdbc.update(
+        "update auth_sessions set revoked_at = CURRENT_TIMESTAMP where user_id=? and revoked_at is null",
+        user.getId());
     jdbc.update("delete from account_challenges where user_id = ?", user.getId());
   }
 

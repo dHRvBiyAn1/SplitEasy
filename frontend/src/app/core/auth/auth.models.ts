@@ -5,6 +5,7 @@ export interface UserSummary {
 }
 
 export interface AuthResponse {
+  sessionId: string;
   accessToken: string;
   tokenType: string;
   expiresIn: number;
@@ -20,4 +21,13 @@ export interface RegisterRequest {
 export interface LoginRequest {
   email: string;
   password: string;
+}
+
+export interface DeviceSession {
+  id: string;
+  deviceLabel: string;
+  createdAt: string;
+  refreshedAt: string;
+  expiresAt: string;
+  current: boolean;
 }

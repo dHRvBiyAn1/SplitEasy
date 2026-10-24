@@ -11,6 +11,7 @@ import { ProfileComponent } from '../profile/profile.component';
 
 const alice: AuthResponse = {
   accessToken: testJwt('alice-id'),
+  sessionId: 'alice-device',
   tokenType: 'Bearer',
   expiresIn: 3600,
   user: { id: 'alice-id', email: 'alice@example.com', displayName: 'Alice' },
@@ -18,6 +19,7 @@ const alice: AuthResponse = {
 const bob: AuthResponse = {
   ...alice,
   accessToken: testJwt('bob-id'),
+  sessionId: 'bob-device',
   user: { id: 'bob-id', email: 'bob@example.com', displayName: 'Bob' },
 };
 const alicePrefs = {
@@ -72,13 +74,17 @@ describe('account-owned profile preferences', () => {
     request.flush(server[id]);
   }
 
-  function boot(): void {
+  function boot(restored?: AuthResponse): void {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     auth = TestBed.inject(AuthService);
     profile = TestBed.inject(ProfileService);
     requests = TestBed.inject(HttpTestingController);
+    if (restored) {
+      auth.restore().subscribe();
+      requests.expectOne('/api/auth/refresh').flush(restored);
+    }
   }
 
   function login(response: AuthResponse, register = false): void {
@@ -99,6 +105,7 @@ describe('account-owned profile preferences', () => {
     login(alice);
     update(alicePrefs);
     auth.logout();
+    requests.expectOne('/api/auth/logout').flush(null);
     expect(profile.prefs().phone).toBe('');
     login(bob);
     expect(profile.prefs()).toMatchObject({
@@ -113,7 +120,7 @@ describe('account-owned profile preferences', () => {
     expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });
     requests.verify();
     TestBed.resetTestingModule();
-    boot();
+    boot(alice);
     load(alice);
     expect(auth.user()?.id).toBe(alice.user.id);
     expect(profile.prefs()).toMatchObject({ ...alicePrefs, joinedAt: '2020-01-01T00:00:00Z' });

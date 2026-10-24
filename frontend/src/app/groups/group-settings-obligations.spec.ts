@@ -27,7 +27,6 @@ describe('group settings bilateral obligations', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     localStorage.clear();
-    storeTestSession(bob);
     TestBed.configureTestingModule({
       imports: [GroupSettingsComponent],
       providers: [
@@ -38,6 +37,7 @@ describe('group settings bilateral obligations', () => {
       ],
     });
     http = TestBed.inject(HttpTestingController);
+    storeTestSession(bob);
   });
   afterEach(() => {
     http.verify({ ignoreCancelled: true });

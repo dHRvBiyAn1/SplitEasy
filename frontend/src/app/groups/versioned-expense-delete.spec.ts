@@ -15,7 +15,6 @@ describe('versioned expense deletion through the group route', () => {
   });
 
   it('sends the displayed version and retains the expense after a stale-delete conflict', async () => {
-    storeTestSession(user);
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -24,6 +23,7 @@ describe('versioned expense deletion through the group route', () => {
       ],
     });
     const http = TestBed.inject(HttpTestingController);
+    storeTestSession(user);
     const harness = await RouterTestingHarness.create('/groups/g');
     const summary = {
       id: 'e',

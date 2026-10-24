@@ -1,3 +1,4 @@
+import { storeTestSession } from './core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -35,11 +36,6 @@ describe('overview read retry controls', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem(
-      'spliteasy.accessToken',
-      'e30.' + btoa(JSON.stringify({ sub: user.id })) + '.fixture',
-    );
-    localStorage.setItem('spliteasy.user', JSON.stringify(user));
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -49,6 +45,7 @@ describe('overview read retry controls', () => {
       ],
     });
     http = TestBed.inject(HttpTestingController);
+    storeTestSession(user);
   });
   afterEach(() => {
     http.verify();

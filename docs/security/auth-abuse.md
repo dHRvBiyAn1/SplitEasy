@@ -7,6 +7,7 @@ The application adds a small, independent protection for its single Java instanc
 | POST `/api/auth/login` | IP | 30 attempts | 5 minutes |
 | POST `/api/auth/login` | normalized email + IP | 5 attempts | 5 minutes |
 | POST `/api/auth/register` | IP | 20 attempts | 1 hour |
+| POST `/api/auth/refresh` | IP | 120 attempts | 5 minutes |
 
 The registration allowance supports shared-IP group onboarding and can be changed with `APP_AUTH_REGISTRATION_LIMIT` (positive integer). Login scopes apply together. An account's budget is local to each IP, avoiding an account-wide lockout an unrelated remote visitor could trigger. Distributed guessing across many source IPs remains an edge/monitoring concern.
 
@@ -42,3 +43,8 @@ Public reset acceptance never guarantees account existence or final delivery.
 Disabled/misconfigured sender gives uniform 503; actual transport failures roll
 back issuance and preserve generic 202 for both known/unknown accounts. Full
 contract and SMTP configuration: [account recovery](account-recovery.md).
+
+A03 refresh attempts use an independent IP budget after the trusted-Origin and
+explicit browser-header check, before credential lookup. Missing, unknown,
+expired and reused cookies all consume it. Refresh never resets login or
+registration budgets, and protected access does not consume refresh attempts.

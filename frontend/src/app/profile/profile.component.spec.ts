@@ -18,6 +18,7 @@ describe('truthful profile preferences', () => {
     const http = TestBed.inject(HttpTestingController);
     http.expectOne('/api/auth/login').flush({
       accessToken: 'token',
+      sessionId: 'alice-device',
       user: { id: 'alice', displayName: 'Alice', email: 'alice@example.com' },
     });
     const fixture = TestBed.createComponent(ProfileComponent);
@@ -90,7 +91,9 @@ describe('server profile request ownership and errors', () => {
   });
   function login(user = alice): void {
     auth.login({ email: user.email, password: 'password' }).subscribe();
-    http.expectOne('/api/auth/login').flush({ accessToken: `${user.id}-token`, user });
+    http
+      .expectOne('/api/auth/login')
+      .flush({ accessToken: `${user.id}-token`, sessionId: `${user.id}-device`, user });
   }
   beforeEach(() => {
     localStorage.clear();

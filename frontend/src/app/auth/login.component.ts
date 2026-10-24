@@ -19,6 +19,7 @@ export class LoginComponent {
     inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === 'password-changed'
       ? 'Password changed. Log in with your new password.'
       : '';
+  protected readonly logoutWarning = this.auth.logoutWarning;
   protected readonly passwordVisible = signal(false);
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);

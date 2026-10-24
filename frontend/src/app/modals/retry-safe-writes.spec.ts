@@ -1,9 +1,9 @@
-import { storeTestSession } from '../core/auth/auth-test-fixture';
+import { storeTestSession, testAuthResponse } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { appConfig } from '../app.config';
 import { ProfileComponent } from '../profile/profile.component';
-import { Component } from '@angular/core';
+import { ApplicationInitStatus, Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ModalService } from './modal.service';
@@ -18,7 +18,7 @@ const actor = { id: 'owner', email: 'owner@example.test', displayName: 'Owner' }
 describe('retry-safe rendered writes', () => {
   let http: HttpTestingController;
   let fixture: ComponentFixture<NewGroupModalComponent>;
-  function open() {
+  function open(restore = false) {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -27,6 +27,7 @@ describe('retry-safe rendered writes', () => {
       ],
     });
     http = TestBed.inject(HttpTestingController);
+    storeTestSession(actor, restore);
     TestBed.inject(ModalService).openGroup();
     fixture = TestBed.createComponent(NewGroupModalComponent);
     fixture.detectChanges();
@@ -45,7 +46,6 @@ describe('retry-safe rendered writes', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    storeTestSession(actor);
     open();
   });
   afterEach(() => {
@@ -65,7 +65,7 @@ describe('retry-safe rendered writes', () => {
     first.error(new ProgressEvent('error'));
     fixture.destroy();
     TestBed.resetTestingModule();
-    open();
+    open(true);
     expect((fixture.nativeElement.querySelector('#ng-name') as HTMLInputElement).value).toBe(
       'Weekend',
     );
@@ -122,7 +122,7 @@ describe('retry-safe rendered writes', () => {
     request.flush({ message: 'Operation conflict.' }, { status: 409, statusText: 'Conflict' });
     fixture.destroy();
     TestBed.resetTestingModule();
-    open();
+    open(true);
     expect((fixture.nativeElement.querySelector('#ng-name') as HTMLInputElement).value).toBe(
       'Original trip',
     );
@@ -140,6 +140,8 @@ describe('retry-safe rendered writes', () => {
       providers: [...appConfig.providers, provideHttpClientTesting()],
     });
     http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/auth/refresh').flush(testAuthResponse(actor));
+    await TestBed.inject(ApplicationInitStatus).donePromise;
     const profile = TestBed.createComponent(ProfileComponent);
     profile.detectChanges();
     http.expectOne('/api/me').flush({
@@ -150,12 +152,12 @@ describe('retry-safe rendered writes', () => {
       createdAt: '2026-01-01T00:00:00Z',
     });
     (profile.nativeElement.querySelector('.profile__signout') as HTMLButtonElement).click();
+    http.expectOne('/api/auth/logout').flush(null);
     await profile.whenStable();
     profile.destroy();
     http.verify();
     TestBed.resetTestingModule();
-    storeTestSession(actor);
-    open();
+    open(false);
     expect((fixture.nativeElement.querySelector('#ng-name') as HTMLInputElement).value).toBe('');
     fill('#ng-name', 'Original trip');
     submit();
@@ -198,11 +200,12 @@ describe('retry-safe rendered expense drafts', () => {
   let http: HttpTestingController;
   let fixture: ComponentFixture<NewExpenseModalComponent>;
   const group = { id: 'g', name: 'Trip', members: [actor] };
-  function open() {
+  function open(restore = false) {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
+    storeTestSession(actor, restore);
     TestBed.inject(ModalService).openExpense('g');
     fixture = TestBed.createComponent(NewExpenseModalComponent);
     fixture.detectChanges();
@@ -223,7 +226,6 @@ describe('retry-safe rendered expense drafts', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    storeTestSession(actor);
     open();
   });
   afterEach(() => {
@@ -243,7 +245,7 @@ describe('retry-safe rendered expense drafts', () => {
     first.error(new ProgressEvent('error'));
     fixture.destroy();
     TestBed.resetTestingModule();
-    open();
+    open(true);
     expect((fixture.nativeElement.querySelector('#ne-desc') as HTMLInputElement).value).toBe(
       'Dinner',
     );
@@ -306,11 +308,12 @@ describe('retry-safe rendered payment drafts', () => {
     counterparty: { id: 'friend', email: 'friend@example.test', displayName: 'Friend' },
     netCents: -1000,
   };
-  function open(prefill = true) {
+  function open(prefill = true, restore = false) {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
+    storeTestSession(actor, restore);
     TestBed.inject(ModalService).openSettle(prefill ? settlement : undefined);
     fixture = TestBed.createComponent(SettleUpModalComponent);
     fixture.detectChanges();
@@ -322,7 +325,6 @@ describe('retry-safe rendered payment drafts', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    storeTestSession(actor);
     open();
   });
   afterEach(() => {
@@ -341,7 +343,7 @@ describe('retry-safe rendered payment drafts', () => {
     first.error(new ProgressEvent('error'));
     fixture.destroy();
     TestBed.resetTestingModule();
-    open(false);
+    open(false, true);
     expect((fixture.nativeElement.querySelector('input') as HTMLInputElement | null)?.value).toBe(
       '4.56',
     );

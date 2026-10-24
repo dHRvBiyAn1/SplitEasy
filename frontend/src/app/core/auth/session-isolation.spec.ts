@@ -20,6 +20,7 @@ import { AuthService } from './auth.service';
 
 const alice: AuthResponse = {
   accessToken: testJwt('alice'),
+  sessionId: 'alice-device',
   tokenType: 'Bearer',
   expiresIn: 3600,
   user: { id: 'alice', displayName: 'Alice', email: 'alice@example.com' },
@@ -27,6 +28,7 @@ const alice: AuthResponse = {
 const bob: AuthResponse = {
   ...alice,
   accessToken: 'bob-token',
+  sessionId: 'bob-device',
   user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
 };
 const aliceDashboard: DashboardResponse = {
@@ -78,8 +80,6 @@ describe('account session isolation', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('spliteasy.accessToken', alice.accessToken);
-    localStorage.setItem('spliteasy.user', JSON.stringify(alice.user));
     TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -91,12 +91,17 @@ describe('account session isolation', () => {
     requests = TestBed.inject(HttpTestingController);
     http = TestBed.inject(HttpClient);
     auth = TestBed.inject(AuthService);
+    auth.login({ email: alice.user.email, password: 'fixture-password' }).subscribe();
+    requests.expectOne('/api/auth/login').flush(alice);
     dashboard = TestBed.inject(DashboardService);
     modal = TestBed.inject(ModalService);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
 
-  afterEach(() => requests.verify());
+  afterEach(() => {
+    requests.match('/api/auth/logout').forEach((request) => request.flush(null));
+    requests.verify();
+  });
 
   function login(response: AuthResponse = bob): void {
     auth.login({ email: response.user.email, password: 'test-password' }).subscribe();
@@ -184,6 +189,7 @@ describe('account session isolation', () => {
 
     http.get('/api/groups').subscribe({ error: () => {} });
     requests.expectOne('/api/groups').flush({}, unauthorized);
+    requests.expectOne('/api/auth/refresh').flush({}, unauthorized);
     fixture.detectChanges();
     expect(auth.user()).toBeNull();
     expect(navigate).toHaveBeenCalledWith(['/login']);
@@ -237,6 +243,7 @@ describe('account session isolation', () => {
       } else {
         http.get('/api/groups').subscribe({ error: () => {} });
         requests.expectOne('/api/groups').flush({}, unauthorized);
+        requests.expectOne('/api/auth/refresh').flush({}, unauthorized);
       }
 
       expect(dashboard.data()).toBeNull();
@@ -365,6 +372,7 @@ describe('account session isolation', () => {
     const second = requests.expectOne('/api/dashboard');
     first.flush({}, unauthorized);
     second.flush({}, unauthorized);
+    requests.expectOne('/api/auth/refresh').flush({}, unauthorized);
     expect(auth.isAuthenticated()).toBe(false);
     expect(auth.getToken()).toBeNull();
     expect(navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
