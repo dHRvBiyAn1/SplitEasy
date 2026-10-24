@@ -1,12 +1,18 @@
 <div class="gd">
   <a class="gd__back" routerLink="/dashboard"><span aria-hidden="true">‹</span> Dashboard</a>
 
-  @if (loading()) {
+  @if (loading() && !group()) {
     <div class="dc-loading" role="status" aria-label="Loading group"></div>
-  } @else if (error()) {
+  } @else if (error() && !group()) {
     <p class="gd__error" role="alert">{{ error() }}</p>
     <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
   } @else if (group(); as g) {
+    @if (error()) {
+      <p class="gd__error" role="alert">{{ error() }} Showing the last loaded group.</p>
+      <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
+    } @else if (loading()) {
+      <p role="status">Refreshing group…</p>
+    }
     <header class="gd__head">
       <app-group-art [type]="g.type" />
       <div class="gd__id">
@@ -14,7 +20,12 @@
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
       </div>
       <div class="gd__actions">
-        <button type="button" class="dc-btn-outline" (click)="settleUp()">
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="settleUp()"
+          [disabled]="loading() || !!error()"
+        >
           <svg
             viewBox="0 0 24 24"
             width="15"

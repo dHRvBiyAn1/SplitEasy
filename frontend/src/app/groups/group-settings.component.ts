@@ -2,7 +2,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { GroupArtComponent } from '../shared/group-art.component';
-import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
@@ -79,17 +79,22 @@ export class GroupSettingsComponent implements OnInit {
   protected readonly canLeave = computed(() => this.blockedReason(this.meId()) === null);
 
   constructor() {
-    // A modal action (add member) refreshes the dashboard; re-read so the list stays in step.
-    let initial = true;
-    effect(() => {
-      this.dashboard.data();
-      if (initial) {
-        initial = false;
-        return;
-      }
-      if (this.groupId) {
-        this.reload();
-      }
+    this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.group.set(null);
+      this.memberBalances.set([]);
+      this.obligations.set([]);
+      this.financialsReady.set(false);
+      this.editingName.set(false);
+      this.nameControl.reset('');
+      this.savingName.set(false);
+      this.savingSimplify.set(false);
+      this.confirming.set(null);
+      this.busy.set(false);
+      this.error.set(null);
+      this.loading.set(false);
+    });
+    this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe((force) => {
+      if (this.groupId) this.reload(force);
     });
   }
 
@@ -113,7 +118,8 @@ export class GroupSettingsComponent implements OnInit {
     });
   }
 
-  private reload(): void {
+  private reload(force = true): void {
+    if (!force && this.loadRequest && !this.loadRequest.closed) return;
     this.loadRequest?.unsubscribe();
     this.financialsReady.set(false);
     this.memberBalances.set([]);
@@ -135,6 +141,7 @@ export class GroupSettingsComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
+        if (err?.status === 403 || err?.status === 404) this.group.set(null);
         this.error.set(
           err?.status === 403
             ? 'You are not a member of this group.'
@@ -143,6 +150,10 @@ export class GroupSettingsComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  retry(): void {
+    this.reload();
   }
 
   /** That member's net in this group; 0 when they have no activity yet. */
@@ -230,7 +241,7 @@ export class GroupSettingsComponent implements OnInit {
     this.scoped(this.groups.removeMember(this.groupId, userId)).subscribe({
       next: () => {
         this.busy.set(false);
-        this.dashboard.refresh(); // effect() re-reads this group
+        this.dashboard.refresh(); // also re-reads this group
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not remove that member.');
@@ -252,9 +263,7 @@ export class GroupSettingsComponent implements OnInit {
       next: (updated) => {
         this.group.set(updated);
         this.savingSimplify.set(false);
-        // Recheck eligibility immediately; the dashboard refresh may fail independently.
-        this.reload();
-        this.dashboard.refresh();
+        this.dashboard.refresh(); // also rechecks group eligibility independently
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not change that setting.');

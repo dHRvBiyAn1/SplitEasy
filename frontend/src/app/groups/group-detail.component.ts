@@ -2,7 +2,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { GroupArtComponent } from '../shared/group-art.component';
-import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { UserSummary } from '../core/auth/auth.models';
@@ -101,18 +101,23 @@ export class GroupDetailComponent implements OnInit {
   });
 
   constructor() {
-    // Reload group-scoped data whenever the shared dashboard payload changes
-    // (a modal action calls dashboard.refresh(), so this stays in sync).
-    let initial = true;
-    effect(() => {
-      this.dashboard.data();
-      if (initial) {
-        initial = false;
-        return;
-      }
-      if (this.groupId) {
-        this.reload();
-      }
+    this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.group.set(null);
+      this.myBalances.set([]);
+      this.expenses.set([]);
+      this.detailCache.clear();
+      this.expandedId.set(null);
+      this.detail.set(null);
+      this.detailLoading.set(false);
+      this.detailError.set(null);
+      this.deleteError.set(null);
+      this.deletingId.set(null);
+      this.error.set(null);
+      this.loading.set(false);
+    });
+    // Group reads do not depend on the overview request succeeding.
+    this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe((force) => {
+      if (this.groupId) this.reload(force);
     });
   }
 
@@ -128,6 +133,8 @@ export class GroupDetailComponent implements OnInit {
       this.group.set(null);
       this.myBalances.set([]);
       this.expenses.set([]);
+      this.detailError.set(null);
+      this.deleteError.set(null);
       this.deletingId.set(null);
       this.groupId = id;
       this.loading.set(true);
@@ -138,15 +145,16 @@ export class GroupDetailComponent implements OnInit {
     });
   }
 
-  private reload(): void {
+  private reload(force = true): void {
+    if (!force && this.loadRequest && !this.loadRequest.closed) return;
     this.loadRequest?.unsubscribe();
-    this.detailRequest?.unsubscribe();
-    this.detailCache.clear();
-    this.detailError.set(null);
-    this.deleteError.set(null);
-    this.expandedId.set(null);
-    this.detail.set(null);
-    this.detailLoading.set(false);
+    if (force) {
+      this.detailRequest?.unsubscribe();
+      this.detailCache.clear();
+      this.expandedId.set(null);
+      this.detail.set(null);
+      this.detailLoading.set(false);
+    }
     this.loading.set(true);
     this.error.set(null);
     this.loadRequest = this.scoped(
@@ -161,8 +169,27 @@ export class GroupDetailComponent implements OnInit {
         this.myBalances.set(res.balances);
         this.expenses.set(res.expenses);
         this.loading.set(false);
+        this.detailCache.clear();
+        const selected = res.expenses.find((e) => e.id === this.expandedId());
+        if (selected && !this.detailError()) {
+          this.expandedId.set(null);
+          this.toggleExpand(selected);
+        } else if (!selected) {
+          this.expandedId.set(null);
+          this.detail.set(null);
+          this.detailLoading.set(false);
+        }
       },
       error: (err) => {
+        if (err?.status === 403 || err?.status === 404) {
+          this.detailRequest?.unsubscribe();
+          this.group.set(null);
+          this.myBalances.set([]);
+          this.expenses.set([]);
+          this.detailCache.clear();
+          this.expandedId.set(null);
+          this.detail.set(null);
+        }
         this.error.set(
           err?.status === 403
             ? 'You are not a member of this group.'
@@ -174,7 +201,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   retry(): void {
-    this.reload();
+    this.reload(false);
   }
 
   addExpense(): void {

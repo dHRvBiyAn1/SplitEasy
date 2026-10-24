@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { GroupDetailComponent } from './group-detail.component';
+import { DashboardService } from '../dashboard/dashboard.service';
+import { SessionService } from '../core/auth/session.service';
 
 const user = { id: 'me', displayName: 'Ada', email: 'ada@example.test' };
 const expense = {
@@ -44,6 +46,175 @@ describe('visible expense failures', () => {
     (fixture.nativeElement.querySelector('.xrow') as HTMLButtonElement).click();
     return fixture;
   }
+  it('refreshes the selected expense independently when the overview fails', () => {
+    const fixture = open();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    TestBed.inject(DashboardService).revalidate();
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
+    http.expectOne('/api/groups/a/balances/mine').flush([{ user, netCents: 3000 }]);
+    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountCents: 6000 }]);
+    http.expectOne('/api/groups/a/expenses/e').flush({ ...expense, amountCents: 6000 });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('$60.00');
+    expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+    expect(fixture.nativeElement.textContent).toContain('Delete expense');
+  });
+  it('keeps confirmed group money and actionable detail errors visible after a failed refresh', () => {
+    const fixture = open();
+    http
+      .expectOne('/api/groups/a/expenses/e')
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    TestBed.inject(DashboardService).revalidate();
+    const overview = http.expectOne('/api/dashboard');
+    const group = http.expectOne('/api/groups/a');
+    const balances = http.expectOne('/api/groups/a/balances/mine');
+    const expenses = http.expectOne('/api/groups/a/expenses');
+    group.flush({}, { status: 503, statusText: 'Unavailable' });
+    overview.flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(balances.cancelled).toBe(true);
+    expect(expenses.cancelled).toBe(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Showing the last loaded group');
+    expect(fixture.nativeElement.textContent).toContain('Dinner');
+    expect(fixture.nativeElement.textContent).toContain('Could not load this expense.');
+    expect(fixture.nativeElement.querySelector('.gd__actions .dc-btn-outline')?.disabled).toBe(
+      true,
+    );
+  });
+  it('keeps the selected receipt and its actionable detail error through an explicit group read retry', () => {
+    const fixture = open();
+    http
+      .expectOne('/api/groups/a/expenses/e')
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    TestBed.inject(DashboardService).revalidate();
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    const group = http.expectOne('/api/groups/a');
+    http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/expenses');
+    group.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    const retry = Array.from(
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.textContent?.trim() === 'Try again')!;
+    retry.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+    expect(fixture.nativeElement.textContent).toContain('Could not load this expense.');
+    http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
+    http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/expenses').flush([expense]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+    expect(fixture.nativeElement.textContent).toContain('Could not load this expense.');
+    fixture.nativeElement.querySelector('.xdetail .dc-btn-outline').click();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Delete expense');
+    expect(fixture.nativeElement.textContent).not.toContain('Could not load this expense.');
+  });
+  it('hides previously loaded financial content when refreshed membership is denied', () => {
+    const fixture = open();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    TestBed.inject(DashboardService).revalidate();
+    const group = http.expectOne('/api/groups/a');
+    http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/expenses');
+    group.flush({}, { status: 403, statusText: 'Forbidden' });
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('You are not a member');
+    expect(fixture.nativeElement.textContent).not.toContain('Dinner');
+    expect(fixture.nativeElement.querySelector('.gd__pills')).toBeNull();
+  });
+  it('clears account-owned group history synchronously when a session ends', () => {
+    const fixture = open();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    TestBed.inject(DashboardService).revalidate();
+    const overview = http.expectOne('/api/dashboard');
+    const group = http.expectOne('/api/groups/a');
+    const balances = http.expectOne('/api/groups/a/balances/mine');
+    const expenses = http.expectOne('/api/groups/a/expenses');
+    TestBed.inject(SessionService).reset();
+    expect([overview, group, balances, expenses].every((r) => r.cancelled)).toBe(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Dinner');
+    expect(fixture.nativeElement.querySelector('.gd__pills')).toBeNull();
+  });
+  it('preserves a pending selected-expense read through failed foreground revalidation', () => {
+    const fixture = open();
+    const detail = http.expectOne('/api/groups/a/expenses/e');
+    TestBed.inject(DashboardService).revalidate();
+    const overview = http.expectOne('/api/dashboard');
+    const group = http.expectOne('/api/groups/a');
+    http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/expenses');
+    expect(detail.cancelled).toBe(false);
+    group.flush({}, { status: 503, statusText: 'Unavailable' });
+    overview.flush({}, { status: 503, statusText: 'Unavailable' });
+    detail.flush(expense);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Showing the last loaded group');
+    expect(fixture.nativeElement.textContent).toContain('Delete expense');
+    expect(fixture.nativeElement.querySelector('[aria-label="Loading details"]')).toBeNull();
+  });
+  it('keeps write-invalidated detail collapsed after failed group refresh and allows re-expansion', () => {
+    const fixture = open();
+    const detail = http.expectOne('/api/groups/a/expenses/e');
+    TestBed.inject(DashboardService).refresh();
+    const overview = http.expectOne('/api/dashboard');
+    const group = http.expectOne('/api/groups/a');
+    http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/expenses');
+    expect(detail.cancelled).toBe(true);
+    group.flush({}, { status: 503, statusText: 'Unavailable' });
+    overview.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label="Loading details"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.xdetail')).toBeNull();
+    fixture.nativeElement.querySelector('.xrow').click();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Delete expense');
+  });
+  it('clears retained expense feedback across group route generations A to B to A', () => {
+    const fixture = open();
+    http.expectOne('/api/groups/a/expenses/e').flush(expense);
+    fixture.detectChanges();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fixture.nativeElement.querySelector('.xdetail__del').click();
+    http
+      .expectOne(
+        (request) =>
+          request.method === 'DELETE' && request.url.split('?')[0] === '/api/groups/a/expenses/e',
+      )
+      .flush({ message: 'Old deletion conflict' }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Old deletion conflict');
+    params.next(convertToParamMap({ id: 'b' }));
+    http.expectOne('/api/groups/b').flush({ id: 'b', name: 'Trip', type: 'TRIP', members: [user] });
+    http.expectOne('/api/groups/b/balances/mine').flush([]);
+    http.expectOne('/api/groups/b/expenses').flush([]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Old deletion conflict');
+    params.next(convertToParamMap({ id: 'a' }));
+    http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
+    http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/expenses').flush([expense]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Dinner');
+    expect(fixture.nativeElement.querySelector('[role=alert]')).toBeNull();
+  });
   it('offers an explicit current-expense retry after detail failure', () => {
     const fixture = open();
     http
