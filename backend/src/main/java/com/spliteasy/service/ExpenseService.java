@@ -41,6 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ExpenseService {
 
+  private final CreateOperations createOperations;
+  private final ExpenseVersionPolicy versionPolicy;
+  private final jakarta.persistence.EntityManager entityManager;
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
   private final GroupWriteGuard groupWriteGuard;
@@ -52,6 +55,9 @@ public class ExpenseService {
   private final Map<SplitType, SplitStrategy> strategies;
 
   public ExpenseService(
+      CreateOperations createOperations,
+      ExpenseVersionPolicy versionPolicy,
+      jakarta.persistence.EntityManager entityManager,
       ExpenseRepository expenseRepository,
       ExpenseParticipantRepository participantRepository,
       GroupWriteGuard groupWriteGuard,
@@ -59,6 +65,9 @@ public class ExpenseService {
       UserRepository userRepository,
       MembershipGuard membershipGuard,
       List<SplitStrategy> splitStrategies) {
+    this.createOperations = createOperations;
+    this.versionPolicy = versionPolicy;
+    this.entityManager = entityManager;
     this.expenseRepository = expenseRepository;
     this.participantRepository = participantRepository;
     this.groupWriteGuard = groupWriteGuard;
@@ -74,6 +83,33 @@ public class ExpenseService {
   public ExpenseResponse createExpense(
       UUID requesterId, UUID groupId, CreateExpenseRequest request) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    return createOperations.create(
+        requesterId,
+        "expense",
+        groupId,
+        request.operationId(),
+        new CreateExpenseRequest(
+            request.description().trim(),
+            request.amountCents(),
+            request.paidByUserId(),
+            request.participantUserIds() == null
+                ? List.of()
+                : request.participantUserIds().stream().distinct().sorted().toList(),
+            request.splitType() == null ? SplitType.EQUAL : request.splitType(),
+            request.splits() == null
+                ? null
+                : request.splits().stream()
+                    .sorted(Comparator.comparing(SplitInput::userId))
+                    .toList(),
+            categoryOf(request),
+            request.spentOn()),
+        ExpenseResponse.class,
+        response -> {},
+        () -> createNewExpense(requesterId, groupId, group, request));
+  }
+
+  private ExpenseResponse createNewExpense(
+      UUID requesterId, UUID groupId, Group group, CreateExpenseRequest request) {
     log.debug("Creating expense in group {} by user {}", groupId, requesterId);
 
     ComputedSplit split = computeSplit(groupId, request);
@@ -110,10 +146,13 @@ public class ExpenseService {
       throw new NotFoundException("Expense not found in this group");
     }
 
+    versionPolicy.requireExpected(request.expectedVersion(), expense.getVersion());
     requireActiveExpenseParticipants(expense);
 
-    // Full replace: recompute shares from the new state via the same strategy path — never stale.
+    // Validate before advancing; parent versions must also cover child-only split intent changes.
     ComputedSplit split = computeSplit(groupId, request);
+    // Immediate increment (unlike deferred OPTIMISTIC_FORCE_INCREMENT) keeps the response current.
+    entityManager.lock(expense, jakarta.persistence.LockModeType.PESSIMISTIC_FORCE_INCREMENT);
     expense.setDescription(request.description().trim());
     expense.setAmountCents(request.amountCents());
     expense.setPaidBy(split.usersById().get(split.payerId()));
@@ -125,13 +164,13 @@ public class ExpenseService {
     expense.clearParticipants();
     expenseRepository.flush();
     addShares(expense, split);
-    expenseRepository.save(expense);
+    expenseRepository.saveAndFlush(expense);
     log.info("Updated expense {} in group {} by user {}", expenseId, groupId, requesterId);
     return toResponse(expense);
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
-  public void deleteExpense(UUID requesterId, UUID groupId, UUID expenseId) {
+  public void deleteExpense(UUID requesterId, UUID groupId, UUID expenseId, Long expectedVersion) {
     groupWriteGuard.lockForMember(groupId, requesterId);
     Expense expense =
         expenseRepository
@@ -140,6 +179,7 @@ public class ExpenseService {
     if (!expense.getGroup().getId().equals(groupId)) {
       throw new NotFoundException("Expense not found in this group");
     }
+    versionPolicy.requireExpected(expectedVersion, expense.getVersion());
     requireActiveExpenseParticipants(expense);
     expenseRepository.delete(expense); // cascade/orphanRemoval deletes expense_participants
     log.info("Deleted expense {} from group {} by user {}", expenseId, groupId, requesterId);
@@ -255,7 +295,8 @@ public class ExpenseService {
                         v.getPayerId(),
                         v.getAmountCents(),
                         myShare.getOrDefault(v.getId(), 0L)),
-                    v.getCreatedAt()))
+                    v.getCreatedAt(),
+                    v.getVersion()))
         .toList();
   }
 
@@ -339,6 +380,7 @@ public class ExpenseService {
             ? expense.getParticipants().stream().map(p -> p.getUser().getId()).sorted().toList()
             : null,
         inputs,
-        expense.getCreatedAt());
+        expense.getCreatedAt(),
+        expense.getVersion());
   }
 }

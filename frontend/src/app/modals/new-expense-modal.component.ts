@@ -14,6 +14,11 @@ import {
   percentToBasisPoints,
   TOTAL_BASIS_POINTS,
 } from '../expenses/expense.service';
+import {
+  PendingWrite,
+  PendingWritesService,
+  UNCERTAIN_WRITE,
+} from '../core/pending-writes.service';
 import { ExpenseService } from '../expenses/expense.service';
 import { CreateExpenseRequest, SplitInput, SplitType } from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
@@ -39,6 +44,9 @@ const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
 })
 export class NewExpenseModalComponent {
   private readonly groups = inject(GroupService);
+  private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly retryNotice = signal<string | null>(null);
+  private restored: PendingWrite<CreateExpenseRequest> | null = null;
   private readonly expenses = inject(ExpenseService);
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
@@ -107,12 +115,22 @@ export class NewExpenseModalComponent {
   /** Set when opened via "Edit" — save() then PUTs instead of POSTing. */
   protected readonly editId = this.modal.editExpenseId();
   private groupRequestVersion = 0;
+  private expectedVersion: number | undefined;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
       if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
     });
-    const preselect = this.modal.expenseGroupId();
+    if (!this.editId) {
+      try {
+        this.restored = this.pendingWrites.read<CreateExpenseRequest>('expense');
+      } catch {
+        this.error.set(
+          'Cannot read the saved retry draft. Check history before starting a separate entry.',
+        );
+      }
+    }
+    const preselect = this.restored?.scope ?? this.modal.expenseGroupId();
     const first = this.groupOptions()[0]?.id ?? null;
     this.selectGroup(preselect ?? first);
   }
@@ -169,6 +187,10 @@ export class NewExpenseModalComponent {
           } else {
             this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
             this.included.set(new Set(g.members.map((m) => m.id)));
+            if (this.restored?.scope === id) {
+              this.restoreDraft(this.restored.request);
+              this.retryNotice.set(UNCERTAIN_WRITE);
+            }
             this.ready.set(true);
           }
         },
@@ -188,6 +210,12 @@ export class NewExpenseModalComponent {
       .subscribe({
         next: (e) => {
           if (version !== this.groupRequestVersion) return;
+          if (!Number.isSafeInteger(e.version) || e.version! < 0) {
+            this.loadFailed.set(true);
+            this.error.set('Reload or upgrade the app to edit this expense safely.');
+            return;
+          }
+          this.expectedVersion = e.version;
           if (!this.description.dirty) this.description.setValue(e.description);
           if (!this.amount.dirty) this.amount.setValue(e.amountCents / 100);
           if (!this.date.dirty) this.date.setValue(e.spentOn);
@@ -363,22 +391,88 @@ export class NewExpenseModalComponent {
     } else {
       req = { ...base, splitType: this.splitType(), splits: this.serializedSplits()! };
     }
+    this.dispatch(gid, this.editId ? { ...req, expectedVersion: this.expectedVersion } : req);
+  }
+
+  private dispatch(gid: string, req: CreateExpenseRequest): void {
+    let pending: PendingWrite<CreateExpenseRequest> | null = null;
+    if (!this.editId) {
+      try {
+        pending = this.pendingWrites.prepare('expense', gid, req);
+        this.restored = pending;
+      } catch (error) {
+        this.error.set((error as Error).message);
+        this.retryNotice.set(UNCERTAIN_WRITE);
+        return;
+      }
+    }
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.error.set(null);
     const save$ = this.editId
       ? this.expenses.updateExpense(gid, this.editId, req)
-      : this.expenses.createExpense(gid, req);
+      : this.expenses.createExpense(gid, { ...req, operationId: pending!.operationId });
     save$.pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
+        if (pending) this.pendingWrites.complete('expense', pending);
         this.dashboard.refresh();
         this.modal.close();
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not save the expense.');
+        if (!this.editId) this.retryNotice.set(UNCERTAIN_WRITE);
         this.saving.set(false);
         this.modal.setMutationPending(false);
       },
     });
+  }
+  retryOriginal(): void {
+    if (
+      this.saving() ||
+      !this.ready() ||
+      this.session.version !== this.sessionVersion ||
+      !this.restored
+    )
+      return;
+    this.dispatch(this.restored.scope, this.restored.request);
+  }
+
+  abandonRetry(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    if (
+      !confirm(
+        'The previous expense may already have been saved. Check expense history first. Start a separate expense anyway?',
+      )
+    )
+      return;
+    try {
+      this.pendingWrites.abandon('expense');
+      this.restored = null;
+      this.retryNotice.set(null);
+      this.error.set(null);
+    } catch {
+      this.error.set(
+        'Cannot clear the saved retry identity. Enable browser storage and try again.',
+      );
+    }
+  }
+
+  private restoreDraft(request: CreateExpenseRequest): void {
+    this.description.setValue(request.description);
+    this.amount.setValue(request.amountCents / 100);
+    this.date.setValue(request.spentOn ?? this.today());
+    this.category.set(request.category ?? 'OTHER');
+    this.paidBy.set(request.paidByUserId);
+    this.splitType.set(request.splitType ?? 'EQUAL');
+    this.included.set(new Set(request.participantUserIds ?? []));
+    this.values.set(
+      Object.fromEntries(
+        (request.splits ?? []).map((input) => [
+          input.userId,
+          request.splitType === 'WEIGHTS' ? String(input.value) : this.display(input.value),
+        ]),
+      ),
+    );
+    this.tick.update((n) => n + 1);
   }
 }

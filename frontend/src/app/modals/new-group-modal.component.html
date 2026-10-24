@@ -82,6 +82,15 @@
       </div>
     }
 
+    @if (retryNotice() && !createdGroupId()) {
+      <p role="status">{{ retryNotice() }}</p>
+      <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="retryOriginal()">
+        Retry original group
+      </button>
+      <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
+        Start a separate group
+      </button>
+    }
     @if (error()) {
       <p class="mform__error" role="alert">{{ error() }}</p>
     }

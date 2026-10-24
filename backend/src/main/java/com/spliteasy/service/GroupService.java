@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GroupService {
 
+  private final CreateOperations createOperations;
   private final GroupRepository groupRepository;
   private final GroupMembershipRepository membershipRepository;
   private final UserRepository userRepository;
@@ -42,8 +43,21 @@ public class GroupService {
   private final PairwiseBalanceService pairwiseBalanceService;
   private final ObligationProjectionService projection;
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
+    return createOperations.create(
+        requesterId,
+        "group",
+        requesterId,
+        request.operationId(),
+        new CreateGroupRequest(
+            request.name().trim(), request.type() == null ? GroupType.OTHER : request.type()),
+        GroupResponse.class,
+        response -> membershipGuard.requireMember(response.id(), requesterId),
+        () -> createNewGroup(requesterId, request));
+  }
+
+  private GroupResponse createNewGroup(UUID requesterId, CreateGroupRequest request) {
     User creator =
         userRepository
             .findById(requesterId)

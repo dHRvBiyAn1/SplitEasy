@@ -60,7 +60,11 @@ public class ExpenseController {
   @DeleteMapping("/{expenseId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deleteExpense(
-      @CurrentUserId UUID userId, @PathVariable UUID groupId, @PathVariable UUID expenseId) {
-    expenseService.deleteExpense(userId, groupId, expenseId);
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @PathVariable UUID expenseId,
+      @org.springframework.web.bind.annotation.RequestParam(required = false)
+          Long expectedVersion) {
+    expenseService.deleteExpense(userId, groupId, expenseId, expectedVersion);
   }
 }

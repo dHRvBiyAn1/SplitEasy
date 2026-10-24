@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -17,6 +18,9 @@ describe('new group member results', () => {
   let refresh: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    storeTestSession({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' });
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });

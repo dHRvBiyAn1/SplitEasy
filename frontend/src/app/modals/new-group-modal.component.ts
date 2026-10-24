@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { concatMap, from, of, takeUntil } from 'rxjs';
 import { catchError, map, toArray } from 'rxjs/operators';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { PendingWritesService, UNCERTAIN_WRITE } from '../core/pending-writes.service';
 import { SessionService } from '../core/auth/session.service';
 import { GroupType } from '../dashboard/dashboard.models';
 import { GroupService } from '../groups/group.service';
@@ -26,6 +27,8 @@ const TYPES: { value: GroupType; label: string }[] = [
   styleUrl: './modals.scss',
 })
 export class NewGroupModalComponent {
+  private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly retryNotice = signal<string | null>(null);
   private readonly groups = inject(GroupService);
   private readonly dashboard = inject(DashboardService);
   private readonly modal = inject(ModalService);
@@ -53,6 +56,20 @@ export class NewGroupModalComponent {
   );
 
   constructor() {
+    try {
+      const pending = this.pendingWrites.read<{ name: string; type: GroupType }>('group');
+      if (pending) {
+        this.name.setValue(pending.request.name);
+        this.type.set(pending.request.type);
+        this.emails.set((pending.draft as { emails?: string[] })?.emails ?? []);
+        this.retryNotice.set(UNCERTAIN_WRITE);
+      }
+    } catch {
+      this.error.set(
+        'Cannot read the saved retry draft. Check history before starting a separate entry.',
+      );
+    }
+
     this.destroyRef.onDestroy(() => {
       if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
     });
@@ -94,24 +111,73 @@ export class NewGroupModalComponent {
       this.addMembers(groupId, this.failedEmails());
       return;
     }
+    let pending;
+    try {
+      pending = this.pendingWrites.prepare(
+        'group',
+        'new',
+        { name: this.name.value.trim(), type: this.type() },
+        { emails: this.emails() },
+      );
+    } catch (error) {
+      this.error.set((error as Error).message);
+      this.retryNotice.set(UNCERTAIN_WRITE);
+      return;
+    }
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.error.set(null);
     const emails = [...this.emails()];
     this.groups
-      .createGroup(this.name.value.trim(), this.type())
+      .createGroup(pending.request.name, pending.request.type, pending.operationId)
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (group) => {
+          this.pendingWrites.complete('group', pending);
+          this.retryNotice.set(null);
           this.createdGroupId.set(group.id);
           this.addMembers(group.id, emails);
         },
         error: (err) => {
           this.error.set(err?.error?.message ?? 'Could not create the group.');
+          this.retryNotice.set(UNCERTAIN_WRITE);
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
       });
+  }
+
+  retryOriginal(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    try {
+      const pending = this.pendingWrites.read<{ name: string; type: GroupType }>('group');
+      if (!pending) return;
+      this.name.setValue(pending.request.name);
+      this.type.set(pending.request.type);
+      this.emails.set((pending.draft as { emails?: string[] })?.emails ?? []);
+      this.save();
+    } catch {
+      this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
+    }
+  }
+
+  abandonRetry(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    if (
+      !confirm(
+        'The previous group may already have been saved. Check your groups first. Start a separate group anyway?',
+      )
+    )
+      return;
+    try {
+      this.pendingWrites.abandon('group');
+      this.retryNotice.set(null);
+      this.error.set(null);
+    } catch {
+      this.error.set(
+        'Cannot clear the saved retry identity. Enable browser storage and try again.',
+      );
+    }
   }
 
   private addMembers(groupId: string, emails: string[]): void {
