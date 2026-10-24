@@ -9,9 +9,8 @@
     "F04"
   ],
   "next_candidates": [
-    "E02",
-    "A02",
-    "H06"
+    "A03",
+    "C01"
   ],
   "packages": [
     {
@@ -110,13 +109,14 @@
       "depends_on": [
         "A01"
       ],
-      "status": "in_progress",
+      "status": "merged_dev",
       "conditional": false,
       "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
       "integration_state": "not_merged",
       "migration_version": "13",
       "migration_rollout_after": "E02 V12; promote both together or deploy V12 first",
-      "security_revision": "Credential-version validation revokes access tokens on password reset/change and confirmed email change; device sessions and refresh remain A03."
+      "security_revision": "Credential-version validation revokes access tokens on password reset/change and confirmed email change; device sessions and refresh remain A03.",
+      "pull_request": 103
     },
     {
       "id": "A03",
@@ -129,8 +129,11 @@
         "A02",
         "E02"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "implementation_in_progress",
+      "conditional": false,
+      "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
+      "branch": "bugfix/alignment-a03-revocable-sessions",
+      "execution_plan": "2026-10-24-alignment-a03.md"
     },
     {
       "id": "A04",
@@ -176,13 +179,16 @@
         "E01",
         "E02"
       ],
-      "status": "planned",
+      "status": "implementation_in_progress",
       "conditional": false,
       "legacy_currency_decision": {
         "currency": "USD",
         "owner_confirmed": "2026-10-19",
         "implementation_status": "Pending C01; no current schema or data change"
-      }
+      },
+      "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
+      "branch": "bugfix/alignment-c01-currency-ledger",
+      "execution_plan": "2026-10-24-alignment-c01.md"
     },
     {
       "id": "C02",
@@ -230,11 +236,12 @@
         "E01",
         "F04"
       ],
-      "status": "reviewed",
+      "status": "merged_dev",
       "conditional": false,
       "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
       "integration_state": "not_merged",
-      "migration_version": "12"
+      "migration_version": "12",
+      "pull_request": 101
     },
     {
       "id": "E03",
@@ -428,10 +435,11 @@
       "depends_on": [
         "F03"
       ],
-      "status": "reviewed",
+      "status": "merged_dev",
       "conditional": false,
       "base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
-      "integration_state": "not_merged"
+      "integration_state": "not_merged",
+      "pull_request": 102
     },
     {
       "id": "H07",
@@ -1862,11 +1870,10 @@
     "dependency_gate": "F01/F03/F04 merged through PR95-97; final CI39226477137 passed."
   },
   "current_batch": [
-    "E02",
-    "A02",
-    "H06"
+    "A03",
+    "C01"
   ],
-  "implementation_base_dev": "e5b219773e54f890e56358f2a57de28f56d4bdff",
+  "implementation_base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
   "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
   "current_batch_status": "implementation_in_progress",
   "second_batch_delivery": {
@@ -1887,6 +1894,22 @@
   "sender_decision": {
     "choice": "Native SMTP Configuration",
     "owner_confirmed": "2026-10-19",
-    "delivery_status": "Implementation uses standard SMTP and owned local capture; production sender settings not supplied."
+    "delivery_status": "Production SMTP configuration explicitly deferred on 24 October 2026; disabled by default.",
+    "provider": "Google Workspace"
+  },
+  "third_batch_delivery": {
+    "state": "merged_dev",
+    "packages": [
+      "E02",
+      "A02",
+      "H06"
+    ],
+    "pull_requests": [
+      101,
+      103,
+      102
+    ],
+    "dev_head": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
+    "ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/40079232599"
   }
 }
