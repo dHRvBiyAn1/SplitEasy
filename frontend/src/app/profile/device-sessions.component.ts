@@ -3,7 +3,6 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { takeUntil } from 'rxjs';
-import { ApiService } from '../core/api/api.service';
 import { DeviceSession } from '../core/auth/auth.models';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
@@ -98,7 +97,6 @@ import { SessionService } from '../core/auth/session.service';
   `,
 })
 export class DeviceSessionsComponent {
-  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly session = inject(SessionService);
   private readonly destroyRef = inject(DestroyRef);
@@ -126,8 +124,8 @@ export class DeviceSessionsComponent {
     this.error.set('');
     this.message.set('');
     this.devices.set([]);
-    this.api
-      .get<DeviceSession[]>('/me/sessions')
+    this.auth
+      .listSessions()
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (devices) => {
@@ -157,8 +155,8 @@ export class DeviceSessionsComponent {
     this.busy.set(true);
     this.error.set('');
     this.message.set('');
-    this.api
-      .delete<void>('/me/sessions/' + device.id)
+    this.auth
+      .revokeSession(device.id)
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
