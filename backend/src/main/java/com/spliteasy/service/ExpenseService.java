@@ -152,11 +152,11 @@ public class ExpenseService {
       throw new NotFoundException("Expense not found in this group");
     }
 
+    com.spliteasy.config.LedgerContract.requireCurrency(expense.getCurrency());
     if (expense.getCurrency() != request.resolvedCurrency()) {
       throw new BadRequestException(
           "Expense currency cannot change. Create a separate expense in the correct currency.");
     }
-    com.spliteasy.config.LedgerContract.requireCurrency(expense.getCurrency());
     versionPolicy.requireExpected(request.expectedVersion(), expense.getVersion());
     requireActiveExpenseParticipants(expense);
 

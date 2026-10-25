@@ -71,6 +71,7 @@ public class DashboardService {
                       ExpenseRepository.CurrencyAmount::getCurrency,
                       ExpenseRepository.CurrencyAmount::getTotalCents));
       var currencies = new java.util.TreeSet<>(spent.keySet());
+      currencies.addAll(paymentRepository.findCurrenciesByGroupId(g.id()));
       for (PersonBalance pb : pairwise) {
         settlements.add(new Settlement(g.id(), g.name(), pb.user(), pb.netMinor(), pb.currency()));
         peopleNet.merge(
