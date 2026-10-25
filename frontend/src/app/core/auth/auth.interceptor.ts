@@ -12,13 +12,18 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const session = inject(SessionService);
   const version = session.version;
+  const authAttempt = auth.getAuthAttempt();
   const sessionId = auth.getSessionId();
   const userId = auth.user()?.id;
   const token = auth.getToken();
   const path = apiPath(req.url, inject(API_BASE_URL));
   const isPrivateApi = path !== null && !path.startsWith('/auth/');
+  // Explicit sign-in supersedes old callbacks before its response changes the current identity.
   const ownsRequest = () =>
-    session.version === version && auth.getSessionId() === sessionId && auth.user()?.id === userId;
+    auth.getAuthAttempt() === authAttempt &&
+    session.version === version &&
+    auth.getSessionId() === sessionId &&
+    auth.user()?.id === userId;
   const expired = () => {
     auth.clearSession();
     void router.navigate(['/login']);

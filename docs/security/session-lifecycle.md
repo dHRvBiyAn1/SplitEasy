@@ -105,10 +105,13 @@ owned callbacks and clear pending writes. Same-device access rotation preserves
 the session generation and form drafts, including profile edits.
 
 A protected 401 shares one renewal with concurrent failures and can retry at most
-once. It captures immutable user ID, session ID and session generation, and
-checks all three after renewal. A different account or device cancels the old
-request instead of replaying it under the new identity. Late failures never issue
-a server logout against a replacement account.
+once. It captures immutable user ID, session ID, session generation and the
+authentication attempt, and checks all four after renewal. Starting explicit
+login/registration supersedes old callbacks before its response replaces the
+identity; an older renewal cannot clear or invalidate that newer sign-in.
+A different account or device cancels the old request instead of replaying it
+under the new identity. Late failures never issue a server logout against a
+replacement account.
 
 Native Web Locks serialize login/register/refresh across tabs through the entire
 HTTP response and cookie/body processing. Other tabs receive only a nonsecret

@@ -200,6 +200,10 @@ export class AuthService {
     return untracked(this.currentSession)?.sessionId ?? null;
   }
 
+  getAuthAttempt(): number {
+    return this.authAttempt;
+  }
+
   /** Fresh profile data may change presentation, never identity, email or credentials. */
   applyProfileName(id: string, version: number, displayName: string): void {
     const current = this.currentSession();

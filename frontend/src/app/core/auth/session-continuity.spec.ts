@@ -9,6 +9,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { appConfig } from '../../app.config';
 import { LoginComponent } from '../../auth/login.component';
+import { RegisterComponent } from '../../auth/register.component';
 import { ProfileComponent } from '../../profile/profile.component';
 import { authInterceptor } from './auth.interceptor';
 import { SessionService } from './session.service';
@@ -205,56 +206,101 @@ describe('cookie-backed browser session continuity', () => {
     ).toBe('Unsubmitted draft');
   });
 
-  it('holds the native cookie lock until the complete refresh response before starting a registration', async () => {
-    TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    const auth = TestBed.inject(AuthService);
-    auth.login({ email: alice.email, password: 'password123' }).subscribe();
-    http.expectOne('/api/auth/login').flush(response);
-    const original = Object.getOwnPropertyDescriptor(navigator, 'locks');
-    let tail: Promise<unknown> = Promise.resolve();
-    Object.defineProperty(navigator, 'locks', {
-      configurable: true,
-      value: {
-        request: (_name: string, operation: () => Promise<unknown>) => {
-          const next = tail.then(operation);
-          tail = next.then(
-            () => undefined,
-            () => undefined,
-          );
-          return next;
+  it.each(['login', 'register'])(
+    'preserves a newer rendered %s while an older protected-request renewal holds the native cookie lock',
+    async (operation) => {
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(withInterceptors([authInterceptor])),
+          provideHttpClientTesting(),
+          provideRouter([
+            { path: 'dashboard', component: ProfileComponent },
+            { path: 'login', component: LoginComponent },
+          ]),
+        ],
+      });
+      const http = TestBed.inject(HttpTestingController);
+      const auth = TestBed.inject(AuthService);
+      auth.login({ email: alice.email, password: 'password123' }).subscribe();
+      http.expectOne('/api/auth/login').flush(response);
+      const original = Object.getOwnPropertyDescriptor(navigator, 'locks');
+      let tail: Promise<unknown> = Promise.resolve();
+      Object.defineProperty(navigator, 'locks', {
+        configurable: true,
+        value: {
+          request: (_name: string, operation: () => Promise<unknown>) => {
+            const next = tail.then(operation);
+            tail = next.then(
+              () => undefined,
+              () => undefined,
+            );
+            return next;
+          },
         },
-      },
-    });
-    try {
-      auth.restore().subscribe({ error: () => {} });
-      let renewal!: TestRequest;
-      await vi.waitFor(() => {
-        renewal = http.expectOne('/api/auth/refresh');
       });
-      auth
-        .register({ email: 'bob@example.test', password: 'password123', displayName: 'Bob' })
-        .subscribe();
-      http.expectNone('/api/auth/register');
-      renewal.flush({ ...response, accessToken: 'rotated-alice' });
-      let registration!: TestRequest;
-      await vi.waitFor(() => {
-        registration = http.expectOne('/api/auth/register');
-      });
-      registration.flush({
-        ...response,
-        sessionId: 'bob-device',
-        accessToken: 'bob-token',
-        user: { id: 'bob', displayName: 'Bob', email: 'bob@example.test' },
-      });
-      await vi.waitFor(() => expect(auth.user()?.id).toBe('bob'));
-    } finally {
-      if (original) Object.defineProperty(navigator, 'locks', original);
-      else Reflect.deleteProperty(navigator, 'locks');
-    }
-  });
+      try {
+        let oldFailures = 0;
+        TestBed.inject(HttpClient)
+          .get('/api/groups')
+          .subscribe({ error: () => oldFailures++ });
+        http.expectOne('/api/groups').flush({}, { status: 401, statusText: 'Expired' });
+        let renewal!: TestRequest;
+        await vi.waitFor(() => {
+          renewal = http.expectOne('/api/auth/refresh');
+        });
+        const form =
+          operation === 'login'
+            ? TestBed.createComponent(LoginComponent)
+            : TestBed.createComponent(RegisterComponent);
+        form.detectChanges();
+        for (const [name, value] of Object.entries({
+          email: 'bob@example.test',
+          password: 'password123',
+          displayName: 'Bob',
+        })) {
+          const input = form.nativeElement.querySelector(
+            `[formControlName="${name}"]`,
+          ) as HTMLInputElement | null;
+          if (input) {
+            input.value = value;
+            input.dispatchEvent(new Event('input'));
+          }
+        }
+        const marker = localStorage.getItem('spliteasy.auth-change');
+        form.nativeElement
+          .querySelector('form')
+          .dispatchEvent(new Event('submit', { cancelable: true }));
+        http.expectNone('/api/auth/' + operation);
+        renewal.flush({ ...response, accessToken: 'rotated-alice' });
+        let signIn!: TestRequest;
+        await vi.waitFor(() => {
+          signIn = http.expectOne('/api/auth/' + operation);
+        });
+        expect(oldFailures).toBe(1);
+        expect(localStorage.getItem('spliteasy.auth-change')).toBe(marker);
+        http.expectNone('/api/groups');
+        http.expectNone('/api/auth/logout');
+        signIn.flush({
+          ...response,
+          sessionId: 'bob-device',
+          accessToken: 'bob-token',
+          user: { id: 'bob', displayName: 'Bob', email: 'bob@example.test' },
+        });
+        await vi.waitFor(() => expect(auth.user()?.id).toBe('bob'));
+        const profileFixture = TestBed.createComponent(ProfileComponent);
+        profileFixture.detectChanges();
+        http
+          .expectOne('/api/me')
+          .flush({ ...profile, id: 'bob', email: 'bob@example.test', displayName: 'Bob' });
+        profileFixture.detectChanges();
+        expect(profileFixture.nativeElement.textContent).toContain('bob@example.test');
+        expect(profileFixture.nativeElement.textContent).not.toContain(alice.email);
+      } finally {
+        if (original) Object.defineProperty(navigator, 'locks', original);
+        else Reflect.deleteProperty(navigator, 'locks');
+      }
+    },
+  );
 
   it('a delayed login cannot replace a newer account and its abandoned device is revoked', () => {
     TestBed.configureTestingModule({
