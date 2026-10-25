@@ -12,12 +12,13 @@ const expense = {
   id: 'e',
   version: 0,
   description: 'Dinner',
-  amountCents: 2000,
+  amountMinor: 2000,
+  currency: 'USD' as const,
   paidBy: user,
   category: 'FOOD_DRINK',
   spentOn: '2026-10-16',
-  viewerDeltaCents: 1000,
-  participants: [{ user, shareCents: 2000 }],
+  viewerDeltaMinor: 1000,
+  participants: [{ user, shareMinor: 2000 }],
 };
 const secondExpense = { ...expense, id: 'second', description: 'Lunch' };
 describe('visible expense failures', () => {
@@ -41,6 +42,7 @@ describe('visible expense failures', () => {
     fixture.detectChanges();
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/balances').flush({ balances: [] });
     http.expectOne('/api/groups/a/expenses').flush(items);
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.xrow') as HTMLButtonElement).click();
@@ -53,9 +55,10 @@ describe('visible expense failures', () => {
     TestBed.inject(DashboardService).revalidate();
     http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
-    http.expectOne('/api/groups/a/balances/mine').flush([{ user, netCents: 3000 }]);
-    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountCents: 6000 }]);
-    http.expectOne('/api/groups/a/expenses/e').flush({ ...expense, amountCents: 6000 });
+    http.expectOne('/api/groups/a/balances/mine').flush([{ user, netMinor: 3000 }]);
+    http.expectOne('/api/groups/a/balances').flush({ balances: [] });
+    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountMinor: 6000 }]);
+    http.expectOne('/api/groups/a/expenses/e').flush({ ...expense, amountMinor: 6000 });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('$60.00');
     expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
@@ -73,10 +76,12 @@ describe('visible expense failures', () => {
     const overview = http.expectOne('/api/dashboard');
     const group = http.expectOne('/api/groups/a');
     const balances = http.expectOne('/api/groups/a/balances/mine');
+    const ledger = http.expectOne('/api/groups/a/balances');
     const expenses = http.expectOne('/api/groups/a/expenses');
     group.flush({}, { status: 503, statusText: 'Unavailable' });
     overview.flush({}, { status: 503, statusText: 'Unavailable' });
     expect(balances.cancelled).toBe(true);
+    expect(ledger.cancelled).toBe(true);
     expect(expenses.cancelled).toBe(true);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Showing the last loaded group');
@@ -95,6 +100,7 @@ describe('visible expense failures', () => {
     http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
     const group = http.expectOne('/api/groups/a');
     http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/balances');
     http.expectOne('/api/groups/a/expenses');
     group.flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges();
@@ -109,6 +115,7 @@ describe('visible expense failures', () => {
     expect(fixture.nativeElement.textContent).toContain('Could not load this expense.');
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/balances').flush({ balances: [] });
     http.expectOne('/api/groups/a/expenses').flush([expense]);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
@@ -128,6 +135,7 @@ describe('visible expense failures', () => {
     TestBed.inject(DashboardService).revalidate();
     const group = http.expectOne('/api/groups/a');
     http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/balances');
     http.expectOne('/api/groups/a/expenses');
     group.flush({}, { status: 403, statusText: 'Forbidden' });
     http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
@@ -144,9 +152,10 @@ describe('visible expense failures', () => {
     const overview = http.expectOne('/api/dashboard');
     const group = http.expectOne('/api/groups/a');
     const balances = http.expectOne('/api/groups/a/balances/mine');
+    const ledger = http.expectOne('/api/groups/a/balances');
     const expenses = http.expectOne('/api/groups/a/expenses');
     TestBed.inject(SessionService).reset();
-    expect([overview, group, balances, expenses].every((r) => r.cancelled)).toBe(true);
+    expect([overview, group, balances, ledger, expenses].every((r) => r.cancelled)).toBe(true);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Dinner');
     expect(fixture.nativeElement.querySelector('.gd__pills')).toBeNull();
@@ -158,6 +167,7 @@ describe('visible expense failures', () => {
     const overview = http.expectOne('/api/dashboard');
     const group = http.expectOne('/api/groups/a');
     http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/balances');
     http.expectOne('/api/groups/a/expenses');
     expect(detail.cancelled).toBe(false);
     group.flush({}, { status: 503, statusText: 'Unavailable' });
@@ -175,6 +185,7 @@ describe('visible expense failures', () => {
     const overview = http.expectOne('/api/dashboard');
     const group = http.expectOne('/api/groups/a');
     http.expectOne('/api/groups/a/balances/mine');
+    http.expectOne('/api/groups/a/balances');
     http.expectOne('/api/groups/a/expenses');
     expect(detail.cancelled).toBe(true);
     group.flush({}, { status: 503, statusText: 'Unavailable' });
@@ -204,12 +215,14 @@ describe('visible expense failures', () => {
     params.next(convertToParamMap({ id: 'b' }));
     http.expectOne('/api/groups/b').flush({ id: 'b', name: 'Trip', type: 'TRIP', members: [user] });
     http.expectOne('/api/groups/b/balances/mine').flush([]);
+    http.expectOne('/api/groups/b/balances').flush({ balances: [] });
     http.expectOne('/api/groups/b/expenses').flush([]);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Old deletion conflict');
     params.next(convertToParamMap({ id: 'a' }));
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/balances').flush({ balances: [] });
     http.expectOne('/api/groups/a/expenses').flush([expense]);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Dinner');
@@ -309,10 +322,10 @@ describe('visible expense failures', () => {
       .expectOne({ method: 'DELETE', url: '/api/groups/a/expenses/e?expectedVersion=0' })
       .flush(null, { status: 204, statusText: 'No Content' });
     http.expectOne('/api/dashboard').flush({
-      totalNetCents: 0,
-      owedCents: 0,
+      totalNetMinor: 0,
+      owedMinor: 0,
       owedPeopleCount: 0,
-      oweCents: 0,
+      oweMinor: 0,
       owePeopleCount: 0,
       groupCount: 1,
       groups: [],
@@ -323,6 +336,7 @@ describe('visible expense failures', () => {
     fixture.detectChanges();
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/balances').flush({ balances: [] });
     http.expectOne('/api/groups/a/expenses').flush([secondExpense]);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Dinner');
@@ -346,6 +360,7 @@ describe('visible expense failures', () => {
     expect(old.cancelled).toBe(true);
     http.expectOne('/api/groups/b').flush({ id: 'b', name: 'Trip', type: 'TRIP', members: [user] });
     http.expectOne('/api/groups/b/balances/mine').flush([]);
+    http.expectOne('/api/groups/b/balances').flush({ balances: [] });
     http.expectOne('/api/groups/b/expenses').flush([]);
     fixture.detectChanges();
     fixture.componentInstance.retryDetail();

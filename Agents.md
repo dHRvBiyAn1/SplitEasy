@@ -125,22 +125,21 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   overlapping partial edits preserve omitted fields. Same-field edits have no version check: the
   last committed dirty write wins; assigning the loaded value is a no-op. PATCH responses reflect
   the transaction's loaded entity; use a fresh GET to observe other concurrent commits.
-- **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero group net and no incident canonical obligation for the selected mode. Direct mode retains offsetting pair debts; simplified mode allows zero-net intermediaries to leave. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. Historical correction still requires explicit re-add; no history is silently rewritten.
+- **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero net in every currency and no incident canonical obligation for the selected mode. Direct mode retains offsetting pair debts; simplified mode allows zero-net intermediaries to leave. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. Historical correction still requires explicit re-add; no history is silently rewritten.
 - **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations, non-null mode PATCHes and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
 - **Canonical obligations**: `ObligationProjectionService` selects direct pair netting or deterministic greedy net matching (`NetSettlementCalculator`, amount then UUID ties). Pairwise, dashboard/People/headlines/actions and departure checks share this projection. Net balances and recorded history are unchanged. Mode PATCH locks/reauthorizes with financial writes and rejects target obligations involving former participants with 409 re-add/repair guidance. Net-derived `/debt-simplification` remains a preview with an explicit nullable direct-mode warning; an empty preview does not establish direct settlement. Settlement UI uses canonical dashboard rows without a second preview fetch.
-- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and account-owned, tab-isolated reload retry limits: `docs/api/payment-retries.md`.
-- **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
-  `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
+- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/currency/minor amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and account-owned, tab-isolated reload retry limits: `docs/api/payment-retries.md`.
+- **Money = explicit currency + integer minor units** (`long`/`BIGINT`). Catalogue: USD/EUR/GBP/INR exponent2, JPY0, KWD3. New clients send `X-Ledger-Version:2`, `currency` and positive `amountMinor` ≤1e12; floats/ambiguous inputs fail400. Legacy `amountCents` is USD-only; response cents/scalar aliases are null for non-USD/mixed scopes. Every aggregate/pair/settlement/leave check partitions by currency; dashboard/group `totals[]` are authoritative. Expense currency is immutable; preferences never relabel history or retry drafts. Outputs beyond JavaScript's exact integer range fail409. V15 follows V14; drain all old servers before non-USD writes and use a forward fix afterwards. Read [the ledger contract](docs/api/multi-currency-ledger.md) before money/rollout changes.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`Percentage`/`Weights`/`AdjustmentsSplitStrategy`
   `@Component`s selected via `Map<SplitType, SplitStrategy>` in `ExpenseService` — **no switch on type**.
   New types implement the interface. Build inputs via `SplitContext.forEqual(...)` / `.forSplits(...)`
   factories (never the raw ctor). `100%` = `TOTAL_BASIS_POINTS = 10_000`. Rounding
-  (`SplitStrategy.absorbRemainder`): floor each share, **payer absorbs leftover cents** (else first
-  id-sorted participant); shares always sum to the total. Exact inputs must be `0..amountCents`;
+  (`SplitStrategy.absorbRemainder`): floor each share, **payer absorbs leftover minor units** (else first
+  id-sorted participant); shares always sum to the total. Exact inputs must be `0..amountMinor`;
   percentage inputs must be `0..10_000`. Strategies validate bounds and sum with `BigInteger`
   before computing shares; percentage multiplication uses quotient/remainder arithmetic to
   avoid overflow. Weights use positive integer units (1..1e12), with `BigInteger` multiplication/division
-  and the same remainder rule. Adjustments are signed cents (±1e12) added to the deterministic EQUAL
+  and the same remainder rule. Adjustments are signed minor units (±1e12) added to the deterministic EQUAL
   allocation over the explicitly listed split participants; their `BigInteger` sum must be zero and
   all final shares nonnegative. POST/PUT reject invalid splits before changing expense or participant rows.
 - **Original expense split intent** (V11): retain `expense_participants.split_value` alongside final
@@ -250,7 +249,7 @@ and shared CSS tokens replace the earlier Evenly presentation. The editable sele
 `docs/reviews/2026-10-15-ui-redesign/implementation/verification.md`.
 
 **Standing rule:** reuse `_tokens.scss`, `.dc-*` and `.dc-amount`; never reintroduce Material presentation
-or duplicate money-status logic. `app-money` formats integer cents for the dashboard/tray, keeps plain
+or duplicate money-status logic. `app-money` formats explicit currency/minor units for the dashboard/tray, keeps plain
 totals neutral, and makes unusually long amounts keyboard-scrollable with their full text available.
 Auth routes remain full-bleed with a named Appearance control.
 
@@ -283,13 +282,13 @@ Auth routes remain full-bleed with a named Appearance control.
 
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
-- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR, defaultUSD). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
+- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR/JPY/KWD, defaultUSD; V15 extends the catalogue). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
 - **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
-- **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
+- **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0, minor-unit storage), V15 `currency` (defaultUSD, immutable), `paid_by`→users,
   `version` BIGINT (V12, opaque nonnegative optimistic precondition); `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
-- **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0); V11 nullable `split_value` BIGINT for original typed input (EQUAL1, exact cents, basis points, weight units, signed adjustment cents). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
+- **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0); V11 nullable `split_value` BIGINT for original typed input (EQUAL1, exact minor units, basis points, weight units, signed adjustment minor units). Unique `(expense_id,user_id)`.
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0, minor-unit storage), V15 `currency` (defaultUSD), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
 
 - **create_operations** (V12) — primary key `(actor_id,kind,scope_id,operation_id)`, normalized submitted `intent` and original `response` snapshots. Actor references users (CASCADE); scope intentionally has no group FK so expense/group response identities survive resource deletion. Claims and resource writes commit together; no automatic expiry.
 
@@ -321,25 +320,25 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   obligations to viewer signs for dashboard cards, People, settlement and balance pills. Direct mode can show
   "Dan owes you $50" and "you owe Sofia $50" at once; simplified mode omits zero-net intermediaries. Viewer sums
   equal the member's unchanged net in either mode.
-- **`GET /api/dashboard`** assembles one payload: cross-group totals (`totalNetCents = owed − owe`), per-group
+- **`GET /api/dashboard`** assembles one payload: cross-group per-currency `totals[]` (`totalNetMinor = owedMinor − oweMinor`), per-group
   cards, aggregated people, per-group `Settlement[]`, and a merged recent-activity feed (expenses + payments,
-  newest first, capped 15) with per-item `viewerDeltaCents` (+lent / −borrowed; 0 for settlements).
+  newest first, capped 15) with per-item `viewerDeltaMinor` (+lent / −borrowed; 0 for settlements).
 - **Debt simplification** is read-only over balances (reuses `BalanceService.computeBalances`, inherits 403):
   deterministic max-creditor/max-debtor match with UUID ties, ≤N−1 transfers, excludes zero balances, no leftover
-  cents. The direct-mode warning explains that this preview may leave offsetting pair obligations. Acting on a
+  minor units in each currency. The direct-mode warning explains that this preview may leave offsetting pair obligations. Acting on a
   suggestion records a normal `Payment`. Frontend seeds settle-up from canonical dashboard `Settlement` rows
   through `ModalService.settlePrefill`; it does not fetch or match a second preview.
-- **Split-type semantics** (default EQUAL): UNEQUAL carries `splits` in **cents** (must sum to `amountCents`);
+- **Split-type semantics** (default EQUAL): UNEQUAL carries `splits` in **minor units** (must sum to `amountMinor`);
   PERCENTAGE carries `splits` in **basis points** (sum10000); WEIGHTS carries positive whole units
-  (floor(total×weight/sum), payer absorbs remainder); ADJUSTMENTS carries signed cents added to equal
+  (floor(total×weight/sum), payer absorbs remainder); ADJUSTMENTS carries signed minor units added to equal
   allocation across the listed split users (sum0, nonnegative final shares). Bad values/totals →400.
   Frontend gates submit on the actual serialized inputs, including after an amount change.
 
 ## Domain Rules
 
-- Monetary amounts are integer cents — never float. JSON integer fields reject floating-point tokens
+- Monetary amounts are explicit currency and integer minor units — never float. JSON integer fields reject floating-point tokens
   through `spring.jackson.deserialization.accept-float-as-int=false` before DTO validation; split
-  values are exact cents (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed cents (ADJUSTMENTS).
+  values are exact transaction minor units (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed transaction minor units (ADJUSTMENTS).
 - Every split sums exactly to the expense total; rounding remainder handled deterministically (payer absorbs).
 
 ## Known Gaps / TODOs
@@ -350,10 +349,7 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   mix simplified and direct rows. The flag rides on the dashboard payload
   (`GroupSummary` → `DashboardGroup`) — anything changing it must call `dashboard.refresh()`, or the
   modal keeps reading the cached value.
-- **Profile prefs are client-side only** (PR #23, #53) — phone/currency/avatar-color per account in
-  localStorage; theme/palette per device. "First seen here" = first-visit month. No profile-update
-  endpoint yet; `User.createdAt` already stores registration time but is not exposed by the current
-  profile/auth summary contract. Do not add a duplicate signup-date column.
+- **FX conversion** remains future P03 work. Currency defaults affect new drafts only; original denominations and separate balances remain authoritative. Compatibility retirement follows deployed-client verification, separately from C01.
 
 ## Git Workflow
 
@@ -536,5 +532,14 @@ PR #95–#97 review remediation (2026-10-19): user authorized fixing comments an
 Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–#103 into dev and deferred production SMTP configuration. Preserve reviewed E02/H06/A02 changes and the verified combined integration resolutions; require updated-head CI, merge E02 V12 before A02 V13, and check final dev CI. Google Workspace is the selected future SMTP provider. Production mail remains disabled until configured; this task targets dev only.
 
 - [x] Alignment A03 candidate (2026-10-24) — persisted per-request sid enforcement, device list/selective revoke/logout-all, bounded hashed rotating HttpOnly Secure cookie renewal, credential-boundary revocation, origin/header guards and preserved limits. Memory-only access, full-response native Web Locks, nonsecret tab markers and immutable user/sid/generation retry checks preserve same-device drafts and cancel replacement-account work. Sequential HTTP/Pg/rendered regressions, backend 298/frontend 306, formatting/build, deployment 14, ShellCheck/Actionlint/Compose and official OpenAPI 183 refs pass. Root independently verified 55 packaged HTTP/upgrade/finance-preservation cases on Java-identical source. One-time legacy re-login; V14 before C01 V15; old-binary rollback requires reviewed all-instance key rotation/compatible frontend. Initial bundle warning 518.20kB remains documented. Evidence: `docs/reviews/2026-10-24-alignment/a03-sessions.md`. Independent review/native browser/publication remain root gates; no worker push/merge/deployment or production SMTP change.
+- [x] Alignment C01 currency ledger (2026-10-24) — V15 adds explicit USD/EUR/GBP/INR/JPY/KWD denomination with owner-confirmed USD backfill and original integers preserved; per-currency balances/People/headlines/simplification/settlement/departure, immutable expense currency and exact integer amount forms/formatting retain split intent and retry safety. Legacy USD aliases/drafts/immutable receipts remain compatible; mixed old backends are unsafe, V14 must precede V15, and post-currency rollback uses a forward fix. Sequential authenticated HTTP/rendered regressions, backend289/Spotless/verify/package, frontend302/40files, full-source Prettier, production build and official OpenAPI3.1/211-ref validation passed; root independently passed51 packaged HTTP checks. Build has a nonblocking511.24kB/500kB initial warning. Evidence: `docs/reviews/2026-10-19-alignment/c01-currency-ledger.md`. Compatibility retirement deferred; root owns combined migration/browser/reviews/publication. No push, merge or deployment by worker.
 - [x] A03 review follow-up (2026-10-25) — device GET/DELETE use existing AuthService and DeviceSession DTO; rendered panel keeps cancellation/UI state. Logout401 from expired access now warns that server revocation is unconfirmed, preserving the signed-out generation guard against stale replacement-account callbacks. One rendered HTTP red→green, focused19/full307/40 files, full-source Prettier and production build pass; initial518.29kB warning. Backend unchanged/no rerun; updated frozen frontend307/evidence. No push/PR/merge/deployment by worker.
+
+- [x] C01 final review corrections (2026-10-25) — dashboard currency scope includes persisted payment denominations even when reciprocal payments cancel or omit the viewer; mixed scalar aliases stay null and zero currency rows remain visible. Headerless legacy PUT against a non-USD expense returns409 upgrade guidance after authorization and before currency comparison. Catalogue DTO moved to dto.common unchanged. Two sequential authenticated HTTP red→green regressions and full Java21 backend291/Spotless/verify/package pass; frontend/OpenAPI unchanged. Corrected artifact/evidence: `docs/reviews/2026-10-19-alignment/c01-currency-ledger.md`. Root owns combined updated rehearsal and publication; no worker remote writes.
 - [x] PR104 superseded-renewal P2 (2026-10-25) — interceptor ownership includes the authentication attempt before newer login/registration responses arrive; older renewal failure cannot clear or invalidate the newer explicit sign-in. Rendered real forms under a controlled Web Locks queue reproduce both failures before fix; focused24/full308/40 files, full-source Prettier and production build pass, initial518.38kB warning. Backend unchanged/no rerun. Frozen frontend308/evidence updated; publisher owns combined browser/CI/review reply. No worker push/remote reply/merge/deployment.
+
+- [x] Batch4 integration acceptance (2026-10-25) — A03/C01 reviewed corrections pass combined backend309/frontend319, full formatting/production build and OpenAPI224 refs; populated V13→V14→V15 plus127 HTTP/169 native-browser API responses pass at1280/390 with no page errors/overflow and owned cleanup. Evidence: `docs/reviews/2026-10-24-alignment/fourth-batch-integration.md`. A03 PR104 and C01 companion target dev; merge A03 before C01, deployment separate. H01 design prepared and gated on verified integrated dev; production SMTP deferred.
+
+- [x] PR105 settled-currency group headline (2026-10-25) — complete group-balance rows retain zero-valued ledger currencies after the final settlement, including payment-only history; per-currency pairwise obligations determine each open/settled label. The new read shares route/session cancellation, retained-read retry and failure handling, independently of dashboard availability. Two sequential rendered HTTP reds→greens, full Node22 frontend322/42files, full-source Prettier and production build pass; backend/OpenAPI unchanged from combinedc1422b1. Evidence: `docs/reviews/2026-10-19-alignment/c01-currency-ledger.md`; root owns native acceptance and PR publication/CI.
+
+- [x] Final PR105 native review acceptance (2026-10-25) — the corrected combined frontend322 and unchanged backend309 pass populated V13→V14→V15 plus129 HTTP/211 real browser API responses at1280/390; actual KWD617 settlement preserves KWD Allsquare and reload with JPY open retains both independent statuses. No errors/overflow, screenshots inspected, owned cleanup. Both review threads fixed/replied/resolved by publication owner; PR104/105 target dev, no merge/deployment or SMTP setup.

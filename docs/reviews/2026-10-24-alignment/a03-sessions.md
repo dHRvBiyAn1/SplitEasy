@@ -144,7 +144,7 @@ application/database/gateway resources were removed. Artifact:
 After the307-test review fix, the integrated browser rehearsal repeated those
 native session cases against the unchanged frozen A03 backend plus C01, with
 117 HTTP and171 real browser API responses; both widths passed and cleanup was
-confirmed (`batch4/combined-final/acceptance.json`). Currency review follow-ups
+confirmed (`batch4/combined-final/acceptance-initial-e509ec8.json`). Currency review follow-ups
 are verified separately in the integration evidence. No backend repeat was needed
 for the frontend-only logout warning/resource-service fix.
 
@@ -175,3 +175,6 @@ as do full-source Prettier and production build. Logs are
 `frontend-pr104-{full-green,prettier,build}.log`. Backend is unchanged and was not
 rerun; earlier browser acceptance above predates this fix. Publisher owns the
 updated combined browser/CI acceptance and review reply.
+
+
+Final corrected A03/C01 native acceptance and source equivalence are recorded in [fourth-batch integration evidence](fourth-batch-integration.md): backend309/frontend322,129 HTTP and211 real browser API responses, all green with owned cleanup confirmed.

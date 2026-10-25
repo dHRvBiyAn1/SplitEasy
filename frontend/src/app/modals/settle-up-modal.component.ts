@@ -1,3 +1,10 @@
+import {
+  CURRENCY_EXPONENT,
+  MAX_TRANSACTION_MINOR,
+  amountToMinor,
+  minorToDisplay,
+} from '../shared/currency';
+import { MoneyComponent } from '../shared/money.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef, Component, computed, inject, signal } from '@angular/core';
 import { takeUntil } from 'rxjs';
@@ -5,7 +12,6 @@ import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
-import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
 import {
   PendingWritesService,
   PendingWriteError,
@@ -19,7 +25,7 @@ import { ModalShellComponent } from './modal-shell.component';
 
 @Component({
   selector: 'app-settle-up-modal',
-  imports: [ModalShellComponent],
+  imports: [ModalShellComponent, MoneyComponent],
   templateUrl: './settle-up-modal.component.html',
   styleUrl: './modals.scss',
 })
@@ -34,7 +40,15 @@ export class SettleUpModalComponent {
   private readonly sessionVersion = this.session.version;
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly display = centsToDisplay;
+  protected readonly precision = computed(
+    () => CURRENCY_EXPONENT[this.selected()?.currency ?? 'USD'],
+  );
+  protected readonly maximum = computed(() =>
+    minorToDisplay(MAX_TRANSACTION_MINOR, this.selected()?.currency ?? 'USD'),
+  );
+  protected readonly step = computed(() =>
+    this.precision() === 0 ? '1' : '0.' + '0'.repeat(this.precision() - 1) + '1',
+  );
 
   /** The dashboard already projects the selected mode, including all settlement actions. */
   protected readonly settlements = computed<Settlement[]>(() => {
@@ -51,7 +65,7 @@ export class SettleUpModalComponent {
   });
 
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
-  /** Editable amount for the selected row, in dollars — settle in full or partially. */
+  /** Editable amount for the selected row, in the obligation currency — settle in full or partially. */
   protected readonly amount = signal('');
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -64,7 +78,9 @@ export class SettleUpModalComponent {
       const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
       if (pending?.draft) {
         this.selected.set(pending.draft as Settlement);
-        this.amount.set(centsToDisplay(pending.request.amountCents));
+        this.amount.set(
+          minorToDisplay(pending.request.amountMinor, pending.request.currency ?? 'USD'),
+        );
         this.retryNotice.set(UNCERTAIN_WRITE);
         return;
       }
@@ -75,7 +91,7 @@ export class SettleUpModalComponent {
     }
     const prefill = this.modal.settlePrefill();
     if (prefill) {
-      this.amount.set(centsToDisplay(Math.abs(prefill.netCents)));
+      this.amount.set(minorToDisplay(Math.abs(prefill.netMinor), prefill.currency ?? 'USD'));
     }
   }
 
@@ -95,18 +111,18 @@ export class SettleUpModalComponent {
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: Settlement): string {
     const name = `${s.counterparty.displayName} (${s.counterparty.email})`;
-    return s.netCents > 0 ? `${name} owes you` : `You owe ${name}`;
+    return s.netMinor > 0 ? `${name} owes you` : `You owe ${name}`;
   }
 
   /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
   payingLabel(s: Settlement): string {
     const name = `${s.counterparty.displayName} (${s.counterparty.email})`;
-    return s.netCents > 0 ? `${name} is paying you` : `You are paying ${name}`;
+    return s.netMinor > 0 ? `${name} is paying you` : `You are paying ${name}`;
   }
 
   select(s: Settlement): void {
     this.error.set(null);
-    this.amount.set(centsToDisplay(Math.abs(s.netCents)));
+    this.amount.set(minorToDisplay(Math.abs(s.netMinor), s.currency ?? 'USD'));
     this.selected.set(s);
   }
 
@@ -115,10 +131,9 @@ export class SettleUpModalComponent {
     this.error.set(null);
   }
 
-  /** Entered dollars as integer cents; NaN/blank becomes 0 so validation rejects it. */
-  protected enteredCents(): number {
-    const n = Number(this.amount());
-    return Number.isFinite(n) ? dollarsToCents(n) : 0;
+  /** Parse exact currency units; invalid precision and amounts block dispatch. */
+  protected enteredMinor(): number {
+    return amountToMinor(this.amount(), this.selected()?.currency ?? 'USD', false);
   }
 
   cancel(): void {
@@ -138,18 +153,29 @@ export class SettleUpModalComponent {
     if (!s || this.saving()) {
       return;
     }
-    const cents = this.enteredCents();
-    if (cents <= 0) {
-      this.error.set('Enter an amount greater than zero.');
+    const cents = this.enteredMinor();
+    if (!Number.isSafeInteger(cents) || cents <= 0 || cents > 1_000_000_000_000) {
+      this.error.set(
+        'Enter an amount greater than zero within the selected currency precision and maximum.',
+      );
       return;
     }
     const me = this.auth.user()?.id ?? '';
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
-    const [payer, payee] = s.netCents > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
+    const [payer, payee] = s.netMinor > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.payments
-      .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents }, s)
+      .recordPayment(
+        s.groupId,
+        {
+          payerUserId: payer,
+          payeeUserId: payee,
+          amountMinor: cents,
+          currency: s.currency ?? 'USD',
+        },
+        s,
+      )
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
@@ -174,7 +200,9 @@ export class SettleUpModalComponent {
       const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
       if (!pending?.draft) return;
       this.selected.set(pending.draft as Settlement);
-      this.amount.set(centsToDisplay(pending.request.amountCents));
+      this.amount.set(
+        minorToDisplay(pending.request.amountMinor, pending.request.currency ?? 'USD'),
+      );
       this.confirm();
     } catch {
       this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');

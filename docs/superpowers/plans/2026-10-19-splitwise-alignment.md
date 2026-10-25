@@ -10,6 +10,12 @@
 
 **Spec:** [Proposed design](../specs/2026-10-19-splitwise-alignment-design.md).
 
+## Current delivery checkpoint (25 October 2026)
+
+A03 and C01 have reviewed PRs to `dev`: [A03 #104](https://github.com/dHRvBiyAn1/SplitEasy/pull/104) and [C01 #105](https://github.com/dHRvBiyAn1/SplitEasy/pull/105). The C01 companion carries their combined integration and the [fourth-batch verification](../../reviews/2026-10-24-alignment/fourth-batch-integration.md). Apply V14 before V15 or together and drain old writers before cutover. Publication does not authorize merge or deployment. Production Google Workspace SMTP remains deferred.
+
+The next phase has a prepared [H01 history/recovery design](2026-10-24-alignment-h01.md). Start implementation from verified `dev` after C01 and A03 integrate; preserve per-currency projections, session ownership and immutable create receipts.
+
 ## Global Constraints
 
 - Java 21, Spring Boot 4.1, PostgreSQL 16/Flyway, Angular 21 standalone components/signals, Vitest; CI Node 22.
@@ -37,9 +43,11 @@
 
 F02 obligation coherence depends on F01 and must start from its integrated result. It is deliberately not a fourth concurrent ledger thread. The next three candidates are F02, A01 server-owned profile, and E01 split intent; they can run together after ownership review because they primarily change balance projection, account/profile, and expense/split code respectively. Rebase all three on the same reviewed foundation.
 
-Current execution: F02/A01/E01 merged through PRs #100/#99/#98, and final `dev` CI passed at `e5b219773e54f890e56358f2a57de28f56d4bdff`. The user approved **E02, A02 and H06** next. Separate branches start at this verified commit: E02 retry-safe writes (Sol high; V12), A02 identity/recovery (Sol high; V13), and H06 freshness (Sol medium; no migration). Preserve the established HTTP/PostgreSQL, rendered Angular and owned-browser seams. Promote V12 before V13 or both together. This batch ends in reviewed PRs to `dev`; follow later user instructions for merge/release/deployment.
+Current execution: E02/A02/H06 merged through PRs #101/#103/#102. Final `dev` CI passed at `4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5`. On 24 October 2026 the user approved **A03 and C01** next, with two separate Sol-high threads from that verified commit. A03 owns revocable sessions (V14); C01 owns currency (V15+) in serial implementation slices. Preserve the established HTTP/PostgreSQL, rendered Angular and owned-browser seams. Apply V14 before V15 or together. This batch ends in reviewed PRs to `dev`; later merges, release and deployment follow the user's subsequent instructions.
 
-A02 security revision: credential changes invalidate existing access tokens through a per-user credential version checked on authenticated requests. Missing claims on legacy tokens represent version zero, preserving access until that user's credentials change. Device-session management, refresh credentials and logout-all UX remain A03. The user selected native SMTP configuration. Email delivery uses standard configurable SMTP and an owned local mailbox for evidence; a real production sender must be configured separately.
+A03's [execution contract](2026-10-24-alignment-a03.md) introduces persisted sessions, immediate revocation and protected rotating refresh cookies; sidless legacy access tokens require one re-login after rollout. C01's [execution contract](2026-10-24-alignment-c01.md) backfills historical USD, partitions all financial calculations by denomination and supports zero/two/three decimal precision without FX. Compatibility retirement waits for deployed-client verification. Shared auth/session and money owners coordinate profile/shell hunks.
+
+The user selected Google Workspace for native SMTP but explicitly deferred production configuration. Existing A02 recovery remains disabled until an owned sender, TLS and egress settings are configured. No production mail or deployment belongs to this batch.
 
 These are planning IDs, not GitHub issue numbers. Implementation was requested on 19 October 2026; execute the first batch and preserve the documented dependency gates. Subsequent batches refill available slots only with dependency-ready tasks; there is no requirement to keep three agents busy when the safe dependency graph exposes fewer.
 

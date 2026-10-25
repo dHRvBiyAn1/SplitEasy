@@ -14,13 +14,29 @@ import java.util.List;
  * aggregated across groups.
  */
 public record DashboardResponse(
-    long totalNetCents,
-    long owedCents,
+    Long totalNetCents,
+    Long owedCents,
     int owedPeopleCount,
-    long oweCents,
+    Long oweCents,
     int owePeopleCount,
     int groupCount,
     List<DashboardGroup> groups,
     List<PersonBalance> people,
     List<Settlement> settlements,
-    List<ActivityItem> activity) {}
+    List<ActivityItem> activity,
+    List<CurrencyTotals> totals) {
+  @com.fasterxml.jackson.annotation.JsonProperty("totalNetMinor")
+  public Long totalNetMinor() {
+    return totalNetCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("owedMinor")
+  public Long owedMinor() {
+    return owedCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("oweMinor")
+  public Long oweMinor() {
+    return oweCents;
+  }
+}

@@ -24,10 +24,11 @@ export class PaymentService {
     const version = this.session.version;
     return defer(() => {
       if (this.session.version !== version) return EMPTY;
-      const pending = this.pendingWrites.prepare('payment', groupId, request, draft);
+      const intent = { ...request, currency: request.currency ?? ('USD' as const) };
+      const pending = this.pendingWrites.prepare('payment', groupId, intent, draft);
       return this.api
         .post<PaymentResponse>(`/groups/${groupId}/payments`, {
-          ...request,
+          ...intent,
           operationId: pending.operationId,
         })
         .pipe(tap(() => this.pendingWrites.complete('payment', pending)));

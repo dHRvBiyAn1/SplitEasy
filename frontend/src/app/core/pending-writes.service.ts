@@ -1,3 +1,4 @@
+import { Currency, CURRENCIES, MAX_TRANSACTION_MINOR } from '../shared/currency';
 import { Injectable, inject } from '@angular/core';
 import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
@@ -13,6 +14,14 @@ export interface PendingWrite<T> {
 }
 export class PendingWriteError extends Error {}
 const PREFIX = 'spliteasy.pending-write.v1.';
+/** Object property order is not changed financial intent; retain every key and array position. */
+function intentJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item) =>
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item,
+  );
+}
 export const UNCERTAIN_WRITE =
   'This request may already have been saved. Retry the original draft, or check history before starting a separate entry.';
 
@@ -44,6 +53,46 @@ export class PendingWritesService {
         'The saved retry draft is unreadable. Check history before starting a separate entry.',
       );
     }
+    if (kind !== 'group') {
+      const request = { ...stored.request } as Record<string, unknown>;
+      const currency = request['currency'] ?? 'USD';
+      const legacy = request['amountCents'];
+      if (
+        !CURRENCIES.includes(currency as Currency) ||
+        (legacy != null && (currency !== 'USD' || request['amountMinor'] != null))
+      )
+        throw new PendingWriteError(
+          'The saved currency is unreadable. Check history before starting a separate entry.',
+        );
+      const amount = request['amountMinor'] ?? legacy;
+      if (
+        typeof amount !== 'number' ||
+        !Number.isSafeInteger(amount) ||
+        amount <= 0 ||
+        amount > MAX_TRANSACTION_MINOR
+      )
+        throw new PendingWriteError(
+          'The saved amount is unreadable. Check history before starting a separate entry.',
+        );
+      // A pre-C01 uncertain draft is USD regardless of the account's later preference.
+      request['currency'] = currency;
+      request['amountMinor'] = amount;
+      delete request['amountCents'];
+      stored.request = request as T;
+      if (kind === 'payment' && stored.draft && typeof stored.draft === 'object') {
+        const draft = { ...stored.draft } as Record<string, unknown>;
+        if (draft['netMinor'] == null && draft['netCents'] != null) {
+          if (currency !== 'USD')
+            throw new PendingWriteError('The saved currency is unreadable. Check payment history.');
+          draft['netMinor'] = draft['netCents'];
+          delete draft['netCents'];
+        }
+        if (draft['currency'] != null && draft['currency'] !== currency)
+          throw new PendingWriteError('The saved currencies disagree. Check payment history.');
+        draft['currency'] = currency;
+        stored.draft = draft;
+      }
+    }
     return { ...stored, sessionVersion: this.session.version };
   }
 
@@ -60,7 +109,7 @@ export class PendingWritesService {
     }
     if (
       previous &&
-      (previous.scope !== scope || JSON.stringify(previous.request) !== JSON.stringify(request))
+      (previous.scope !== scope || intentJson(previous.request) !== intentJson(request))
     ) {
       throw new PendingWriteError(UNCERTAIN_WRITE);
     }

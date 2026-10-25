@@ -7,4 +7,6 @@ public interface UserAmount {
   UUID getUserId();
 
   long getTotalCents();
+
+  com.spliteasy.entity.LedgerCurrency getCurrency();
 }

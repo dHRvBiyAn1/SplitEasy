@@ -38,6 +38,7 @@ public class PaymentService {
   public PaymentResponse recordPayment(
       UUID requesterId, UUID groupId, RecordPaymentRequest request) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    com.spliteasy.config.LedgerContract.requireCurrency(request.resolvedCurrency());
     if (request.operationId() != null) {
       var existing =
           paymentRepository.findByGroupIdAndRecordedByAndOperationId(
@@ -64,7 +65,8 @@ public class PaymentService {
         userRepository.findAllById(List.of(payerId, payeeId)).stream()
             .collect(Collectors.toMap(User::getId, Function.identity()));
     Payment payment =
-        new Payment(group, users.get(payerId), users.get(payeeId), request.amountCents());
+        new Payment(group, users.get(payerId), users.get(payeeId), request.resolvedAmountMinor());
+    payment.setCurrency(request.resolvedCurrency());
     if (request.operationId() == null) {
       payment = paymentRepository.save(payment);
     } else {
@@ -74,7 +76,8 @@ public class PaymentService {
               groupId,
               payerId,
               payeeId,
-              request.amountCents(),
+              request.resolvedAmountMinor(),
+              request.resolvedCurrency().name(),
               payment.getCreatedAt(),
               requesterId,
               request.operationId());
@@ -90,7 +93,7 @@ public class PaymentService {
         payment.getId(),
         payerId,
         payeeId,
-        request.amountCents(),
+        request.resolvedAmountMinor(),
         groupId);
     return PaymentResponse.from(payment);
   }
@@ -98,7 +101,8 @@ public class PaymentService {
   private PaymentResponse replay(Payment payment, RecordPaymentRequest request) {
     if (!payment.getPayer().getId().equals(request.payerUserId())
         || !payment.getPayee().getId().equals(request.payeeUserId())
-        || payment.getAmountCents() != request.amountCents()) {
+        || payment.getAmountCents() != request.resolvedAmountMinor()
+        || payment.getCurrency() != request.resolvedCurrency()) {
       throw new ConflictException("Operation ID already used for a different payment");
     }
     return PaymentResponse.from(payment);

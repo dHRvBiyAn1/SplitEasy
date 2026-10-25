@@ -58,83 +58,150 @@ public class DashboardService {
 
     List<DashboardGroup> groupCards = new ArrayList<>();
     List<Settlement> settlements = new ArrayList<>();
-    // counterparty id -> aggregated pairwise net across groups (+ their display info).
-    Map<UUID, Long> peopleNet = new LinkedHashMap<>();
+    record PersonCurrency(UUID userId, com.spliteasy.entity.LedgerCurrency currency) {}
+    Map<PersonCurrency, Long> peopleNet = new LinkedHashMap<>();
     Map<UUID, UserSummary> peopleInfo = new LinkedHashMap<>();
-
+    var allCurrencies = new java.util.TreeSet<com.spliteasy.entity.LedgerCurrency>();
     for (GroupSummary g : myGroups) {
       List<PersonBalance> pairwise = pairwiseService.compute(userId, g.id());
-      long owed = 0;
-      long owe = 0;
+      Map<com.spliteasy.entity.LedgerCurrency, Long> spent =
+          expenseRepository.sumAmountsByGroup(g.id()).stream()
+              .collect(
+                  Collectors.toMap(
+                      ExpenseRepository.CurrencyAmount::getCurrency,
+                      ExpenseRepository.CurrencyAmount::getTotalCents));
+      var currencies = new java.util.TreeSet<>(spent.keySet());
+      currencies.addAll(paymentRepository.findCurrenciesByGroupId(g.id()));
       for (PersonBalance pb : pairwise) {
-        settlements.add(new Settlement(g.id(), g.name(), pb.user(), pb.netCents()));
-        if (pb.netCents() > 0) {
-          owed += pb.netCents();
-        } else {
-          owe += -pb.netCents();
-        }
-        peopleNet.merge(pb.user().id(), pb.netCents(), Long::sum);
+        settlements.add(new Settlement(g.id(), g.name(), pb.user(), pb.netMinor(), pb.currency()));
+        peopleNet.merge(
+            new PersonCurrency(pb.user().id(), pb.currency()), pb.netMinor(), Math::addExact);
         peopleInfo.putIfAbsent(pb.user().id(), pb.user());
+        currencies.add(pb.currency());
       }
+      if (currencies.isEmpty()) currencies.add(com.spliteasy.entity.LedgerCurrency.USD);
+      allCurrencies.addAll(currencies);
+      var totals =
+          currencies.stream()
+              .map(
+                  currency -> {
+                    long owed =
+                        pairwise.stream()
+                            .filter(pb -> pb.currency() == currency && pb.netMinor() > 0)
+                            .mapToLong(PersonBalance::netMinor)
+                            .reduce(0, Math::addExact);
+                    long owe =
+                        pairwise.stream()
+                            .filter(pb -> pb.currency() == currency && pb.netMinor() < 0)
+                            .mapToLong(pb -> -pb.netMinor())
+                            .reduce(0, Math::addExact);
+                    return new com.spliteasy.dto.dashboard.GroupCurrencyTotals(
+                        currency,
+                        spent.getOrDefault(currency, 0L),
+                        owed,
+                        owe,
+                        Math.subtractExact(owed, owe));
+                  })
+              .toList();
+      var usd =
+          totals.size() == 1
+                  && totals.getFirst().currency() == com.spliteasy.entity.LedgerCurrency.USD
+              ? totals.getFirst()
+              : null;
       groupCards.add(
           new DashboardGroup(
               g.id(),
               g.name(),
               g.type(),
               g.memberCount(),
-              expenseRepository.sumAmountByGroup(g.id()),
-              owed,
-              owe,
-              owed - owe,
-              g.simplifyDebts()));
+              usd == null ? null : usd.totalSpentMinor(),
+              usd == null ? null : usd.youAreOwedMinor(),
+              usd == null ? null : usd.youOweMinor(),
+              usd == null ? null : usd.netMinor(),
+              g.simplifyDebts(),
+              totals));
     }
-
     List<PersonBalance> people =
         peopleNet.entrySet().stream()
             .filter(e -> e.getValue() != 0)
-            .map(e -> new PersonBalance(peopleInfo.get(e.getKey()), e.getValue()))
+            .map(
+                e ->
+                    new PersonBalance(
+                        peopleInfo.get(e.getKey().userId()), e.getValue(), e.getKey().currency()))
             .sorted(
-                Comparator.comparingLong((PersonBalance pb) -> Math.abs(pb.netCents()))
-                    .reversed()
+                Comparator.comparing(PersonBalance::currency)
                     .thenComparing(pb -> pb.user().displayName()))
             .toList();
-
-    // Headline totals are GROSS (summed across every pairwise balance in every group), not the
-    // per-person net below — so owing someone in one group always shows in "You owe", even when
-    // another group leaves you net-positive with them. totalNet still equals owed - owe.
-    long owedCents =
-        settlements.stream().filter(s -> s.netCents() > 0).mapToLong(Settlement::netCents).sum();
-    long oweCents =
-        settlements.stream().filter(s -> s.netCents() < 0).mapToLong(s -> -s.netCents()).sum();
+    if (allCurrencies.isEmpty()) allCurrencies.add(com.spliteasy.entity.LedgerCurrency.USD);
+    var totals =
+        allCurrencies.stream()
+            .map(
+                currency -> {
+                  var rows = settlements.stream().filter(s -> s.currency() == currency).toList();
+                  long owed =
+                      rows.stream()
+                          .filter(s -> s.netMinor() > 0)
+                          .mapToLong(Settlement::netMinor)
+                          .reduce(0, Math::addExact);
+                  long owe =
+                      rows.stream()
+                          .filter(s -> s.netMinor() < 0)
+                          .mapToLong(s -> -s.netMinor())
+                          .reduce(0, Math::addExact);
+                  return new com.spliteasy.dto.dashboard.CurrencyTotals(
+                      currency,
+                      Math.subtractExact(owed, owe),
+                      owed,
+                      (int)
+                          rows.stream()
+                              .filter(s -> s.netMinor() > 0)
+                              .map(s -> s.counterparty().id())
+                              .distinct()
+                              .count(),
+                      owe,
+                      (int)
+                          rows.stream()
+                              .filter(s -> s.netMinor() < 0)
+                              .map(s -> s.counterparty().id())
+                              .distinct()
+                              .count());
+                })
+            .toList();
+    var usd =
+        totals.size() == 1
+                && totals.getFirst().currency() == com.spliteasy.entity.LedgerCurrency.USD
+            ? totals.getFirst()
+            : null;
+    settlements.sort(
+        Comparator.comparing(Settlement::currency)
+            .thenComparing(
+                Comparator.comparingLong((Settlement s) -> Math.abs(s.netMinor())).reversed()));
     int owedPeople =
         (int)
             settlements.stream()
-                .filter(s -> s.netCents() > 0)
+                .filter(s -> s.netMinor() > 0)
                 .map(s -> s.counterparty().id())
                 .distinct()
                 .count();
     int owePeople =
         (int)
             settlements.stream()
-                .filter(s -> s.netCents() < 0)
+                .filter(s -> s.netMinor() < 0)
                 .map(s -> s.counterparty().id())
                 .distinct()
                 .count();
-
-    // Largest imbalances first for the settle-up modal.
-    settlements.sort(Comparator.comparingLong((Settlement s) -> Math.abs(s.netCents())).reversed());
-
     return new DashboardResponse(
-        owedCents - oweCents,
-        owedCents,
+        usd == null ? null : usd.totalNetMinor(),
+        usd == null ? null : usd.owedMinor(),
         owedPeople,
-        oweCents,
+        usd == null ? null : usd.oweMinor(),
         owePeople,
         myGroups.size(),
         groupCards,
         people,
         settlements,
-        buildActivity(userId, myGroups.stream().map(GroupSummary::id).toList()));
+        buildActivity(userId, myGroups.stream().map(GroupSummary::id).toList()),
+        totals);
   }
 
   private List<ActivityItem> buildActivity(UUID userId, List<UUID> groupIds) {
@@ -166,7 +233,8 @@ public class DashboardService {
               ExpenseService.viewerDelta(
                   userId, e.getPayerId(), e.getAmountCents(), myShare.getOrDefault(e.getId(), 0L)),
               e.getCategory(),
-              e.getSpentOn()));
+              e.getSpentOn(),
+              e.getCurrency()));
     }
     paymentRepository
         .findRecentByGroupIds(groupIds, limit)
@@ -184,7 +252,8 @@ public class DashboardService {
                         p.getAmountCents(),
                         0L,
                         null,
-                        p.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate())));
+                        p.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate(),
+                        p.getCurrency())));
 
     // Merge both streams and keep the most recent by spent/settled date.
     items.sort(Comparator.comparing(ActivityItem::date).reversed());

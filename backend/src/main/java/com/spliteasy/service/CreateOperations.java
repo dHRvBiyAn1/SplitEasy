@@ -45,9 +45,9 @@ public class CreateOperations {
               .params(actor, kind, scope, operation)
               .query((rs, row) -> new Stored(rs.getString(1), rs.getString(2)))
               .single();
-      T response = mapper.readValue(stored.response(), responseType);
+      T response = mapper.treeToValue(receipt(kind, stored.response()), responseType);
       authorizeReplay.accept(response);
-      if (!stored.intent().equals(submitted)) {
+      if (!intent(kind, stored.intent()).equals(intent(kind, submitted))) {
         throw new ConflictException("Operation ID already used for a different " + kind);
       }
       return response;
@@ -61,6 +61,35 @@ public class CreateOperations {
         .params(mapper.writeValueAsString(response), actor, kind, scope, operation)
         .update();
     return response;
+  }
+
+  /** Normalize only the currency contract; every original intent field remains part of equality. */
+  private tools.jackson.databind.JsonNode intent(String kind, String json) {
+    var node = mapper.readTree(json);
+    if (!"expense".equals(kind)) return node;
+    var object = (tools.jackson.databind.node.ObjectNode) node;
+    if (!object.hasNonNull("currency")) object.put("currency", "USD");
+    if (!object.hasNonNull("amountMinor") && object.hasNonNull("amountCents")) {
+      object.set("amountMinor", object.get("amountCents"));
+    }
+    object.remove("amountCents");
+    return object;
+  }
+
+  /** Enrich the immutable stored USD snapshot, never the edited/deleted live resource. */
+  private tools.jackson.databind.JsonNode receipt(String kind, String json) {
+    var node = mapper.readTree(json);
+    if ("expense".equals(kind) && !node.hasNonNull("currency")) {
+      var object = (tools.jackson.databind.node.ObjectNode) node;
+      object.put("currency", "USD");
+      object.set("amountMinor", object.get("amountCents"));
+      for (var share : object.path("participants")) {
+        var participant = (tools.jackson.databind.node.ObjectNode) share;
+        participant.put("currency", "USD");
+        participant.set("shareMinor", participant.get("shareCents"));
+      }
+    }
+    return node;
   }
 
   private record Stored(String intent, String response) {}

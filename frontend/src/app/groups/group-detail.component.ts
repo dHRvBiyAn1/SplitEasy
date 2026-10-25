@@ -9,7 +9,8 @@ import { UserSummary } from '../core/auth/auth.models';
 import { BalanceService } from '../balances/balance.service';
 import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { centsToDisplay } from '../expenses/expense.service';
+import { Currency } from '../shared/currency';
+import { formatMoney } from '../shared/money.component';
 import { ExpenseService } from '../expenses/expense.service';
 import { ExpenseResponse, ExpenseSummary, SplitShare } from '../expenses/expense.models';
 import { ModalService } from '../modals/modal.service';
@@ -61,12 +62,14 @@ export class GroupDetailComponent implements OnInit {
   private readonly dashboard = inject(DashboardService);
   protected readonly modal = inject(ModalService);
 
-  protected readonly display = centsToDisplay;
+  protected readonly display = (amount: number, currency: Currency = 'USD') =>
+    formatMoney(amount, false, currency);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
   protected readonly myBalances = signal<PersonBalance[]>([]);
+  private readonly ledgerCurrencies = signal<Currency[]>([]);
   protected readonly expenses = signal<ExpenseSummary[]>([]);
 
   /** The expense whose detail row is expanded, plus its fetched full breakdown. */
@@ -83,7 +86,25 @@ export class GroupDetailComponent implements OnInit {
   protected groupId = ''; // read by the template for the settings link
 
   /** My net in this group = sum of the pairwise nets (positive = I'm owed overall). */
-  protected readonly myNet = computed(() => this.myBalances().reduce((s, b) => s + b.netCents, 0));
+  protected readonly myTotals = computed(() => {
+    const amounts = new Map<Currency, number>(
+      this.ledgerCurrencies().map((currency) => [currency, 0]),
+    );
+    for (const balance of this.myBalances()) {
+      const currency = balance.currency ?? 'USD';
+      amounts.set(currency, (amounts.get(currency) ?? 0) + balance.netMinor);
+    }
+    if (!amounts.size) amounts.set('USD', 0);
+    return [...amounts]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, netMinor]) => ({
+        currency,
+        netMinor,
+        hasOpenBalances: this.myBalances().some(
+          (balance) => (balance.currency ?? 'USD') === currency && balance.netMinor !== 0,
+        ),
+      }));
+  });
 
   /** Expenses grouped by "MONTH YEAR", newest month first (list already sorted desc). */
   protected readonly months = computed<MonthGroup[]>(() => {
@@ -104,6 +125,7 @@ export class GroupDetailComponent implements OnInit {
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
       this.group.set(null);
       this.myBalances.set([]);
+      this.ledgerCurrencies.set([]);
       this.expenses.set([]);
       this.detailCache.clear();
       this.expandedId.set(null);
@@ -132,6 +154,7 @@ export class GroupDetailComponent implements OnInit {
       this.scopeChanges.next();
       this.group.set(null);
       this.myBalances.set([]);
+      this.ledgerCurrencies.set([]);
       this.expenses.set([]);
       this.detailError.set(null);
       this.deleteError.set(null);
@@ -161,12 +184,14 @@ export class GroupDetailComponent implements OnInit {
       forkJoin({
         group: this.groups.getGroup(this.groupId),
         balances: this.balances.getMyBalances(this.groupId),
+        ledger: this.balances.getBalances(this.groupId),
         expenses: this.expensesApi.listExpenses(this.groupId),
       }),
     ).subscribe({
       next: (res) => {
         this.group.set(res.group);
         this.myBalances.set(res.balances);
+        this.ledgerCurrencies.set(res.ledger.balances.map((balance) => balance.currency ?? 'USD'));
         this.expenses.set(res.expenses);
         this.loading.set(false);
         this.detailCache.clear();
@@ -185,6 +210,7 @@ export class GroupDetailComponent implements OnInit {
           this.detailRequest?.unsubscribe();
           this.group.set(null);
           this.myBalances.set([]);
+          this.ledgerCurrencies.set([]);
           this.expenses.set([]);
           this.detailCache.clear();
           this.expandedId.set(null);
@@ -330,7 +356,7 @@ export class GroupDetailComponent implements OnInit {
 
   pillLabel(b: PersonBalance): string {
     const name = b.user.displayName.split(/\s+/)[0];
-    return b.netCents > 0 ? `${name} owes you` : `you owe ${name}`;
+    return b.netMinor > 0 ? `${name} owes you` : `you owe ${name}`;
   }
 
   categoryGlyph(c: ExpenseCategory): string {
@@ -339,12 +365,12 @@ export class GroupDetailComponent implements OnInit {
 
   paidSub(e: ExpenseSummary): string {
     const who = e.paidBy.id === this.meId() ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
-    return `${who} paid $${this.display(e.amountCents)}`;
+    return `${who} paid ${this.display(e.amountMinor, e.currency)}`;
   }
 
   deltaLabel(e: ExpenseSummary): string {
-    if (e.viewerDeltaCents > 0) return 'you lent';
-    if (e.viewerDeltaCents < 0) return 'you borrowed';
+    if (e.viewerDeltaMinor > 0) return 'you lent';
+    if (e.viewerDeltaMinor < 0) return 'you borrowed';
     return 'not involved';
   }
 

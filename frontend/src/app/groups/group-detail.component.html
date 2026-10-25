@@ -83,32 +83,36 @@
     </header>
 
     <div class="gd__pills">
-      <span
-        class="pill pill--overall"
-        [class.pill--owed]="myNet() > 0"
-        [class.pill--owes]="myNet() < 0"
-      >
-        {{
-          myNet() > 0
-            ? 'You are owed'
-            : myNet() < 0
-              ? 'You owe'
-              : myBalances().length
-                ? 'Even overall · open balances'
-                : 'All square'
-        }}
-        @if (myNet() !== 0) {
-          <strong
-            class="dc-amount"
-            [class.dc-amount--owed]="myNet() > 0"
-            [class.dc-amount--owes]="myNet() < 0"
-          >
-            ${{ display(myNet() < 0 ? -myNet() : myNet()) }}
-          </strong>
-          overall
-        }
-      </span>
-      @for (b of myBalances(); track b.user.id) {
+      @for (total of myTotals(); track total.currency) {
+        <span
+          class="pill pill--overall"
+          [class.pill--owed]="total.netMinor > 0"
+          [class.pill--owes]="total.netMinor < 0"
+        >
+          {{ total.currency }}
+          {{
+            total.netMinor > 0
+              ? 'You are owed'
+              : total.netMinor < 0
+                ? 'You owe'
+                : total.hasOpenBalances
+                  ? 'Even overall · open balances'
+                  : 'All square'
+          }}
+          @if (total.netMinor !== 0) {
+            <strong
+              class="dc-amount"
+              [class.dc-amount--owed]="total.netMinor > 0"
+              [class.dc-amount--owes]="total.netMinor < 0"
+              >{{
+                display(total.netMinor < 0 ? -total.netMinor : total.netMinor, total.currency)
+              }}</strong
+            >
+            overall
+          }
+        </span>
+      }
+      @for (b of myBalances(); track b.user.id + (b.currency ?? 'USD')) {
         <span class="pill">
           <span class="dc-avatar pill__av" aria-hidden="true" [style]="tint(b.user.id)">{{
             initials(b.user.displayName)
@@ -116,10 +120,10 @@
           {{ pillLabel(b) }}
           <strong
             class="dc-amount"
-            [class.dc-amount--owed]="b.netCents > 0"
-            [class.dc-amount--owes]="b.netCents < 0"
+            [class.dc-amount--owed]="b.netMinor > 0"
+            [class.dc-amount--owes]="b.netMinor < 0"
           >
-            ${{ display(b.netCents < 0 ? -b.netCents : b.netCents) }}
+            {{ display(b.netMinor < 0 ? -b.netMinor : b.netMinor, b.currency) }}
           </strong>
         </span>
       }
@@ -155,15 +159,18 @@
                   </span>
                   <span class="xrow__right">
                     <span class="xrow__delta-label">{{ deltaLabel(e) }}</span>
-                    @if (e.viewerDeltaCents === 0) {
-                      <span class="xrow__amt">$0.00</span>
+                    @if (e.viewerDeltaMinor === 0) {
+                      <span class="xrow__amt">{{ display(0, e.currency) }}</span>
                     } @else {
                       <span
                         class="xrow__amt dc-amount"
-                        [class.dc-amount--owed]="e.viewerDeltaCents > 0"
-                        [class.dc-amount--owes]="e.viewerDeltaCents < 0"
-                        >${{
-                          display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents)
+                        [class.dc-amount--owed]="e.viewerDeltaMinor > 0"
+                        [class.dc-amount--owes]="e.viewerDeltaMinor < 0"
+                        >{{
+                          display(
+                            e.viewerDeltaMinor < 0 ? -e.viewerDeltaMinor : e.viewerDeltaMinor,
+                            e.currency
+                          )
                         }}</span
                       >
                     }
@@ -189,7 +196,7 @@
                     } @else if (detail(); as d) {
                       <div class="xdetail__line xdetail__line--paid">
                         <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>
-                        <span class="xdetail__amt">${{ display(d.amountCents) }}</span>
+                        <span class="xdetail__amt">{{ display(d.amountMinor, d.currency) }}</span>
                       </div>
                       @for (p of d.participants; track p.user.id) {
                         <div class="xdetail__line">
@@ -200,7 +207,7 @@
                             >{{ initials(p.user.displayName) }}</span
                           >
                           <span class="xdetail__who">{{ partLabel(p) }}</span>
-                          <span class="xdetail__amt">${{ display(p.shareCents) }}</span>
+                          <span class="xdetail__amt">{{ display(p.shareMinor, d.currency) }}</span>
                         </div>
                       }
                       <div class="xdetail__actions">

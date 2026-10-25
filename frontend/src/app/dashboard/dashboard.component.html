@@ -43,17 +43,23 @@
                 ><app-group-art [type]="g.type" /><span class="group-object__copy"
                   ><strong>{{ g.name }}</strong
                   ><small>{{ g.memberCount }} members · {{ g.type.toLowerCase() }}</small
-                  ><span class="group-object__balance"
-                    ><span>{{
-                      g.netCents > 0
-                        ? 'You’re owed'
-                        : g.netCents < 0
-                          ? 'You owe'
-                          : g.youAreOwedCents || g.youOweCents
-                            ? 'Even overall'
-                            : 'All square'
-                    }}</span
-                    ><app-money [cents]="g.netCents" [net]="true" /></span></span
+                  ><span class="group-object__balance">
+                    @for (total of groupTotals(g); track total.currency) {
+                      <span>{{
+                        total.netMinor > 0
+                          ? 'You’re owed'
+                          : total.netMinor < 0
+                            ? 'You owe'
+                            : total.youAreOwedMinor || total.youOweMinor
+                              ? 'Even overall'
+                              : 'All square'
+                      }}</span>
+                      <app-money
+                        [minor]="total.netMinor"
+                        [currency]="total.currency"
+                        [net]="true"
+                      />
+                    }</span></span
                 ><span class="group-object__arrow" aria-hidden="true">↗</span></a
               >
             }
@@ -74,38 +80,46 @@
           }
         </div>
         <div class="balance-core">
-          <span>Your overall balance</span><app-money [cents]="d.totalNetCents" [net]="true" />
-          <p>
-            {{
-              d.totalNetCents > 0
-                ? 'You’re owed overall'
-                : d.totalNetCents < 0
-                  ? 'You owe overall'
-                  : d.owedCents || d.oweCents
-                    ? 'Even overall · open balances below'
-                    : 'All square. A clear head.'
-            }}
-          </p>
+          <span>Your balances by currency</span>
+          @for (total of totals(d); track total.currency) {
+            <app-money [minor]="total.totalNetMinor" [currency]="total.currency" [net]="true" />
+            <p>
+              {{
+                total.totalNetMinor > 0
+                  ? 'You’re owed overall'
+                  : total.totalNetMinor < 0
+                    ? 'You owe overall'
+                    : total.owedMinor || total.oweMinor
+                      ? 'Even overall · open balances below'
+                      : 'All square. A clear head.'
+              }}
+            </p>
+          }
           <button type="button" class="balance-settle" (click)="modal.openSettle()">
             Let’s settle up <app-icon name="arrow" />
           </button>
         </div>
         <div class="balance-pockets">
-          <div class="balance-pocket balance-pocket--owed">
-            <span>You’re owed</span><app-money [cents]="d.owedCents" /><small
-              >From {{ d.owedPeopleCount }}
-              {{ d.owedPeopleCount === 1 ? 'person' : 'people' }}</small
-            >
-          </div>
-          <div class="balance-pocket balance-pocket--owes">
-            <span>You owe</span><app-money [cents]="d.oweCents" /><small
-              >To {{ d.owePeopleCount }} {{ d.owePeopleCount === 1 ? 'person' : 'people' }}</small
-            >
-          </div>
+          @for (total of totals(d); track total.currency) {
+            <div class="balance-pocket balance-pocket--owed">
+              <span>You’re owed</span
+              ><app-money [minor]="total.owedMinor" [currency]="total.currency" /><small
+                >From {{ total.owedPeopleCount }}
+                {{ total.owedPeopleCount === 1 ? 'person' : 'people' }}</small
+              >
+            </div>
+            <div class="balance-pocket balance-pocket--owes">
+              <span>You owe</span
+              ><app-money [minor]="total.oweMinor" [currency]="total.currency" /><small
+                >To {{ total.owePeopleCount }}
+                {{ total.owePeopleCount === 1 ? 'person' : 'people' }}</small
+              >
+            </div>
+          }
         </div>
         <p class="collection-note">
-          Across {{ d.groupCount }} {{ d.groupCount === 1 ? 'group' : 'groups' }}. Always to the
-          cent.
+          Across {{ d.groupCount }} {{ d.groupCount === 1 ? 'group' : 'groups' }}. Amounts keep
+          their original currency.
         </p>
       </section>
       <aside class="friends" aria-labelledby="people-heading">
@@ -121,14 +135,14 @@
             <p>No open balances with anyone.</p>
           </div>
         }
-        @for (p of d.people; track p.user.id) {
+        @for (p of d.people; track p.user.id + (p.currency ?? 'USD')) {
           <div class="friend-object dc-glass">
             <span class="dc-avatar" aria-hidden="true" [style]="tint(p.user.id)">{{
               initials(p.user.displayName)
             }}</span>
             <h3>{{ p.user.displayName }}</h3>
-            <p>{{ p.netCents > 0 ? 'Owes you' : p.netCents < 0 ? 'You owe' : 'All square' }}</p>
-            <app-money [cents]="p.netCents" [net]="true" /><button
+            <p>{{ p.netMinor > 0 ? 'Owes you' : p.netMinor < 0 ? 'You owe' : 'All square' }}</p>
+            <app-money [minor]="p.netMinor" [currency]="p.currency ?? 'USD'" [net]="true" /><button
               type="button"
               class="dc-btn-link"
               (click)="modal.openSettle()"
@@ -159,10 +173,14 @@
                 }}</a
                 ><span class="feed__sub">{{ activitySub(a) }}</span></span
               ><span class="feed__right">
-                @if (a.kind === 'PAYMENT' || a.viewerDeltaCents === 0) {
-                  <app-money [cents]="a.amountCents" />
+                @if (a.kind === 'PAYMENT' || a.viewerDeltaMinor === 0) {
+                  <app-money [minor]="a.amountMinor" [currency]="a.currency ?? 'USD'" />
                 } @else {
-                  <app-money [cents]="a.viewerDeltaCents" [net]="true" />
+                  <app-money
+                    [minor]="a.viewerDeltaMinor"
+                    [currency]="a.currency ?? 'USD'"
+                    [net]="true"
+                  />
                 }
                 <span class="feed__date">{{ shortDate(a.date) }}</span></span
               >

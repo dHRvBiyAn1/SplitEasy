@@ -11,6 +11,12 @@ import { GroupResponse } from '../groups/group.models';
 import { ModalService } from './modal.service';
 import { NewExpenseModalComponent } from './new-expense-modal.component';
 
+// Expense-only fixtures keep the default USD draft while profile loading is unavailable.
+function settleProfileRead(http: HttpTestingController): void {
+  for (const request of http.match('/api/me'))
+    if (!request.cancelled) request.flush({}, { status: 503, statusText: 'Unavailable' });
+}
+
 const me = { id: 'me', email: 'me@example.test', displayName: 'Alex Rivera' };
 const other = { id: 'other', email: 'other@example.test', displayName: 'Noor Kapoor' };
 const third = { id: 'third', email: 'third@example.test', displayName: 'Bob Chen' };
@@ -30,22 +36,23 @@ const expense: ExpenseResponse = {
   id: 'current-expense',
   groupId: group.id,
   description: 'Original lunch',
-  amountCents: 1000,
+  amountMinor: 1000,
+  currency: 'USD' as const,
   splitType: 'EQUAL',
   category: 'FOOD_DRINK',
   spentOn: '2026-10-17',
   paidBy: me,
   participants: [
-    { user: me, shareCents: 500 },
-    { user: other, shareCents: 500 },
+    { user: me, shareMinor: 500 },
+    { user: other, shareMinor: 500 },
   ],
   createdAt: '2026-10-17T00:00:00Z',
 };
 const emptyOverview: DashboardResponse = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 0,
   groups: [],
@@ -74,6 +81,7 @@ describe('expense modal group ownership and overview availability', () => {
   });
   afterEach(() => {
     try {
+      settleProfileRead(http);
       http.verify();
     } finally {
       TestBed.resetTestingModule();
@@ -94,10 +102,10 @@ describe('expense modal group ownership and overview availability', () => {
       groups: [group, secondGroup].map((g) => ({
         ...g,
         memberCount: g.members.length,
-        totalSpentCents: 0,
-        youAreOwedCents: 0,
-        youOweCents: 0,
-        netCents: 0,
+        totalSpentMinor: 0,
+        youAreOwedMinor: 0,
+        youOweMinor: 0,
+        netMinor: 0,
       })),
     });
     modal.openExpense(group.id, edit ? expense.id : undefined);
@@ -268,7 +276,7 @@ describe('expense modal group ownership and overview availability', () => {
     http.expectOne(`/api/groups/${group.id}`).flush(group);
     http
       .expectOne(`/api/groups/${group.id}/expenses/${expense.id}`)
-      .flush({ ...expense, description: 'Old server description', amountCents: 9900 });
+      .flush({ ...expense, description: 'Old server description', amountMinor: 9900 });
     fixture.detectChanges();
     expect(root.querySelector<HTMLInputElement>('#ne-desc')!.value).toBe('Lunch');
     expect(root.querySelector<HTMLInputElement>('#ne-amt')!.value).toBe('12');
@@ -423,11 +431,12 @@ describe('expense modal group ownership and overview availability', () => {
         });
         expect(save.request.body).toMatchObject({
           description: 'Updated lunch',
-          amountCents: 1234,
+          amountMinor: 1234,
+          currency: 'USD' as const,
           paidByUserId: me.id,
           participantUserIds: [me.id, other.id],
         });
-        save.flush({ ...expense, description: 'Updated lunch', amountCents: 1234 });
+        save.flush({ ...expense, description: 'Updated lunch', amountMinor: 1234 });
         if (availability === 'pending') initialOverview.flush(emptyOverview);
         http.expectOne('/api/dashboard').flush(emptyOverview);
         expect(modal.active()).toBeNull();
@@ -476,7 +485,7 @@ describe('expense modal group ownership and overview availability', () => {
       expect(button('Food & drink').getAttribute('aria-pressed')).toBe('false');
       const inputs = members.map((m) =>
         root.querySelector<HTMLInputElement>(
-          `input[aria-label="${payerName(m)} ${splitType === 'UNEQUAL' ? 'exact amount in dollars' : 'share in percent'}"]`,
+          `input[aria-label="${payerName(m)} ${splitType === 'UNEQUAL' ? 'exact amount in USD' : 'share in percent'}"]`,
         ),
       );
       expect(inputs.every(Boolean)).toBe(true);
@@ -498,7 +507,8 @@ describe('expense modal group ownership and overview availability', () => {
         .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       const save = http.expectOne({ method: 'POST', url: `/api/groups/${group.id}/expenses` });
       expect(save.request.body).toMatchObject({
-        amountCents: 1234,
+        amountMinor: 1234,
+        currency: 'USD' as const,
         paidByUserId: 'alex-three',
         category: 'GROCERIES',
         splitType,
@@ -569,7 +579,14 @@ describe('serialized expense split validation', () => {
     });
     http = TestBed.inject(HttpTestingController);
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    try {
+      settleProfileRead(http);
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
 
   function open(type: 'UNEQUAL' | 'PERCENTAGE', values: string[], edit = false) {
     TestBed.inject(ModalService).openExpense(group.id, edit ? expense.id : undefined);
@@ -580,8 +597,8 @@ describe('serialized expense split validation', () => {
         ...expense,
         splitType: 'PERCENTAGE',
         participants: [
-          { user: me, shareCents: 333 },
-          { user: other, shareCents: 667 },
+          { user: me, shareMinor: 333 },
+          { user: other, shareMinor: 667 },
         ],
       });
     }
@@ -612,7 +629,7 @@ describe('serialized expense split validation', () => {
     const body: CreateExpenseRequest = save.request.body;
     expect(body.splits!.every((s) => Number.isSafeInteger(s.value) && s.value >= 0)).toBe(true);
     expect(body.splits!.reduce((total, s) => total + s.value, 0)).toBe(
-      body.splitType === 'PERCENTAGE' ? 10000 : body.amountCents,
+      body.splitType === 'PERCENTAGE' ? 10000 : body.amountMinor,
     );
     save.flush(expense);
     http.expectOne('/api/dashboard').flush(emptyOverview);
@@ -699,7 +716,14 @@ describe('original split intent in the rendered editor', () => {
     });
     http = TestBed.inject(HttpTestingController);
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    try {
+      settleProfileRead(http);
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
 
   it('keeps original 50/50 percentages for a one-cent expense and recalculates after an amount change', () => {
     TestBed.inject(ModalService).openExpense(group.id, expense.id);
@@ -707,15 +731,16 @@ describe('original split intent in the rendered editor', () => {
     http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
     http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
       ...expense,
-      amountCents: 1,
+      amountMinor: 1,
+      currency: 'USD' as const,
       splitType: 'PERCENTAGE',
       splits: [
         { userId: me.id, value: 5000 },
         { userId: other.id, value: 5000 },
       ],
       participants: [
-        { user: me, shareCents: 1 },
-        { user: other, shareCents: 0 },
+        { user: me, shareMinor: 1 },
+        { user: other, shareMinor: 0 },
       ],
     });
     fixture.detectChanges();
@@ -737,7 +762,8 @@ describe('original split intent in the rendered editor', () => {
       url: `/api/groups/${group.id}/expenses/${expense.id}`,
     });
     expect(save.request.body).toMatchObject({
-      amountCents: 100,
+      amountMinor: 100,
+      currency: 'USD' as const,
       splitType: 'PERCENTAGE',
       splits: [
         { userId: me.id, value: 5000 },
@@ -759,8 +785,8 @@ describe('original split intent in the rendered editor', () => {
         { userId: other.id, value: 0 },
       ],
       participants: [
-        { user: me, shareCents: 1000 },
-        { user: other, shareCents: 0 },
+        { user: me, shareMinor: 1000 },
+        { user: other, shareMinor: 0 },
       ],
     });
     fixture.detectChanges();
@@ -808,7 +834,8 @@ describe('original split intent in the rendered editor', () => {
     const save = http.expectOne({ method: 'POST', url: `/api/groups/${group.id}/expenses` });
     expect(save.request.body).toMatchObject({
       splitType: 'WEIGHTS',
-      amountCents: 5,
+      amountMinor: 5,
+      currency: 'USD' as const,
       splits: [
         { userId: me.id, value: 1 },
         { userId: other.id, value: 2 },
@@ -824,15 +851,16 @@ describe('original split intent in the rendered editor', () => {
     http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
     http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
       ...expense,
-      amountCents: 200,
+      amountMinor: 200,
+      currency: 'USD' as const,
       splitType: 'ADJUSTMENTS',
       splits: [
         { userId: me.id, value: -50 },
         { userId: other.id, value: 50 },
       ],
       participants: [
-        { user: me, shareCents: 50 },
-        { user: other, shareCents: 150 },
+        { user: me, shareMinor: 50 },
+        { user: other, shareMinor: 150 },
       ],
     });
     fixture.detectChanges();
@@ -841,7 +869,7 @@ describe('original split intent in the rendered editor', () => {
     expect(selected.textContent?.trim()).toBe('Adjustments');
     const inputs = root.querySelectorAll<HTMLInputElement>('.prow__val');
     expect(inputs[0].value).toBe('-0.50');
-    expect(inputs[0].getAttribute('aria-label')).toContain('adjustment in signed dollars');
+    expect(inputs[0].getAttribute('aria-label')).toContain('adjustment in signed USD');
     const amount = root.querySelector<HTMLInputElement>('#ne-amt')!;
     amount.value = '0.50';
     amount.dispatchEvent(new Event('input', { bubbles: true }));
@@ -906,15 +934,16 @@ describe('original split intent in the rendered editor', () => {
     http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, other, third] });
     http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
       ...expense,
-      amountCents: 5,
+      amountMinor: 5,
+      currency: 'USD' as const,
       splitType: 'WEIGHTS',
       splits: [
         { userId: me.id, value: 1 },
         { userId: other.id, value: 2 },
       ],
       participants: [
-        { user: me, shareCents: 2 },
-        { user: other, shareCents: 3 },
+        { user: me, shareMinor: 2 },
+        { user: other, shareMinor: 3 },
       ],
     });
     fixture.detectChanges();
@@ -935,7 +964,8 @@ describe('original split intent in the rendered editor', () => {
     });
     expect(save.request.body).toMatchObject({
       splitType: 'WEIGHTS',
-      amountCents: 10,
+      amountMinor: 10,
+      currency: 'USD' as const,
       splits: [
         { userId: me.id, value: 1 },
         { userId: other.id, value: 2 },
@@ -953,15 +983,16 @@ describe('original split intent in the rendered editor', () => {
     http.expectOne(`/api/groups/${group.id}`).flush({ ...group, members: [me, low, high] });
     http.expectOne(`/api/groups/${group.id}/expenses/${expense.id}`).flush({
       ...expense,
-      amountCents: 1,
+      amountMinor: 1,
+      currency: 'USD' as const,
       splitType: 'ADJUSTMENTS',
       splits: [
         { userId: low.id, value: 1 },
         { userId: high.id, value: -1 },
       ],
       participants: [
-        { user: low, shareCents: 1 },
-        { user: high, shareCents: 0 },
+        { user: low, shareMinor: 1 },
+        { user: high, shareMinor: 0 },
       ],
     });
     fixture.detectChanges();

@@ -40,8 +40,8 @@ public class PairwiseBalanceService {
         .map(
             d ->
                 d.from().id().equals(viewer)
-                    ? new PersonBalance(d.to(), -d.amountCents())
-                    : new PersonBalance(d.from(), d.amountCents()))
+                    ? new PersonBalance(d.to(), -d.amountMinor(), d.currency())
+                    : new PersonBalance(d.from(), d.amountMinor(), d.currency()))
         .sorted(
             Comparator.comparingLong((PersonBalance b) -> Math.abs(b.netCents()))
                 .reversed()

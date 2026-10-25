@@ -10,7 +10,8 @@ import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { BalanceService, describeBalance } from '../balances/balance.service';
 import { DirectObligation, MemberBalance } from '../balances/balance.models';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { centsToDisplay } from '../expenses/expense.service';
+import { Currency } from '../shared/currency';
+import { formatMoney } from '../shared/money.component';
 import { ModalService } from '../modals/modal.service';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
@@ -51,7 +52,8 @@ export class GroupSettingsComponent implements OnInit {
   private readonly dashboard = inject(DashboardService);
   protected readonly modal = inject(ModalService);
 
-  protected readonly display = centsToDisplay;
+  protected readonly display = (amount: number, currency: Currency = 'USD', net = false) =>
+    formatMoney(amount, net, currency);
   protected readonly describe = describeBalance;
 
   protected readonly loading = signal(true);
@@ -75,7 +77,7 @@ export class GroupSettingsComponent implements OnInit {
   protected readonly meId = computed(() => this.auth.user()?.id ?? '');
   /** Only the creator owns the group, so only they may delete it. */
   protected readonly isCreator = computed(() => this.group()?.createdBy.id === this.meId());
-  protected readonly myNet = computed(() => this.netOf(this.meId()));
+  protected readonly hasMyBalance = computed(() => this.hasBalance(this.meId()));
   protected readonly canLeave = computed(() => this.blockedReason(this.meId()) === null);
 
   constructor() {
@@ -156,9 +158,11 @@ export class GroupSettingsComponent implements OnInit {
     this.reload();
   }
 
-  /** That member's net in this group; 0 when they have no activity yet. */
-  netOf(userId: string): number {
-    return this.memberBalances().find((b) => b.user.id === userId)?.netCents ?? 0;
+  balancesOf(userId: string): MemberBalance[] {
+    return this.memberBalances().filter((b) => b.user.id === userId);
+  }
+  hasBalance(userId: string): boolean {
+    return this.balancesOf(userId).some((b) => b.netMinor !== 0);
   }
 
   /** A member's current-mode counterparties, including people who have left the group. */
@@ -167,7 +171,8 @@ export class GroupSettingsComponent implements OnInit {
       .filter((debt) => debt.from.id === userId || debt.to.id === userId)
       .map((debt) => ({
         user: debt.from.id === userId ? debt.to : debt.from,
-        netCents: debt.from.id === userId ? -debt.amountCents : debt.amountCents,
+        netMinor: debt.from.id === userId ? -debt.amountMinor : debt.amountMinor,
+        currency: debt.currency ?? 'USD',
       }));
   }
 
@@ -179,12 +184,15 @@ export class GroupSettingsComponent implements OnInit {
     if (this.group()?.createdBy.id === userId) {
       return 'Created this group';
     }
-    const net = this.netOf(userId);
-    if (net > 0) {
-      return `Is owed $${this.display(net)}`;
-    }
-    if (net < 0) {
-      return `Owes $${this.display(-net)}`;
+    const balances = this.balancesOf(userId).filter((b) => b.netMinor !== 0);
+    if (balances.length > 1)
+      return (
+        'Outstanding balances: ' +
+        balances.map((b) => this.display(b.netMinor, b.currency, true)).join('; ')
+      );
+    if (balances.length === 1) {
+      const balance = balances[0];
+      return `${balance.netMinor > 0 ? 'Is owed' : 'Owes'} ${this.display(Math.abs(balance.netMinor), balance.currency)}`;
     }
     if (this.obligationsOf(userId).length) {
       return 'Has outstanding obligations';

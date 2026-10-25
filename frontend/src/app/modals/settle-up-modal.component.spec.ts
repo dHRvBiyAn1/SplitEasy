@@ -15,10 +15,10 @@ const dan = { id: 'd1', email: 'd@ex.com', displayName: 'Dan Kim' };
 
 /** The dashboard sends canonical simplified obligations. */
 const dashboardData = {
-  totalNetCents: 3000,
-  owedCents: 5000,
+  totalNetMinor: 3000,
+  owedMinor: 5000,
   owedPeopleCount: 1,
-  oweCents: 2000,
+  oweMinor: 2000,
   owePeopleCount: 1,
   groupCount: 1,
   groups: [
@@ -27,16 +27,16 @@ const dashboardData = {
       name: 'Maple St. House',
       type: 'HOME',
       memberCount: 3,
-      totalSpentCents: 10000,
-      youAreOwedCents: 5000,
-      youOweCents: 2000,
-      netCents: 3000,
+      totalSpentMinor: 10000,
+      youAreOwedMinor: 5000,
+      youOweMinor: 2000,
+      netMinor: 3000,
       simplifyDebts: true,
     },
   ],
   people: [],
   settlements: [
-    { groupId: 'g1', groupName: 'Maple St. House', counterparty: priya, netCents: 3000 },
+    { groupId: 'g1', groupName: 'Maple St. House', counterparty: priya, netMinor: 3000 },
   ],
   activity: [],
 } as unknown as DashboardResponse;
@@ -86,13 +86,13 @@ describe('SettleUpModalComponent', () => {
           groupId: 'g1',
           groupName: 'Home',
           counterparty: { ...priya, displayName: 'Alex Chen' },
-          netCents: 1000,
+          netMinor: 1000,
         },
         {
           groupId: 'g1',
           groupName: 'Home',
           counterparty: { ...dan, displayName: 'Alex Chen' },
-          netCents: -1000,
+          netMinor: -1000,
         },
       ],
     });
@@ -127,8 +127,8 @@ describe('SettleUpModalComponent', () => {
       ...dashboardData,
       groups: [{ ...dashboardData.groups[0], simplifyDebts: false }],
       settlements: [
-        { groupId: 'g1', groupName: 'Home', counterparty: priya, netCents: 5000 },
-        { groupId: 'g1', groupName: 'Home', counterparty: dan, netCents: -2000 },
+        { groupId: 'g1', groupName: 'Home', counterparty: priya, netMinor: 5000 },
+        { groupId: 'g1', groupName: 'Home', counterparty: dan, netMinor: -2000 },
       ],
     } as DashboardResponse);
     await render();
@@ -154,8 +154,8 @@ describe('SettleUpModalComponent', () => {
 
     expect(recordPayment).toHaveBeenCalledWith(
       'g1',
-      { payerUserId: priya.id, payeeUserId: me.id, amountCents: 1250 },
-      { groupId: 'g1', groupName: 'Maple St. House', counterparty: priya, netCents: 3000 },
+      { payerUserId: priya.id, payeeUserId: me.id, amountMinor: 1250, currency: 'USD' },
+      { groupId: 'g1', groupName: 'Maple St. House', counterparty: priya, netMinor: 3000 },
     );
   });
 

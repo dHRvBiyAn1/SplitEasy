@@ -40,6 +40,10 @@ public class Payment {
   @JoinColumn(name = "payee_id", nullable = false, updatable = false)
   private User payee;
 
+  @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+  @Column(nullable = false, length = 3)
+  private LedgerCurrency currency = LedgerCurrency.USD;
+
   @Column(name = "amount_cents", nullable = false)
   private long amountCents;
 

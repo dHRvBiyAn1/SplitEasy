@@ -112,7 +112,7 @@
         </label>
 
         <div class="pfield">
-          <span class="dc-field-label">Currency</span>
+          <span class="dc-field-label">Default currency for new expenses</span>
           <div class="chips">
             @for (c of currencies; track c) {
               <button
@@ -175,7 +175,8 @@
   </section>
   <p class="profile__note">
     Name, phone, avatar and currency preferences are saved to your account. Phone is unverified
-    contact information. Currency preferences do not change or convert recorded amounts.
+    contact information. Currency preferences do not change or convert recorded amounts. They
+    prefill new expense drafts.
   </p>
 
   <button type="button" class="dc-btn-outline profile__signout" (click)="signOut()">

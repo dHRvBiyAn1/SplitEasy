@@ -83,6 +83,7 @@ public class ExpenseService {
   public ExpenseResponse createExpense(
       UUID requesterId, UUID groupId, CreateExpenseRequest request) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    com.spliteasy.config.LedgerContract.requireCurrency(request.resolvedCurrency());
     return createOperations.create(
         requesterId,
         "expense",
@@ -102,7 +103,11 @@ public class ExpenseService {
                     .sorted(Comparator.comparing(SplitInput::userId))
                     .toList(),
             categoryOf(request),
-            request.spentOn()),
+            request.spentOn(),
+            null,
+            null,
+            request.amountMinor(),
+            request.currency()),
         ExpenseResponse.class,
         response -> {},
         () -> createNewExpense(requesterId, groupId, group, request));
@@ -117,11 +122,12 @@ public class ExpenseService {
         new Expense(
             group,
             request.description().trim(),
-            request.amountCents(),
+            request.resolvedAmountMinor(),
             split.usersById().get(split.payerId()),
             split.splitType(),
             categoryOf(request),
             spentOnOf(request));
+    expense.setCurrency(request.resolvedCurrency());
     addShares(expense, split);
     expenseRepository.save(expense);
     log.info(
@@ -146,6 +152,11 @@ public class ExpenseService {
       throw new NotFoundException("Expense not found in this group");
     }
 
+    com.spliteasy.config.LedgerContract.requireCurrency(expense.getCurrency());
+    if (expense.getCurrency() != request.resolvedCurrency()) {
+      throw new BadRequestException(
+          "Expense currency cannot change. Create a separate expense in the correct currency.");
+    }
     versionPolicy.requireExpected(request.expectedVersion(), expense.getVersion());
     requireActiveExpenseParticipants(expense);
 
@@ -154,7 +165,7 @@ public class ExpenseService {
     // Immediate increment (unlike deferred OPTIMISTIC_FORCE_INCREMENT) keeps the response current.
     entityManager.lock(expense, jakarta.persistence.LockModeType.PESSIMISTIC_FORCE_INCREMENT);
     expense.setDescription(request.description().trim());
-    expense.setAmountCents(request.amountCents());
+    expense.setAmountCents(request.resolvedAmountMinor());
     expense.setPaidBy(split.usersById().get(split.payerId()));
     expense.setSplitType(split.splitType());
     expense.setCategory(categoryOf(request));
@@ -179,6 +190,7 @@ public class ExpenseService {
     if (!expense.getGroup().getId().equals(groupId)) {
       throw new NotFoundException("Expense not found in this group");
     }
+    com.spliteasy.config.LedgerContract.requireCurrency(expense.getCurrency());
     versionPolicy.requireExpected(expectedVersion, expense.getVersion());
     requireActiveExpenseParticipants(expense);
     expenseRepository.delete(expense); // cascade/orphanRemoval deletes expense_participants
@@ -216,13 +228,13 @@ public class ExpenseService {
     if (splitType == SplitType.EQUAL) {
       ctx =
           SplitContext.forEqual(
-              request.amountCents(),
+              request.resolvedAmountMinor(),
               payerId,
               resolveParticipants(request.participantUserIds(), memberIds));
     } else {
       ctx =
           SplitContext.forSplits(
-              request.amountCents(), payerId, requireSplits(request.splits(), memberIds));
+              request.resolvedAmountMinor(), payerId, requireSplits(request.splits(), memberIds));
     }
     List<Share> shares = strategies.get(splitType).split(ctx);
     Map<UUID, User> usersById = loadUsers(shares.stream().map(Share::userId).toList(), payerId);
@@ -296,7 +308,8 @@ public class ExpenseService {
                         v.getAmountCents(),
                         myShare.getOrDefault(v.getId(), 0L)),
                     v.getCreatedAt(),
-                    v.getVersion()))
+                    v.getVersion(),
+                    v.getCurrency()))
         .toList();
   }
 
@@ -347,7 +360,10 @@ public class ExpenseService {
   private ExpenseResponse toResponse(Expense expense) {
     List<SplitShare> shares =
         expense.getParticipants().stream()
-            .map(p -> new SplitShare(UserSummary.from(p.getUser()), p.getShareCents()))
+            .map(
+                p ->
+                    new SplitShare(
+                        UserSummary.from(p.getUser()), p.getShareCents(), expense.getCurrency()))
             .sorted(Comparator.comparing(s -> s.user().displayName()))
             .toList();
     // Old writers cannot retain non-equal intent. Expose safe exact editing, never infer ratios.
@@ -381,6 +397,7 @@ public class ExpenseService {
             : null,
         inputs,
         expense.getCreatedAt(),
-        expense.getVersion());
+        expense.getVersion(),
+        expense.getCurrency());
   }
 }

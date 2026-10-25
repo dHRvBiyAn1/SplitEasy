@@ -1,3 +1,4 @@
+import { groupTotals } from './dashboard/dashboard.models';
 import {
   Component,
   HostListener,
@@ -39,6 +40,7 @@ import { MoneyComponent } from './shared/money.component';
   styleUrl: './app.scss',
 })
 export class App {
+  protected readonly groupTotals = groupTotals;
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
   private readonly profile = inject(ProfileService);
