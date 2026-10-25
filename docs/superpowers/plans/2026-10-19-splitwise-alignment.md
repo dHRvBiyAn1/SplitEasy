@@ -10,6 +10,12 @@
 
 **Spec:** [Proposed design](../specs/2026-10-19-splitwise-alignment-design.md).
 
+## Current delivery checkpoint (25 October 2026)
+
+A03 and C01 are reviewed candidates for PRs to `dev`; A03 is [PR #104](https://github.com/dHRvBiyAn1/SplitEasy/pull/104). The C01 companion carries their combined integration and the [fourth-batch verification](../../reviews/2026-10-24-alignment/fourth-batch-integration.md). Apply V14 before V15 or together and drain old writers before cutover. Publication does not authorize merge or deployment. Production Google Workspace SMTP remains deferred.
+
+The next phase has a prepared [H01 history/recovery design](2026-10-24-alignment-h01.md). Start implementation from verified `dev` after C01 and A03 integrate; preserve per-currency projections, session ownership and immutable create receipts.
+
 ## Global Constraints
 
 - Java 21, Spring Boot 4.1, PostgreSQL 16/Flyway, Angular 21 standalone components/signals, Vitest; CI Node 22.

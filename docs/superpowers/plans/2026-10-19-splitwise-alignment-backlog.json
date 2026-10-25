@@ -9,8 +9,7 @@
     "F04"
   ],
   "next_candidates": [
-    "A03",
-    "C01"
+    "H01"
   ],
   "packages": [
     {
@@ -129,11 +128,14 @@
         "A02",
         "E02"
       ],
-      "status": "implementation_in_progress",
+      "status": "reviewed_pr_ready",
       "conditional": false,
       "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
       "branch": "bugfix/alignment-a03-revocable-sessions",
-      "execution_plan": "2026-10-24-alignment-a03.md"
+      "execution_plan": "2026-10-24-alignment-a03.md",
+      "integration_state": "not_merged",
+      "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report.",
+      "pull_request": 104
     },
     {
       "id": "A04",
@@ -179,16 +181,18 @@
         "E01",
         "E02"
       ],
-      "status": "implementation_in_progress",
+      "status": "reviewed_pr_ready",
       "conditional": false,
       "legacy_currency_decision": {
         "currency": "USD",
         "owner_confirmed": "2026-10-19",
-        "implementation_status": "Pending C01; no current schema or data change"
+        "implementation_status": "V15 owner-confirmed USD backfill implemented and reviewed; deployment remains separate."
       },
       "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
       "branch": "bugfix/alignment-c01-currency-ledger",
-      "execution_plan": "2026-10-24-alignment-c01.md"
+      "execution_plan": "2026-10-24-alignment-c01.md",
+      "integration_state": "not_merged",
+      "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report."
     },
     {
       "id": "C02",
@@ -363,8 +367,10 @@
         "E02",
         "C01"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "design_prepared",
+      "conditional": false,
+      "subsystem_plan": "docs/superpowers/plans/2026-10-24-alignment-h01.md",
+      "implementation_gate": "C01 and A03 integrated into verified dev; branch from that dev. No PR merge authorization implied."
     },
     {
       "id": "H02",
@@ -1381,7 +1387,7 @@
       "legacy_currency_decision": {
         "currency": "USD",
         "owner_confirmed": "2026-10-19",
-        "implementation_status": "Pending C01; no current schema or data change"
+        "implementation_status": "V15 owner-confirmed USD backfill implemented and reviewed; deployment remains separate."
       }
     },
     {
@@ -1875,7 +1881,7 @@
   ],
   "implementation_base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
   "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
-  "current_batch_status": "implementation_in_progress",
+  "current_batch_status": "reviewed_prs_to_dev",
   "second_batch_delivery": {
     "state": "merged_dev",
     "packages": [
@@ -1911,5 +1917,16 @@
     ],
     "dev_head": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
     "ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/40079232599"
+  },
+  "fourth_batch_delivery": {
+    "state": "reviewed_prs_to_dev",
+    "packages": [
+      "A03",
+      "C01"
+    ],
+    "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
+    "migration_order": "A03 V14 before C01 V15, or same release; drain old writers",
+    "evidence": "docs/reviews/2026-10-24-alignment/fourth-batch-integration.md",
+    "merge_authorized": false
   }
 }

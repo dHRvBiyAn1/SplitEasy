@@ -19,3 +19,18 @@ Raw logs remain outside git at `/workspace/issue-context/alignment-implementatio
 Two authenticated MVC/PostgreSQL regressions ran individually red→green. Cancelled reciprocal JPY payments alongside USD expenses previously left numeric USD dashboard/group aliases; payment-history currencies now remain in the complete scope even when their obligations net to zero or the viewer is a third member. The regression observes null mixed scalar aliases and an explicit zero JPY totals row for both viewers. A headerless legacy amountCents PUT against a JPY expense previously returned400; the persisted-currency client contract now runs after membership/resource-scope authorization and before the immutable-currency comparison, returning409 with upgrade guidance without changing the expense. The unchanged catalogue wire record moved to dto.common per repository conventions.
 
 Java21 `backend/mvnw -f backend/pom.xml -s /workspace/maven-proxy-settings.xml -B spotless:check verify` passed291 tests with no failures/errors and packaged successfully. Logs: `review-dashboard-{red,green}.log`, `review-legacy-put-{red,green}.log`, `review-format.log`, and `review-full-verify.log` in the raw-log directory. Frozen corrected artifact: `review-fixed.jar`, SHA256 `d2cf0d4a72a040388efd5b6e75886bf9e4bfcba92194de8ca88e98417d94f1e6`; final source/artifact hashes are recorded in `CANDIDATE.json`. Frontend/OpenAPI source is unchanged from the preceding verified candidate, so those checks were not repeated. The earlier51-request independent report applies to92ac31e; root owns updated combined backend/migration/browser verification and publication.
+
+
+## Final combined acceptance
+
+The corrected C01 candidate and A03 `d00ced2` passed combined backend309,
+frontend319/42 files, full-source Prettier, production build and official
+OpenAPI3.1/224-ref validation. Populated V13→V14→V15 acceptance passed127 HTTP
+responses and169 actual browser API responses at1280/390, including both final
+currency regressions, native cookie renewal/account isolation, dropped successful
+response/reload/explicit same-operation retry, and KWD/JPY forms. Zero page errors
+or overflow; screenshots inspected and all owned resources removed. See the
+[fourth-batch integration evidence](../2026-10-24-alignment/fourth-batch-integration.md)
+for frozen artifact hashes, commands and migration/rollback limits. The C01 PR
+carries the tested integration with companion A03 PR #104 and H01's prepared design;
+merge A03 first. Publication does not authorize merge/deployment.
