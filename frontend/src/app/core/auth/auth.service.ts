@@ -12,7 +12,13 @@ import {
   throwError,
 } from 'rxjs';
 import { ApiService } from '../api/api.service';
-import { AuthResponse, LoginRequest, RegisterRequest, UserSummary } from './auth.models';
+import {
+  AuthResponse,
+  DeviceSession,
+  LoginRequest,
+  RegisterRequest,
+  UserSummary,
+} from './auth.models';
 import { SessionService } from './session.service';
 
 const AUTH_MARKER = 'spliteasy.auth-change';
@@ -154,6 +160,14 @@ export class AuthService {
     this.signOut('/me/sessions/logout-all', 'other devices and copied credentials');
   }
 
+  listSessions(): Observable<DeviceSession[]> {
+    return this.api.get<DeviceSession[]>('/me/sessions');
+  }
+
+  revokeSession(id: string): Observable<void> {
+    return this.api.delete<void>('/me/sessions/' + id);
+  }
+
   private signOut(path: string, unconfirmed: string): void {
     const token = this.getToken();
     this.logoutWarning.set(null);
@@ -161,8 +175,8 @@ export class AuthService {
     const version = this.session.version;
     if (token)
       this.api.post<void>(path, {}, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
-        error: (error) => {
-          if (error.status !== 401 && this.session.version === version && !this.user())
+        error: () => {
+          if (this.session.version === version && !this.user())
             this.logoutWarning.set(
               `Signed out on this device. Server sign-out could not be confirmed; ${unconfirmed} may still work. Sign in again to manage your sessions.`,
             );

@@ -299,6 +299,36 @@ describe('cookie-backed browser session continuity', () => {
     expect(fixture.nativeElement.textContent).toContain('copied credentials may still work');
   });
 
+  it('warns after an expired access bearer cannot confirm server sign-out with 401', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        provideRouter([{ path: 'login', component: LoginComponent }]),
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const auth = TestBed.inject(AuthService);
+    const expiredToken = `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: alice.id, exp: 1 }))}.dGVzdA`;
+    auth.login({ email: alice.email, password: 'password123' }).subscribe();
+    http.expectOne('/api/auth/login').flush({ ...response, accessToken: expiredToken });
+    const profileFixture = TestBed.createComponent(ProfileComponent);
+    profileFixture.detectChanges();
+    http.expectOne('/api/me').flush(profile);
+    profileFixture.detectChanges();
+    (profileFixture.nativeElement.querySelector('.profile__signout') as HTMLButtonElement).click();
+    expect(auth.user()).toBeNull();
+    expect(auth.getToken()).toBeNull();
+    const signout = http.expectOne('/api/auth/logout');
+    expect(signout.request.headers.get('Authorization')).toBe('Bearer ' + expiredToken);
+    signout.flush({}, { status: 401, statusText: 'Unauthorized' });
+    http.expectNone('/api/auth/refresh');
+    const login = TestBed.createComponent(LoginComponent);
+    login.detectChanges();
+    expect(login.nativeElement.textContent).toContain('Server sign-out could not be confirmed');
+    expect(login.nativeElement.textContent).toContain('copied credentials may still work');
+  });
+
   it('signs out immediately with the captured bearer and ignores a late failure after a replacement login', () => {
     TestBed.configureTestingModule({
       providers: [
