@@ -26,8 +26,8 @@ describe('canonical settlement actions', () => {
     TestBed.inject(DashboardService).refresh();
     http.expectOne('/api/dashboard').flush({
       groups: [{ id: 'g', name: 'Chain', simplifyDebts: true }],
-      settlements: [{ groupId: 'g', groupName: 'Chain', counterparty: carol, netCents: -1000 }],
-      people: [{ user: carol, netCents: -1000 }],
+      settlements: [{ groupId: 'g', groupName: 'Chain', counterparty: carol, netMinor: -1000 }],
+      people: [{ user: carol, netMinor: -1000 }],
       activity: [],
     });
     TestBed.inject(ModalService).openSettle(undefined, 'g');
@@ -43,7 +43,8 @@ describe('canonical settlement actions', () => {
     expect(payment.request.body).toMatchObject({
       payerUserId: 'a',
       payeeUserId: 'c',
-      amountCents: 1000,
+      amountMinor: 1000,
+      currency: 'USD' as const,
     });
     payment.flush({ message: 'Reload' }, { status: 409, statusText: 'Conflict' });
     http.verify();
@@ -63,9 +64,9 @@ describe('canonical settlement actions', () => {
           groupId: 'g',
           groupName: 'Cycle',
           counterparty: { id: 'b', displayName: 'Bob', email: 'b@test.com' },
-          netCents: -1000,
+          netMinor: -1000,
         },
-        { groupId: 'g', groupName: 'Cycle', counterparty: carol, netCents: 1000 },
+        { groupId: 'g', groupName: 'Cycle', counterparty: carol, netMinor: 1000 },
       ],
       people: [],
       activity: [],
@@ -85,7 +86,8 @@ describe('canonical settlement actions', () => {
     expect(payment.request.body).toMatchObject({
       payerUserId: 'c',
       payeeUserId: 'a',
-      amountCents: 1000,
+      amountMinor: 1000,
+      currency: 'USD' as const,
     });
     payment.flush({ message: 'Reload' }, { status: 409, statusText: 'Conflict' });
     http.verify();

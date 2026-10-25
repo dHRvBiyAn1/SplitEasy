@@ -13,8 +13,16 @@ import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
 import { ApiService } from './api/api.service';
 
-export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR';
-export const CURRENCY_SYMBOL: Record<Currency, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹' };
+import { Currency } from '../shared/currency';
+export type { Currency } from '../shared/currency';
+export const CURRENCY_SYMBOL: Record<Currency, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  INR: '₹',
+  JPY: '¥',
+  KWD: 'KWD',
+};
 export const AVATAR_COLORS = ['#12A57E', '#D96D3F', '#3F7BD9', '#C25B84', '#D9A03F'];
 export interface CurrentProfile {
   id: string;

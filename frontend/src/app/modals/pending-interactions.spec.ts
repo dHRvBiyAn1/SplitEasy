@@ -7,6 +7,12 @@ import { SessionService } from '../core/auth/session.service';
 import { ModalService } from './modal.service';
 import { ModalsComponent } from './modals.component';
 
+// Expense-only fixtures keep the default USD draft while profile loading is unavailable.
+function settleProfileRead(http: HttpTestingController): void {
+  for (const request of http.match('/api/me'))
+    if (!request.cancelled) request.flush({}, { status: 503, statusText: 'Unavailable' });
+}
+
 const alice = { id: 'alice', displayName: 'Alice', email: 'alice@example.test' };
 const bob = { id: 'bob', displayName: 'Bob', email: 'bob@example.test' };
 const group = { id: 'a', name: 'Home', type: 'HOME', members: [alice, bob] };
@@ -25,11 +31,18 @@ describe('mutation close policy across the rendered global dialogs', () => {
     storeTestSession(alice);
     modal = TestBed.inject(ModalService);
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    try {
+      settleProfileRead(http);
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
   function open(kind: string) {
     if (kind === 'expense') modal.openExpense('a');
     if (kind === 'payment')
-      modal.openSettle({ groupId: 'a', groupName: 'Home', counterparty: bob, netCents: -1000 });
+      modal.openSettle({ groupId: 'a', groupName: 'Home', counterparty: bob, netMinor: -1000 });
     if (kind === 'group') modal.openGroup();
     if (kind === 'member') modal.openAddMember('a');
     const fixture = TestBed.createComponent(ModalsComponent);

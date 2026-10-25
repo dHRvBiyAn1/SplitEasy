@@ -9,4 +9,6 @@ public interface PairAmount {
   UUID getToId();
 
   long getTotalCents();
+
+  com.spliteasy.entity.LedgerCurrency getCurrency();
 }

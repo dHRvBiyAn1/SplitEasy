@@ -12,7 +12,7 @@ public record ExpenseResponse(
     UUID id,
     UUID groupId,
     String description,
-    long amountCents,
+    long amountMinor,
     SplitType splitType,
     ExpenseCategory category,
     LocalDate spentOn,
@@ -21,4 +21,15 @@ public record ExpenseResponse(
     List<UUID> participantUserIds,
     List<SplitInput> splits,
     Instant createdAt,
-    long version) {}
+    long version,
+    com.spliteasy.entity.LedgerCurrency currency) {
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public long amountCents() {
+    return amountMinor;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("amountCents")
+  public Long legacyAmountCents() {
+    return currency == com.spliteasy.entity.LedgerCurrency.USD ? amountMinor : null;
+  }
+}

@@ -32,10 +32,10 @@ const bob: AuthResponse = {
   user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
 };
 const aliceDashboard: DashboardResponse = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 1,
   groups: [
@@ -44,10 +44,10 @@ const aliceDashboard: DashboardResponse = {
       name: 'Alice private group',
       type: 'HOME',
       memberCount: 1,
-      totalSpentCents: 0,
-      youAreOwedCents: 0,
-      youOweCents: 0,
-      netCents: 0,
+      totalSpentMinor: 0,
+      youAreOwedMinor: 0,
+      youOweMinor: 0,
+      netMinor: 0,
       simplifyDebts: true,
     },
   ],
@@ -99,8 +99,14 @@ describe('account session isolation', () => {
   });
 
   afterEach(() => {
-    requests.match('/api/auth/logout').forEach((request) => request.flush(null));
-    requests.verify();
+    try {
+      requests.match('/api/auth/logout').forEach((request) => request.flush(null));
+      for (const request of requests.match('/api/me'))
+        if (!request.cancelled) request.flush({}, { status: 503, statusText: 'Unavailable' });
+      requests.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
   });
 
   function login(response: AuthResponse = bob): void {
@@ -226,7 +232,7 @@ describe('account session isolation', () => {
           groupId: 'alice-group',
           groupName: 'Alice private group',
           counterparty: alice.user,
-          netCents: 100,
+          netMinor: 100,
         },
         'alice-group',
       );

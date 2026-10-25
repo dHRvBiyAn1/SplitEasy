@@ -49,7 +49,7 @@ public class ObligationProjectionService {
     return NetSettlementCalculator.calculate(
             balanceService.computeBalances(requesterId, groupId).balances())
         .stream()
-        .map(t -> new DirectObligation(t.from(), t.to(), t.amountCents()))
+        .map(t -> new DirectObligation(t.from(), t.to(), t.amountMinor(), t.currency()))
         .toList();
   }
 
@@ -79,7 +79,8 @@ public class ObligationProjectionService {
                 new DirectObligation(
                     people.get(entry.getKey().from()),
                     people.get(entry.getKey().to()),
-                    entry.getValue()))
+                    entry.getValue(),
+                    entry.getKey().currency()))
         .sorted(
             Comparator.comparing((DirectObligation debt) -> debt.from().id())
                 .thenComparing(debt -> debt.to().id()))
@@ -89,10 +90,12 @@ public class ObligationProjectionService {
   private void addPairs(Map<Pair, Long> amounts, List<PairAmount> rows, int sign) {
     for (PairAmount row : rows) {
       long amount = row.getTotalCents() * sign;
-      amounts.merge(new Pair(row.getFromId(), row.getToId()), amount, Long::sum);
-      amounts.merge(new Pair(row.getToId(), row.getFromId()), -amount, Long::sum);
+      amounts.merge(
+          new Pair(row.getFromId(), row.getToId(), row.getCurrency()), amount, Math::addExact);
+      amounts.merge(
+          new Pair(row.getToId(), row.getFromId(), row.getCurrency()), -amount, Math::addExact);
     }
   }
 
-  private record Pair(UUID from, UUID to) {}
+  private record Pair(UUID from, UUID to, com.spliteasy.entity.LedgerCurrency currency) {}
 }

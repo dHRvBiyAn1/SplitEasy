@@ -1,5 +1,12 @@
 <app-modal-shell [heading]="heading()" [maxWidth]="600" (closed)="close()">
-  <form class="mform" (submit)="$event.preventDefault(); save()">
+  <form
+    class="mform"
+    (input)="freezeCurrencyDefault()"
+    (change)="freezeCurrencyDefault()"
+    (click)="freezeCurrencyDefault()"
+    (keydown)="freezeCurrencyDefault()"
+    (submit)="$event.preventDefault(); save()"
+  >
     @if (groupOptions().length === 0 && !groupId()) {
       <p class="mform__lead">Create a group before adding an expense.</p>
       <button type="button" class="dc-btn-outline" (click)="createGroup()">Create a group</button>
@@ -33,20 +40,49 @@
         />
       </div>
 
+      <div class="mform__field">
+        <label class="dc-field-label" for="ne-currency">Currency</label>
+        <select
+          id="ne-currency"
+          class="dc-field"
+          [value]="currency()"
+          [disabled]="!!editId"
+          (change)="selectCurrency($any($event.target).value)"
+        >
+          @for (code of currencies; track code) {
+            <option [value]="code">{{ code }}</option>
+          }
+        </select>
+        @if (editId) {
+          <p class="mform__hint">
+            Currency is fixed for recorded expenses. Create a separate expense to use another
+            currency.
+          </p>
+        }
+        <p class="mform__hint">
+          {{ currency() }} uses {{ precision() }} decimal places. Enter an exact amount at this
+          precision.
+        </p>
+      </div>
       <div class="mform__grid2">
         <div class="mform__field">
-          <label class="dc-field-label" for="ne-amt">Amount</label>
+          <label class="dc-field-label" for="ne-amt">Amount ({{ currency() }})</label>
           <input
             id="ne-amt"
             class="dc-field"
-            type="number"
-            step="0.01"
-            min="0.01"
+            type="text"
+            maxlength="32"
+            [attr.step]="step()"
+            aria-describedby="ne-amount-hint"
             inputmode="decimal"
             [formControl]="amount"
             (input)="tick.update((n) => n + 1)"
-            placeholder="0.00"
+            [placeholder]="display(0)"
           />
+          <p id="ne-amount-hint" class="mform__hint">
+            Use a dot for decimals, without grouping. Maximum {{ currency() }}
+            {{ display(maxAmountMinor) }}.
+          </p>
         </div>
         <div class="mform__field">
           <label class="dc-field-label" for="ne-date">Date</label>
@@ -155,15 +191,18 @@
                   [attr.aria-label]="
                     memberLabel(m) +
                     (splitType() === 'ADJUSTMENTS'
-                      ? ' adjustment in signed dollars'
+                      ? ' adjustment in signed ' + currency()
                       : splitType() === 'WEIGHTS'
                         ? ' weight in whole units'
                         : splitType() === 'PERCENTAGE'
                           ? ' share in percent'
-                          : ' exact amount in dollars')
+                          : ' exact amount in ' + currency())
                   "
-                  type="number"
-                  [attr.step]="splitType() === 'WEIGHTS' ? '1' : 'any'"
+                  [type]="splitType() === 'WEIGHTS' ? 'number' : 'text'"
+                  maxlength="32"
+                  [attr.step]="
+                    splitType() === 'WEIGHTS' ? '1' : splitType() === 'PERCENTAGE' ? '0.01' : step()
+                  "
                   [attr.min]="
                     splitType() === 'ADJUSTMENTS' ? null : splitType() === 'WEIGHTS' ? '1' : '0'
                   "
@@ -171,7 +210,11 @@
                   [value]="values()[m.id] || ''"
                   (input)="setValue(m.id, $any($event.target).value)"
                   [placeholder]="
-                    splitType() === 'WEIGHTS' ? 'units' : splitType() === 'PERCENTAGE' ? '%' : '$'
+                    splitType() === 'WEIGHTS'
+                      ? 'units'
+                      : splitType() === 'PERCENTAGE'
+                        ? '%'
+                        : currency()
                   "
                 />
               }
@@ -182,10 +225,16 @@
           <p class="mform__hint" id="ne-split-precision">
             {{
               splitType() === 'ADJUSTMENTS'
-                ? 'Add signed dollar adjustments to equal shares over the entered participants. Adjustments must total $0.00; final shares cannot be negative. Blank excludes; enter 0 to include without adjustment. Each adjustment rounds to 2 decimal places.'
+                ? 'Add signed ' +
+                  currency() +
+                  ' adjustments to equal shares over the entered participants. Adjustments must total zero; final shares cannot be negative. Blank excludes; enter 0 to include without adjustment. Each adjustment rounds to ' +
+                  precision() +
+                  ' decimal places.'
                 : splitType() === 'WEIGHTS'
                   ? 'Use positive whole units, such as 1 and 2. Blank excludes a participant.'
-                  : 'Each share rounds to 2 decimal places. Blank excludes; 0 keeps a participant.'
+                  : 'Each share rounds to ' +
+                    (splitType() === 'PERCENTAGE' ? 2 : precision()) +
+                    ' decimal places. Blank excludes; 0 keeps a participant.'
             }}
           </p>
         }

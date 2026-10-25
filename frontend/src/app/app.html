@@ -100,8 +100,10 @@
           (click)="groupsOpen.set(false)"
           ><app-group-art [type]="g.type" /><span
             ><strong>{{ g.name }}</strong
-            ><small>{{ g.memberCount }} members</small
-            ><app-money [cents]="g.netCents" [net]="true" /></span
+            ><small>{{ g.memberCount }} members</small>
+            @for (total of groupTotals(g); track total.currency) {
+              <app-money [minor]="total.netMinor" [currency]="total.currency" [net]="true" />
+            }</span
           ><app-icon name="arrow"
         /></a>
       }

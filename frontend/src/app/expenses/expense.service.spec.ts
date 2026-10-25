@@ -33,7 +33,8 @@ describe('ExpenseService', () => {
     service
       .createExpense('g1', {
         description: 'Dinner',
-        amountCents: 1000,
+        amountMinor: 1000,
+        currency: 'USD' as const,
         paidByUserId: 'u1',
         participantUserIds: ['u1', 'u2'],
         splitType: 'EQUAL',
@@ -42,7 +43,7 @@ describe('ExpenseService', () => {
       .subscribe();
     const req = httpTesting.expectOne('/api/groups/g1/expenses');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body.amountCents).toBe(1000);
+    expect(req.request.body.amountMinor).toBe(1000);
     expect(req.request.body.participantUserIds).toEqual(['u1', 'u2']);
     req.flush({});
   });
@@ -58,7 +59,8 @@ describe('ExpenseService', () => {
     service
       .updateExpense('g1', 'e1', {
         description: 'Dinner',
-        amountCents: 2000,
+        amountMinor: 2000,
+        currency: 'USD' as const,
         paidByUserId: 'u1',
         participantUserIds: ['u1', 'u2'],
         splitType: 'EQUAL',
@@ -67,7 +69,7 @@ describe('ExpenseService', () => {
       .subscribe();
     const req = httpTesting.expectOne('/api/groups/g1/expenses/e1');
     expect(req.request.method).toBe('PUT');
-    expect(req.request.body.amountCents).toBe(2000);
+    expect(req.request.body.amountMinor).toBe(2000);
     req.flush({});
   });
 

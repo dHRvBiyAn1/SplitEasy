@@ -59,17 +59,17 @@ describe('group settings bilateral obligations', () => {
       http.expectOne('/api/groups/g/balances').flush({
         groupId: 'g',
         balances: [
-          { user: alice, netCents: -1000 },
-          { user: bob, netCents: 0 },
-          { user: carol, netCents: 1000 },
-          { user: dan, netCents: 0 },
+          { user: alice, netMinor: -1000 },
+          { user: bob, netMinor: 0 },
+          { user: carol, netMinor: 1000 },
+          { user: dan, netMinor: 0 },
         ],
       });
       // Matching, rather than requiring, lets the old screen reproduce its unsafe enabled controls.
       http.match('/api/groups/g/balances/current-obligations').forEach((r) =>
         r.flush([
-          { from: alice, to: bob, amountCents: 1000 },
-          { from: bob, to: carol, amountCents: 1000 },
+          { from: alice, to: bob, amountMinor: 1000 },
+          { from: bob, to: carol, amountMinor: 1000 },
         ]),
       );
       fixture.detectChanges();
@@ -95,22 +95,22 @@ describe('group settings bilateral obligations', () => {
     http.expectOne('/api/groups/g').flush(group);
     http.expectOne('/api/groups/g/balances').flush({
       balances: [
-        { user: alice, netCents: -1000 },
-        { user: bob, netCents: 0 },
-        { user: carol, netCents: 1000 },
-        { user: dan, netCents: 0 },
+        { user: alice, netMinor: -1000 },
+        { user: bob, netMinor: 0 },
+        { user: carol, netMinor: 1000 },
+        { user: dan, netMinor: 0 },
       ],
     });
     // Old code consumes raw debts and wrongly blocks Bob. The canonical read omits him.
     http.match('/api/groups/g/balances/obligations').forEach((r) =>
       r.flush([
-        { from: alice, to: bob, amountCents: 1000 },
-        { from: bob, to: carol, amountCents: 1000 },
+        { from: alice, to: bob, amountMinor: 1000 },
+        { from: bob, to: carol, amountMinor: 1000 },
       ]),
     );
     http
       .match('/api/groups/g/balances/current-obligations')
-      .forEach((r) => r.flush([{ from: alice, to: carol, amountCents: 1000 }]));
+      .forEach((r) => r.flush([{ from: alice, to: carol, amountMinor: 1000 }]));
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;
     expect(root.querySelector<HTMLButtonElement>('[aria-label="Remove Bob"]')!.disabled).toBe(
@@ -137,7 +137,7 @@ describe('group settings bilateral obligations', () => {
     http.expectOne('/api/groups/g').flush(group);
     http
       .expectOne('/api/groups/g/balances')
-      .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
+      .flush({ balances: group.members.map((user) => ({ user, netMinor: 0 })) });
     http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;
@@ -170,16 +170,16 @@ describe('group settings bilateral obligations', () => {
     http.expectOne('/api/groups/g').flush(group);
     http
       .expectOne('/api/groups/g/balances')
-      .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
+      .flush({ balances: group.members.map((user) => ({ user, netMinor: 0 })) });
     http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
     fixture.detectChanges();
     TestBed.inject(DashboardService).revalidate();
     http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
     http.expectOne('/api/groups/g').flush(group);
-    http.expectOne('/api/groups/g/balances').flush({ balances: [{ user: bob, netCents: -2000 }] });
+    http.expectOne('/api/groups/g/balances').flush({ balances: [{ user: bob, netMinor: -2000 }] });
     http
       .expectOne('/api/groups/g/balances/current-obligations')
-      .flush([{ from: bob, to: carol, amountCents: 2000 }]);
+      .flush([{ from: bob, to: carol, amountMinor: 2000 }]);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[aria-label="Remove Bob"]')?.disabled).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Owes $20.00 to Carol');
@@ -200,7 +200,7 @@ describe('group settings bilateral obligations', () => {
     http.expectOne('/api/groups/g').flush(group);
     http
       .expectOne('/api/groups/g/balances')
-      .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
+      .flush({ balances: group.members.map((user) => ({ user, netMinor: 0 })) });
     http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[aria-label="Remove Bob"]')?.disabled).toBe(false);
@@ -242,7 +242,7 @@ describe('group settings bilateral obligations', () => {
     http.expectOne('/api/groups/g').flush(group);
     http
       .expectOne('/api/groups/g/balances')
-      .flush({ balances: group.members.map((user) => ({ user, netCents: 0 })) });
+      .flush({ balances: group.members.map((user) => ({ user, netMinor: 0 })) });
     http.expectOne('/api/groups/g/balances/current-obligations').flush([]);
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;

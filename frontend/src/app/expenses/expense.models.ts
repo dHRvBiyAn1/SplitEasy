@@ -1,3 +1,5 @@
+import { Currency } from '../shared/currency';
+import { MoneyInput } from '../shared/currency';
 import { UserSummary } from '../core/auth/auth.models';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
 
@@ -5,7 +7,8 @@ export type SplitType = 'EQUAL' | 'UNEQUAL' | 'PERCENTAGE' | 'WEIGHTS' | 'ADJUST
 
 export interface SplitShare {
   user: UserSummary;
-  shareCents: number;
+  shareMinor: number;
+  currency?: Currency;
 }
 
 export interface ExpenseResponse {
@@ -13,7 +16,8 @@ export interface ExpenseResponse {
   id: string;
   groupId: string;
   description: string;
-  amountCents: number;
+  amountMinor: number;
+  currency?: Currency;
   splitType: SplitType;
   category: ExpenseCategory;
   spentOn: string;
@@ -30,31 +34,31 @@ export interface ExpenseSummary {
   version?: number;
   id: string;
   description: string;
-  amountCents: number;
+  amountMinor: number;
+  currency?: Currency;
   paidBy: UserSummary;
   participantCount: number;
   category: ExpenseCategory;
   spentOn: string;
   /** Viewer's net for this expense: +lent / −borrowed / 0 not-involved. */
-  viewerDeltaCents: number;
+  viewerDeltaMinor: number;
   createdAt: string;
 }
 
-/** Original cents (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed adjustment cents. */
+/** Original minor units (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed adjustment minor units. */
 export interface SplitInput {
   userId: string;
   value: number;
 }
 
-export interface CreateExpenseRequest {
+export type CreateExpenseRequest = MoneyInput & {
   operationId?: string;
   expectedVersion?: number;
   description: string;
-  amountCents: number;
   paidByUserId: string;
   participantUserIds?: string[] | null;
   splitType?: SplitType;
   splits?: SplitInput[] | null;
   category?: ExpenseCategory;
   spentOn?: string;
-}
+};

@@ -174,8 +174,8 @@ public class GroupService {
               : "The group creator can't be removed");
     }
 
-    long net = netOf(requesterId, groupId, targetUserId);
-    if (net != 0 || !pairwiseBalanceService.compute(targetUserId, groupId).isEmpty()) {
+    if (hasNonzeroBalance(requesterId, groupId, targetUserId)
+        || !pairwiseBalanceService.compute(targetUserId, groupId).isEmpty()) {
       throw new ConflictException(
           isSelf
               ? "Settle your outstanding obligations before leaving this group"
@@ -199,12 +199,10 @@ public class GroupService {
   }
 
   /** That member's net in the group, read through the shared balance aggregation. */
-  private long netOf(UUID requesterId, UUID groupId, UUID targetUserId) {
+  private boolean hasNonzeroBalance(UUID requesterId, UUID groupId, UUID targetUserId) {
     return balanceService.computeBalances(requesterId, groupId).balances().stream()
         .filter(b -> b.user().id().equals(targetUserId))
-        .mapToLong(b -> b.netCents())
-        .findFirst()
-        .orElse(0L);
+        .anyMatch(b -> b.netMinor() != 0);
   }
 
   /** Builds the full response, fetching members with their users in a single query. */

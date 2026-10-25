@@ -5,10 +5,10 @@ import { DashboardService } from './dashboard.service';
 import { SessionService } from '../core/auth/session.service';
 
 const empty = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 0,
   groups: [],

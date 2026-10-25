@@ -19,18 +19,23 @@
         >
         <span class="settle-confirm__label">{{ payingLabel(s) }}</span>
         <label class="settle-amount">
-          <span class="settle-amount__sym" aria-hidden="true">$</span>
+          <span class="settle-amount__sym" aria-hidden="true">{{ s.currency ?? 'USD' }}</span>
           <input
             class="settle-amount__input"
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            maxlength="32"
+            [attr.step]="step()"
+            aria-describedby="settle-precision"
             inputmode="decimal"
-            aria-label="Amount to settle"
+            [attr.aria-label]="'Amount to settle (' + (s.currency ?? 'USD') + ')'"
             [value]="amount()"
             (input)="onAmountInput($any($event.target).value)"
           />
         </label>
+        <p id="settle-precision" class="mform__hint">
+          {{ s.currency ?? 'USD' }} uses {{ precision() }} decimal places. Use a dot without
+          grouping. Maximum {{ maximum() }}.
+        </p>
         <span class="settle-confirm__group">
           Recorded in {{ s.groupName }} as a cash settlement. Settle less to pay part of it.
         </span>
@@ -74,7 +79,7 @@
       <p class="mempty">No current-mode obligations for you.</p>
     } @else {
       <div class="slist">
-        @for (s of settlements(); track s.groupId + s.counterparty.id) {
+        @for (s of settlements(); track s.groupId + s.counterparty.id + (s.currency ?? 'USD')) {
           <button type="button" class="srow" (click)="select(s)">
             <span class="dc-avatar srow__av" aria-hidden="true" [style]="tint(s.counterparty.id)">{{
               initials(s.counterparty.displayName)
@@ -85,10 +90,12 @@
             </span>
             <span
               class="srow__amt dc-amount"
-              [class.dc-amount--owed]="s.netCents > 0"
-              [class.dc-amount--owes]="s.netCents < 0"
-              >${{ display(s.netCents < 0 ? -s.netCents : s.netCents) }}</span
-            >
+              [class.dc-amount--owed]="s.netMinor > 0"
+              [class.dc-amount--owes]="s.netMinor < 0"
+              ><app-money
+                [minor]="s.netMinor < 0 ? -s.netMinor : s.netMinor"
+                [currency]="s.currency ?? 'USD'"
+            /></span>
             <span class="srow__chev" aria-hidden="true">›</span>
           </button>
         }

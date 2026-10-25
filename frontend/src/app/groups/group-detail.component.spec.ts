@@ -12,12 +12,13 @@ const expense = {
   id: 'e',
   version: 0,
   description: 'Dinner',
-  amountCents: 2000,
+  amountMinor: 2000,
+  currency: 'USD' as const,
   paidBy: user,
   category: 'FOOD_DRINK',
   spentOn: '2026-10-16',
-  viewerDeltaCents: 1000,
-  participants: [{ user, shareCents: 2000 }],
+  viewerDeltaMinor: 1000,
+  participants: [{ user, shareMinor: 2000 }],
 };
 const secondExpense = { ...expense, id: 'second', description: 'Lunch' };
 describe('visible expense failures', () => {
@@ -53,9 +54,9 @@ describe('visible expense failures', () => {
     TestBed.inject(DashboardService).revalidate();
     http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
-    http.expectOne('/api/groups/a/balances/mine').flush([{ user, netCents: 3000 }]);
-    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountCents: 6000 }]);
-    http.expectOne('/api/groups/a/expenses/e').flush({ ...expense, amountCents: 6000 });
+    http.expectOne('/api/groups/a/balances/mine').flush([{ user, netMinor: 3000 }]);
+    http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountMinor: 6000 }]);
+    http.expectOne('/api/groups/a/expenses/e').flush({ ...expense, amountMinor: 6000 });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('$60.00');
     expect(fixture.nativeElement.querySelector('.xrow')?.getAttribute('aria-expanded')).toBe(
@@ -309,10 +310,10 @@ describe('visible expense failures', () => {
       .expectOne({ method: 'DELETE', url: '/api/groups/a/expenses/e?expectedVersion=0' })
       .flush(null, { status: 204, statusText: 'No Content' });
     http.expectOne('/api/dashboard').flush({
-      totalNetCents: 0,
-      owedCents: 0,
+      totalNetMinor: 0,
+      owedMinor: 0,
       owedPeopleCount: 0,
-      oweCents: 0,
+      oweMinor: 0,
       owePeopleCount: 0,
       groupCount: 1,
       groups: [],

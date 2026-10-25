@@ -1,5 +1,15 @@
+import { formatMoney } from '../shared/money.component';
+import { ProfileService } from '../core/profile.service';
+import {
+  Currency,
+  CURRENCIES,
+  CURRENCY_EXPONENT,
+  MAX_TRANSACTION_MINOR,
+  amountToMinor,
+  minorToDisplay,
+} from '../shared/currency';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DestroyRef, Component, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
@@ -8,12 +18,7 @@ import { avatarTint } from '../core/avatar';
 import { UserSummary } from '../core/auth/auth.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
-import {
-  centsToDisplay,
-  dollarsToCents,
-  percentToBasisPoints,
-  TOTAL_BASIS_POINTS,
-} from '../expenses/expense.service';
+import { percentToBasisPoints, TOTAL_BASIS_POINTS } from '../expenses/expense.service';
 import {
   PendingWrite,
   PendingWritesService,
@@ -44,6 +49,28 @@ const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
 })
 export class NewExpenseModalComponent {
   private readonly groups = inject(GroupService);
+  private readonly profile = inject(ProfileService);
+  protected get currencies() {
+    return CURRENCIES;
+  }
+  protected readonly currency = signal<Currency>(this.profile.prefs().currency);
+  protected readonly precision = computed(() => CURRENCY_EXPONENT[this.currency()]);
+  protected get maxAmountMinor() {
+    return MAX_TRANSACTION_MINOR;
+  }
+  protected readonly step = computed(() =>
+    this.precision() === 0 ? '1' : '0.' + '0'.repeat(this.precision() - 1) + '1',
+  );
+  private currencyChosen = false;
+  freezeCurrencyDefault(): void {
+    this.currencyChosen = true;
+  }
+  selectCurrency(value: string): void {
+    if (this.editId || !CURRENCIES.includes(value as Currency)) return;
+    this.currencyChosen = true;
+    this.currency.set(value as Currency);
+    this.tick.update((n) => n + 1);
+  }
   private readonly pendingWrites = inject(PendingWritesService);
   protected readonly retryNotice = signal<string | null>(null);
   private restored: PendingWrite<CreateExpenseRequest> | null = null;
@@ -56,7 +83,7 @@ export class NewExpenseModalComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly categories = CATEGORIES;
-  protected readonly display = centsToDisplay;
+  protected readonly display = (value: number) => minorToDisplay(value, this.currency());
 
   protected readonly groupOptions = () => this.dashboard.data()?.groups ?? [];
   protected readonly groupId = signal<string | null>(null);
@@ -66,7 +93,7 @@ export class NewExpenseModalComponent {
     nonNullable: true,
     validators: [Validators.required],
   });
-  protected readonly amount = new FormControl<number | null>(null);
+  protected readonly amount = new FormControl<string | number | null>(null);
   protected readonly date = new FormControl(this.today(), { nonNullable: true });
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
   protected readonly paidBy = signal<string>('');
@@ -78,17 +105,16 @@ export class NewExpenseModalComponent {
   /** Normalize once for the running total, save gate and request; retain explicit zeros. */
   private readonly serializedSplits = computed<SplitInput[] | null>(() => {
     const type = this.splitType();
-    const convert =
-      type === 'WEIGHTS'
-        ? (n: number) => n
-        : type === 'PERCENTAGE'
-          ? percentToBasisPoints
-          : dollarsToCents;
     const values = this.values();
     const splits: SplitInput[] = [];
     for (const member of this.members()) {
       const raw = Number(values[member.id] ?? 0);
-      const value = convert(raw);
+      const value =
+        type === 'WEIGHTS'
+          ? raw
+          : type === 'PERCENTAGE'
+            ? percentToBasisPoints(raw)
+            : amountToMinor(values[member.id]?.trim() || '0', this.currency());
       if (
         !Number.isFinite(raw) ||
         (type !== 'ADJUSTMENTS' && raw < 0) ||
@@ -118,6 +144,11 @@ export class NewExpenseModalComponent {
   private expectedVersion: number | undefined;
 
   constructor() {
+    effect(() => {
+      const preferred = this.profile.prefs().currency;
+      if (!this.editId && !this.restored && !this.currencyChosen && !this.amount.dirty)
+        this.currency.set(preferred);
+    });
     this.destroyRef.onDestroy(() => {
       if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
     });
@@ -216,8 +247,10 @@ export class NewExpenseModalComponent {
             return;
           }
           this.expectedVersion = e.version;
+          this.currency.set(e.currency ?? 'USD');
           if (!this.description.dirty) this.description.setValue(e.description);
-          if (!this.amount.dirty) this.amount.setValue(e.amountCents / 100);
+          if (!this.amount.dirty)
+            this.amount.setValue(minorToDisplay(e.amountMinor, this.currency()));
           if (!this.date.dirty) this.date.setValue(e.spentOn);
           this.category.set(e.category);
           this.paidBy.set(e.paidBy.id);
@@ -231,9 +264,13 @@ export class NewExpenseModalComponent {
             if (e.splits) {
               for (const input of e.splits)
                 vals[input.userId] =
-                  e.splitType === 'WEIGHTS' ? String(input.value) : this.display(input.value);
+                  e.splitType === 'WEIGHTS'
+                    ? String(input.value)
+                    : e.splitType === 'PERCENTAGE'
+                      ? minorToDisplay(input.value, 'USD')
+                      : this.display(input.value);
             } else {
-              for (const p of e.participants) vals[p.user.id] = this.display(p.shareCents);
+              for (const p of e.participants) vals[p.user.id] = this.display(p.shareMinor);
             }
             this.values.set(vals);
           }
@@ -285,8 +322,8 @@ export class NewExpenseModalComponent {
     this.tick.update((n) => n + 1);
   }
 
-  private amountCents(): number {
-    return dollarsToCents(this.amount.value ?? 0);
+  private amountMinor(): number {
+    return amountToMinor(this.amount.value ?? '0', this.currency(), false);
   }
 
   runningLabel(): string {
@@ -296,8 +333,8 @@ export class NewExpenseModalComponent {
     }
     if (this.splitType() === 'ADJUSTMENTS') {
       return this.adjustmentsValid()
-        ? 'Adjustments total $0.00; final shares nonnegative'
-        : 'Adjustments must total $0.00 and leave final shares nonnegative';
+        ? `Adjustments total ${formatMoney(0, false, this.currency())}; final shares nonnegative`
+        : `Adjustments must total ${formatMoney(0, false, this.currency())} and leave final shares nonnegative`;
     }
     if (this.splitType() === 'WEIGHTS') {
       const splits = this.serializedSplits();
@@ -308,9 +345,9 @@ export class NewExpenseModalComponent {
     const total = this.assignedTotal();
     if (total === undefined) return 'Enter valid nonnegative shares';
     if (this.splitType() === 'PERCENTAGE') {
-      return `${this.display(total)}% / 100%`;
+      return `${minorToDisplay(total, 'USD')}% / 100%`;
     }
-    return `$${this.display(total)} / $${this.display(this.amountCents())}`;
+    return `${formatMoney(total, false, this.currency())} / ${formatMoney(this.amountMinor(), false, this.currency())}`;
   }
 
   splitValid(): boolean {
@@ -325,12 +362,12 @@ export class NewExpenseModalComponent {
     if (this.splitType() === 'PERCENTAGE') {
       return total === TOTAL_BASIS_POINTS;
     }
-    return this.amountCents() > 0 && total === this.amountCents();
+    return this.amountMinor() > 0 && total === this.amountMinor();
   }
 
   private adjustmentsValid(): boolean {
     const splits = this.serializedSplits();
-    const amount = this.amountCents();
+    const amount = this.amountMinor();
     if (!splits?.length || !Number.isSafeInteger(amount) || amount <= 0) return false;
     if (splits.reduce((sum, s) => sum + BigInt(s.value), 0n) !== 0n) return false;
     const base = Math.floor(amount / splits.length);
@@ -358,9 +395,9 @@ export class NewExpenseModalComponent {
       !!this.groupId() &&
       this.ready() &&
       this.description.valid &&
-      Number.isSafeInteger(this.amountCents()) &&
-      this.amountCents() > 0 &&
-      this.amountCents() <= 1_000_000_000_000 &&
+      Number.isSafeInteger(this.amountMinor()) &&
+      this.amountMinor() > 0 &&
+      this.amountMinor() <= 1_000_000_000_000 &&
       !!this.paidBy() &&
       this.splitValid() &&
       !this.saving()
@@ -380,7 +417,8 @@ export class NewExpenseModalComponent {
     const gid = this.groupId()!;
     const base = {
       description: this.description.value.trim(),
-      amountCents: this.amountCents(),
+      amountMinor: this.amountMinor(),
+      currency: this.currency(),
       paidByUserId: this.paidBy(),
       category: this.category(),
       spentOn: this.date.value,
@@ -459,7 +497,10 @@ export class NewExpenseModalComponent {
 
   private restoreDraft(request: CreateExpenseRequest): void {
     this.description.setValue(request.description);
-    this.amount.setValue(request.amountCents / 100);
+    this.currency.set(request.currency ?? 'USD');
+    this.amount.setValue(
+      minorToDisplay(request.amountMinor ?? request.amountCents!, this.currency()),
+    );
     this.date.setValue(request.spentOn ?? this.today());
     this.category.set(request.category ?? 'OTHER');
     this.paidBy.set(request.paidByUserId);
@@ -469,7 +510,11 @@ export class NewExpenseModalComponent {
       Object.fromEntries(
         (request.splits ?? []).map((input) => [
           input.userId,
-          request.splitType === 'WEIGHTS' ? String(input.value) : this.display(input.value),
+          request.splitType === 'WEIGHTS'
+            ? String(input.value)
+            : request.splitType === 'PERCENTAGE'
+              ? minorToDisplay(input.value, 'USD')
+              : this.display(input.value),
         ]),
       ),
     );

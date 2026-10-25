@@ -109,7 +109,7 @@ class ProfileIntegrationTest extends AbstractIntegrationTest {
     var alice = register("profile-invalid@example.com", "password123", "Alice");
     for (var invalid :
         java.util.List.of(
-            Map.of("preferredCurrency", "JPY"),
+            Map.of("preferredCurrency", "CAD"),
             Map.of("avatarColor", "url(evil)"),
             Map.of("phone", "x".repeat(51)),
             Map.of("displayName", "   "),

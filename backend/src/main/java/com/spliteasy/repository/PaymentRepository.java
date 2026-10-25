@@ -22,8 +22,8 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
       value =
           """
       insert into payments
-        (id, group_id, payer_id, payee_id, amount_cents, created_at, recorded_by, operation_id)
-      values (:id, :groupId, :payerId, :payeeId, :amountCents, :createdAt, :requesterId, :operationId)
+        (id, group_id, payer_id, payee_id, amount_cents, currency, created_at, recorded_by, operation_id)
+      values (:id, :groupId, :payerId, :payeeId, :amountCents, :currency, :createdAt, :requesterId, :operationId)
       on conflict (group_id, recorded_by, operation_id) do nothing
       """,
       nativeQuery = true)
@@ -33,6 +33,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
       UUID payerId,
       UUID payeeId,
       long amountCents,
+      String currency,
       Instant createdAt,
       UUID requesterId,
       UUID operationId);
@@ -40,40 +41,40 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
   /** Recorded payments, grouped by payer and payee across the whole group. */
   @Query(
       """
-      select p.payer.id as fromId, p.payee.id as toId, sum(p.amountCents) as totalCents
+      select p.payer.id as fromId, p.currency as currency, p.payee.id as toId, sum(p.amountCents) as totalCents
       from Payment p
       where p.group.id = :groupId and p.payer.id <> p.payee.id
-      group by p.payer.id, p.payee.id
+      group by p.payer.id, p.payee.id, p.currency
       """)
   List<PairAmount> sumPaidByPair(@Param("groupId") UUID groupId);
 
   /** Total paid out per payer across a group's settle-up payments (one aggregate query). */
   @Query(
       """
-            select p.payer.id as userId, sum(p.amountCents) as totalCents
+            select p.payer.id as userId, p.currency as currency, sum(p.amountCents) as totalCents
             from Payment p
             where p.group.id = :groupId
-            group by p.payer.id
+            group by p.payer.id, p.currency
             """)
   List<UserAmount> sumPaidByGroup(@Param("groupId") UUID groupId);
 
   /** Total received per payee across a group's settle-up payments (one aggregate query). */
   @Query(
       """
-            select p.payee.id as userId, sum(p.amountCents) as totalCents
+            select p.payee.id as userId, p.currency as currency, sum(p.amountCents) as totalCents
             from Payment p
             where p.group.id = :groupId
-            group by p.payee.id
+            group by p.payee.id, p.currency
             """)
   List<UserAmount> sumReceivedByGroup(@Param("groupId") UUID groupId);
 
   /** Total the given user paid to each payee in a group (payer = user), grouped by payee. */
   @Query(
       """
-            select p.payee.id as userId, sum(p.amountCents) as totalCents
+            select p.payee.id as userId, p.currency as currency, sum(p.amountCents) as totalCents
             from Payment p
             where p.group.id = :groupId and p.payer.id = :userId
-            group by p.payee.id
+            group by p.payee.id, p.currency
             """)
   List<UserAmount> sumPaidByUserToEach(
       @Param("groupId") UUID groupId, @Param("userId") UUID userId);
@@ -81,10 +82,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
   /** Total each payer paid to the given user in a group (payee = user), grouped by payer. */
   @Query(
       """
-            select p.payer.id as userId, sum(p.amountCents) as totalCents
+            select p.payer.id as userId, p.currency as currency, sum(p.amountCents) as totalCents
             from Payment p
             where p.group.id = :groupId and p.payee.id = :userId
-            group by p.payer.id
+            group by p.payer.id, p.currency
             """)
   List<UserAmount> sumReceivedByUserFromEach(
       @Param("groupId") UUID groupId, @Param("userId") UUID userId);
