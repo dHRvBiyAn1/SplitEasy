@@ -281,6 +281,112 @@ class CurrencyLedgerIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  void legacyExpensePutRequiresUpgradeBeforeComparingThePersistedCurrency() throws Exception {
+    var ledger = ledger("currency-legacy-put");
+    expense(ledger, "JPY", 2000, ledger.alice().user().id());
+    var original = read(ledger, "/expenses").get(0);
+    var result =
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/groups/"
+                            + ledger.groupId()
+                            + "/expenses/"
+                            + original.path("id").asText())
+                    .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken()))
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content(
+                        json(
+                            Map.of(
+                                "description",
+                                "Legacy replacement",
+                                "amountCents",
+                                3000,
+                                "paidByUserId",
+                                ledger.alice().user().id(),
+                                "expectedVersion",
+                                original.path("version").asLong()))))
+            .andExpect(status().isConflict())
+            .andReturn();
+    assertThat(
+            objectMapper
+                .readTree(result.getResponse().getContentAsString())
+                .path("message")
+                .asText())
+        .isEqualTo("Reload or upgrade the app to use this multi-currency ledger safely.");
+    assertThat(read(ledger, "/expenses").get(0)).isEqualTo(original);
+  }
+
+  @Test
+  void dashboardRetainsCancelledPaymentCurrenciesForEveryGroupViewer() throws Exception {
+    var ledger = ledger("currency-payment-scope");
+    var carol = register("currency-payment-scope-c@example.test", "password123", "Carol");
+    mockMvc
+        .perform(
+            jsonPost(
+                    "/api/groups/" + ledger.groupId() + "/members",
+                    Map.of("email", carol.user().email()))
+                .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken())))
+        .andExpect(status().isOk());
+    expense(ledger, "USD", 2000, ledger.alice().user().id());
+    for (var payer : java.util.List.of(ledger.alice(), ledger.bob())) {
+      var payee = payer == ledger.alice() ? ledger.bob() : ledger.alice();
+      mockMvc
+          .perform(
+              jsonPost(
+                      "/api/groups/" + ledger.groupId() + "/payments",
+                      Map.of(
+                          "payerUserId",
+                          payer.user().id(),
+                          "payeeUserId",
+                          payee.user().id(),
+                          "amountMinor",
+                          1000,
+                          "currency",
+                          "JPY"))
+                  .header("X-Ledger-Version", "2")
+                  .header(HttpHeaders.AUTHORIZATION, bearer(ledger.alice().accessToken())))
+          .andExpect(status().isCreated());
+    }
+    for (var viewer : java.util.List.of(ledger.alice(), carol)) {
+      var result =
+          mockMvc
+              .perform(
+                  org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                          "/api/dashboard")
+                      .header("X-Ledger-Version", "2")
+                      .header(HttpHeaders.AUTHORIZATION, bearer(viewer.accessToken())))
+              .andExpect(status().isOk())
+              .andReturn();
+      var dashboard = objectMapper.readTree(result.getResponse().getContentAsString());
+      for (var field :
+          java.util.List.of(
+              "totalNetCents", "totalNetMinor", "owedCents", "owedMinor", "oweCents", "oweMinor"))
+        assertThat(dashboard.path(field).isNull()).as(field).isTrue();
+      var group = dashboard.path("groups").get(0);
+      for (var field :
+          java.util.List.of(
+              "totalSpentCents",
+              "totalSpentMinor",
+              "youAreOwedCents",
+              "youAreOwedMinor",
+              "youOweCents",
+              "youOweMinor",
+              "netCents",
+              "netMinor")) assertThat(group.path(field).isNull()).as(field).isTrue();
+      var headline = new java.util.HashMap<String, Long>();
+      for (var total : dashboard.path("totals"))
+        headline.put(total.path("currency").asText(), total.path("totalNetMinor").asLong());
+      assertThat(headline.keySet()).containsExactlyInAnyOrder("USD", "JPY");
+      assertThat(headline.get("JPY")).isZero();
+      var spent = new java.util.HashMap<String, Long>();
+      for (var total : group.path("totals"))
+        spent.put(total.path("currency").asText(), total.path("totalSpentMinor").asLong());
+      assertThat(spent).containsExactlyInAnyOrderEntriesOf(Map.of("USD", 2000L, "JPY", 0L));
+    }
+  }
+
+  @Test
   void dashboardPeopleGroupSpendingAndHeadlineTotalsArePartitionedByCurrency() throws Exception {
     var ledger = ledger("currency-dashboard");
     expense(ledger, "USD", 2000, ledger.alice().user().id());

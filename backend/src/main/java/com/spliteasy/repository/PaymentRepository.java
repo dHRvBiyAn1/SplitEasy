@@ -1,5 +1,6 @@
 package com.spliteasy.repository;
 
+import com.spliteasy.entity.LedgerCurrency;
 import com.spliteasy.entity.Payment;
 import java.time.Instant;
 import java.util.List;
@@ -37,6 +38,9 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
       Instant createdAt,
       UUID requesterId,
       UUID operationId);
+
+  @Query("select distinct p.currency from Payment p where p.group.id = :groupId")
+  List<LedgerCurrency> findCurrenciesByGroupId(@Param("groupId") UUID groupId);
 
   /** Recorded payments, grouped by payer and payee across the whole group. */
   @Query(
