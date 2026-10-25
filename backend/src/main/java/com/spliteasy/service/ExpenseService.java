@@ -214,7 +214,7 @@ public class ExpenseService {
     groupWriteGuard.lockForMember(groupId, requesterId);
     Expense expense =
         expenseRepository
-            .findById(expenseId)
+            .findByIdFetchAll(expenseId)
             .orElseThrow(() -> new NotFoundException("Expense not found"));
     if (!expense.getGroup().getId().equals(groupId) || expense.getDeletedAt() != null) {
       throw new NotFoundException("Expense not found in this group");
