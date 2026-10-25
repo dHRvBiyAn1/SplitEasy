@@ -30,9 +30,9 @@ Raw logs and frozen artifacts are outside git at
 | Check | Exact command / interface | Result |
 | --- | --- | --- |
 | Backend | Java21 toolchain; `./mvnw -s /workspace/maven-proxy-settings.xml -B spotless:check verify` | 298 tests; zero failures/errors; formatting and packaged JAR pass |
-| Frontend | Node22; `node node_modules/@angular/cli/bin/ng.js test --watch=false` | 307 tests across 40 files pass after review fixes |
+| Frontend | Node22; `node node_modules/@angular/cli/bin/ng.js test --watch=false` | 308 tests across 40 files pass after PR104 review fix |
 | Formatting | Node22; `node node_modules/prettier/bin/prettier.cjs --check 'src/**/*.{ts,html,scss,json}'` | Pass |
-| Production build | Node22; `node node_modules/@angular/cli/bin/ng.js build --configuration production` | Pass; initial 518.29kB vs 500kB warning budget; previous baseline 501.19kB also warned; no budget change |
+| Production build | Node22; `node node_modules/@angular/cli/bin/ng.js build --configuration production` | Pass; initial 518.38kB vs 500kB warning budget; previous baseline 501.19kB also warned; no budget change |
 | Deployment tests | `python3 -m unittest discover -s deploy/tests -v` | 14 pass |
 | Release shell scripts | ShellCheck 0.10.0 on `deploy/deploy.sh deploy/backup.sh deploy/deliver.sh` | Pass |
 | CI workflow | Actionlint with the pinned ShellCheck executable | Pass |
@@ -96,12 +96,12 @@ auth 429 feedback and session-generation cases remain covered.
   `6567fd3e36250fc74ded727a772ddd2d4bc28041ca90fef5826798fe73f2e067`.
   `backend-final-manifest.json` records the exact command and the sole comment-only
   difference from root's 55-request checkpoint.
-- Frontend: `frontend-307-browser/`; artifact-manifest SHA256
-  `7103daf50e2e077d9c80c77e01f25f69b4b60fcb217283a9ab61e136b8131a98`.
+- Frontend: `frontend-308-browser/`; artifact-manifest SHA256
+  `1a6fb853eb2d507880c82ff876f30f58fea926c61e7a2ac8380a3cc3562b9160`.
 - Frontend main-source manifest SHA256:
-  `0fe325e627e434bd1d417d34bba127ff90f3f14f10dd68e0c23d3ec08523d1f4`.
-  `frontend-307-manifest.json` pins the test/build/format logs and build warning;
-  prior 306-test artifacts remain frozen separately.
+  `755e1407ea42c9b242cd0945bebc829cb0b33c882e1c99ab48b5e7a92c2899a3`.
+  `frontend-308-manifest.json` pins the test/build/format logs and build warning;
+  prior 306/307-test artifacts remain frozen separately.
 - Independent root evidence: `independent-backend-full.json`,
   `independent-checkpoint-preservation.json` and their frozen-JAR manifests.
   Their owned resources were cleaned. Native-browser acceptance remains a
@@ -154,3 +154,24 @@ AuthService public methods: both logout commands warn on401, replacement-account
 and generation guards suppress late warnings, and device list/revoke preserve
 endpoint and observable behavior. Original Standards/Spec findings have zero
 remaining issues (`batch4/reviews/a03-followup.md`).
+
+## PR104 superseded-renewal fix (2026-10-25)
+
+The [P2 review](https://github.com/dHRvBiyAn1/SplitEasy/pull/104#discussion_r4371261795)
+identified a protected401 renewal that could invalidate a newer explicit sign-in
+before its response replaced the identity. Interceptor ownership now captures the
+authentication attempt as well as user/session/generation. An old renewal error
+cannot sign out or retry after a newer login/registration begins; actual current
+renewal failures still clear the owned session.
+
+The existing rendered HTTP cookie-lock scenario was strengthened to begin with
+a protected401 and submit each real login/registration form while renewal held
+the controlled Web Locks queue. Both cases reproduced failure before the newer
+HTTP command could dispatch, then passed after the ownership fix. The old request
+fails without replay/logout or a signed-out marker; the new command completes
+and renders only the replacement profile. Focused24 and full308/40 files pass,
+as do full-source Prettier and production build. Logs are
+`f15-superseded-renewal-red.log`, `f15-superseded-renewal-green.log` and
+`frontend-pr104-{full-green,prettier,build}.log`. Backend is unchanged and was not
+rerun; earlier browser acceptance above predates this fix. Publisher owns the
+updated combined browser/CI acceptance and review reply.
