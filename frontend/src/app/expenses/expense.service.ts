@@ -2,7 +2,13 @@ import { Currency, amountToMinor, minorToDisplay } from '../shared/currency';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
-import { CreateExpenseRequest, ExpenseResponse, ExpenseSummary } from './expense.models';
+import {
+  CreateExpenseRequest,
+  ExpenseResponse,
+  ExpenseSummary,
+  ExpenseRevision,
+  DeletedExpense,
+} from './expense.models';
 
 /** Expenses are nested under a group. One service per backend resource (AGENTS.md). */
 @Injectable({ providedIn: 'root' })
@@ -15,6 +21,24 @@ export class ExpenseService {
 
   getExpense(groupId: string, expenseId: string): Observable<ExpenseResponse> {
     return this.api.get<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}`);
+  }
+
+  getHistory(groupId: string, expenseId: string): Observable<ExpenseRevision[]> {
+    return this.api.get<ExpenseRevision[]>(`/groups/${groupId}/expenses/${expenseId}/history`);
+  }
+
+  listDeleted(groupId: string): Observable<DeletedExpense[]> {
+    return this.api.get<DeletedExpense[]>(`/groups/${groupId}/expenses/deleted`);
+  }
+
+  restoreExpense(
+    groupId: string,
+    expenseId: string,
+    expectedVersion: number,
+  ): Observable<ExpenseResponse> {
+    return this.api.post<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}/restore`, {
+      expectedVersion,
+    });
   }
 
   createExpense(groupId: string, request: CreateExpenseRequest): Observable<ExpenseResponse> {

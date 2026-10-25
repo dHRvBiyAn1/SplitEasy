@@ -2,8 +2,11 @@ package com.spliteasy.controller;
 
 import com.spliteasy.config.CurrentUserId;
 import com.spliteasy.dto.expense.CreateExpenseRequest;
+import com.spliteasy.dto.expense.DeletedExpense;
 import com.spliteasy.dto.expense.ExpenseResponse;
+import com.spliteasy.dto.expense.ExpenseRevision;
 import com.spliteasy.dto.expense.ExpenseSummary;
+import com.spliteasy.dto.expense.RestoreExpenseRequest;
 import com.spliteasy.service.ExpenseService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,6 +52,26 @@ public class ExpenseController {
     return expenseService.getExpense(userId, groupId, expenseId);
   }
 
+  @GetMapping("/deleted")
+  public List<DeletedExpense> deleted(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return expenseService.listDeleted(userId, groupId);
+  }
+
+  @GetMapping("/{expenseId}/history")
+  public List<ExpenseRevision> history(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId, @PathVariable UUID expenseId) {
+    return expenseService.getHistory(userId, groupId, expenseId);
+  }
+
+  @PostMapping("/{expenseId}/restore")
+  public ExpenseResponse restore(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @PathVariable UUID expenseId,
+      @Valid @RequestBody RestoreExpenseRequest request) {
+    return expenseService.restoreExpense(userId, groupId, expenseId, request);
+  }
+
   @PutMapping("/{expenseId}")
   public ExpenseResponse updateExpense(
       @CurrentUserId UUID userId,
@@ -63,8 +87,8 @@ public class ExpenseController {
       @CurrentUserId UUID userId,
       @PathVariable UUID groupId,
       @PathVariable UUID expenseId,
-      @org.springframework.web.bind.annotation.RequestParam(required = false)
-          Long expectedVersion) {
-    expenseService.deleteExpense(userId, groupId, expenseId, expectedVersion);
+      @RequestParam(required = false) Long expectedVersion,
+      @RequestParam(required = false) UUID operationId) {
+    expenseService.deleteExpense(userId, groupId, expenseId, expectedVersion, operationId);
   }
 }

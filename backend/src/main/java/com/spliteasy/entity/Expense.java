@@ -71,6 +71,9 @@ public class Expense {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
   @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<ExpenseParticipant> participants = new ArrayList<>();
 

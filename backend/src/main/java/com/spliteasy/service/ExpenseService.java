@@ -1,9 +1,13 @@
 package com.spliteasy.service;
 
+import com.spliteasy.config.LedgerContract;
 import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.dto.expense.CreateExpenseRequest;
+import com.spliteasy.dto.expense.DeletedExpense;
 import com.spliteasy.dto.expense.ExpenseResponse;
+import com.spliteasy.dto.expense.ExpenseRevision;
 import com.spliteasy.dto.expense.ExpenseSummary;
+import com.spliteasy.dto.expense.RestoreExpenseRequest;
 import com.spliteasy.dto.expense.SplitInput;
 import com.spliteasy.dto.expense.SplitShare;
 import com.spliteasy.entity.Expense;
@@ -21,6 +25,7 @@ import com.spliteasy.repository.UserRepository;
 import com.spliteasy.service.split.Share;
 import com.spliteasy.service.split.SplitContext;
 import com.spliteasy.service.split.SplitStrategy;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -41,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ExpenseService {
 
+  private final ExpenseHistory history;
   private final CreateOperations createOperations;
   private final ExpenseVersionPolicy versionPolicy;
   private final jakarta.persistence.EntityManager entityManager;
@@ -55,6 +61,7 @@ public class ExpenseService {
   private final Map<SplitType, SplitStrategy> strategies;
 
   public ExpenseService(
+      ExpenseHistory history,
       CreateOperations createOperations,
       ExpenseVersionPolicy versionPolicy,
       jakarta.persistence.EntityManager entityManager,
@@ -65,6 +72,7 @@ public class ExpenseService {
       UserRepository userRepository,
       MembershipGuard membershipGuard,
       List<SplitStrategy> splitStrategies) {
+    this.history = history;
     this.createOperations = createOperations;
     this.versionPolicy = versionPolicy;
     this.entityManager = entityManager;
@@ -83,7 +91,7 @@ public class ExpenseService {
   public ExpenseResponse createExpense(
       UUID requesterId, UUID groupId, CreateExpenseRequest request) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
-    com.spliteasy.config.LedgerContract.requireCurrency(request.resolvedCurrency());
+    LedgerContract.requireCurrency(request.resolvedCurrency());
     return createOperations.create(
         requesterId,
         "expense",
@@ -129,7 +137,7 @@ public class ExpenseService {
             spentOnOf(request));
     expense.setCurrency(request.resolvedCurrency());
     addShares(expense, split);
-    expenseRepository.save(expense);
+    expenseRepository.saveAndFlush(expense);
     log.info(
         "Created {} expense {} ({} cents) in group {} paid by {}",
         split.splitType(),
@@ -137,7 +145,14 @@ public class ExpenseService {
         expense.getAmountCents(),
         groupId,
         split.payerId());
-    return toResponse(expense);
+    ExpenseResponse response = toResponse(expense);
+    history.record(
+        "CREATED",
+        UserSummary.from(userRepository.getReferenceById(requesterId)),
+        request.operationId(),
+        null,
+        response);
+    return response;
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -148,11 +163,11 @@ public class ExpenseService {
         expenseRepository
             .findByIdFetchAll(expenseId)
             .orElseThrow(() -> new NotFoundException("Expense not found"));
-    if (!expense.getGroup().getId().equals(groupId)) {
+    if (!expense.getGroup().getId().equals(groupId) || expense.getDeletedAt() != null) {
       throw new NotFoundException("Expense not found in this group");
     }
 
-    com.spliteasy.config.LedgerContract.requireCurrency(expense.getCurrency());
+    LedgerContract.requireCurrency(expense.getCurrency());
     if (expense.getCurrency() != request.resolvedCurrency()) {
       throw new BadRequestException(
           "Expense currency cannot change. Create a separate expense in the correct currency.");
@@ -160,6 +175,7 @@ public class ExpenseService {
     versionPolicy.requireExpected(request.expectedVersion(), expense.getVersion());
     requireActiveExpenseParticipants(expense);
 
+    ExpenseResponse before = toResponse(expense);
     // Validate before advancing; parent versions must also cover child-only split intent changes.
     ComputedSplit split = computeSplit(groupId, request);
     // Immediate increment (unlike deferred OPTIMISTIC_FORCE_INCREMENT) keeps the response current.
@@ -177,23 +193,44 @@ public class ExpenseService {
     addShares(expense, split);
     expenseRepository.saveAndFlush(expense);
     log.info("Updated expense {} in group {} by user {}", expenseId, groupId, requesterId);
-    return toResponse(expense);
+    ExpenseResponse response = toResponse(expense);
+    history.record(
+        "REPLACED",
+        UserSummary.from(userRepository.getReferenceById(requesterId)),
+        request.operationId(),
+        before,
+        response);
+    return response;
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void deleteExpense(UUID requesterId, UUID groupId, UUID expenseId, Long expectedVersion) {
+    deleteExpense(requesterId, groupId, expenseId, expectedVersion, null);
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public void deleteExpense(
+      UUID requesterId, UUID groupId, UUID expenseId, Long expectedVersion, UUID operationId) {
     groupWriteGuard.lockForMember(groupId, requesterId);
     Expense expense =
         expenseRepository
             .findById(expenseId)
             .orElseThrow(() -> new NotFoundException("Expense not found"));
-    if (!expense.getGroup().getId().equals(groupId)) {
+    if (!expense.getGroup().getId().equals(groupId) || expense.getDeletedAt() != null) {
       throw new NotFoundException("Expense not found in this group");
     }
-    com.spliteasy.config.LedgerContract.requireCurrency(expense.getCurrency());
+    LedgerContract.requireCurrency(expense.getCurrency());
     versionPolicy.requireExpected(expectedVersion, expense.getVersion());
     requireActiveExpenseParticipants(expense);
-    expenseRepository.delete(expense); // cascade/orphanRemoval deletes expense_participants
+    ExpenseResponse before = toResponse(expense);
+    expense.setDeletedAt(Instant.now());
+    expenseRepository.saveAndFlush(expense);
+    history.record(
+        "DELETED",
+        UserSummary.from(userRepository.getReferenceById(requesterId)),
+        operationId,
+        before,
+        toResponse(expense));
     log.info("Deleted expense {} from group {} by user {}", expenseId, groupId, requesterId);
   }
 
@@ -330,10 +367,67 @@ public class ExpenseService {
         expenseRepository
             .findByIdFetchAll(expenseId)
             .orElseThrow(() -> new NotFoundException("Expense not found"));
-    if (!expense.getGroup().getId().equals(groupId)) {
+    if (!expense.getGroup().getId().equals(groupId) || expense.getDeletedAt() != null) {
       throw new NotFoundException("Expense not found in this group");
     }
     return toResponse(expense);
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<ExpenseRevision> getHistory(UUID requesterId, UUID groupId, UUID expenseId) {
+    membershipGuard.requireMember(groupId, requesterId);
+    Expense expense =
+        expenseRepository
+            .findById(expenseId)
+            .filter(e -> e.getGroup().getId().equals(groupId))
+            .orElseThrow(() -> new NotFoundException("Expense not found"));
+    LedgerContract.requireCurrency(expense.getCurrency());
+    return history.list(expenseId);
+  }
+
+  @Transactional(readOnly = true)
+  public List<DeletedExpense> listDeleted(UUID requesterId, UUID groupId) {
+    membershipGuard.requireMember(groupId, requesterId);
+    return expenseRepository.findDeletedByGroupId(groupId).stream()
+        .map(
+            expense -> {
+              LedgerContract.requireCurrency(expense.getCurrency());
+              return new DeletedExpense(toResponse(expense), expense.getDeletedAt());
+            })
+        .toList();
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public ExpenseResponse restoreExpense(
+      UUID requesterId, UUID groupId, UUID expenseId, RestoreExpenseRequest request) {
+    groupWriteGuard.lockForMember(groupId, requesterId);
+    Expense expense =
+        expenseRepository
+            .findByIdFetchAll(expenseId)
+            .filter(e -> e.getGroup().getId().equals(groupId))
+            .orElseThrow(() -> new NotFoundException("Expense not found"));
+    LedgerContract.requireCurrency(expense.getCurrency());
+    if (request.expectedVersion() == null) {
+      throw new BadRequestException(
+          "expectedVersion is required. Reload and review deleted expenses before restoring.");
+    }
+    versionPolicy.requireExpected(request.expectedVersion(), expense.getVersion());
+    if (expense.getDeletedAt() == null) {
+      throw new ConflictException(
+          "This expense is already active. Reload and review the latest changes.");
+    }
+    requireActiveExpenseParticipants(expense);
+    ExpenseResponse before = toResponse(expense);
+    expense.setDeletedAt(null);
+    expenseRepository.saveAndFlush(expense);
+    ExpenseResponse response = toResponse(expense);
+    history.record(
+        "RESTORED",
+        UserSummary.from(userRepository.getReferenceById(requesterId)),
+        request.operationId(),
+        before,
+        response);
+    return response;
   }
 
   private List<UUID> resolveParticipants(List<UUID> requested, Set<UUID> memberIds) {

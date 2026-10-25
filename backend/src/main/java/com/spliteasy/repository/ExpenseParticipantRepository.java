@@ -14,7 +14,7 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
       """
       select p.user.id as fromId, p.expense.currency as currency, p.expense.paidBy.id as toId, sum(p.shareCents) as totalCents
       from ExpenseParticipant p
-      where p.expense.group.id = :groupId and p.user.id <> p.expense.paidBy.id
+      where p.expense.deletedAt is null and p.expense.group.id = :groupId and p.user.id <> p.expense.paidBy.id
       group by p.user.id, p.expense.paidBy.id, p.expense.currency
       """)
   List<PairAmount> sumOwedByPair(@Param("groupId") UUID groupId);
@@ -27,7 +27,7 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
       """
             select p.user.id as userId, p.expense.currency as currency, sum(p.shareCents) as totalCents
             from ExpenseParticipant p
-            where p.expense.group.id = :groupId
+            where p.expense.deletedAt is null and p.expense.group.id = :groupId
             group by p.user.id, p.expense.currency
             """)
   List<UserAmount> sumOwedByGroup(@Param("groupId") UUID groupId);
@@ -40,7 +40,7 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
       """
             select p.expense.id as expenseId, p.shareCents as shareCents
             from ExpenseParticipant p
-            where p.user.id = :userId and p.expense.group.id in :groupIds
+            where p.expense.deletedAt is null and p.user.id = :userId and p.expense.group.id in :groupIds
             """)
   List<ExpenseShareView> findSharesByUserAndGroups(
       @Param("userId") UUID userId, @Param("groupIds") List<UUID> groupIds);
@@ -60,7 +60,7 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
       """
             select p.user.id as userId, p.expense.currency as currency, sum(p.shareCents) as totalCents
             from ExpenseParticipant p
-            where p.expense.group.id = :groupId
+            where p.expense.deletedAt is null and p.expense.group.id = :groupId
               and p.expense.paidBy.id = :userId
               and p.user.id <> :userId
             group by p.user.id, p.expense.currency
@@ -75,7 +75,7 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
       """
             select p.expense.paidBy.id as userId, p.expense.currency as currency, sum(p.shareCents) as totalCents
             from ExpenseParticipant p
-            where p.expense.group.id = :groupId
+            where p.expense.deletedAt is null and p.expense.group.id = :groupId
               and p.user.id = :userId
               and p.expense.paidBy.id <> :userId
             group by p.expense.paidBy.id, p.expense.currency

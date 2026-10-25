@@ -757,7 +757,7 @@ paths:
 
         to authenticated actor/group. Identical replay returns the immutable original201
 
-        response even after edit/delete; changed intent returns409. Current membership
+        response even after edit/delete/restore; changed intent returns409. Current membership
 
         is checked before replay. Missing/null ID retains legacy additive writes.
 
@@ -835,7 +835,7 @@ paths:
     get:
       operationId: getExpense
       summary: Get expense detail
-      description: Returns the expense with its per-participant share breakdown.
+      description: Returns an active expense with its per-participant share breakdown. Deleted expenses return404; use authorized history and recovery reads.
       tags:
       - Expenses
       responses:
@@ -911,13 +911,13 @@ paths:
     delete:
       operationId: deleteExpense
       summary: Delete an expense
-      description: 'Hard-deletes the expense and its participant shares (FK cascade). If its
+      description: 'Soft-deletes the expense, retaining shares and attributable history while excluding it from ordinary reads and every financial projection. Advances its version. Recover while the group still exists through the explicit restore command. If its
 
         recorded payer or any share participant is no longer active, returns 409 with
 
         instructions to re-add former participants before changing history. No expense,
 
-        share or payment is changed by a rejected deletion. Financial mutations
+        share, revision or payment is changed by a rejected deletion. Financial mutations
 
         serialize per group. Submit expectedVersion from the list/detail as a query
 
@@ -939,9 +939,16 @@ paths:
           type: integer
           format: int64
           minimum: 0
+      - name: operationId
+        in: query
+        required: false
+        description: Optional UUID recorded on the accepted deletion; does not enable automatic replay
+        schema:
+          type: string
+          format: uuid
       responses:
         '204':
-          description: Expense deleted
+          description: Expense marked deleted; fetch the recovery list or history for its new version
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -953,6 +960,103 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
           description: Former participant referenced, or detected persistence write conflict
+
+  /api/groups/{groupId}/expenses/deleted:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedExpenses
+      summary: List recoverable deleted expenses
+      description: Current members only, checked before group disclosure. Newest deletion first. Non-USD requires ledger version2. Group deletion still cascades all retained expenses and revisions.
+      tags: [Expenses]
+      responses:
+        '200':
+          description: Deleted expenses with their retained financial state and current opaque versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeletedExpense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/history:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getExpenseHistory
+      summary: Read attributable expense revisions, including deleted expenses
+      description: Current membership is checked before resource disclosure. Chronological accepted revisions with actor snapshots, server timestamps and complete before/after denomination and split intent. Imported baselines have no known recorder and use migration recording time; original spent/creation dates remain in the financial snapshot. Failed writes add no revision. Previously hard-deleted expenses cannot be recovered.
+      tags: [Expenses]
+      responses:
+        '200':
+          description: Revisions ordered by opaque increasing resource version
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseRevision'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/restore:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: restoreExpense
+      summary: Restore one deleted expense at its expected version
+      description: Always requires expectedVersion, including before the E02 deadline. Current membership is checked before disclosure and again under the group financial lock. The retained payer and every share participant must be active, otherwise409 instructs explicit re-add. Restores unchanged currency, amount and split intent and advances the version once. Stale/repeated/already-active commands return409 without another revision or financial change. Optional operationId is attribution, not a replay contract. On an uncertain response reload and review; never automatically retry. Immutable create receipt replay never restores an expense.
+      tags: [Expenses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreExpenseRequest'
+      responses:
+        '200':
+          description: Restored active expense at its new resource version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /api/groups/{groupId}/balances:
     parameters:
@@ -1715,6 +1819,60 @@ components:
           maximum: 9007199254740991
           description: What this participant owes, in integer minor units
 
+    RestoreExpenseRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Mandatory current deleted-resource version from recovery/history, regardless of compatibility deadline
+        operationId:
+          type: [string, 'null']
+          format: uuid
+          description: Optional recorded operation identity; restore uses versions, never automatic replay
+
+    DeletedExpense:
+      type: object
+      required: [expense, deletedAt]
+      properties:
+        expense:
+          $ref: '#/components/schemas/ExpenseResponse'
+        deletedAt:
+          type: string
+          format: date-time
+
+    ExpenseRevision:
+      type: object
+      required: [action, actor, recordedAt, version, operationId, before, after]
+      properties:
+        action:
+          type: string
+          enum: [IMPORTED, CREATED, REPLACED, DELETED, RESTORED]
+        actor:
+          description: Captured recording actor, distinct from payer; unknown for imported baselines
+          anyOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+        recordedAt:
+          type: string
+          format: date-time
+          description: Server recording timestamp; migration time for imported baselines
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type: [string, 'null']
+          format: uuid
+        before:
+          anyOf:
+          - $ref: '#/components/schemas/ExpenseResponse'
+          - type: 'null'
+        after:
+          $ref: '#/components/schemas/ExpenseResponse'
+
     ExpenseResponse:
       type: object
       required:
@@ -1738,7 +1896,7 @@ components:
           type: integer
           format: int64
           minimum: 0
-          description: Opaque expectedVersion for financial edit/delete
+          description: Opaque expectedVersion for financial edit/delete/restore
         id:
           type: string
           format: uuid
@@ -1830,7 +1988,7 @@ components:
           type: integer
           format: int64
           minimum: 0
-          description: Opaque expectedVersion for financial edit/delete
+          description: Opaque expectedVersion for financial edit/delete/restore
         id:
           type: string
           format: uuid

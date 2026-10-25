@@ -62,3 +62,18 @@ export type CreateExpenseRequest = MoneyInput & {
   category?: ExpenseCategory;
   spentOn?: string;
 };
+
+export interface ExpenseRevision {
+  action: 'IMPORTED' | 'CREATED' | 'REPLACED' | 'DELETED' | 'RESTORED';
+  actor: UserSummary | null;
+  recordedAt: string;
+  version: number;
+  operationId?: string | null;
+  before: ExpenseResponse | null;
+  after: ExpenseResponse;
+}
+
+export interface DeletedExpense {
+  expense: ExpenseResponse;
+  deletedAt: string;
+}

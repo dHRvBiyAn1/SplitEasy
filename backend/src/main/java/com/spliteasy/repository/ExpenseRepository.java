@@ -31,14 +31,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    (select count(p.id) from ExpenseParticipant p where p.expense = e) as participantCount
             from Expense e
             join e.paidBy payer
-            where e.group.id = :groupId
+            where e.deletedAt is null and e.group.id = :groupId
             order by e.spentOn desc, e.createdAt desc
             """)
   List<ExpenseSummaryView> findSummariesByGroupId(@Param("groupId") UUID groupId);
 
   /** Total of every expense in a group, in cents (0 if none). Drives the "total spent" card. */
   @Query(
-      "select e.currency as currency, sum(e.amountCents) as totalCents from Expense e where e.group.id = :groupId group by e.currency")
+      "select e.currency as currency, sum(e.amountCents) as totalCents from Expense e where e.deletedAt is null and e.group.id = :groupId group by e.currency")
   List<CurrencyAmount> sumAmountsByGroup(@Param("groupId") UUID groupId);
 
   interface CurrencyAmount {
@@ -69,7 +69,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
             from Expense e
             join e.paidBy payer
             join e.group g
-            where g.id in :groupIds
+            where e.deletedAt is null and g.id in :groupIds
             order by e.spentOn desc, e.createdAt desc
             """)
   List<ActivityExpenseView> findRecentByGroupIds(
@@ -98,10 +98,21 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
       """
             select e.paidBy.id as userId, e.currency as currency, sum(e.amountCents) as totalCents
             from Expense e
-            where e.group.id = :groupId
+            where e.deletedAt is null and e.group.id = :groupId
             group by e.paidBy.id, e.currency
             """)
   List<UserAmount> sumPaidByGroup(@Param("groupId") UUID groupId);
+
+  @Query(
+      """
+      select distinct e from Expense e
+      join fetch e.paidBy
+      left join fetch e.participants p
+      join fetch p.user
+      where e.group.id = :groupId and e.deletedAt is not null
+      order by e.deletedAt desc, e.id
+      """)
+  List<Expense> findDeletedByGroupId(@Param("groupId") UUID groupId);
 
   /** Projection backing {@link #findSummariesByGroupId(UUID)}. */
   interface ExpenseSummaryView {
