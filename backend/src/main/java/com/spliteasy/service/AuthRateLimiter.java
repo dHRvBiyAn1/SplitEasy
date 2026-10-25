@@ -61,6 +61,10 @@ public class AuthRateLimiter {
         new Budget(new Key("sensitive", "", userId.toString()), 5));
   }
 
+  public void refresh(String ip) {
+    take(LOGIN_WINDOW, new Budget(new Key("refresh", ip, ""), 120));
+  }
+
   public void register(String ip) {
     take(REGISTER_WINDOW, new Budget(new Key("register", ip, ""), registrationLimit));
   }

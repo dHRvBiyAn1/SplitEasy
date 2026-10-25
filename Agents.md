@@ -23,10 +23,10 @@ payments and greedy debt-simplification suggestions. Balances are
 - **Frontend**: Angular 21 standalone components + signals; **Vitest** tests. Angular
   Material present but only its `--mat-sys-*` colors are remapped to tokens — screens use
   plain semantic HTML.
-- **Auth**: Spring Security + JWT (HS256, symmetric) via `oauth2-resource-server`. Access
-  tokens only (1h), intended re-login on expiry; client logout does not revoke tokens.
-  Password reset/change and confirmed email change revoke prior tokens through per-request persisted credential-version checks.
-  Contract and future requirements: [session lifecycle](docs/security/session-lifecycle.md).
+- **Auth**: Spring Security + HS256 JWT access (1h), persisted revocable device sessions,
+  and bounded rotating refresh credentials in a Secure HttpOnly host cookie. Each protected
+  request checks session ownership/expiry/revocation and per-user credentialVersion. Sidless
+  legacy JWTs require one re-login. Contract: [session lifecycle](docs/security/session-lifecycle.md).
 
 ## Run & Test
 
@@ -52,18 +52,22 @@ Prereqs: Java 21, Node 22+, Docker Desktop running (dev DB **and** backend tests
 - `.github/workflows/ci-cd.yml`: PR/dev checks, Node 22 Pages artifact, real backend/Caddy/Postgres smoke, main-only GHCR backend digest publication. Serialized production delivery requires repository `DEPLOY_ENABLED=true`, production environment SSH settings, Cloudflare account/project variables and Pages Edit token. Backend/tunnel health succeeds before Pages upload. `deploy/deliver.sh` implements that ordering and skips superseded main revisions. No AWS API keys required for delivery.
 - Releases use a single backend digest manifest and unique directories. Retain host lock, pre-migration pg_dump, physical release paths, failed-release pointer protection and schema-aware rollback. PostgreSQL volume identity remains unchanged. Pages and backend publication are not atomic; Pages failure leaves the healthy backend in place.
 - `deploy/compose.ci.yml` is disposable-only: Caddy port on 127.0.0.1:18080, cloudflared disabled behind a profile. Never use this override or `down --volumes` on production.
-- Daily off-host backups are configured separately; `deploy/backup.sh` supports exported `BACKUP_S3_URI`. A value placed only in Compose .env is not automatically exported to the backup script. Existing application review gaps/refresh tokens remain outside this deployment migration.
+- Daily off-host backups are configured separately; `deploy/backup.sh` supports exported `BACKUP_S3_URI`. A value placed only in Compose .env is not automatically exported to the backup script. Session rollout/rollback constraints are in `docs/security/session-lifecycle.md`.
 - CI and frontend verification use Node 22. Node 26 experimental Web Storage interferes with jsdom/Vitest localStorage; use the validated runtime.
 - First production release fcf12e6 is live: backend/tunnel and Pages activated; public API health and Angular deep links verified. Main run38649436260 succeeded on attempt2 after a transient previous-HTML check failure. Follow-up propagation retry change remains subject to dev/main promotion.
 
 ## API
 
-All under `/api`; all except `auth/*` and `health` require `Authorization: Bearer <jwt>`.
+All under `/api`; protected routes require `Authorization: Bearer <jwt>`. Public auth commands
+and health are exceptions; `/auth/logout` requires a bearer and `/auth/refresh` requires the
+secure cookie plus a trusted Origin and explicit browser header.
 Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/auth/register`, `/auth/login` | issue access token |
+| POST | `/auth/register`, `/auth/login`, `/auth/refresh` | issue one-hour access and rotate secure browser cookie |
+| GET/DELETE | `/me/sessions`, `/me/sessions/{id}` | list owned devices / revoke one |
+| POST | `/auth/logout`, `/me/sessions/logout-all` | revoke captured device / all account devices |
 | GET | `/health` | liveness |
 | GET/PATCH | `/me` | current server-owned name/contact/default preferences; email read-only |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
@@ -102,9 +106,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **UUID PKs** everywhere (`@UuidGenerator`, app-side so it works under `validate`; Postgres `uuid`).
 - **Auth abuse limits**: login 30/IP/5min and 5/(normalized email, IP)/5min; registration 20/IP/hour (`APP_AUTH_REGISTRATION_LIMIT`). Atomic process-local fixed windows cap at 10k buckets; restart resets, share enforcement before multiple instances. Prod native Caddy/Tomcat forwarding relies on private Tunnel→Caddy→Java networks; direct dev ignores forwarded headers. See `docs/security/auth-abuse.md`; 429 includes CORS-exposed Retry-After and both forms retain session state.
 - **Auth**: tokens issued in `JwtService` (claims `sub`=user UUID, `email`, `displayName`),
-  plus `credentialVersion`; validated by the resource-server filter (`NimbusJwtDecoder` in
+  plus `sid` and `credentialVersion`; validated by the resource-server filter (`NimbusJwtDecoder` in
   `SecurityConfig`) against persisted current credential state on every protected request.
-  Legacy absent versions mean zero until the account changes credentials. Read caller as
+  Sidless tokens fail closed; absent credential versions remain zero only with a valid persisted sid.
+  Refresh/revoke/login serialize on the user row; hashes only, strict reuse revokes the family. Read caller as
   `@CurrentUserId UUID` (resolver in `config/`) — not raw `Jwt`. Passwords BCrypt.
 - **Reuse these, don't re-inline**: `MembershipGuard.requireMember(groupId,userId)` (the group-membership
   check → 403); `@CurrentUserId`; `Emails.normalize()` (trim+lowercase, canonical form for lookup/storage).
@@ -202,12 +207,18 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   and successful import removes only that owner's record. Never import ownerless `spliteasy.profile`.
   Original server `createdAt` replaces the device first-visit date. Theme/palette remain device-wide.
 
-- **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
-  synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
-  call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
-  request; each refresh advances it so only the newest request owns data, error and loading. Protected
-  401 logout/redirect must match the initiating session version (even if a new login returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
-  after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
+- **Account session ownership**: access credentials stay in memory; bootstrap renews the Secure
+  HttpOnly cookie before routing. Eager PendingWritesService initialization precedes restoration;
+  initial matching-owner restoration preserves explicit retry drafts. Login/register, logout and
+  account/device replacement reset SessionService; same-device rotation preserves it. Profile's
+  editing/import linked signals consume a computed immutable owner key so token/name refreshes
+  do not discard drafts. Native Web Locks cover complete login/register/refresh HTTP processing;
+  cross-tab notifications contain only a nonsecret marker. Capture user ID + sid + generation for
+  protected 401 renewal, share one attempt and retry once only if all still match. Never replay old
+  work under a new identity or call server logout for a stale 401. Logout uses captured bearer,
+  clears locally at once and reports unconfirmed server revocation accurately. Modal HTTP operations
+  retain takeUntil(session.changes) after whole aggregations; dashboard callbacks retain cache-generation guards.
+
 - **Custom expense splits**: cache the normalized outgoing original-input list and reuse it for the
   live total, validation and POST/PUT. Blank excludes; explicit zero retains a participant. Restore
   original inputs on edit (legacy responses without intent use exact shares); never add other group
@@ -219,7 +230,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - Financial member controls use full display name plus email for accessible identity (including duplicate names),
   numeric split labels name dollars, percent, whole weight units or signed adjustment dollars, and selection buttons expose `aria-pressed`.
 
-- **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Browser reload/cross-tab loses the identity; consult history after an uncertain response.
+- **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Owned uncertain drafts survive cookie-backed reload without automatic dispatch; account/device replacement clears them. Consult history after an uncertain response.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - New-group member additions retain the created group ID and per-email outcomes; failed-only retries reuse that group. Keep session cancellation after the entire sequential aggregation.
@@ -282,6 +293,14 @@ UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
 - **create_operations** (V12) — primary key `(actor_id,kind,scope_id,operation_id)`, normalized submitted `intent` and original `response` snapshots. Actor references users (CASCADE); scope intentionally has no group FK so expense/group response identities survive resource deletion. Claims and resource writes commit together; no automatic expiry.
 
+- **auth_sessions / refresh_credentials** (V14) — account-owned device UUID, credential version,
+  coarse label, creation/renewal/absolute/idle expiry, revocation and bounded rotation counter;
+  refresh rows contain SHA-256 hashes and consumption timestamps only, cascading with the session.
+  Account locks serialize renewal/reuse/revoke/credential boundaries. Login cleanup retains at most 20
+  families, at most 2049 hashes each; inactive accounts retain expired rows until next login. Apply V14
+  before C01 V15 or together, without out-of-order migrations. Old binaries bypass session revocation:
+  forward-fix or review all-instance signing-key rotation plus compatible frontend rollback.
+
 User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All five split types store final owed amounts in the **same `share_cents`** column, alongside original typed `split_value`, and each expense's shares sum exactly to its amount.
 
 ## Balances & Splits (the math)
@@ -325,7 +344,6 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 
 ## Known Gaps / TODOs
 
-- **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. This is the current explicit session contract; rotating refresh/revocation requires a separate implementation (see `docs/security/session-lifecycle.md`).
 - **Register reveals email existence** (409 on duplicate) — fine for now; revisit if enumeration matters.
 - **Simplify-debts is a group setting, not a view toggle** (`groups.simplify_debts`, V8, default on).
   Settle up has no switch of its own: it reads each group's flag, so a dashboard-level settle-up can
@@ -516,3 +534,7 @@ PR #95–#97 review remediation (2026-10-19): user authorized fixing comments an
 
 
 Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–#103 into dev and deferred production SMTP configuration. Preserve reviewed E02/H06/A02 changes and the verified combined integration resolutions; require updated-head CI, merge E02 V12 before A02 V13, and check final dev CI. Google Workspace is the selected future SMTP provider. Production mail remains disabled until configured; this task targets dev only.
+
+- [x] Alignment A03 candidate (2026-10-24) — persisted per-request sid enforcement, device list/selective revoke/logout-all, bounded hashed rotating HttpOnly Secure cookie renewal, credential-boundary revocation, origin/header guards and preserved limits. Memory-only access, full-response native Web Locks, nonsecret tab markers and immutable user/sid/generation retry checks preserve same-device drafts and cancel replacement-account work. Sequential HTTP/Pg/rendered regressions, backend 298/frontend 306, formatting/build, deployment 14, ShellCheck/Actionlint/Compose and official OpenAPI 183 refs pass. Root independently verified 55 packaged HTTP/upgrade/finance-preservation cases on Java-identical source. One-time legacy re-login; V14 before C01 V15; old-binary rollback requires reviewed all-instance key rotation/compatible frontend. Initial bundle warning 518.20kB remains documented. Evidence: `docs/reviews/2026-10-24-alignment/a03-sessions.md`. Independent review/native browser/publication remain root gates; no worker push/merge/deployment or production SMTP change.
+- [x] A03 review follow-up (2026-10-25) — device GET/DELETE use existing AuthService and DeviceSession DTO; rendered panel keeps cancellation/UI state. Logout401 from expired access now warns that server revocation is unconfirmed, preserving the signed-out generation guard against stale replacement-account callbacks. One rendered HTTP red→green, focused19/full307/40 files, full-source Prettier and production build pass; initial518.29kB warning. Backend unchanged/no rerun; updated frozen frontend307/evidence. No push/PR/merge/deployment by worker.
+- [x] PR104 superseded-renewal P2 (2026-10-25) — interceptor ownership includes the authentication attempt before newer login/registration responses arrive; older renewal failure cannot clear or invalidate the newer explicit sign-in. Rendered real forms under a controlled Web Locks queue reproduce both failures before fix; focused24/full308/40 files, full-source Prettier and production build pass, initial518.38kB warning. Backend unchanged/no rerun. Frozen frontend308/evidence updated; publisher owns combined browser/CI/review reply. No worker push/remote reply/merge/deployment.

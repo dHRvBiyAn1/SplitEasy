@@ -11,12 +11,12 @@ describe('PaymentService', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
-    storeTestSession({ id: 'u1', email: 'owner@example.test', displayName: 'Owner' });
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(PaymentService);
     httpTesting = TestBed.inject(HttpTestingController);
+    storeTestSession({ id: 'u1', email: 'owner@example.test', displayName: 'Owner' });
   });
 
   afterEach(() => httpTesting.verify());

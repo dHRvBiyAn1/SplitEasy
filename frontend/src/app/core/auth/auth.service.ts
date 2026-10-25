@@ -1,57 +1,139 @@
 import { DestroyRef, Injectable, computed, inject, signal, untracked } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  defer,
+  finalize,
+  firstValueFrom,
+  from,
+  of,
+  shareReplay,
+  tap,
+  throwError,
+} from 'rxjs';
 import { ApiService } from '../api/api.service';
-import { AuthResponse, LoginRequest, RegisterRequest, UserSummary } from './auth.models';
+import {
+  AuthResponse,
+  DeviceSession,
+  LoginRequest,
+  RegisterRequest,
+  UserSummary,
+} from './auth.models';
 import { SessionService } from './session.service';
 
-const TOKEN_KEY = 'spliteasy.accessToken';
-const USER_KEY = 'spliteasy.user';
-interface StoredSession {
+const AUTH_MARKER = 'spliteasy.auth-change';
+
+interface BrowserSession {
   token: string;
+  sessionId: string;
   user: UserSummary;
 }
 
-/**
- * Owns authentication state: calls the auth endpoints, persists the access token
- * and current user in localStorage (so a refresh keeps you logged in), and exposes
- * the current user as a signal. The token is attached to requests by authInterceptor.
- */
+/** Access credentials stay in memory; only the API's HttpOnly cookie survives a reload. */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
-
-  private readonly currentSession = signal<StoredSession | null>(this.readStoredSession());
+  private authAttempt = 0;
+  private ownerMarker = this.readMarker();
+  private renewal: Observable<AuthResponse> | null = null;
+  private readonly currentSession = signal<BrowserSession | null>(null);
   readonly user = computed(() => this.currentSession()?.user ?? null);
   readonly isAuthenticated = computed(() => this.user() !== null);
+  readonly logoutWarning = signal<string | null>(null);
 
   constructor() {
+    try {
+      localStorage.removeItem('spliteasy.accessToken');
+      localStorage.removeItem('spliteasy.user');
+    } catch {
+      /* Legacy storage is never an authentication source. */
+    }
     const synchronize = (event: StorageEvent) => {
-      if (
-        event.storageArea !== localStorage ||
-        (event.key !== null && event.key !== TOKEN_KEY && event.key !== USER_KEY)
-      )
+      if (event.storageArea !== localStorage || (event.key !== null && event.key !== AUTH_MARKER))
         return;
-      const next = this.readStoredSession();
-      const previous = this.currentSession();
-      if (previous?.token !== next?.token || previous?.user.id !== next?.user.id)
-        this.session.reset();
-      this.currentSession.set(next);
+      const next = this.readMarker();
+      if (next === this.ownerMarker) return;
+      this.ownerMarker = next;
+      this.clearSession(false);
+      if (!this.signedOut(next)) {
+        const attempt = this.authAttempt;
+        this.restore().subscribe({
+          error: () => {
+            if (attempt === this.authAttempt) this.clearSession(false);
+          },
+        });
+      }
     };
     window.addEventListener('storage', synchronize);
     inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', synchronize));
   }
 
+  initialize(): Observable<AuthResponse | null> {
+    if (this.signedOut(this.readMarker())) return of(null);
+    return this.restore().pipe(catchError(() => of(null)));
+  }
+
+  restore(): Observable<AuthResponse> {
+    if (this.renewal) return this.renewal;
+    const renewal = this.cookieRequest('/auth/refresh', {}, false).pipe(
+      finalize(() => {
+        if (this.renewal === renewal) this.renewal = null;
+      }),
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
+    this.renewal = renewal;
+    return renewal;
+  }
+
   register(request: RegisterRequest): Observable<AuthResponse> {
-    return this.api
-      .post<AuthResponse>('/auth/register', request)
-      .pipe(tap((res) => this.persist(res)));
+    return this.cookieRequest('/auth/register', request, true);
   }
 
   login(request: LoginRequest): Observable<AuthResponse> {
-    return this.api
-      .post<AuthResponse>('/auth/login', request)
-      .pipe(tap((res) => this.persist(res)));
+    return this.cookieRequest('/auth/login', request, true);
+  }
+
+  private cookieRequest(path: string, body: unknown, login: boolean): Observable<AuthResponse> {
+    return defer(() => {
+      const attempt = login ? ++this.authAttempt : this.authAttempt;
+      const marker = this.readMarker();
+      const execute = () => {
+        if (attempt !== this.authAttempt || marker !== this.readMarker())
+          return throwError(
+            () => new Error('The authentication request belongs to an earlier session'),
+          );
+        return this.api
+          .post<AuthResponse>(path, body, {
+            withCredentials: true,
+            headers: path === '/auth/refresh' ? { 'X-SplitEasy-Session': '1' } : undefined,
+          })
+          .pipe(
+            tap((response) => {
+              if (attempt !== this.authAttempt || marker !== this.readMarker()) {
+                if (login)
+                  this.api
+                    .post<void>(
+                      '/auth/logout',
+                      {},
+                      { headers: { Authorization: `Bearer ${response.accessToken}` } },
+                    )
+                    .subscribe({ error: () => {} });
+                throw new Error('The authentication request belongs to an earlier session');
+              }
+              this.accept(response, login);
+            }),
+          );
+      };
+      // Keep ownership through body processing: Set-Cookie is already applied when HttpClient emits.
+      return navigator.locks
+        ? from(
+            Promise.resolve(
+              navigator.locks.request('spliteasy-auth-cookie', () => firstValueFrom(execute())),
+            ),
+          )
+        : execute();
+    });
   }
 
   requestPasswordReset(email: string): Observable<void> {
@@ -71,73 +153,107 @@ export class AuthService {
   }
 
   logout(): void {
-    const current = this.currentSession();
+    this.signOut('/auth/logout', 'copied credentials');
+  }
+
+  logoutAll(): void {
+    this.signOut('/me/sessions/logout-all', 'other devices and copied credentials');
+  }
+
+  listSessions(): Observable<DeviceSession[]> {
+    return this.api.get<DeviceSession[]>('/me/sessions');
+  }
+
+  revokeSession(id: string): Observable<void> {
+    return this.api.delete<void>('/me/sessions/' + id);
+  }
+
+  private signOut(path: string, unconfirmed: string): void {
+    const token = this.getToken();
+    this.logoutWarning.set(null);
+    this.clearSession();
+    const version = this.session.version;
+    if (token)
+      this.api.post<void>(path, {}, { headers: { Authorization: `Bearer ${token}` } }).subscribe({
+        error: () => {
+          if (this.session.version === version && !this.user())
+            this.logoutWarning.set(
+              `Signed out on this device. Server sign-out could not be confirmed; ${unconfirmed} may still work. Sign in again to manage your sessions.`,
+            );
+        },
+      });
+  }
+
+  clearSession(broadcast = true): void {
+    this.authAttempt++;
+    this.renewal = null;
     this.session.reset();
-    // An unseen login in another tab owns its stored credentials, even before its storage event.
-    if (
-      current &&
-      localStorage.getItem(TOKEN_KEY) === current.token &&
-      this.readStoredUser()?.id === current.user.id
-    ) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-    }
     this.currentSession.set(null);
+    if (broadcast && this.ownerMarker === this.readMarker()) this.publishMarker(true);
   }
 
   getToken(): string | null {
     return untracked(this.currentSession)?.token ?? null;
   }
 
-  /** Fresh profile data may change presentation, never identity, email or the access token. */
+  getSessionId(): string | null {
+    return untracked(this.currentSession)?.sessionId ?? null;
+  }
+
+  getAuthAttempt(): number {
+    return this.authAttempt;
+  }
+
+  /** Fresh profile data may change presentation, never identity, email or credentials. */
   applyProfileName(id: string, version: number, displayName: string): void {
     const current = this.currentSession();
-    const user = current?.user;
-    if (!user || user.id !== id || this.session.version !== version) return;
-    const next = { ...user, displayName };
-    this.currentSession.set({ token: current!.token, user: next });
-    if (localStorage.getItem(TOKEN_KEY) === current!.token && this.readStoredUser()?.id === id)
-      localStorage.setItem(USER_KEY, JSON.stringify(next));
+    if (!current || current.user.id !== id || this.session.version !== version) return;
+    this.currentSession.set({ ...current, user: { ...current.user, displayName } });
   }
 
-  private persist(res: AuthResponse): void {
-    this.session.reset();
-    localStorage.setItem(TOKEN_KEY, res.accessToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-    this.currentSession.set({ token: res.accessToken, user: res.user });
+  private accept(response: AuthResponse, login: boolean): void {
+    if (!response.sessionId || !response.accessToken || !response.user?.id)
+      throw new Error('Invalid session response');
+    const current = this.currentSession();
+    if (
+      login ||
+      (current &&
+        (current.sessionId !== response.sessionId || current.user.id !== response.user.id))
+    )
+      this.session.reset();
+    this.logoutWarning.set(null);
+    this.currentSession.set({
+      token: response.accessToken,
+      sessionId: response.sessionId,
+      user: response.user,
+    });
+    if (login) this.publishMarker(false);
+    else this.ownerMarker = this.readMarker();
   }
 
-  private readStoredSession(): StoredSession | null {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const user = this.readStoredUser();
-    if (!token || !user) return null;
+  private readMarker(): string | null {
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return null;
-      const claims = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      // Presentation-pair coherence only: API signature/issuer/expiry validation remains authoritative.
-      return claims.sub === user.id ? { token, user } : null;
+      return localStorage.getItem(AUTH_MARKER);
     } catch {
       return null;
     }
   }
 
-  private readStoredUser(): UserSummary | null {
-    const raw = localStorage.getItem(USER_KEY);
-    if (!raw) {
-      return null;
-    }
+  private signedOut(marker: string | null): boolean {
     try {
-      const user = JSON.parse(raw) as UserSummary;
-      return user &&
-        typeof user.id === 'string' &&
-        !!user.id &&
-        typeof user.email === 'string' &&
-        typeof user.displayName === 'string'
-        ? user
-        : null;
+      return marker !== null && JSON.parse(marker).signedOut === true;
     } catch {
-      return null;
+      return false;
+    }
+  }
+
+  private publishMarker(signedOut: boolean): void {
+    const marker = JSON.stringify({ id: crypto.randomUUID(), signedOut });
+    try {
+      localStorage.setItem(AUTH_MARKER, marker);
+      this.ownerMarker = marker;
+    } catch {
+      /* Authentication stays in memory when browser storage is unavailable. */
     }
   }
 }

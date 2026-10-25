@@ -17,12 +17,12 @@ describe('canonical settlement actions', () => {
   });
 
   it('renders and records the same simplified obligation as the dashboard without a second preview', () => {
-    storeTestSession(me);
     TestBed.configureTestingModule({
       imports: [SettleUpModalComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     const http = TestBed.inject(HttpTestingController);
+    storeTestSession(me);
     TestBed.inject(DashboardService).refresh();
     http.expectOne('/api/dashboard').flush({
       groups: [{ id: 'g', name: 'Chain', simplifyDebts: true }],
@@ -49,12 +49,12 @@ describe('canonical settlement actions', () => {
     http.verify();
   });
   it('shows offsetting direct debts and records the displayed incoming direction', () => {
-    storeTestSession(me);
     TestBed.configureTestingModule({
       imports: [SettleUpModalComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     const http = TestBed.inject(HttpTestingController);
+    storeTestSession(me);
     TestBed.inject(DashboardService).refresh();
     http.expectOne('/api/dashboard').flush({
       groups: [{ id: 'g', name: 'Cycle', simplifyDebts: false }],

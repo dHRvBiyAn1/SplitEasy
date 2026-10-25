@@ -31,7 +31,7 @@ public class JwtService {
     return expirationSeconds;
   }
 
-  public String issueToken(User user) {
+  public String issueToken(User user, java.util.UUID sessionId) {
     Instant now = Instant.now();
     JwtClaimsSet claims =
         JwtClaimsSet.builder()
@@ -39,6 +39,7 @@ public class JwtService {
             .issuedAt(now)
             .expiresAt(now.plusSeconds(expirationSeconds))
             .subject(user.getId().toString())
+            .claim("sid", sessionId.toString())
             .claim("credentialVersion", user.getCredentialVersion())
             .claim("email", user.getEmail())
             .claim("displayName", user.getDisplayName())

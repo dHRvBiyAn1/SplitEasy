@@ -41,7 +41,9 @@ describe('profile account security', () => {
     http = TestBed.inject(HttpTestingController);
     auth = TestBed.inject(AuthService);
     auth.login({ email: user.email, password: 'password' }).subscribe();
-    http.expectOne('/api/auth/login').flush({ accessToken: 'alice-token', user });
+    http
+      .expectOne('/api/auth/login')
+      .flush({ accessToken: 'alice-token', sessionId: 'alice-device', user });
   });
   afterEach(() => http.verify());
   it('focuses linked password errors, lets each link focus its field and focuses the remaining single error', () => {

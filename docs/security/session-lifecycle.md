@@ -1,79 +1,155 @@
 # Authentication and session lifecycle
 
-SplitEasy intentionally requires re-login when an access token expires. Login and
-registration return an HS256 bearer access token and `expiresIn`; the default
-`app.jwt.expiration-seconds` is 3600 seconds (one hour). There is no silent renewal,
-refresh token, refresh/logout endpoint, or server-side device session store.
-This is the current product contract; refresh remains a separate enhancement.
+Login and registration create a persisted device session and return the existing
+HS256 bearer response (`expiresIn=3600`) plus an opaque `sessionId`. Every access
+JWT includes `sid` and the account's `credentialVersion`. Protected requests
+validate signature, HS256, issuer, timestamps, current account version, and a
+matching, active, unexpired persisted session owned by the JWT subject. Cookie
+possession alone never authenticates a business request.
 
-## Expiry and client logout
+## Cutover and immediate revocation
 
-The resource server verifies the HS256 signature, configured `app.jwt.issuer`, and
-token timestamps on protected requests. A02 additionally validates the persisted
-account credentialVersion on every protected request. Missing legacy version
-claims mean zero; malformed/negative versions and missing accounts are rejected. Spring Security's default timestamp
-validator permits 60 seconds of clock skew; the nominal one-hour lifetime is not
-an exact wall-clock cutoff. An expired or otherwise invalid bearer token receives
-401. These protected-route failures are produced by the Spring Security filter chain,
-so their error body is not guaranteed to match the application `ErrorResponse` schema.
-The browser keeps the access token and user summary in localStorage across page reloads; local identity state is not proof of server authorization. There is
-no client expiry timer. The next protected API request that returns 401 clears
-the matching client session and redirects to `/login`. A late 401 from an earlier
-session cannot clear a subsequent login.
+A03 rejects all JWTs without a valid persisted `sid`, including previously issued
+legacy JWTs. Users sign in once after rollout. There is no legacy-token adoption
+endpoint or grace period that leaves copied tokens outside device revocation.
+The existing missing-credentialVersion-as-zero parser remains, but never exempts
+a token from the session check. JWT timestamps retain Spring's 60-second skew;
+persisted session expiry and revocation are independent server checks.
 
-Signing out calls `AuthService.logout()`: it synchronously resets account-scoped
-state and pending UI operations, removes the stored token/user, and clears the
-current identity. It does not contact the server or invalidate a copied token.
-A previously issued token remains usable until expiry (subject to clock skew)
-or a credential boundary. Password reset, authenticated password change and
-confirmed actual email change atomically increment credentialVersion, invalidating
-all older tokens after commit. Requests authenticated before commit may finish.
-Client logout itself does not increment this version or affect another device.
-Selective per-session revoke, refresh and logout-all UI remain A03 work. localStorage is
-accessible to same-origin JavaScript, so bearer-token theft through script
-compromise remains a risk; client cleanup cannot revoke stolen copies.
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| GET | `/api/me/sessions` | List only the caller's active devices, dates and current flag |
+| DELETE | `/api/me/sessions/{id}` | Revoke one owned device; unknown/foreign IDs also return 204 |
+| POST | `/api/auth/logout` | Revoke the session in the captured bearer token |
+| POST | `/api/me/sessions/logout-all` | Revoke every session of the authenticated account |
+| POST | `/api/auth/refresh` | Rotate the browser refresh credential and issue one-hour access |
 
-## Requirements before adding refresh or revocation
+Logout requires bearer authentication even though other public commands use the
+`/auth` prefix. Revoke and logout-all serialize on the existing account row lock,
+shared with refresh, login and credential changes. After commit, later protected
+requests on every API instance reject copied access tokens. Requests already
+being authenticated or running when revocation commits may finish; there is no
+attempt to cancel completed business work.
 
-Agree on and document these requirements before implementation; they are not
-additional capabilities beyond A02 credential-boundary revocation:
+Password reset, authenticated password change and confirmed actual email change
+atomically increment credentialVersion, revoke all persisted sessions and
+invalidate mailbox challenges. Verification alone does not revoke sessions. Login
+selects a scalar account UUID, locks, and rechecks both normalized email and
+password after waiting, including an overlapping confirmed email change.
 
-- Define which events revoke one session versus all account sessions, including
-  logout, suspected theft and operator intervention. A02 already revokes all old
-  credentials after password reset/change and confirmed email changes. Specify
-  when access must stop, including requests already in flight and multi-instance
-  deployments. Immediate access-token revocation requires server-side enforcement;
-  revoking only refresh credentials leaves existing access tokens usable to expiry.
-- Define server-side session identity, persistence, retention and cleanup, access
-  and refresh absolute/idle lifetimes, and secure storage on both sides. Do not
-  persist raw refresh credentials server-side. For browser cookie storage, define
-  Secure, HttpOnly and SameSite settings plus CSRF/CORS protection and deployment
-  origin constraints. Do not simply add long-lived refresh tokens to localStorage.
-- Require refresh rotation on use, atomic consumption, and replay detection with a
-  defined session-family revocation response. Specify concurrent refresh, retry and
-  lost-response behavior so a consumed credential cannot be reused or restored by
-  a race. Keep credentials out of logs and error responses.
-- Define client recovery and account-state cleanup for expiry, failed refresh and
-  revoked sessions. Retain signature, issuer, algorithm and timestamp enforcement.
-  Test real filter/endpoint behavior, rotation, expiry, replay, concurrent use,
-  revocation propagation and account isolation using disposable credentials/data.
+## Refresh credential and browser protection
 
-Changing the shared signing secret is an operator action that invalidates all
-existing tokens once all API instances use the new key. It requires coordinated
-configuration/restarts and forces every user to re-login. It is not selective
-session revocation or a substitute for defining the requirements above.
+Refresh credentials contain256 random bits and are returned only in the
+host-only `__Host-spliteasy-refresh` cookie: Secure, HttpOnly, Path=/,
+SameSite=Strict, no Domain. Only SHA-256 hashes are stored in PostgreSQL. Access
+credentials stay in JavaScript memory; neither access nor refresh credentials
+are written to browser storage, URLs or application logs. Legacy localStorage
+bearer/user keys are discarded. Mailbox-link handling remains governed by
+[account recovery](account-recovery.md).
 
-## Verification
+The production frontend (`https://split-easy.io`) and API
+(`https://api.split-easy.io`) are same-site and cross-origin. Browser
+login/register/refresh requests use credentials. CORS permits exactly configured
+origins and credentials, retaining existing permitted headers, including
+X-Ledger-Version. Refresh additionally requires an exactly trusted Origin and
+`X-SplitEasy-Session: 1`; missing/null/untrusted origins or a missing header return 403
+before token lookup. Login/register reject a supplied untrusted Origin, preventing
+login CSRF. Native non-browser login/register can omit Origin. Other bearer-only
+commands do not gain ambient cookie authentication.
 
-`JwtSecurityIntegrationTest` sends real signed tokens through the protected
-`GET /api/groups` filter chain with throwaway PostgreSQL: a valid control succeeds;
-expired, wrong-issuer, wrong-signature and same-key HS512 tokens each receive 401.
-The expiry case is outside clock-skew tolerance. A02 also checks malformed,
-negative, mismatched and explicitly null credential versions, invalid/missing
-accounts, legacy version-zero acceptance and revocation after a password change. Existing `AuthFlowIntegrationTest`
-covers login/registration and missing/malformed tokens. Frontend auth and
-session-isolation specs cover local cleanup, protected-request 401 handling and
-stale-session callbacks. These checks use no production data or credentials.
+Secure is never disabled for development. Browsers support localhost as a secure
+cookie/Web Locks context; remote development must use HTTPS and an explicitly
+allowed frontend Origin. Previews are not implicitly trusted. Responses issuing
+credentials are no-store. Neither logout nor failed refresh clears a cookie:
+a delayed old response must never erase a newer login's cookie. A revoked cookie
+cannot renew and a later login replaces it.
 
-A02 lifecycle details, SMTP configuration, one-use mailbox challenges and the
-security restriction on old-binary rollback are in [account recovery](account-recovery.md).
+## Rotation, races and server bounds
+
+Each session has a 30-day absolute expiry, a 7-day idle expiry renewed only on
+refresh, and a budget of 2048 successful rotations. The next renewal after budget
+exhaustion revokes the family and requires sign-in. A cookie lasts at most7 days,
+clipped to the remaining absolute lifetime; persisted timestamps always win.
+Access keeps its 3600-second nominal lifetime, bounded by session revocation and
+expiry. Ordinary business reads do not write session activity timestamps.
+
+The account lock serializes credential consumption and replacement. Every
+consumed hash is retained for the family so reuse of any older credential revokes
+the whole session, including access and refresh credentials issued to an earlier
+winner. Reuse returns401 after committing that revocation. There is no replay
+grace or restoration of consumed credentials. Concurrent duplicate renewals
+therefore produce one 200 and one 401, and the winner's credentials subsequently
+fail. A lost refresh response requires sign-in; the browser does not automatically
+retry the refresh request.
+
+Login deletes revoked, expired and obsolete-version families and their hashes,
+then removes the oldest devices before inserting a new one, retaining at most 20
+families per account. Each family has at most 2049 hashes. Cleanup is account-local
+on login: inactive accounts can retain bounded expired rows until their next
+login. Deleted/unknown old credentials still return 401. There is no scheduler or
+new datastore/dependency.
+
+Refresh has an independent 120/IP/5-minute process-local budget in the existing
+bounded limiter. Login, registration and recovery limits are unchanged; see
+[authentication abuse limits](auth-abuse.md). Persisted revocation works across
+instances, but attempt budgets must be shared before horizontal scaling.
+
+## Client continuity and ownership
+
+Initial cookie renewal finishes before routing. Eager pending-write cleanup is
+installed before renewal. Initial restoration does not reset a valid owned
+retry draft; reading a draft still requires its immutable stored owner to match
+the successfully restored account. Reload never submits a financial write.
+Later account/device replacements and every logout reset account state, cancel
+owned callbacks and clear pending writes. Same-device access rotation preserves
+the session generation and form drafts, including profile edits.
+
+A protected 401 shares one renewal with concurrent failures and can retry at most
+once. It captures immutable user ID, session ID, session generation and the
+authentication attempt, and checks all four after renewal. Starting explicit
+login/registration supersedes old callbacks before its response replaces the
+identity; an older renewal cannot clear or invalidate that newer sign-in.
+A different account or device cancels the old request instead of replaying it
+under the new identity. Late failures never issue a server logout against a
+replacement account.
+
+Native Web Locks serialize login/register/refresh across tabs through the entire
+HTTP response and cookie/body processing. Other tabs receive only a nonsecret
+localStorage change marker; they clear old owned state and restore the identity
+from the HttpOnly cookie. Successful renewals do not broadcast another marker,
+avoiding renewal loops. Old-marker callbacks cannot overwrite newer state.
+Without Web Locks a duplicate refresh fails closed and may require sign-in.
+Cross-tab notifications and persisted local sign-out intent require browser
+storage; credentials are never used as a fallback storage mechanism.
+
+Local logout clears memory immediately and sends captured bearer credentials.
+If the request fails, the login screen says server sign-out could not be
+confirmed and copied credentials/other devices may still work. A nonsecret
+signed-out marker prevents a reload from silently restoring that unconfirmed
+cookie until an explicit successful login. It is not server revocation. An old
+tab preserves a newer unseen login marker when signing out its own bearer.
+
+Profile's Manage sessions panel loads on demand, identifies the current device,
+shows created/last-renewed/maximum-expiry dates, supports selective revoke and
+Sign out all devices, and offers manual retry after errors. Device labels are
+coarse browser/platform names; the API exposes neither IP addresses, raw user
+agents nor any refresh hashes or credentials.
+
+## Migration, release and rollback
+
+A03 owns V14; C01 owns V15+. Apply V14 before V15 or ship them together. Do not
+use Flyway out-of-order mode. Stop/drain old backends before serving the session
+contract: mixed old/new binaries cannot guarantee immediate revocation. Coordinate
+frontend/backend rollout and the forced one-time sign-in.
+
+V14 is additive. Keep its schema on rollback. Old authentication binaries accept
+session-revoked access JWTs, so prefer a forward fix. A reviewed binary rollback
+requires an all-instance signing-key rotation, forced sign-in and a compatible
+frontend; it restores the older authentication behavior rather than preserving
+A03's guarantees. Production SMTP/provider setup remains outside this change.
+
+Verification includes authenticated MVC with real PostgreSQL, consumed-token and
+concurrent rotation races, expiry, all revocation commands, account isolation,
+credential boundaries, and rendered Angular HTTP/session ownership. Package,
+upgrade and owned-browser evidence is recorded in the A03 review report; do not
+infer production deployment from local acceptance.

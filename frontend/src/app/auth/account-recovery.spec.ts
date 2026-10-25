@@ -267,9 +267,10 @@ describe('public account recovery', () => {
     auth.login({ email: 'bob@example.com', password: 'password' }).subscribe();
     http.expectOne('/api/auth/login').flush({
       accessToken: 'bob-token',
+      sessionId: 'bob-device',
       user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
     });
-    const storedUser = localStorage.getItem('spliteasy.user');
+    const storedUser = auth.user();
     history.replaceState({}, '', '/account-action#action=email-change&token=' + 'c'.repeat(43));
     const route = routes.find((route) => route.path === 'account-action')!;
     const f = TestBed.createComponent((await route.loadComponent!()) as typeof LoginComponent);
@@ -307,8 +308,9 @@ describe('public account recovery', () => {
     http.expectNone('/api/me');
     expect(auth.user()?.email).toBe('bob@example.com');
     expect(auth.getToken()).toBe('bob-token');
-    expect(localStorage.getItem('spliteasy.accessToken')).toBe('bob-token');
-    expect(localStorage.getItem('spliteasy.user')).toBe(storedUser);
+    expect(auth.getToken()).toBe('bob-token');
+    expect(localStorage.getItem('spliteasy.accessToken')).toBeNull();
+    expect(auth.user()).toEqual(storedUser);
   });
 
   it('refreshes the signed-in profile after a mailbox action without marking a different account verified or logging it out', async () => {
@@ -317,6 +319,7 @@ describe('public account recovery', () => {
     auth.login({ email: 'bob@example.com', password: 'password' }).subscribe();
     http.expectOne('/api/auth/login').flush({
       accessToken: 'bob-token',
+      sessionId: 'bob-device',
       user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
     });
     history.replaceState(
@@ -428,6 +431,7 @@ describe('public account recovery', () => {
     auth.login({ email: 'bob@example.com', password: 'password' }).subscribe();
     http.expectOne('/api/auth/login').flush({
       accessToken: 'bob-token',
+      sessionId: 'bob-device',
       user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
     });
     expect(request.cancelled).toBe(true);

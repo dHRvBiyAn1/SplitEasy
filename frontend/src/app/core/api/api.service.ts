@@ -43,8 +43,12 @@ export class ApiService {
     return this.http.get<T>(`${this.baseUrl}${path}`);
   }
 
-  post<T>(path: string, body: unknown): Observable<T> {
-    return this.http.post<T>(`${this.baseUrl}${path}`, body);
+  post<T>(
+    path: string,
+    body: unknown,
+    options: { withCredentials?: boolean; headers?: Record<string, string> } = {},
+  ): Observable<T> {
+    return this.http.post<T>(`${this.baseUrl}${path}`, body, options);
   }
 
   put<T>(path: string, body: unknown): Observable<T> {

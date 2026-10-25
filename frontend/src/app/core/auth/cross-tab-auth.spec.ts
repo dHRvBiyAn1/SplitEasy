@@ -4,9 +4,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { vi } from 'vitest';
 import { ProfileComponent } from '../../profile/profile.component';
+import { SessionService } from './session.service';
 import { AuthService } from './auth.service';
 import { authInterceptor } from './auth.interceptor';
-import { storeTestSession, testJwt } from './auth-test-fixture';
+import { storeTestSession, testAuthResponse, testJwt } from './auth-test-fixture';
 
 const alice = { id: 'alice', displayName: 'Alice', email: 'alice@example.com' };
 const bob = { id: 'bob', displayName: 'Bob', email: 'bob@example.com' };
@@ -18,21 +19,26 @@ const profile = (user = alice) => ({
   avatarColor: '#12A57E',
   createdAt: '2020-01-01T00:00:00Z',
 });
-function storageEvent(): void {
+function remoteLogin(): string {
+  const marker = JSON.stringify({ id: crypto.randomUUID(), signedOut: false });
+  localStorage.setItem('spliteasy.auth-change', marker);
+  return marker;
+}
+function deliverMarker(): void {
   window.dispatchEvent(
     new StorageEvent('storage', {
-      key: 'spliteasy.user',
+      key: 'spliteasy.auth-change',
       storageArea: localStorage,
-      newValue: localStorage.getItem('spliteasy.user'),
+      newValue: localStorage.getItem('spliteasy.auth-change'),
     }),
   );
 }
+
 describe('cross-tab authentication ownership', () => {
   let http: HttpTestingController;
   let auth: AuthService;
   beforeEach(() => {
     localStorage.clear();
-    storeTestSession(alice);
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -42,88 +48,108 @@ describe('cross-tab authentication ownership', () => {
     });
     http = TestBed.inject(HttpTestingController);
     auth = TestBed.inject(AuthService);
+    storeTestSession(alice);
     vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
   afterEach(() => http.verify());
-  it('keeps an old draft on its own credential until storage delivery, then cancels it and switches the rendered account', () => {
-    const f = TestBed.createComponent(ProfileComponent);
-    f.detectChanges();
+
+  it('keeps an old draft on its own bearer until marker delivery, then cancels it and restores the replacement account', () => {
+    const fixture = TestBed.createComponent(ProfileComponent);
+    fixture.detectChanges();
     http.expectOne('/api/me').flush(profile());
-    f.detectChanges();
+    fixture.detectChanges();
     const change = Array.from(
-      f.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
     ).find((button) => button.textContent?.trim() === 'Change password')!;
     change.click();
-    f.detectChanges();
+    fixture.detectChanges();
     for (const [selector, value] of [
       ['#security-current-password', 'old-password'],
       ['#security-new-password', 'new-password'],
     ]) {
-      const field = f.nativeElement.querySelector(selector);
+      const field = fixture.nativeElement.querySelector(selector);
       field.value = value;
       field.dispatchEvent(new Event('input'));
     }
-    storeTestSession(bob);
-    f.nativeElement
+    remoteLogin();
+    fixture.nativeElement
       .querySelector('form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     const pending = http.expectOne('/api/me/password');
     expect(pending.request.headers.get('Authorization')).toBe('Bearer ' + testJwt('alice'));
-    storageEvent();
+    deliverMarker();
     expect(pending.cancelled).toBe(true);
-    expect(auth.user()?.id).toBe('bob');
-    f.detectChanges();
+    expect(auth.user()).toBeNull();
+    http.expectOne('/api/auth/refresh').flush(testAuthResponse(bob));
+    fixture.detectChanges();
     http.expectOne('/api/me').flush(profile(bob));
-    f.detectChanges();
-    expect(f.nativeElement.textContent).toContain('bob@example.com');
-    expect(f.nativeElement.querySelector('input[type=password]')).toBeNull();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('bob@example.com');
+    expect(fixture.nativeElement.querySelector('input[type=password]')).toBeNull();
     expect(auth.getToken()).toBe(testJwt('bob'));
   });
-  it('preserves a newer tab login when an old credential returns 401 before its storage event', () => {
+
+  it('does not revoke a newer unseen tab login when an old bearer returns401', () => {
     TestBed.inject(HttpClient)
       .get('/api/groups')
       .subscribe({ error: () => {} });
     const pending = http.expectOne('/api/groups');
-    storeTestSession(bob);
+    const marker = remoteLogin();
     pending.flush({}, { status: 401, statusText: 'Unauthorized' });
-    expect(localStorage.getItem('spliteasy.accessToken')).toBe(testJwt('bob'));
-    expect(JSON.parse(localStorage.getItem('spliteasy.user')!).id).toBe('bob');
-    storageEvent();
+    http.expectOne('/api/auth/refresh').flush(testAuthResponse(bob));
+    http.expectNone('/api/groups');
+    http.expectNone('/api/auth/logout');
+    expect(localStorage.getItem('spliteasy.auth-change')).toBe(marker);
     expect(auth.user()?.id).toBe('bob');
+    deliverMarker();
+    http.expectNone('/api/auth/refresh');
     expect(auth.getToken()).toBe(testJwt('bob'));
   });
-  it('rejects partial and malformed storage pairs without erasing the newer shared credentials', () => {
-    localStorage.setItem('spliteasy.accessToken', testJwt('bob'));
-    storageEvent();
-    expect(auth.user()).toBeNull();
-    expect(auth.getToken()).toBeNull();
+
+  it('ignores partial or malformed legacy storage instead of adopting another bearer', () => {
+    for (const raw of [testJwt('bob'), 'malformed']) {
+      localStorage.setItem('spliteasy.accessToken', raw);
+      localStorage.setItem('spliteasy.user', '{bad');
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'spliteasy.user', storageArea: localStorage }),
+      );
+      expect(auth.user()?.id).toBe('alice');
+      expect(auth.getToken()).toBe(testJwt('alice'));
+    }
     auth.logout();
-    expect(localStorage.getItem('spliteasy.accessToken')).toBe(testJwt('bob'));
-    localStorage.setItem('spliteasy.user', '{bad');
-    storageEvent();
-    expect(auth.isAuthenticated()).toBe(false);
-    localStorage.setItem('spliteasy.user', JSON.stringify(bob));
-    storageEvent();
-    expect(auth.user()?.id).toBe('bob');
-    localStorage.setItem('spliteasy.accessToken', 'malformed');
-    storageEvent();
-    expect(auth.user()).toBeNull();
+    const signout = http.expectOne('/api/auth/logout');
+    expect(signout.request.headers.get('Authorization')).toBe('Bearer ' + testJwt('alice'));
+    signout.flush(null);
   });
-  it('does not let an old profile response overwrite a newer tab identity or turn a name update into a login generation', () => {
-    const f = TestBed.createComponent(ProfileComponent);
-    f.detectChanges();
-    const old = http.expectOne('/api/me');
-    storeTestSession(bob);
-    old.flush({ ...profile(), displayName: 'Fresh Alice' });
-    expect(JSON.parse(localStorage.getItem('spliteasy.user')!).id).toBe('bob');
-    storageEvent();
-    f.detectChanges();
-    http.expectOne('/api/me').flush(profile(bob));
-    f.detectChanges();
-    localStorage.setItem('spliteasy.user', JSON.stringify({ ...bob, displayName: 'Fresh Bob' }));
-    storageEvent();
-    f.detectChanges();
+
+  it('preserves the newer shared marker when an old tab signs out before its storage event', () => {
+    const marker = remoteLogin();
+    auth.logout();
+    expect(localStorage.getItem('spliteasy.auth-change')).toBe(marker);
+    const signout = http.expectOne('/api/auth/logout');
+    expect(signout.request.headers.get('Authorization')).toBe('Bearer ' + testJwt('alice'));
+    signout.flush(null);
+    deliverMarker();
+    http.expectOne('/api/auth/refresh').flush(testAuthResponse(bob));
+    expect(auth.user()?.id).toBe('bob');
+    expect(localStorage.getItem('spliteasy.auth-change')).toBe(marker);
+  });
+
+  it('ignores an old profile callback and keeps the generation during a same-device name renewal', () => {
+    const oldVersion = TestBed.inject(SessionService).version;
+    const marker = remoteLogin();
+    auth.applyProfileName('alice', oldVersion, 'Late Alice');
+    expect(localStorage.getItem('spliteasy.auth-change')).toBe(marker);
+    deliverMarker();
+    http.expectOne('/api/auth/refresh').flush(testAuthResponse(bob));
+    auth.applyProfileName('alice', oldVersion, 'Wrong replacement');
+    expect(auth.user()?.displayName).toBe('Bob');
+    const version = TestBed.inject(SessionService).version;
+    auth.restore().subscribe();
+    http
+      .expectOne('/api/auth/refresh')
+      .flush(testAuthResponse({ ...bob, displayName: 'Fresh Bob' }));
     expect(auth.user()?.displayName).toBe('Fresh Bob');
-    http.expectNone('/api/me');
+    expect(TestBed.inject(SessionService).version).toBe(version);
   });
 });

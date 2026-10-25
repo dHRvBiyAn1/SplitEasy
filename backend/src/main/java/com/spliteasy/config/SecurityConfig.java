@@ -46,6 +46,8 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
+                    .requestMatchers("/api/auth/logout")
+                    .authenticated()
                     .requestMatchers("/api/auth/**", "/api/health")
                     .permitAll()
                     // Internal container probe; Caddy blocks all /actuator routes.
@@ -68,7 +70,9 @@ public class SecurityConfig {
   }
 
   @Bean
-  public JwtDecoder jwtDecoder(com.spliteasy.repository.UserRepository users) {
+  public JwtDecoder jwtDecoder(
+      com.spliteasy.repository.UserRepository users,
+      com.spliteasy.service.AuthSessionService sessions) {
     NimbusJwtDecoder decoder =
         NimbusJwtDecoder.withSecretKey(jwtKey).macAlgorithm(MacAlgorithm.HS256).build();
     org.springframework.security.oauth2.core.OAuth2TokenValidator<
@@ -87,6 +91,9 @@ public class SecurityConfig {
                   version = ((Number) raw).longValue();
                   if (version < 0) return failure;
                 }
+                if (!sessions.active(
+                    java.util.UUID.fromString(jwt.getSubject()),
+                    java.util.UUID.fromString(jwt.getClaimAsString("sid")))) return failure;
                 Long current =
                     users
                         .findCredentialVersion(java.util.UUID.fromString(jwt.getSubject()))

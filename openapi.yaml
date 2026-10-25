@@ -7,11 +7,14 @@ info:
     payments, and debt-simplification suggestions.
 
     ## Authentication
-    All endpoints except `/auth/*` and `/health` require a Bearer JWT access token
-    (1h lifetime) obtained from `POST /api/auth/register` or `POST /api/auth/login`.
+    Protected endpoints require a Bearer JWT access token; public auth commands and health are
+    exceptions. `/auth/logout` requires a bearer and `/auth/refresh` requires its secure cookie.
+    Access tokens (1h lifetime) are obtained from `POST /api/auth/register` or `POST /api/auth/login`.
     Missing, invalid or revoked tokens are rejected with `401`. Password resets, password
     changes and confirmed email changes revoke earlier access tokens immediately after commit
-    through per-account credential versions. Device sessions/refresh remain future work.
+    through per-account credential versions and persisted device sessions. Every JWT requires a
+    valid owned sid; sidless legacy tokens require one re-login. Browser renewal rotates a
+    Secure HttpOnly host cookie, bounded by 7-day idle and 30-day absolute session expiry.
 
     ## Authorization
     Every group-scoped endpoint is restricted to group members. A non-member receives
@@ -46,7 +49,7 @@ servers:
 
 tags:
   - name: Auth
-    description: Registration and login — issues JWT access tokens
+    description: Authentication, bounded cookie renewal and immediate device-session revocation
   - name: Profile
     description: Current authenticated account profile and default preferences
   - name: Health
@@ -261,11 +264,106 @@ paths:
           $ref: "#/components/responses/TooManyRequests"
         "503":
           description: Delivery disabled or misconfigured; authenticated requests also report transport failures
+  /api/me/sessions:
+    get:
+      operationId: listDeviceSessions
+      summary: List the current account's active device sessions
+      description: Coarse device labels and dates only; no IP addresses, raw user agents, refresh credentials or hashes.
+      tags: [Auth]
+      responses:
+        "200":
+          description: Owned active sessions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeviceSession" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/me/sessions/{id}:
+    delete:
+      operationId: revokeDeviceSession
+      summary: Revoke one owned device immediately after commit
+      description: Unknown and foreign session UUIDs return the same 204. Requests already authenticating or running may finish.
+      tags: [Auth]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: "Device revoked, or identifier is not an owned session" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/me/sessions/logout-all:
+    post:
+      operationId: logoutAllDevices
+      summary: Revoke every session of the authenticated account
+      description: Stops access and cookie renewal after commit, including the current device. Does not clear cookies in the response.
+      tags: [Auth]
+      responses:
+        "204": { description: All account sessions revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auth/logout:
+    post:
+      operationId: logoutCurrentDevice
+      summary: Revoke the device in the captured bearer token
+      description: Requires bearer authentication. Ignores cookie identity and never clears a cookie, so a delayed old logout cannot erase a newer login.
+      tags: [Auth]
+      responses:
+        "204": { description: Captured device session revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auth/refresh:
+    post:
+      operationId: refreshBrowserSession
+      summary: Rotate a browser refresh credential and issue one-hour access
+      description: |
+        Requires an exact allowed Origin and X-SplitEasy-Session header. Browser CORS is
+        credentialed and exact-origin. Each use consumes the old credential atomically;
+        reuse revokes the whole device family, including the earlier winner's access.
+        Concurrent duplicates fail closed; a lost response requires sign-in. Sessions
+        last at most 30 days absolute / 7 days idle / 2048 successful renewals.
+        Access credentials are memory-only; refresh credentials never appear in JSON.
+      tags: [Auth]
+      security:
+        - refreshCookie: []
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Exactly configured frontend origin; browsers set this automatically
+          schema: { type: string }
+        - name: X-SplitEasy-Session
+          in: header
+          required: true
+          schema: { type: string, const: "1" }
+      responses:
+        "200":
+          description: Same device renewed; old cookie consumed
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/RefreshCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { description: "Missing, invalid, expired, consumed or revoked credential; no cookie clearing" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429":
+          description: Independent 120/IP/5-minute refresh budget exhausted
+          headers:
+            Retry-After: { $ref: "#/components/headers/RetryAfter" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /api/auth/register:
     post:
       operationId: register
       summary: Register a new user
-      description: Creates a user account and returns an access token.
+      description: Creates an account and persisted device, returns one-hour access and a Secure HttpOnly SameSite=Strict host refresh cookie. Supplied Origin must be trusted.
       tags: [Auth]
       security: []
       requestBody:
@@ -280,7 +378,9 @@ paths:
               displayName: Alice
       responses:
         "201":
-          description: Account created; access token issued
+          description: Account created; access and device session issued
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/RefreshCookie" }
           content:
             application/json:
               schema:
@@ -308,7 +408,9 @@ paths:
       operationId: login
       summary: Log in
       description: |
-        Authenticates with email and password and returns an access token.
+        Authenticates with email and password and creates a persisted device session,
+        returning one-hour access and a Secure HttpOnly SameSite=Strict host refresh cookie.
+        A supplied Origin must exactly match the configured frontend origins.
         Invalid credentials are deliberately generic: always
         "Invalid email or password".
       tags: [Auth]
@@ -324,7 +426,9 @@ paths:
               password: super-secret
       responses:
         "200":
-          description: Access token issued
+          description: Access token and device session issued
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/RefreshCookie" }
           content:
             application/json:
               schema:
@@ -1073,10 +1177,22 @@ components:
           type: string
           format: date-time
 
+    DeviceSession:
+      type: object
+      required: [id, deviceLabel, createdAt, refreshedAt, expiresAt, current]
+      properties:
+        id: { type: string, format: uuid, description: Opaque identifier; never an authentication credential }
+        deviceLabel: { type: string, maxLength: 80, description: Coarse browser/platform label }
+        createdAt: { type: string, format: date-time }
+        refreshedAt: { type: string, format: date-time, description: "Last renewal, not every business read" }
+        expiresAt: { type: string, format: date-time, description: Absolute upper bound; idle expiry and revocation can end access earlier }
+        current: { type: boolean }
+
     AuthResponse:
       type: object
-      required: [accessToken, tokenType, expiresIn, user]
+      required: [sessionId, accessToken, tokenType, expiresIn, user]
       properties:
+        sessionId: { type: string, format: uuid, description: Persisted device identity; not a bearer credential }
         accessToken:
           type: string
           description: 'JWT access token; send as `Authorization: Bearer <token>`'
@@ -1704,6 +1820,9 @@ components:
         format: uuid
 
   headers:
+    RefreshCookie:
+      description: Host-only __Host-spliteasy-refresh; Secure, HttpOnly, Path=/, SameSite=Strict. At most seven days, clipped to absolute expiry. Never place this credential in browser storage or URLs.
+      schema: { type: string }
     RetryAfter:
       description: Seconds to wait before retrying the authentication request; CORS exposes this header to browser clients
       schema:
@@ -1751,6 +1870,11 @@ components:
             $ref: "#/components/schemas/Error"
 
   securitySchemes:
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-spliteasy-refresh
+      description: Rotating HttpOnly Secure browser credential; requires trusted Origin and X-SplitEasy-Session header
     bearerAuth:
       type: http
       scheme: bearer
