@@ -18,11 +18,11 @@ describe('mutation close policy across the rendered global dialogs', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    storeTestSession(alice);
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
+    storeTestSession(alice);
     modal = TestBed.inject(ModalService);
   });
   afterEach(() => http.verify());

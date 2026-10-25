@@ -13,6 +13,9 @@
       @if (securityNotice) {
         <p role="status">{{ securityNotice }}</p>
       }
+      @if (logoutWarning()) {
+        <p class="auth__error" role="alert">{{ logoutWarning() }}</p>
+      }
       @if (submitting()) {
         <div class="dc-loading" role="status" aria-label="Signing in"></div>
       }

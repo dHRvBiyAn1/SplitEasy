@@ -1,3 +1,4 @@
+import { AuthService } from '../core/auth/auth.service';
 import { storeTestSession, testJwt } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -123,7 +124,8 @@ describe('authentication presentation', () => {
         'Too many attempts. Please wait before trying again.',
       );
       expect(f.nativeElement.querySelector('button[type="submit"]').disabled).toBe(false);
-      expect(localStorage.getItem('spliteasy.accessToken')).toBe(testJwt('alice'));
+      expect(TestBed.inject(AuthService).getToken()).toBe(testJwt('alice'));
+      expect(localStorage.getItem('spliteasy.accessToken')).toBeNull();
     });
   }
 });

@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AccountActionComponent } from './auth/account-action.component';
 import { App } from './app';
-import { storeTestSession } from './core/auth/auth-test-fixture';
+import { storeTestSession, testAuthResponse } from './core/auth/auth-test-fixture';
 import { SessionService } from './core/auth/session.service';
 
 function signIn(): void {
@@ -244,14 +244,17 @@ describe('App', () => {
       .expectOne('/api/dashboard')
       .flush({ groups: [], people: [], settlements: [], activity: [] });
     fixture.detectChanges();
-    storeTestSession({ id: 'u2', email: 'b@example.test', displayName: 'Blair' });
+    const replacement = { id: 'u2', email: 'b@example.test', displayName: 'Blair' };
+    const marker = JSON.stringify({ id: 'remote-login', signedOut: false });
+    localStorage.setItem('spliteasy.auth-change', marker);
     window.dispatchEvent(
       new StorageEvent('storage', {
-        key: 'spliteasy.user',
+        key: 'spliteasy.auth-change',
         storageArea: localStorage,
-        newValue: localStorage.getItem('spliteasy.user'),
+        newValue: marker,
       }),
     );
+    httpTesting.expectOne('/api/auth/refresh').flush(testAuthResponse(replacement));
     fixture.detectChanges();
     httpTesting.expectOne('/api/me').flush({ id: 'u2', displayName: 'Blair' });
     httpTesting

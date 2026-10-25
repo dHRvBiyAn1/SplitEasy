@@ -1,3 +1,4 @@
+import { DeviceSessionsComponent } from './device-sessions.component';
 import { AccountSecurityComponent } from './account-security.component';
 import { AppearancePanelComponent } from '../shared/appearance-panel.component';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
@@ -9,7 +10,12 @@ import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../cor
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, AppearancePanelComponent, AccountSecurityComponent],
+  imports: [
+    ReactiveFormsModule,
+    AppearancePanelComponent,
+    AccountSecurityComponent,
+    DeviceSessionsComponent,
+  ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
@@ -25,8 +31,9 @@ export class ProfileComponent {
   protected readonly error = this.profile.error;
   protected readonly loaded = this.profile.data;
   protected readonly legacyPrefs = this.profile.legacyPrefs;
+  private readonly owner = computed(() => `${this.session.currentVersion()}:${this.user()?.id}`);
   protected readonly importDismissed = linkedSignal({
-    source: () => `${this.session.currentVersion()}:${this.user()?.id}`,
+    source: this.owner,
     computation: () => false,
   });
   protected readonly name = new FormControl('', {
@@ -35,7 +42,7 @@ export class ProfileComponent {
   });
   protected readonly prefs = this.profile.prefs;
   protected readonly editing = linkedSignal({
-    source: () => `${this.session.currentVersion()}:${this.user()?.id}`,
+    source: this.owner,
     computation: () => false,
   });
 

@@ -302,7 +302,7 @@ export class AccountSecurityComponent {
         next: () => {
           if (!this.ownsSession()) return;
           this.passwordForm.reset();
-          this.auth.logout();
+          this.auth.clearSession();
           this.router.navigate(['/login'], { queryParams: { reason: 'password-changed' } });
         },
         error: (err) =>

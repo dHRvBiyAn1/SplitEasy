@@ -14,7 +14,6 @@ describe('authInterceptor', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    storeTestSession({ id: 'u1', email: 'alice@example.com', displayName: 'Alice' });
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
@@ -25,6 +24,7 @@ describe('authInterceptor', () => {
     http = TestBed.inject(HttpClient);
     httpTesting = TestBed.inject(HttpTestingController);
     auth = TestBed.inject(AuthService);
+    storeTestSession({ id: 'u1', email: 'alice@example.com', displayName: 'Alice' });
   });
 
   afterEach(() => httpTesting.verify());
@@ -67,13 +67,14 @@ describe('authInterceptor', () => {
   it('logs out and redirects to /login on 401', () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    const logout = vi.spyOn(auth, 'logout');
+    const logout = vi.spyOn(auth, 'clearSession');
 
     http.get('/api/groups').subscribe({ error: () => {} });
     httpTesting
       .expectOne('/api/groups')
       .flush({ message: 'nope' }, { status: 401, statusText: 'Unauthorized' });
 
+    httpTesting.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Revoked' });
     expect(logout).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith(['/login']);
   });

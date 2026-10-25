@@ -621,6 +621,60 @@ class AccountLifecycleIntegrationTest extends AbstractIntegrationTest {
     }
   }
 
+  @Test
+  void loginWaitingBehindConfirmedEmailChangeRejectsTheFormerEmail() throws Exception {
+    String oldEmail = "login-old-race@example.com";
+    String newEmail = "login-new-race@example.com";
+    var auth = register(oldEmail, "password123", "Login race");
+    mockMvc
+        .perform(
+            jsonPost(
+                    "/api/me/email-change-requests",
+                    Map.of("currentPassword", "password123", "email", newEmail))
+                .header("Authorization", bearer(auth.accessToken())))
+        .andExpect(status().isAccepted());
+    String token = mailbox.token(newEmail);
+    try (var workers = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+        var connection = dataSource.getConnection()) {
+      connection.setAutoCommit(false);
+      try (var lock = connection.prepareStatement("select id from users where id=? for update")) {
+        lock.setObject(1, auth.user().id());
+        lock.executeQuery().close();
+      }
+      var confirmation =
+          workers.submit(
+              () ->
+                  mockMvc
+                      .perform(
+                          jsonPost("/api/auth/email-change-confirmations", Map.of("token", token)))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      awaitWaitingWriters(1);
+      var oldLogin =
+          workers.submit(
+              () ->
+                  mockMvc
+                      .perform(
+                          jsonPost("/api/auth/login", new LoginRequest(oldEmail, "password123")))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      awaitWaitingWriters(2);
+      connection.commit();
+      assertEquals(204, confirmation.get(10, java.util.concurrent.TimeUnit.SECONDS));
+      assertEquals(401, oldLogin.get(10, java.util.concurrent.TimeUnit.SECONDS));
+    }
+    var fresh = login(newEmail, "password123");
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(fresh.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.email").value(newEmail));
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(auth.accessToken())))
+        .andExpect(status().isUnauthorized());
+  }
+
   private void awaitWaitingWriters(int count) throws Exception {
     long deadline = System.nanoTime() + java.time.Duration.ofSeconds(8).toNanos();
     while (System.nanoTime() < deadline) {

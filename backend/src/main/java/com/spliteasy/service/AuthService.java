@@ -1,9 +1,7 @@
 package com.spliteasy.service;
 
-import com.spliteasy.dto.auth.AuthResponse;
 import com.spliteasy.dto.auth.LoginRequest;
 import com.spliteasy.dto.auth.RegisterRequest;
-import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
@@ -24,10 +22,11 @@ public class AuthService {
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
-  private final JwtService jwtService;
+  private final AuthSessionService sessions;
+  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   @Transactional
-  public AuthResponse register(RegisterRequest request) {
+  public AuthSessionService.IssuedSession register(RegisterRequest request, String userAgent) {
     if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
       throw new BadRequestException("Password must be at most 72 UTF-8 bytes");
     }
@@ -38,13 +37,13 @@ public class AuthService {
     }
     User user =
         new User(email, passwordEncoder.encode(request.password()), request.displayName().trim());
-    userRepository.save(user);
+    userRepository.saveAndFlush(user);
     log.info("Registered new user {} ({})", user.getId(), email);
-    return toAuthResponse(user);
+    return sessions.create(user, userAgent);
   }
 
-  @Transactional(readOnly = true)
-  public AuthResponse login(LoginRequest request) {
+  @Transactional
+  public AuthSessionService.IssuedSession login(LoginRequest request, String userAgent) {
     if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
       throw new BadCredentialsException("Invalid email or password");
     }
@@ -52,17 +51,21 @@ public class AuthService {
     log.debug("Login attempt for {}", email);
     User user =
         userRepository
-            .findByEmail(email)
+            .findLockedById(
+                jdbc
+                    .query(
+                        "select id from users where email = ?",
+                        (rs, row) -> rs.getObject(1, java.util.UUID.class),
+                        email)
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new BadCredentialsException("Invalid email or password")))
             .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
-    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+    if (!user.getEmail().equals(email)
+        || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
       throw new BadCredentialsException("Invalid email or password");
     }
     log.info("User {} logged in", user.getId());
-    return toAuthResponse(user);
-  }
-
-  private AuthResponse toAuthResponse(User user) {
-    String token = jwtService.issueToken(user);
-    return AuthResponse.bearer(token, jwtService.getExpirationSeconds(), UserSummary.from(user));
+    return sessions.create(user, userAgent);
   }
 }

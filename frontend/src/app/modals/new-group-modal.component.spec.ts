@@ -20,11 +20,11 @@ describe('new group member results', () => {
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
-    storeTestSession({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' });
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     requests = TestBed.inject(HttpTestingController);
+    storeTestSession({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' });
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     refresh = vi.spyOn(TestBed.inject(DashboardService), 'refresh').mockImplementation(() => {});
     TestBed.inject(ModalService).openGroup();
