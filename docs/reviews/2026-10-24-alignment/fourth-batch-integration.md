@@ -33,7 +33,7 @@ Browser acceptance uses native HttpOnly cookies, Web Locks and cross-tab events.
 Raw logs and artifacts stay outside git at `/workspace/issue-context/alignment-implementation/batch4`:
 
 - `combined-backend-final.log`, `C01/settled-currency-final-tests.log`, `C01/settled-currency-format-check.log`, `C01/settled-currency-build.log`, `combined-contract.log`.
-- `combined-final/acceptance.json`: final 129 HTTP/169 browser API acceptance; `passed:true`, `cleanup:true`.
+- `combined-final/acceptance.json`: final 129 HTTP/211 browser API acceptance; `passed:true`, `cleanup:true`.
 - `combined-final/backend-verified.jar`: SHA256 `5b4c6e66c53e371a3c6df75ccf6786491e1d770420468bbe0cc120e202fa8d76`; `backend-manifest.json` pins every tracked backend file and successful command.
 - `combined-final/frontend-browser/` and `frontend-manifest.json`: source manifest SHA256 `e2d8fac255a72acfe806c553ea9b976a6e1b8fa68294fd221f7623d5a3e36a0a`, artifact manifest SHA256 `08c344c8d3f6114808b4886b95a4dfa5cfaf8debeb6edf210022d9343a04fe28`.
 - Pinned original V13 JAR SHA256 `25e824e9685ce3560180a49ad4c0fdfb63d4999bac8e66c205aa270fc6e050cf`; A03 migration artifact SHA256 `43a76e69321cc86980e33577a21f95c935f1a09af6784782dec4e31bc9250c4c`.
