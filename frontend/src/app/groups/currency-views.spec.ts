@@ -39,6 +39,7 @@ describe('denominated group views', () => {
     TestBed.inject(AuthService).login({ email: me.email, password: 'password123' }).subscribe();
     http.expectOne('/api/auth/login').flush({
       accessToken: 'currency-access-token',
+      sessionId: 'currency-session',
       tokenType: 'Bearer',
       expiresIn: 3600,
       user: me,
