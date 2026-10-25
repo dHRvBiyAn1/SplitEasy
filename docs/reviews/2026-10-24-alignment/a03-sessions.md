@@ -126,3 +126,31 @@ and notifications have the compatibility limits documented in the contract.
 
 Production Google Workspace SMTP setup, external mail delivery, FX/currency
 implementation, main promotion and deployment remain outside this worker.
+
+
+## Independent native-browser acceptance (2026-10-25)
+
+Root's owned packaged V13→V14 rehearsal passed71 HTTP requests and119 real
+browser API responses at1280px and390px. Native cookie bootstrap survived
+reload; tabs replaced the account through actual browser storage events; a real
+revoked-account401 held until after a different account signed in could not clear
+or leak the replacement account. A real successful expense201 response was dropped;
+reload sent no write, and explicit retry reused its operation identity and produced
+exactly one expense. All-device revocation remained account-scoped. Both viewports
+had zero page errors and no horizontal overflow. Screenshots were inspected; owned
+application/database/gateway resources were removed. Artifact:
+`/workspace/issue-context/alignment-implementation/batch4/A03/native-browser-final.json`.
+
+After the307-test review fix, the integrated browser rehearsal repeated those
+native session cases against the unchanged frozen A03 backend plus C01, with
+117 HTTP and171 real browser API responses; both widths passed and cleanup was
+confirmed (`batch4/combined-final/acceptance.json`). Currency review follow-ups
+are verified separately in the integration evidence. No backend repeat was needed
+for the frontend-only logout warning/resource-service fix.
+
+
+An independent follow-up reviewed1dc266e and exercised the actual transpiled
+AuthService public methods: both logout commands warn on401, replacement-account
+and generation guards suppress late warnings, and device list/revoke preserve
+endpoint and observable behavior. Original Standards/Spec findings have zero
+remaining issues (`batch4/reviews/a03-followup.md`).
