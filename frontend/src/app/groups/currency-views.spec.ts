@@ -6,6 +6,9 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
 import { GroupDetailComponent } from './group-detail.component';
+import { DashboardService } from '../dashboard/dashboard.service';
+import { ModalService } from '../modals/modal.service';
+import { SettleUpModalComponent } from '../modals/settle-up-modal.component';
 
 const me = { id: 'currency-me', email: 'currency-me@example.test', displayName: 'Alex' };
 const other = { id: 'currency-other', email: 'currency-other@example.test', displayName: 'Noor' };
@@ -80,6 +83,98 @@ describe('denominated group views', () => {
     expect(leave.disabled).toBe(true);
   });
 
+  it('retains KWD in the group headline after recording its last settlement', () => {
+    const fixture = TestBed.createComponent(GroupDetailComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/groups/' + group.id).flush(group);
+    http
+      .expectOne('/api/groups/' + group.id + '/balances/mine')
+      .flush([{ user: other, netMinor: 617, currency: 'KWD' }]);
+    http.match('/api/groups/' + group.id + '/balances').forEach((request) =>
+      request.flush({
+        groupId: group.id,
+        balances: [
+          { user: me, netMinor: 617, currency: 'KWD' },
+          { user: other, netMinor: -617, currency: 'KWD' },
+        ],
+      }),
+    );
+    http.expectOne('/api/groups/' + group.id + '/expenses').flush([]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.pill--overall').textContent).toContain('KWD');
+    TestBed.inject(ModalService).openSettle({
+      groupId: group.id,
+      groupName: group.name,
+      counterparty: other,
+      netMinor: 617,
+      currency: 'KWD',
+    });
+    const modal = TestBed.createComponent(SettleUpModalComponent);
+    modal.detectChanges();
+    modal.nativeElement.querySelector('.mform__actions .dc-btn-accent').click();
+    const payment = http.expectOne('/api/groups/' + group.id + '/payments');
+    expect(payment.request.body).toMatchObject({
+      payerUserId: other.id,
+      payeeUserId: me.id,
+      amountMinor: 617,
+      currency: 'KWD',
+    });
+    payment.flush({ id: 'kwd-settlement', ...payment.request.body });
+    http.expectOne('/api/dashboard').flush({
+      groups: [],
+      people: [],
+      settlements: [],
+      activity: [],
+      totals: [{ currency: 'KWD', totalNetMinor: 0, owedMinor: 0, oweMinor: 0 }],
+    });
+    http.expectOne('/api/groups/' + group.id).flush(group);
+    http.expectOne('/api/groups/' + group.id + '/balances/mine').flush([]);
+    http.match('/api/groups/' + group.id + '/balances').forEach((request) =>
+      request.flush({
+        groupId: group.id,
+        balances: [
+          { user: me, netMinor: 0, currency: 'KWD' },
+          { user: other, netMinor: 0, currency: 'KWD' },
+        ],
+      }),
+    );
+    http.expectOne('/api/groups/' + group.id + '/expenses').flush([]);
+    fixture.detectChanges();
+    const headline = fixture.nativeElement.querySelector('.gd__pills').textContent;
+    expect(headline).toMatch(/KWD\s+All square/);
+    expect(headline).not.toContain('USD');
+  });
+
+  it('labels settled payment-only KWD separately from open JPY when the dashboard fails', () => {
+    TestBed.inject(DashboardService).ensureLoaded();
+    http.expectOne('/api/dashboard').flush({}, { status: 503, statusText: 'Unavailable' });
+    const fixture = TestBed.createComponent(GroupDetailComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/groups/' + group.id).flush(group);
+    http
+      .expectOne('/api/groups/' + group.id + '/balances/mine')
+      .flush([{ user: other, netMinor: -500, currency: 'JPY' }]);
+    http.expectOne('/api/groups/' + group.id + '/balances').flush({
+      groupId: group.id,
+      balances: [
+        { user: me, netMinor: 0, currency: 'KWD' },
+        { user: other, netMinor: 0, currency: 'KWD' },
+        { user: me, netMinor: -500, currency: 'JPY' },
+        { user: other, netMinor: 500, currency: 'JPY' },
+      ],
+    });
+    http.expectOne('/api/groups/' + group.id + '/expenses').flush([]);
+    fixture.detectChanges();
+    const headlines = [...fixture.nativeElement.querySelectorAll('.pill--overall')].map(
+      (pill: HTMLElement) => pill.textContent,
+    );
+    expect(headlines).toHaveLength(2);
+    expect(headlines[0]).toMatch(/JPY\s+You owe\s+JPY\s*500/);
+    expect(headlines[1]).toMatch(/KWD\s+All square/);
+    expect(headlines.join(' ')).not.toContain('USD');
+    expect(headlines.join(' ')).not.toContain('open balances');
+  });
+
   it('keeps group net positions separate and renders KWD history and shares at three decimals', () => {
     const fixture = TestBed.createComponent(GroupDetailComponent);
     fixture.detectChanges();
@@ -88,6 +183,10 @@ describe('denominated group views', () => {
       { user: other, netMinor: 1000, currency: 'USD' },
       { user: other, netMinor: -1000, currency: 'JPY' },
     ]);
+    http.expectOne('/api/groups/' + group.id + '/balances').flush({
+      groupId: group.id,
+      balances: [{ user: me, netMinor: 0, currency: 'KWD' }],
+    });
     http.expectOne('/api/groups/' + group.id + '/expenses').flush([
       {
         id: 'kwd-history',

@@ -69,6 +69,7 @@ export class GroupDetailComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
   protected readonly myBalances = signal<PersonBalance[]>([]);
+  private readonly ledgerCurrencies = signal<Currency[]>([]);
   protected readonly expenses = signal<ExpenseSummary[]>([]);
 
   /** The expense whose detail row is expanded, plus its fetched full breakdown. */
@@ -86,7 +87,9 @@ export class GroupDetailComponent implements OnInit {
 
   /** My net in this group = sum of the pairwise nets (positive = I'm owed overall). */
   protected readonly myTotals = computed(() => {
-    const amounts = new Map<Currency, number>();
+    const amounts = new Map<Currency, number>(
+      this.ledgerCurrencies().map((currency) => [currency, 0]),
+    );
     for (const balance of this.myBalances()) {
       const currency = balance.currency ?? 'USD';
       amounts.set(currency, (amounts.get(currency) ?? 0) + balance.netMinor);
@@ -94,7 +97,13 @@ export class GroupDetailComponent implements OnInit {
     if (!amounts.size) amounts.set('USD', 0);
     return [...amounts]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([currency, netMinor]) => ({ currency, netMinor }));
+      .map(([currency, netMinor]) => ({
+        currency,
+        netMinor,
+        hasOpenBalances: this.myBalances().some(
+          (balance) => (balance.currency ?? 'USD') === currency && balance.netMinor !== 0,
+        ),
+      }));
   });
 
   /** Expenses grouped by "MONTH YEAR", newest month first (list already sorted desc). */
@@ -116,6 +125,7 @@ export class GroupDetailComponent implements OnInit {
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
       this.group.set(null);
       this.myBalances.set([]);
+      this.ledgerCurrencies.set([]);
       this.expenses.set([]);
       this.detailCache.clear();
       this.expandedId.set(null);
@@ -144,6 +154,7 @@ export class GroupDetailComponent implements OnInit {
       this.scopeChanges.next();
       this.group.set(null);
       this.myBalances.set([]);
+      this.ledgerCurrencies.set([]);
       this.expenses.set([]);
       this.detailError.set(null);
       this.deleteError.set(null);
@@ -173,12 +184,14 @@ export class GroupDetailComponent implements OnInit {
       forkJoin({
         group: this.groups.getGroup(this.groupId),
         balances: this.balances.getMyBalances(this.groupId),
+        ledger: this.balances.getBalances(this.groupId),
         expenses: this.expensesApi.listExpenses(this.groupId),
       }),
     ).subscribe({
       next: (res) => {
         this.group.set(res.group);
         this.myBalances.set(res.balances);
+        this.ledgerCurrencies.set(res.ledger.balances.map((balance) => balance.currency ?? 'USD'));
         this.expenses.set(res.expenses);
         this.loading.set(false);
         this.detailCache.clear();
@@ -197,6 +210,7 @@ export class GroupDetailComponent implements OnInit {
           this.detailRequest?.unsubscribe();
           this.group.set(null);
           this.myBalances.set([]);
+          this.ledgerCurrencies.set([]);
           this.expenses.set([]);
           this.detailCache.clear();
           this.expandedId.set(null);

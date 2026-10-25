@@ -95,7 +95,7 @@
               ? 'You are owed'
               : total.netMinor < 0
                 ? 'You owe'
-                : myBalances().length
+                : total.hasOpenBalances
                   ? 'Even overall · open balances'
                   : 'All square'
           }}

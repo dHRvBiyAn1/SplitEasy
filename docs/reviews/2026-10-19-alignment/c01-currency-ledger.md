@@ -34,3 +34,11 @@ or overflow; screenshots inspected and all owned resources removed. See the
 for frozen artifact hashes, commands and migration/rollback limits. The C01 PR
 carries the tested integration with companion A03 PR #104 and H01's prepared design;
 merge A03 first. Publication does not authorize merge/deployment.
+
+## PR105 settled-currency headline correction (25 October 2026)
+
+The rendered group detail previously inferred denominations from outstanding pairwise obligations: recording the final KWD settlement changed its headline to “USD All square.” Group detail now also reads the existing complete group-balances endpoint, which retains zero rows for persisted expense/payment currencies, and seeds its headline currencies from those rows. Net amounts and open-balance labels still use the viewer's pairwise obligations, independently for each currency. The additional read shares the existing route/session cancellation and retry scope; group correctness remains independent of dashboard availability.
+
+Two sequential rendered HTTP regressions ran red→green: an actual Record payment617 KWD action retains “KWD All square” after its final obligation disappears; a payment-only zero KWD position alongside open JPY retains both headlines, labels KWD as settled, and still works after a dashboard503. Existing route, session, failed-refresh, pending-read and versioned-delete fixtures cover the complete-ledger read; its own pending/failure scenario was added. Node22 post-format full suite passed322 tests in42 files, full-source Prettier passed, and the production build passed with the existing nonblocking528.21kB/500kB initial warning. Backend and OpenAPI source are unchanged from combined basec1422b1; backend309 was not repeated.
+
+Raw logs: `settled-kwd-{red,green}.log`, `settled-mixed-{red,green}.log`, `settled-currency-final-tests.log`, `settled-currency-format-check.log`, and `settled-currency-build.log` under the C01 evidence directory. Frozen frontend: `frontend-settled-currency`; exact source/artifact hashes: `settled-currency-frontend-manifest.json` and `CANDIDATE.json`. Root owns expanded native-browser acceptance, review resolution and updated PR-head CI; the worker makes no remote writes.

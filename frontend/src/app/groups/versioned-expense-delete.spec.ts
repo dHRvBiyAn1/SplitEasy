@@ -47,6 +47,7 @@ describe('versioned expense deletion through the group route', () => {
     });
     http.expectOne('/api/groups/g/expenses').flush([summary]);
     http.expectOne('/api/groups/g/balances/mine').flush([]);
+    http.expectOne('/api/groups/g/balances').flush({ balances: [] });
     harness.detectChanges();
     (harness.routeNativeElement!.querySelector('.xrow') as HTMLButtonElement).click();
     http.expectOne('/api/groups/g/expenses/e').flush({

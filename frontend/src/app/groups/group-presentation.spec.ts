@@ -69,6 +69,7 @@ describe('group presentation ownership', () => {
       http.expectOne('/api/groups/b').flush(group('b'));
       if (component === GroupDetailComponent) {
         http.expectOne('/api/groups/b/balances/mine').flush([]);
+        http.expectOne('/api/groups/b/balances').flush({ balances: [] });
         http.expectOne('/api/groups/b/expenses').flush([]);
       } else {
         http.expectOne('/api/groups/b/balances').flush({ balances: [] });
@@ -89,6 +90,7 @@ describe('group presentation ownership', () => {
       { user: { ...user, id: 'luca' }, netMinor: -5000 },
     ];
     http.match('/api/groups/a/balances/mine').forEach((r) => r.flush(balances));
+    http.match('/api/groups/a/balances').forEach((r) => r.flush({ balances: [] }));
     http.match('/api/groups/a/expenses').forEach((r) => r.flush([summary]));
     fixture.detectChanges();
     fixture.nativeElement.querySelector('.xrow').click();
@@ -102,6 +104,7 @@ describe('group presentation ownership', () => {
     fixture.detectChanges();
     http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
     http.match('/api/groups/a/balances/mine').forEach((r) => r.flush(balances));
+    http.match('/api/groups/a/balances').forEach((r) => r.flush({ balances: [] }));
     http.match('/api/groups/a/expenses').forEach((r) => r.flush([summary]));
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.xdetail')).toBeNull();
@@ -110,18 +113,19 @@ describe('group presentation ownership', () => {
     );
   });
 
-  it.each(['/api/groups/a/balances/mine', '/api/groups/a/expenses'])(
+  it.each(['/api/groups/a/balances/mine', '/api/groups/a/expenses', '/api/groups/a/balances'])(
     'withholds settled and empty claims while %s is pending and retries failures',
     (pendingUrl) => {
       const fixture = TestBed.createComponent(GroupDetailComponent);
       fixture.detectChanges();
       http.expectOne('/api/groups/a').flush(group('a'));
       const pendingRead = http.expectOne(pendingUrl);
-      if (pendingUrl === '/api/groups/a/balances/mine') {
-        http.expectOne('/api/groups/a/expenses').flush([]);
-      } else {
+      if (pendingUrl !== '/api/groups/a/balances/mine')
         http.expectOne('/api/groups/a/balances/mine').flush([]);
-      }
+      if (pendingUrl !== '/api/groups/a/expenses')
+        http.expectOne('/api/groups/a/expenses').flush([]);
+      if (pendingUrl !== '/api/groups/a/balances')
+        http.expectOne('/api/groups/a/balances').flush({ balances: [] });
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).not.toContain('All square');
       expect(fixture.nativeElement.textContent).not.toContain('No expenses yet');
@@ -135,6 +139,7 @@ describe('group presentation ownership', () => {
       fixture.nativeElement.querySelector('button').click();
       http.expectOne('/api/groups/a').flush(group('a'));
       http.expectOne('/api/groups/a/balances/mine').flush([]);
+      http.expectOne('/api/groups/a/balances').flush({ balances: [] });
       http.expectOne('/api/groups/a/expenses').flush([]);
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toContain('All square');
@@ -147,6 +152,7 @@ describe('group presentation ownership', () => {
     fixture.detectChanges();
     http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
     http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
+    http.match('/api/groups/a/balances').forEach((r) => r.flush({ balances: [] }));
     http.match('/api/groups/a/expenses').forEach((r) => r.flush([summary]));
     fixture.detectChanges();
 
@@ -157,6 +163,7 @@ describe('group presentation ownership', () => {
     fixture.detectChanges();
     http.match('/api/groups/a').forEach((r) => r.flush(group('a')));
     http.match('/api/groups/a/balances/mine').forEach((r) => r.flush([]));
+    http.match('/api/groups/a/balances').forEach((r) => r.flush({ balances: [] }));
     const updated = {
       ...summary,
       amountMinor: 1203,

@@ -55,6 +55,7 @@ describe('overview read retry controls', () => {
   function flushGroup(amountMinor = 2000) {
     http.expectOne('/api/groups/a').flush({ id: 'a', name: 'Home', type: 'HOME', members: [user] });
     http.expectOne('/api/groups/a/balances/mine').flush([]);
+    http.expectOne('/api/groups/a/balances').flush({ balances: [] });
     http.expectOne('/api/groups/a/expenses').flush([{ ...expense, amountMinor }]);
   }
   it.each(['shell', 'dashboard'])(
