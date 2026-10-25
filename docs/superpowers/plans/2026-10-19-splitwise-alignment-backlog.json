@@ -128,14 +128,15 @@
         "A02",
         "E02"
       ],
-      "status": "reviewed_pr_ready",
+      "status": "open_pr",
       "conditional": false,
       "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
       "branch": "bugfix/alignment-a03-revocable-sessions",
       "execution_plan": "2026-10-24-alignment-a03.md",
       "integration_state": "not_merged",
       "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report.",
-      "pull_request": 104
+      "pull_request": 104,
+      "pull_request_url": "https://github.com/dHRvBiyAn1/SplitEasy/pull/104"
     },
     {
       "id": "A04",
@@ -181,7 +182,7 @@
         "E01",
         "E02"
       ],
-      "status": "reviewed_pr_ready",
+      "status": "open_pr",
       "conditional": false,
       "legacy_currency_decision": {
         "currency": "USD",
@@ -192,7 +193,9 @@
       "branch": "bugfix/alignment-c01-currency-ledger",
       "execution_plan": "2026-10-24-alignment-c01.md",
       "integration_state": "not_merged",
-      "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report."
+      "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report.",
+      "pull_request": 105,
+      "pull_request_url": "https://github.com/dHRvBiyAn1/SplitEasy/pull/105"
     },
     {
       "id": "C02",
@@ -1927,6 +1930,10 @@
     "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
     "migration_order": "A03 V14 before C01 V15, or same release; drain old writers",
     "evidence": "docs/reviews/2026-10-24-alignment/fourth-batch-integration.md",
-    "merge_authorized": false
+    "merge_authorized": false,
+    "pull_requests": [
+      104,
+      105
+    ]
   }
 }

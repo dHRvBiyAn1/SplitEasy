@@ -24,9 +24,9 @@ Java21 `backend/mvnw -f backend/pom.xml -s /workspace/maven-proxy-settings.xml -
 ## Final combined acceptance
 
 The corrected C01 candidate and A03 `d00ced2` passed combined backend309,
-frontend319/42 files, full-source Prettier, production build and official
-OpenAPI3.1/224-ref validation. Populated V13→V14→V15 acceptance passed127 HTTP
-responses and169 actual browser API responses at1280/390, including both final
+frontend322/42 files, full-source Prettier, production build and official
+OpenAPI3.1/224-ref validation. Populated V13→V14→V15 acceptance passed129 HTTP
+responses and211 actual browser API responses at1280/390, including both final
 currency regressions, native cookie renewal/account isolation, dropped successful
 response/reload/explicit same-operation retry, and KWD/JPY forms. Zero page errors
 or overflow; screenshots inspected and all owned resources removed. See the

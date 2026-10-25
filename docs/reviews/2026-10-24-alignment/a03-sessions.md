@@ -177,4 +177,4 @@ rerun; earlier browser acceptance above predates this fix. Publisher owns the
 updated combined browser/CI acceptance and review reply.
 
 
-Final corrected A03/C01 native acceptance and source equivalence are recorded in [fourth-batch integration evidence](fourth-batch-integration.md): backend309/frontend319,127 HTTP and169 real browser API responses, all green with owned cleanup confirmed.
+Final corrected A03/C01 native acceptance and source equivalence are recorded in [fourth-batch integration evidence](fourth-batch-integration.md): backend309/frontend322,129 HTTP and211 real browser API responses, all green with owned cleanup confirmed.
