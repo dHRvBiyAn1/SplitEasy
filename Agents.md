@@ -9,6 +9,8 @@ Use **Matt Pocock's skills instead of Superpowers**, as selected by the user. Be
 
 Issues use [GitHub](docs/agents/issue-tracker.md); domain documentation uses [a single context](docs/agents/domain.md). Keep at most three active worker threads, no Astra and Sol reasoning at most high. Work branches start from `dev` and PRs target `dev`.
 
+When changing participant identity, invitations, financial ownership or their wire contracts, read the [G01 subsystem design](docs/superpowers/plans/2026-10-26-alignment-g01.md) and [identity ADR](docs/adr/0001-immutable-financial-participants.md) before coding. The design is recorded; implementation is not yet shipped.
+
 ## Overview
 
 Expense-splitting web app: users create groups, add expenses split among members
