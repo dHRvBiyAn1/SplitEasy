@@ -280,12 +280,12 @@
         "C01",
         "H01"
       ],
-      "status": "implemented_core_candidate",
+      "status": "reviewed_core_candidate",
       "conditional": false,
       "subsystem_plan": "docs/superpowers/plans/2026-10-26-alignment-g01.md",
       "base_dev": "3fae8e5491717245753573e117b35ff466fbaeab",
       "branch": "bugfix/alignment-g01-participant-invitations",
-      "integration_state": "verified_awaiting_independent_reviews",
+      "integration_state": "ready_for_pr_to_dev",
       "evidence": "docs/reviews/2026-10-26-alignment/g01-participant-invitations.md",
       "conditional_followups": [
         "Phone/SMS requires a selected verified channel; none is selected. Production SMTP activation remains deferred."
@@ -1899,7 +1899,7 @@
   ],
   "implementation_base_dev": "3fae8e5491717245753573e117b35ff466fbaeab",
   "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
-  "current_batch_status": "verified_core_candidate_awaiting_reviews",
+  "current_batch_status": "reviewed_verified_core_ready_for_pr",
   "second_batch_delivery": {
     "state": "merged_dev",
     "packages": [
@@ -1981,7 +1981,7 @@
     "final_dev_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/40298485115"
   },
   "sixth_batch_delivery": {
-    "state": "verified_core_candidate_awaiting_reviews",
+    "state": "reviewed_verified_core_ready_for_pr",
     "packages": [
       "G01"
     ],
@@ -2002,6 +2002,8 @@
       1280,
       390
     ],
-    "native_acceptance": "passed; zero page errors/page-width overflow; cleanup true"
+    "native_acceptance": "passed; zero page errors/page-width overflow; cleanup true",
+    "independent_reviews": "Standards FK indexes fixed; Standards follow-up zero; Spec initial/follow-up zero",
+    "backend_sha256": "4f23570214da52b95f486e1b3e7f67e5b150f38a092cac4f71baf701ac7b1cae"
   }
 }

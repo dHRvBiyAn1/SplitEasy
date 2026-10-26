@@ -3,6 +3,7 @@ CREATE TABLE participants (
  id UUID PRIMARY KEY, display_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL,
  scope_group_id UUID REFERENCES groups(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_participants_scope_group_id ON participants(scope_group_id);
 CREATE TABLE participant_account_links (
  participant_id UUID PRIMARY KEY REFERENCES participants(id) ON DELETE CASCADE,
  user_id UUID NOT NULL REFERENCES users(id), linked_at TIMESTAMPTZ NOT NULL,
@@ -17,6 +18,7 @@ CREATE TABLE group_participants (
  active BOOLEAN NOT NULL, added_at TIMESTAMPTZ NOT NULL,
  PRIMARY KEY(group_id,participant_id)
 );
+CREATE INDEX idx_group_participants_participant_id ON group_participants(participant_id);
 INSERT INTO participants(id,display_name,created_at) SELECT id,display_name,created_at FROM users;
 INSERT INTO participant_account_links(participant_id,user_id,linked_at,link_kind)
  SELECT id,id,created_at,'PRIMARY' FROM users;
@@ -46,5 +48,8 @@ CREATE TABLE group_invitations (
  CHECK((kind='EMAIL' AND target_email IS NOT NULL) OR (kind='LINK' AND target_email IS NULL AND participant_id IS NULL))
 );
 CREATE INDEX idx_group_invitations_group ON group_invitations(group_id,created_at DESC);
+CREATE INDEX idx_group_invitations_participant_id ON group_invitations(participant_id);
+CREATE INDEX idx_group_invitations_created_by ON group_invitations(created_by);
+CREATE INDEX idx_group_invitations_accepted_by ON group_invitations(accepted_by);
 ALTER TABLE participant_account_links ADD CONSTRAINT fk_participant_claim_invitation
  FOREIGN KEY(invitation_id) REFERENCES group_invitations(id) ON DELETE SET NULL;
