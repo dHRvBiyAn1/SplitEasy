@@ -12,6 +12,11 @@ export const routes: Routes = [
     loadComponent: () => import('./auth/register.component').then((m) => m.RegisterComponent),
   },
   {
+    path: 'invitation',
+    loadComponent: () =>
+      import('./invitations/invitation.component').then((m) => m.InvitationComponent),
+  },
+  {
     path: 'account-action',
     loadComponent: () =>
       import('./auth/account-action.component').then((m) => m.AccountActionComponent),

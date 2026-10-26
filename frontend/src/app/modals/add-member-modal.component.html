@@ -18,7 +18,10 @@
           Add
         </button>
       </div>
-      <p class="mform__hint">They need an existing SplitEasy account.</p>
+      <p class="mform__hint">
+        They need an existing SplitEasy account. This grants account access immediately and never
+        claims a guest’s entries.
+      </p>
     </div>
 
     @if (error()) {
@@ -46,6 +49,220 @@
         }
       </div>
     </div>
+
+    <section class="mform__field" aria-label="Guests">
+      <h2 class="dc-field-label">Guests without an account</h2>
+      <p class="mform__hint">
+        Add someone by name to include them in expenses. This does not send an invitation or grant
+        access.
+      </p>
+      <label class="dc-field-label" for="guest-name">Guest name</label>
+      <input
+        id="guest-name"
+        class="dc-field"
+        [formControl]="guestName"
+        maxlength="100"
+        [disabled]="saving()"
+      />
+      <button
+        type="button"
+        class="dc-btn-outline"
+        (click)="createGuest()"
+        [disabled]="saving() || membersLoading() || !guestName.value.trim() || guestUncertain()"
+      >
+        Create guest
+      </button>
+      @if (guestNotice()) {
+        <p role="status">{{ guestNotice() }}</p>
+      }
+      @if (guestUncertain()) {
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="createGuest(true)"
+          [disabled]="saving()"
+        >
+          Retry guest creation
+        </button>
+      }
+      <ul>
+        @for (p of participants(); track p.id) {
+          @if (p.accountId === null) {
+            <li>
+              {{ p.displayName }} · guest, no account access
+              <button
+                type="button"
+                class="dc-btn-ghost"
+                (click)="removeGuest(p)"
+                [disabled]="saving()"
+              >
+                Remove guest {{ p.displayName }}
+              </button>
+            </li>
+          }
+        }
+      </ul>
+    </section>
+
+    @if (inactiveGuests().length) {
+      <section class="mform__field" aria-label="Removed guests">
+        <h2 class="dc-field-label">Removed guests</h2>
+        <p class="mform__hint">
+          Re-add the original identity to repair or restore historical entries. Earlier invitations
+          remain revoked.
+        </p>
+        @for (p of inactiveGuests(); track p.id) {
+          <button
+            type="button"
+            class="dc-btn-outline"
+            (click)="reactivateGuest(p)"
+            [disabled]="saving()"
+          >
+            Re-add guest {{ p.displayName }}
+          </button>
+        }
+      </section>
+    }
+
+    <section class="mform__field" aria-label="Invitations">
+      <h2 class="dc-field-label">Invitations</h2>
+      <button
+        type="button"
+        class="dc-btn-outline"
+        (click)="readInvitations()"
+        [disabled]="saving() || invitationsLoading()"
+      >
+        {{ invitationsOpen() ? 'Read invitation status' : 'Manage invitations' }}
+      </button>
+      @if (invitationsOpen()) {
+        @if (invitationsLoading()) {
+          <p role="status">Loading invitation status…</p>
+        }
+        @if (invitationReadError()) {
+          <p class="mform__error" role="alert">{{ invitationReadError() }}</p>
+        }
+        <label class="dc-field-label" for="invite-email">Invitation email</label>
+        <input
+          id="invite-email"
+          class="dc-field"
+          type="email"
+          maxlength="254"
+          [formControl]="inviteEmail"
+          autocomplete="off"
+        />
+        <label class="dc-field-label" for="invite-participant"
+          >Guest to claim after verified acceptance</label
+        >
+        <select
+          id="invite-participant"
+          class="dc-field"
+          [value]="inviteParticipant()"
+          (change)="inviteParticipant.set($any($event.target).value)"
+        >
+          <option value="">Join only · no guest claim</option>
+          @for (p of participants(); track p.id) {
+            @if (p.accountId === null) {
+              <option [value]="p.id">{{ p.displayName }}</option>
+            }
+          }
+        </select>
+        <p class="mform__hint">
+          A guest claim requires the recipient's verified matching email and their explicit
+          ownership confirmation. Guests and group links work independently of email delivery.
+        </p>
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="sendInvitation()"
+          [disabled]="
+            saving() || invitationsLoading() || !inviteEmail.value.trim() || emailUncertain()
+          "
+        >
+          Send email invitation
+        </button>
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="sendInvitation(false, true)"
+          [disabled]="
+            saving() || invitationsLoading() || !inviteEmail.value.trim() || emailUncertain()
+          "
+        >
+          Resend and invalidate earlier email link
+        </button>
+        @if (emailUncertain()) {
+          <button
+            type="button"
+            class="dc-btn-outline"
+            (click)="sendInvitation(true)"
+            [disabled]="saving()"
+          >
+            Retry original email invitation
+          </button>
+          <button
+            type="button"
+            class="dc-btn-outline"
+            (click)="reviewSeparateEmail()"
+            [disabled]="saving() || !linkStatusReviewed()"
+          >
+            Review a separate email invitation
+          </button>
+        }
+        @if (invitationNotice()) {
+          <p role="status">{{ invitationNotice() }}</p>
+        }
+        <h3 class="dc-field-label">Single-use group join link</h3>
+        <p class="mform__hint">
+          Anyone holding the link can join once before expiry. Forwarding transfers that
+          opportunity. This never claims a guest's financial entries.
+        </p>
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="generateLink()"
+          [disabled]="saving() || invitationsLoading() || linkUncertain()"
+        >
+          Generate join link
+        </button>
+        @if (linkUncertain()) {
+          <p role="status">
+            Read status and revoke unknown pending links before creating a replacement.
+          </p>
+          <button
+            type="button"
+            class="dc-btn-outline"
+            (click)="replaceLostLink()"
+            [disabled]="saving() || !canReplaceLink()"
+          >
+            Create replacement link
+          </button>
+        }
+        @if (joinLink()) {
+          <label class="dc-field-label" for="join-link">Copy this link before closing</label>
+          <input id="join-link" class="dc-field" type="text" readonly [value]="joinLink()" />
+          <button type="button" class="dc-btn-outline" (click)="copyLink()">Copy join link</button>
+        }
+        <ul>
+          @for (i of invitationRows(); track i.id) {
+            <li>
+              {{ invitationKind(i.kind) }} · {{ i.participantName || 'Join only' }} ·
+              {{ invitationStatus(i.status) }} · expires
+              <time [attr.datetime]="i.expiresAt">{{ localDate(i.expiresAt) }}</time> (local time)
+              @if (i.status === 'PENDING') {
+                <button
+                  type="button"
+                  class="dc-btn-ghost"
+                  (click)="revokeInvitation(i)"
+                  [disabled]="saving()"
+                >
+                  Revoke invitation
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
 
     <div class="mform__actions">
       <button type="button" class="dc-btn-outline" (click)="close()">Done</button>

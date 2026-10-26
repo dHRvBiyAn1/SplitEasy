@@ -1,8 +1,8 @@
 import { Currency } from '../shared/currency';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
 
 export interface MemberBalance {
-  user: UserSummary;
+  user: ParticipantSummary;
   /** Net position in integer minor units. Positive = owed money; negative = owes money. */
   netMinor: number;
   currency?: Currency;
@@ -15,8 +15,8 @@ export interface GroupBalancesResponse {
 
 /** Directed debt: from owes to. The endpoint defines raw or selected-mode interpretation. */
 export interface DirectObligation {
-  from: UserSummary;
-  to: UserSummary;
+  from: ParticipantSummary;
+  to: ParticipantSummary;
   amountMinor: number;
   currency?: Currency;
 }

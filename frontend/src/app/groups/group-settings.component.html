@@ -192,7 +192,7 @@
             {{ debt.netMinor > 0 ? 'Is owed' : 'Owes' }}
             {{ display(debt.netMinor < 0 ? -debt.netMinor : debt.netMinor, debt.currency) }}
             {{ debt.netMinor > 0 ? 'by' : 'to' }} {{ debt.user.displayName }} ({{
-              debt.user.email
+              debt.user.email || 'guest'
             }})
           </p>
         }
@@ -244,7 +244,7 @@
               You created this group — delete it instead of leaving.
             } @else if (!financialsReady()) {
               Balances and obligations are unavailable. Reload settings before leaving.
-            } @else if (obligationsOf(meId()).length) {
+            } @else if (obligationsOf(viewerAccountId()).length) {
               Settle the obligations listed above in the current mode before leaving.
             } @else if (hasMyBalance()) {
               Settle every currency balance listed above before leaving this group.

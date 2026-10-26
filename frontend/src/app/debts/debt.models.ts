@@ -1,10 +1,10 @@
 import { Currency } from '../shared/currency';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
 
 /** A suggested transfer: `from` (a debtor) pays `to` (a creditor) `amountMinor`. */
 export interface SuggestedTransaction {
-  from: UserSummary;
-  to: UserSummary;
+  from: ParticipantSummary;
+  to: ParticipantSummary;
   amountMinor: number;
   currency?: Currency;
 }

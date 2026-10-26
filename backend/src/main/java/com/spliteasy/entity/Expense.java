@@ -54,7 +54,7 @@ public class Expense {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "paid_by", nullable = false)
-  private User paidBy;
+  private Participant paidBy;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "split_type", nullable = false)
@@ -81,7 +81,7 @@ public class Expense {
       Group group,
       String description,
       long amountCents,
-      User paidBy,
+      Participant paidBy,
       SplitType splitType,
       ExpenseCategory category,
       LocalDate spentOn) {
@@ -97,13 +97,13 @@ public class Expense {
 
   /** Back-compat convenience: no category/date → {@link ExpenseCategory#OTHER} spent today. */
   public Expense(
-      Group group, String description, long amountCents, User paidBy, SplitType splitType) {
+      Group group, String description, long amountCents, Participant paidBy, SplitType splitType) {
     this(
         group, description, amountCents, paidBy, splitType, ExpenseCategory.OTHER, LocalDate.now());
   }
 
   /** Adds a participant share and keeps both sides of the relationship consistent. */
-  public ExpenseParticipant addParticipant(User user, long shareCents) {
+  public ExpenseParticipant addParticipant(Participant user, long shareCents) {
     ExpenseParticipant participant = new ExpenseParticipant(this, user, shareCents);
     participants.add(participant);
     return participant;

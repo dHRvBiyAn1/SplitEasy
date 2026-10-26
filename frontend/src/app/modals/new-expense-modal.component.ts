@@ -15,12 +15,14 @@ import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { avatarTint } from '../core/avatar';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
+import { financialRoster, viewerIdentity, ownedIdentities } from '../groups/group.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
 import { percentToBasisPoints, TOTAL_BASIS_POINTS } from '../expenses/expense.service';
 import {
   PendingWrite,
+  PendingWriteError,
   PendingWritesService,
   UNCERTAIN_WRITE,
 } from '../core/pending-writes.service';
@@ -72,6 +74,8 @@ export class NewExpenseModalComponent {
     this.tick.update((n) => n + 1);
   }
   private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly unmappedOriginalIds = signal<string[]>([]);
+  protected readonly draftBlocked = signal(false);
   protected readonly retryNotice = signal<string | null>(null);
   private restored: PendingWrite<CreateExpenseRequest> | null = null;
   private readonly expenses = inject(ExpenseService);
@@ -87,7 +91,9 @@ export class NewExpenseModalComponent {
 
   protected readonly groupOptions = () => this.dashboard.data()?.groups ?? [];
   protected readonly groupId = signal<string | null>(null);
-  protected readonly members = signal<UserSummary[]>([]);
+  private viewerId = '';
+  private ownedIds: string[] = [];
+  protected readonly members = signal<ParticipantSummary[]>([]);
 
   protected readonly description = new FormControl('', {
     nonNullable: true,
@@ -155,9 +161,12 @@ export class NewExpenseModalComponent {
     if (!this.editId) {
       try {
         this.restored = this.pendingWrites.read<CreateExpenseRequest>('expense');
-      } catch {
-        this.error.set(
-          'Cannot read the saved retry draft. Check history before starting a separate entry.',
+      } catch (err) {
+        this.draftBlocked.set(true);
+        this.retryNotice.set(
+          err instanceof PendingWriteError
+            ? err.message
+            : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
         );
       }
     }
@@ -200,6 +209,7 @@ export class NewExpenseModalComponent {
     this.ready.set(false);
     this.error.set(null);
     this.members.set([]);
+    this.unmappedOriginalIds.set([]);
     this.paidBy.set('');
     this.included.set(new Set());
     this.values.set({});
@@ -212,12 +222,14 @@ export class NewExpenseModalComponent {
       .subscribe({
         next: (g) => {
           if (version !== this.groupRequestVersion) return;
-          this.members.set(g.members);
+          this.members.set(financialRoster(g));
+          this.viewerId = viewerIdentity(g, this.auth.user()?.id ?? '');
+          this.ownedIds = ownedIdentities(g, this.auth.user()?.id ?? '');
           if (this.editId) {
             this.prefillFromExpense(id, this.editId, version);
           } else {
-            this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
-            this.included.set(new Set(g.members.map((m) => m.id)));
+            this.paidBy.set(this.viewerId || this.members()[0]?.id || '');
+            this.included.set(new Set(this.members().map((m) => m.id)));
             if (this.restored?.scope === id) {
               this.restoreDraft(this.restored.request);
               this.retryNotice.set(UNCERTAIN_WRITE);
@@ -246,6 +258,18 @@ export class NewExpenseModalComponent {
             this.error.set('Reload or upgrade the app to edit this expense safely.');
             return;
           }
+          // Keep original alias rows and payer IDs; canonical defaults must not erase history.
+          this.members.update((roster) => {
+            const originals = [e.paidBy, ...e.participants.map((p) => p.user)];
+            return [
+              ...roster,
+              ...originals.filter(
+                (p, i) =>
+                  !roster.some((m) => m.id === p.id) &&
+                  originals.findIndex((m) => m.id === p.id) === i,
+              ),
+            ];
+          });
           this.expectedVersion = e.version;
           this.currency.set(e.currency ?? 'USD');
           if (!this.description.dirty) this.description.setValue(e.description);
@@ -286,15 +310,24 @@ export class NewExpenseModalComponent {
   }
 
   meId(): string {
-    return this.auth.user()?.id ?? '';
+    return this.viewerId;
   }
 
-  firstName(u: UserSummary): string {
-    return u.id === this.meId() ? 'You' : u.displayName.split(/\s+/)[0];
+  firstName(u: ParticipantSummary): string {
+    return this.ownedIds.includes(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
   }
 
-  memberLabel(u: UserSummary): string {
-    return `${u.id === this.meId() ? 'You: ' : ''}${u.displayName} (${u.email})`;
+  sameOwner(u: ParticipantSummary): boolean {
+    return (
+      !!u.canonicalParticipantId &&
+      this.members().some(
+        (m) => m.id !== u.id && m.canonicalParticipantId === u.canonicalParticipantId,
+      )
+    );
+  }
+
+  memberLabel(u: ParticipantSummary): string {
+    return `${this.ownedIds.includes(u.id) ? 'You: ' : ''}${u.displayName}${u.email ? ` (${u.email})` : ' (guest)'}`;
   }
 
   initials(name: string): string {
@@ -394,6 +427,8 @@ export class NewExpenseModalComponent {
     return (
       !!this.groupId() &&
       this.ready() &&
+      !this.draftBlocked() &&
+      this.unmappedOriginalIds().length === 0 &&
       this.description.valid &&
       Number.isSafeInteger(this.amountMinor()) &&
       this.amountMinor() > 0 &&
@@ -487,6 +522,8 @@ export class NewExpenseModalComponent {
       this.pendingWrites.abandon('expense');
       this.restored = null;
       this.retryNotice.set(null);
+      this.draftBlocked.set(false);
+      this.unmappedOriginalIds.set([]);
       this.error.set(null);
     } catch {
       this.error.set(
@@ -496,6 +533,14 @@ export class NewExpenseModalComponent {
   }
 
   private restoreDraft(request: CreateExpenseRequest): void {
+    const originalIds = [
+      request.paidByUserId,
+      ...(request.participantUserIds ?? []),
+      ...(request.splits ?? []).map((s) => s.userId),
+    ];
+    this.unmappedOriginalIds.set(
+      [...new Set(originalIds)].filter((id) => !this.members().some((p) => p.id === id)),
+    );
     this.description.setValue(request.description);
     this.currency.set(request.currency ?? 'USD');
     this.amount.setValue(

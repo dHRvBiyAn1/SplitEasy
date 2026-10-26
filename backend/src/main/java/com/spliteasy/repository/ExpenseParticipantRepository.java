@@ -38,9 +38,10 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
    */
   @Query(
       """
-            select p.expense.id as expenseId, p.shareCents as shareCents
+            select p.expense.id as expenseId, sum(p.shareCents) as shareCents
             from ExpenseParticipant p
-            where p.expense.deletedAt is null and p.user.id = :userId and p.expense.group.id in :groupIds
+            where p.expense.deletedAt is null and p.user.accountId = :userId and p.expense.group.id in :groupIds
+            group by p.expense.id
             """)
   List<ExpenseShareView> findSharesByUserAndGroups(
       @Param("userId") UUID userId, @Param("groupIds") List<UUID> groupIds);

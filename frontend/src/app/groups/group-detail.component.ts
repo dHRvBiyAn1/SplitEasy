@@ -5,7 +5,7 @@ import { GroupArtComponent } from '../shared/group-art.component';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
 import { BalanceService } from '../balances/balance.service';
 import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
@@ -22,7 +22,7 @@ import {
 import { ModalService } from '../modals/modal.service';
 import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { GroupService } from './group.service';
-import { GroupResponse } from './group.models';
+import { financialRoster, ownedIdentities, viewerIdentity, GroupResponse } from './group.models';
 
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
   FOOD_DRINK: '☕',
@@ -533,19 +533,38 @@ export class GroupDetailComponent implements OnInit {
 
   /** Detail-row label: "You owe" / "Priya owes" for each participant's share. */
   partLabel(p: SplitShare): string {
-    return p.user.id === this.meId() ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
+    return this.isOwned(p.user.id) ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
   }
 
   meId(): string {
-    return this.auth.user()?.id ?? '';
+    const group = this.group();
+    return group ? viewerIdentity(group, this.auth.user()?.id ?? '') : '';
   }
 
-  firstName(u: UserSummary): string {
-    return u.id === this.meId() ? 'You' : u.displayName.split(/\s+/)[0];
+  private isOwned(participantId: string): boolean {
+    const group = this.group();
+    return !!group && ownedIdentities(group, this.auth.user()?.id ?? '').includes(participantId);
+  }
+
+  sameSnapshotOwner(snapshot: ExpenseResponse, participant: ParticipantSummary): boolean {
+    return (
+      !!participant.canonicalParticipantId &&
+      snapshot.participants.some(
+        (row) =>
+          row.user.id !== participant.id &&
+          row.user.canonicalParticipantId === participant.canonicalParticipantId,
+      )
+    );
+  }
+
+  firstName(u: ParticipantSummary): string {
+    return this.isOwned(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
   }
 
   memberNames(g: GroupResponse): string {
-    return g.members.map((m) => this.firstName(m)).join(', ');
+    return financialRoster(g)
+      .map((m) => this.firstName(m))
+      .join(', ');
   }
 
   typeLabel(g: GroupResponse): string {
@@ -580,7 +599,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   paidSub(e: ExpenseSummary): string {
-    const who = e.paidBy.id === this.meId() ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
+    const who = this.isOwned(e.paidBy.id) ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
     return `${who} paid ${this.display(e.amountMinor, e.currency)}`;
   }
 

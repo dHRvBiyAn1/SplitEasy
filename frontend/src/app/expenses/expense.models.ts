@@ -1,12 +1,13 @@
 import { Currency } from '../shared/currency';
 import { MoneyInput } from '../shared/currency';
+import { ParticipantSummary } from '../groups/participant.models';
 import { UserSummary } from '../core/auth/auth.models';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
 
 export type SplitType = 'EQUAL' | 'UNEQUAL' | 'PERCENTAGE' | 'WEIGHTS' | 'ADJUSTMENTS';
 
 export interface SplitShare {
-  user: UserSummary;
+  user: ParticipantSummary;
   shareMinor: number;
   currency?: Currency;
 }
@@ -21,7 +22,7 @@ export interface ExpenseResponse {
   splitType: SplitType;
   category: ExpenseCategory;
   spentOn: string;
-  paidBy: UserSummary;
+  paidBy: ParticipantSummary;
   participants: SplitShare[];
   /** Original equal participant set; older responses may omit intent. */
   participantUserIds?: string[] | null;
@@ -36,7 +37,7 @@ export interface ExpenseSummary {
   description: string;
   amountMinor: number;
   currency?: Currency;
-  paidBy: UserSummary;
+  paidBy: ParticipantSummary;
   participantCount: number;
   category: ExpenseCategory;
   spentOn: string;
@@ -55,6 +56,7 @@ export type CreateExpenseRequest = MoneyInput & {
   operationId?: string;
   expectedVersion?: number;
   description: string;
+  /** Compatibility field names retain immutable financial participant IDs. */
   paidByUserId: string;
   participantUserIds?: string[] | null;
   splitType?: SplitType;

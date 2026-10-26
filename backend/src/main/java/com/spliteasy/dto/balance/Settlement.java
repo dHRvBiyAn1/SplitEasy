@@ -2,17 +2,17 @@ package com.spliteasy.dto.balance;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.LedgerCurrency;
 
 public record Settlement(
     java.util.UUID groupId,
     String groupName,
-    UserSummary counterparty,
+    ParticipantSummary counterparty,
     long netMinor,
     LedgerCurrency currency) {
   public Settlement(
-      java.util.UUID groupId, String groupName, UserSummary counterparty, long netMinor) {
+      java.util.UUID groupId, String groupName, ParticipantSummary counterparty, long netMinor) {
     this(groupId, groupName, counterparty, netMinor, LedgerCurrency.USD);
   }
 

@@ -50,6 +50,7 @@ public class CreateOperations {
       if (!intent(kind, stored.intent()).equals(intent(kind, submitted))) {
         throw new ConflictException("Operation ID already used for a different " + kind);
       }
+      com.spliteasy.config.ParticipantContract.requireReceipt(mapper.valueToTree(response));
       return response;
     }
     T response = create.get();

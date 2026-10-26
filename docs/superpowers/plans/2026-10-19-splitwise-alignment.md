@@ -235,3 +235,6 @@ Remaining decisions are needed **at the owning package gate**, not before this p
 - Re-run the 14-capability core assessment and all 27 supplied API workflow mappings after M4, and after optional ecosystem work. Report core-web, platform, Pro and conditional outcomes separately. Do not extrapolate completion dates from the rough 46.4% audit indicator.
 
 This is a complete scope/dependency roadmap with an executable first batch. Later subsystem contracts intentionally receive detailed file/test steps at their kickoff, against the then-current schema and APIs, rather than pretending today's source paths will remain unchanged through every migration.
+
+
+G01 core candidate (26 October 2026): [participant identity/invitation subsystem](2026-10-26-alignment-g01.md) implements stable identities, verified email claims and one-use revocable group links on verified dev3fae8e5 after H01 PR106 merged. [Verification report](../../reviews/2026-10-26-alignment/g01-participant-invitations.md). Phone/SMS remains gated on a selected verified channel; production SMTP stays deferred. Final native/review/publication gates are tracked in the report.

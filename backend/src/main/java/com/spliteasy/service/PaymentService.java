@@ -3,14 +3,12 @@ package com.spliteasy.service;
 import com.spliteasy.dto.payment.PaymentResponse;
 import com.spliteasy.dto.payment.RecordPaymentRequest;
 import com.spliteasy.entity.Group;
+import com.spliteasy.entity.Participant;
 import com.spliteasy.entity.Payment;
-import com.spliteasy.entity.User;
 import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
-import com.spliteasy.repository.GroupMembershipRepository;
+import com.spliteasy.repository.ParticipantRepository;
 import com.spliteasy.repository.PaymentRepository;
-import com.spliteasy.repository.UserRepository;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,9 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentService {
 
   private final PaymentRepository paymentRepository;
+  private final tools.jackson.databind.ObjectMapper mapper;
   private final GroupWriteGuard groupWriteGuard;
-  private final GroupMembershipRepository membershipRepository;
-  private final UserRepository userRepository;
+  private final FinancialParticipantService financialParticipants;
+  private final ParticipantRepository participantIdentities;
   private final MembershipGuard membershipGuard;
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -45,27 +44,35 @@ public class PaymentService {
               groupId, requesterId, request.operationId());
       if (existing.isPresent()) return replay(existing.get(), request);
     }
+    financialParticipants.requireCompatible(groupId);
     UUID payerId = request.payerUserId();
     UUID payeeId = request.payeeUserId();
-    if (payerId.equals(payeeId)) {
+    if (financialParticipants
+        .canonical(groupId, payerId)
+        .equals(financialParticipants.canonical(groupId, payeeId))) {
       throw new BadRequestException("A payment must be between two different people");
     }
     // Overpayment is intentionally allowed (people prepay/overpay/round). We only require
-    // that both parties are members — not that the amount matches any outstanding debt.
-    // One membership query + one batched user fetch (mirrors ExpenseService.loadUsers).
-    Set<UUID> memberIds = new HashSet<>(membershipRepository.findUserIdsByGroupId(groupId));
-    if (!memberIds.contains(payerId)) {
-      throw new BadRequestException("The payer must be a member of this group");
+    // that both parties are active financial participants — not that the amount matches any
+    // outstanding debt.
+    // One roster query + one batched participant fetch.
+    Set<UUID> activeParticipantIds = financialParticipants.active(groupId);
+    if (!activeParticipantIds.contains(payerId)) {
+      throw new BadRequestException("The payer must be an active participant in this group");
     }
-    if (!memberIds.contains(payeeId)) {
-      throw new BadRequestException("The payee must be a member of this group");
+    if (!activeParticipantIds.contains(payeeId)) {
+      throw new BadRequestException("The payee must be an active participant in this group");
     }
 
-    Map<UUID, User> users =
-        userRepository.findAllById(List.of(payerId, payeeId)).stream()
-            .collect(Collectors.toMap(User::getId, Function.identity()));
+    Map<UUID, Participant> participantsById =
+        participantIdentities.findAllById(List.of(payerId, payeeId)).stream()
+            .collect(Collectors.toMap(Participant::getId, Function.identity()));
     Payment payment =
-        new Payment(group, users.get(payerId), users.get(payeeId), request.resolvedAmountMinor());
+        new Payment(
+            group,
+            participantsById.get(payerId),
+            participantsById.get(payeeId),
+            request.resolvedAmountMinor());
     payment.setCurrency(request.resolvedCurrency());
     if (request.operationId() == null) {
       payment = paymentRepository.save(payment);
@@ -89,12 +96,7 @@ public class PaymentService {
       if (inserted == 0) return replay(payment, request);
     }
     log.info(
-        "Recorded payment {}: user {} paid user {} {} cents in group {}",
-        payment.getId(),
-        payerId,
-        payeeId,
-        request.resolvedAmountMinor(),
-        groupId);
+        "Recorded payment {} in group {} by account {}", payment.getId(), groupId, requesterId);
     return PaymentResponse.from(payment);
   }
 
@@ -105,12 +107,15 @@ public class PaymentService {
         || payment.getCurrency() != request.resolvedCurrency()) {
       throw new ConflictException("Operation ID already used for a different payment");
     }
-    return PaymentResponse.from(payment);
+    var response = PaymentResponse.from(payment);
+    com.spliteasy.config.ParticipantContract.requireReceipt(mapper.valueToTree(response));
+    return response;
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<PaymentResponse> listPayments(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     return paymentRepository.findByGroupIdFetchUsers(groupId).stream()
         .map(PaymentResponse::from)
         .toList();

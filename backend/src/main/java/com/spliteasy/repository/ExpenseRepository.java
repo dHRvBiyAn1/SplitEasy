@@ -26,7 +26,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    e.spentOn as spentOn,
                    e.createdAt as createdAt,
                    payer.id as payerId,
-                   payer.displayName as payerDisplayName,
+                   case when payer.scopeGroupId is null then coalesce(payer.currentDisplayName,payer.displayName) else payer.displayName end as payerDisplayName,
                    payer.email as payerEmail,
                    (select count(p.id) from ExpenseParticipant p where p.expense = e) as participantCount
             from Expense e
@@ -64,7 +64,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    e.spentOn as spentOn,
                    e.createdAt as createdAt,
                    payer.id as payerId,
-                   payer.displayName as payerDisplayName,
+                   case when payer.scopeGroupId is null then coalesce(payer.currentDisplayName,payer.displayName) else payer.displayName end as payerDisplayName,
                    payer.email as payerEmail
             from Expense e
             join e.paidBy payer

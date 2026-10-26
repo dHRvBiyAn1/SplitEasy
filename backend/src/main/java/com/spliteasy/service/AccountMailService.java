@@ -109,6 +109,28 @@ public class AccountMailService {
     }
   }
 
+  public static String invitationPath(String token) {
+    return "/invitation#action=group-invitation&token=" + token;
+  }
+
+  public void sendInvitation(String email, String token) {
+    requireConfigured();
+    SimpleMailMessage message = new SimpleMailMessage();
+    message.setFrom(from);
+    message.setTo(email);
+    message.setSubject("SplitEasy group invitation");
+    message.setText(
+        "Review this invitation within 24 hours. Sign in, verify your email, then reopen this original link and explicitly accept. Ownership of an existing participant is a separate irreversible confirmation.\n\n"
+            + frontendUrl
+            + invitationPath(token));
+    try {
+      senders.getObject().send(message);
+    } catch (RuntimeException ex) {
+      log.warn("Invitation email delivery failed");
+      throw new MailDeliveryFailedException();
+    }
+  }
+
   private boolean loopback(String host) {
     return host != null && Set.of("localhost", "127.0.0.1", "::1", "[::1]").contains(host);
   }

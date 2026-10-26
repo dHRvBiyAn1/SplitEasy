@@ -32,6 +32,7 @@ import { ModalShellComponent } from './modal-shell.component';
 export class SettleUpModalComponent {
   private readonly dashboard = inject(DashboardService);
   private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly draftBlocked = signal(false);
   protected readonly retryNotice = signal<string | null>(null);
   private readonly payments = inject(PaymentService);
   private readonly auth = inject(AuthService);
@@ -84,9 +85,12 @@ export class SettleUpModalComponent {
         this.retryNotice.set(UNCERTAIN_WRITE);
         return;
       }
-    } catch {
-      this.error.set(
-        'Cannot read the saved retry draft. Check history before starting a separate entry.',
+    } catch (err) {
+      this.draftBlocked.set(true);
+      this.retryNotice.set(
+        err instanceof PendingWriteError
+          ? err.message
+          : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
       );
     }
     const prefill = this.modal.settlePrefill();
@@ -110,13 +114,13 @@ export class SettleUpModalComponent {
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: Settlement): string {
-    const name = `${s.counterparty.displayName} (${s.counterparty.email})`;
+    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
     return s.netMinor > 0 ? `${name} owes you` : `You owe ${name}`;
   }
 
   /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
   payingLabel(s: Settlement): string {
-    const name = `${s.counterparty.displayName} (${s.counterparty.email})`;
+    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
     return s.netMinor > 0 ? `${name} is paying you` : `You are paying ${name}`;
   }
 
@@ -150,7 +154,7 @@ export class SettleUpModalComponent {
   confirm(): void {
     if (this.session.version !== this.sessionVersion) return;
     const s = this.selected();
-    if (!s || this.saving()) {
+    if (!s || this.saving() || this.draftBlocked()) {
       return;
     }
     const cents = this.enteredMinor();
@@ -160,22 +164,40 @@ export class SettleUpModalComponent {
       );
       return;
     }
-    const me = this.auth.user()?.id ?? '';
+    const me = this.dashboard.data()?.viewerParticipantId ?? this.auth.user()?.id ?? '';
+    if (
+      !me ||
+      s.counterparty.id === me ||
+      this.dashboard.data()?.ownedParticipantIds?.includes(s.counterparty.id)
+    ) {
+      this.error.set(
+        'These identities belong to the same account. Refresh obligations and review the payment.',
+      );
+      return;
+    }
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
     const [payer, payee] = s.netMinor > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
+    this.dispatch(
+      s.groupId,
+      {
+        payerUserId: payer,
+        payeeUserId: payee,
+        amountMinor: cents,
+        currency: s.currency ?? 'USD',
+      },
+      s,
+    );
+  }
+
+  private dispatch(
+    groupId: string,
+    request: Omit<RecordPaymentRequest, 'operationId'>,
+    draft: unknown,
+  ): void {
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.payments
-      .recordPayment(
-        s.groupId,
-        {
-          payerUserId: payer,
-          payeeUserId: payee,
-          amountMinor: cents,
-          currency: s.currency ?? 'USD',
-        },
-        s,
-      )
+      .recordPayment(groupId, request, draft)
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
@@ -194,16 +216,14 @@ export class SettleUpModalComponent {
         },
       });
   }
+
   retryOriginal(): void {
     if (this.saving() || this.session.version !== this.sessionVersion) return;
     try {
       const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
-      if (!pending?.draft) return;
-      this.selected.set(pending.draft as Settlement);
-      this.amount.set(
-        minorToDisplay(pending.request.amountMinor, pending.request.currency ?? 'USD'),
-      );
-      this.confirm();
+      if (!pending) return;
+      // Original IDs and amount are immutable, even if aliases were subsequently claimed.
+      this.dispatch(pending.scope, pending.request, pending.draft);
     } catch {
       this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
     }
@@ -220,6 +240,7 @@ export class SettleUpModalComponent {
     try {
       this.pendingWrites.abandon('payment');
       this.retryNotice.set(null);
+      this.draftBlocked.set(false);
       this.error.set(null);
     } catch {
       this.error.set(

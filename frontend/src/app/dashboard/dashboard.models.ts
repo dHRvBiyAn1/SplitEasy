@@ -1,5 +1,5 @@
 import { Currency } from '../shared/currency';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
 
 export type GroupType = 'HOME' | 'TRIP' | 'DINING' | 'EVENT' | 'OTHER';
 
@@ -8,7 +8,7 @@ export type ExpenseCategory =
 
 /** Positive netMinor = they owe you; negative = you owe them. */
 export interface PersonBalance {
-  user: UserSummary;
+  user: ParticipantSummary;
   netMinor: number;
   currency?: Currency;
 }
@@ -32,7 +32,7 @@ export interface DashboardGroup {
 export interface Settlement {
   groupId: string;
   groupName: string;
-  counterparty: UserSummary;
+  counterparty: ParticipantSummary;
   netMinor: number;
   currency?: Currency;
 }
@@ -43,8 +43,8 @@ export interface ActivityItem {
   groupId: string;
   groupName: string;
   description: string;
-  actor: UserSummary;
-  counterparty: UserSummary | null;
+  actor: ParticipantSummary;
+  counterparty: ParticipantSummary | null;
   amountMinor: number;
   currency?: Currency;
   /** EXPENSE: +lent / −borrowed / 0 not-involved. PAYMENT: 0 (settlement, neutral). */
@@ -54,6 +54,9 @@ export interface ActivityItem {
 }
 
 export interface DashboardResponse {
+  /** Absent only on the explicitly legacy account-only response schema. */
+  viewerParticipantId?: string;
+  ownedParticipantIds?: string[];
   totals?: CurrencyTotals[];
   totalNetMinor: number | null;
   owedMinor: number | null;

@@ -2,11 +2,11 @@ package com.spliteasy.dto.balance;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.LedgerCurrency;
 
-public record PersonBalance(UserSummary user, long netMinor, LedgerCurrency currency) {
-  public PersonBalance(UserSummary user, long netMinor) {
+public record PersonBalance(ParticipantSummary user, long netMinor, LedgerCurrency currency) {
+  public PersonBalance(ParticipantSummary user, long netMinor) {
     this(user, netMinor, LedgerCurrency.USD);
   }
 

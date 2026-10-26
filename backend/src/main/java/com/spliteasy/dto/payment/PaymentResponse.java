@@ -1,14 +1,14 @@
 package com.spliteasy.dto.payment;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.Payment;
 import java.time.Instant;
 import java.util.UUID;
 
 public record PaymentResponse(
     UUID id,
-    UserSummary payer,
-    UserSummary payee,
+    ParticipantSummary payer,
+    ParticipantSummary payee,
     long amountMinor,
     Instant createdAt,
     com.spliteasy.entity.LedgerCurrency currency) {
@@ -26,8 +26,8 @@ public record PaymentResponse(
   public static PaymentResponse from(Payment payment) {
     return new PaymentResponse(
         payment.getId(),
-        UserSummary.from(payment.getPayer()),
-        UserSummary.from(payment.getPayee()),
+        ParticipantSummary.from(payment.getPayer()),
+        ParticipantSummary.from(payment.getPayee()),
         payment.getAmountCents(),
         payment.getCreatedAt(),
         payment.getCurrency());

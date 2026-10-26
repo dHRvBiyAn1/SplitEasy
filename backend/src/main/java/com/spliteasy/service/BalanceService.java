@@ -48,12 +48,19 @@ public class BalanceService {
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
 
-    Map<CurrencyUser, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
-    Map<CurrencyUser, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
-    Map<CurrencyUser, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
-    Map<CurrencyUser, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
+    return snapshot(groupId);
+  }
+
+  // Invitation preview owns a verified capability; other callers first authorize membership.
+  GroupBalancesResponse snapshot(UUID groupId) {
+    Map<CurrencyUser, Long> paid = toMap(groupId, expenseRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> owed = toMap(groupId, participantRepository.sumOwedByGroup(groupId));
+    Map<CurrencyUser, Long> settledOut = toMap(groupId, paymentRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> settledIn =
+        toMap(groupId, paymentRepository.sumReceivedByGroup(groupId));
     Set<CurrencyUser> keys = new HashSet<>(paid.keySet());
     keys.addAll(owed.keySet());
     keys.addAll(settledOut.keySet());
@@ -91,11 +98,15 @@ public class BalanceService {
 
   private record CurrencyUser(com.spliteasy.entity.LedgerCurrency currency, UUID userId) {}
 
-  private Map<CurrencyUser, Long> toMap(List<UserAmount> rows) {
+  private Map<CurrencyUser, Long> toMap(UUID groupId, List<UserAmount> rows) {
+    var originals = financialParticipants.originals(groupId);
     return rows.stream()
         .collect(
             Collectors.toMap(
-                row -> new CurrencyUser(row.getCurrency(), row.getUserId()),
-                UserAmount::getTotalCents));
+                row ->
+                    new CurrencyUser(
+                        row.getCurrency(), originals.get(row.getUserId()).canonicalParticipantId()),
+                UserAmount::getTotalCents,
+                Math::addExact));
   }
 }

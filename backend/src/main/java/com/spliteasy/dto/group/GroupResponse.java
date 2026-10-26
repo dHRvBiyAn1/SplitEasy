@@ -13,4 +13,19 @@ public record GroupResponse(
     UserSummary createdBy,
     List<UserSummary> members,
     boolean simplifyDebts,
-    Instant createdAt) {}
+    Instant createdAt,
+    List<com.spliteasy.dto.common.ParticipantSummary> participants,
+    UUID viewerParticipantId,
+    List<UUID> ownedParticipantIds,
+    List<com.spliteasy.dto.common.ParticipantSummary> inactiveGuests) {
+  public GroupResponse(
+      UUID id,
+      String name,
+      GroupType type,
+      UserSummary createdBy,
+      List<UserSummary> members,
+      boolean simplifyDebts,
+      Instant createdAt) {
+    this(id, name, type, createdBy, members, simplifyDebts, createdAt, null, null, null, null);
+  }
+}

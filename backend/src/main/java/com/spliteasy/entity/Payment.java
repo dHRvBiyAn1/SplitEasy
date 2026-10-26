@@ -34,11 +34,11 @@ public class Payment {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "payer_id", nullable = false, updatable = false)
-  private User payer;
+  private Participant payer;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "payee_id", nullable = false, updatable = false)
-  private User payee;
+  private Participant payee;
 
   @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
   @Column(nullable = false, length = 3)
@@ -56,7 +56,7 @@ public class Payment {
   @Column(name = "operation_id", updatable = false)
   private UUID operationId;
 
-  public Payment(Group group, User payer, User payee, long amountCents) {
+  public Payment(Group group, Participant payer, Participant payee, long amountCents) {
     this.group = group;
     this.payer = payer;
     this.payee = payee;

@@ -383,6 +383,11 @@ class HistoricalParticipantIntegrationTest extends AbstractIntegrationTest {
         "delete from group_memberships where group_id = ? and user_id = ?",
         f.groupId(),
         f.b().user().id());
+    // The V17 migration retains an inactive roster row for this old missing membership.
+    jdbc.update(
+        "update group_participants set active=false where group_id=? and participant_id=?",
+        f.groupId(),
+        f.b().user().id());
   }
 
   private void assertBalances(Fixture f, Map<UUID, Long> expected) throws Exception {
