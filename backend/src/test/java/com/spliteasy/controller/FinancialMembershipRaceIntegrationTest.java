@@ -19,7 +19,6 @@ import com.spliteasy.dto.group.GroupResponse;
 import com.spliteasy.dto.payment.RecordPaymentRequest;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.GroupRepository;
-import com.spliteasy.repository.UserRepository;
 import com.spliteasy.service.MembershipGuard;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc
 class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
   @MockitoSpyBean MembershipGuard membershipGuard;
-  @MockitoSpyBean UserRepository userRepository;
+  @MockitoSpyBean com.spliteasy.repository.ParticipantRepository participantIdentities;
   @MockitoSpyBean GroupRepository groupRepository;
   @MockitoSpyBean GroupMembershipRepository membershipRepository;
   @Autowired JdbcTemplate jdbc;
@@ -119,7 +118,7 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
     CountDownLatch finishWrite = new CountDownLatch(1);
     AtomicInteger blocker = new AtomicInteger();
     doAnswer(holdAfterQuery(validated, finishWrite, blocker))
-        .when(userRepository)
+        .when(participantIdentities)
         .findAllById(any());
     try (var requests = Executors.newFixedThreadPool(2)) {
       var write =
@@ -371,7 +370,9 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
     CountDownLatch validated = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     AtomicInteger blocker = new AtomicInteger();
-    doAnswer(holdAfterQuery(validated, release, blocker)).when(userRepository).findAllById(any());
+    doAnswer(holdAfterQuery(validated, release, blocker))
+        .when(participantIdentities)
+        .findAllById(any());
     try (var requests = Executors.newFixedThreadPool(2)) {
       var write =
           requests.submit(() -> mockMvc.perform(auth(financial(f, payment), f.a())).andReturn());

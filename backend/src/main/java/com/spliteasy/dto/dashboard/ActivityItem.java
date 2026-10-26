@@ -1,6 +1,6 @@
 package com.spliteasy.dto.dashboard;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.ExpenseCategory;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -21,8 +21,8 @@ public record ActivityItem(
     UUID groupId,
     String groupName,
     String description,
-    UserSummary actor,
-    UserSummary counterparty,
+    ParticipantSummary actor,
+    ParticipantSummary counterparty,
     long amountMinor,
     long viewerDeltaMinor,
     ExpenseCategory category,

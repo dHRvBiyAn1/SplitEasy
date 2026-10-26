@@ -2,7 +2,7 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.PersonBalance;
 import com.spliteasy.dto.balance.Settlement;
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.dto.dashboard.ActivityItem;
 import com.spliteasy.dto.dashboard.DashboardGroup;
 import com.spliteasy.dto.dashboard.DashboardResponse;
@@ -44,6 +44,8 @@ public class DashboardService {
   /** Cap on the merged activity feed. */
   private static final int ACTIVITY_LIMIT = 15;
 
+  private final com.spliteasy.repository.ParticipantRepository participantIdentities;
+  private final FinancialParticipantService financialParticipants;
   private final GroupService groupService;
   private final PairwiseBalanceService pairwiseService;
   private final ExpenseRepository expenseRepository;
@@ -60,9 +62,10 @@ public class DashboardService {
     List<Settlement> settlements = new ArrayList<>();
     record PersonCurrency(UUID userId, com.spliteasy.entity.LedgerCurrency currency) {}
     Map<PersonCurrency, Long> peopleNet = new LinkedHashMap<>();
-    Map<UUID, UserSummary> peopleInfo = new LinkedHashMap<>();
+    Map<UUID, ParticipantSummary> peopleInfo = new LinkedHashMap<>();
     var allCurrencies = new java.util.TreeSet<com.spliteasy.entity.LedgerCurrency>();
     for (GroupSummary g : myGroups) {
+      financialParticipants.requireCompatible(g.id());
       List<PersonBalance> pairwise = pairwiseService.compute(userId, g.id());
       Map<com.spliteasy.entity.LedgerCurrency, Long> spent =
           expenseRepository.sumAmountsByGroup(g.id()).stream()
@@ -201,7 +204,9 @@ public class DashboardService {
         people,
         settlements,
         buildActivity(userId, myGroups.stream().map(GroupSummary::id).toList()),
-        totals);
+        totals,
+        userId,
+        financialParticipants.owned(userId));
   }
 
   private List<ActivityItem> buildActivity(UUID userId, List<UUID> groupIds) {
@@ -217,9 +222,16 @@ public class DashboardService {
                     ExpenseParticipantRepository.ExpenseShareView::getShareCents));
 
     List<ActivityItem> items = new ArrayList<>();
-    for (ActivityExpenseView e : expenseRepository.findRecentByGroupIds(groupIds, limit)) {
-      UserSummary payer =
-          new UserSummary(e.getPayerId(), e.getPayerEmail(), e.getPayerDisplayName());
+    var expenseRows = expenseRepository.findRecentByGroupIds(groupIds, limit);
+    var payers =
+        participantIdentities
+            .findAllById(
+                expenseRows.stream().map(ActivityExpenseView::getPayerId).distinct().toList())
+            .stream()
+            .map(ParticipantSummary::from)
+            .collect(Collectors.toMap(ParticipantSummary::id, p -> p));
+    for (ActivityExpenseView e : expenseRows) {
+      ParticipantSummary payer = payers.get(e.getPayerId());
       items.add(
           new ActivityItem(
               e.getId(),
@@ -231,7 +243,10 @@ public class DashboardService {
               null,
               e.getAmountCents(),
               ExpenseService.viewerDelta(
-                  userId, e.getPayerId(), e.getAmountCents(), myShare.getOrDefault(e.getId(), 0L)),
+                  userId,
+                  payer.canonicalParticipantId(),
+                  e.getAmountCents(),
+                  myShare.getOrDefault(e.getId(), 0L)),
               e.getCategory(),
               e.getSpentOn(),
               e.getCurrency()));
@@ -247,8 +262,8 @@ public class DashboardService {
                         p.getGroup().getId(),
                         p.getGroup().getName(),
                         "Settlement",
-                        UserSummary.from(p.getPayer()),
-                        UserSummary.from(p.getPayee()),
+                        ParticipantSummary.from(p.getPayer()),
+                        ParticipantSummary.from(p.getPayee()),
                         p.getAmountCents(),
                         0L,
                         null,

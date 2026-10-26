@@ -40,8 +40,11 @@ export class ApiService {
   private readonly baseUrl = inject(API_BASE_URL);
 
   private ledgerOptions(path: string) {
-    return path === '/dashboard' || path.startsWith('/groups')
-      ? { headers: { 'X-Ledger-Version': '2' } }
+    return path === '/dashboard' ||
+      path === '/groups' ||
+      path.startsWith('/groups/') ||
+      path.startsWith('/invitations/')
+      ? { headers: { 'X-Ledger-Version': '2', 'X-Participant-Version': '1' } }
       : {};
   }
 

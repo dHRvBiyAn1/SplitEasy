@@ -1,6 +1,6 @@
 package com.spliteasy.dto.expense;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.ExpenseCategory;
 import com.spliteasy.entity.SplitType;
 import java.time.Instant;
@@ -16,7 +16,7 @@ public record ExpenseResponse(
     SplitType splitType,
     ExpenseCategory category,
     LocalDate spentOn,
-    UserSummary paidBy,
+    ParticipantSummary paidBy,
     List<SplitShare> participants,
     List<UUID> participantUserIds,
     List<SplitInput> splits,

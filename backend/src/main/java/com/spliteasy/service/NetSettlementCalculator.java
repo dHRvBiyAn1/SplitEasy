@@ -2,7 +2,7 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.MemberBalance;
 import com.spliteasy.dto.balance.SuggestedTransaction;
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -13,7 +13,7 @@ public final class NetSettlementCalculator {
   private NetSettlementCalculator() {}
 
   /** Mutable creditor/debtor holder for the greedy loop. */
-  private record Party(UserSummary user, long remaining) {}
+  private record Party(ParticipantSummary user, long remaining) {}
 
   /**
    * Pure greedy simplification over already-netted balances. Members with a zero net are excluded

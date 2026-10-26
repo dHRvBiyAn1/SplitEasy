@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
+import { ParticipantSummary } from './participant.models';
 import { GroupType } from '../dashboard/dashboard.models';
 import { GroupResponse, GroupSummary, UpdateGroupRequest } from './group.models';
 
@@ -27,6 +28,28 @@ export class GroupService {
 
   addMember(groupId: string, email: string): Observable<GroupResponse> {
     return this.api.post<GroupResponse>(`/groups/${groupId}/members`, { email });
+  }
+
+  createGuest(
+    groupId: string,
+    displayName: string,
+    operationId: string,
+  ): Observable<ParticipantSummary> {
+    return this.api.post<ParticipantSummary>(`/groups/${groupId}/participants`, {
+      displayName,
+      operationId,
+    });
+  }
+
+  removeGuest(groupId: string, participantId: string): Observable<void> {
+    return this.api.delete<void>(`/groups/${groupId}/participants/${participantId}`);
+  }
+
+  reactivateGuest(groupId: string, participantId: string): Observable<ParticipantSummary> {
+    return this.api.post<ParticipantSummary>(
+      `/groups/${groupId}/participants/${participantId}/reactivate`,
+      {},
+    );
   }
 
   /** Partial update from the settings page (rename / type / simplify-debts). */

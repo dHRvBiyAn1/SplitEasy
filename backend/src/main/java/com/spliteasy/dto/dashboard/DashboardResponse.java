@@ -24,7 +24,9 @@ public record DashboardResponse(
     List<PersonBalance> people,
     List<Settlement> settlements,
     List<ActivityItem> activity,
-    List<CurrencyTotals> totals) {
+    List<CurrencyTotals> totals,
+    java.util.UUID viewerParticipantId,
+    List<java.util.UUID> ownedParticipantIds) {
   @com.fasterxml.jackson.annotation.JsonProperty("totalNetMinor")
   public Long totalNetMinor() {
     return totalNetCents;

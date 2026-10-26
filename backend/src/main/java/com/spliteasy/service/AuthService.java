@@ -24,6 +24,7 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final AuthSessionService sessions;
   private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+  private final FinancialParticipantService financialParticipants;
 
   @Transactional
   public AuthSessionService.IssuedSession register(RegisterRequest request, String userAgent) {
@@ -38,6 +39,7 @@ public class AuthService {
     User user =
         new User(email, passwordEncoder.encode(request.password()), request.displayName().trim());
     userRepository.saveAndFlush(user);
+    financialParticipants.createPrimary(user);
     log.info("Registered new user {} ({})", user.getId(), email);
     return sessions.create(user, userAgent);
   }

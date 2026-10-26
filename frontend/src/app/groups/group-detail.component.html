@@ -211,7 +211,15 @@
                             [style]="tint(p.user.id)"
                             >{{ initials(p.user.displayName) }}</span
                           >
-                          <span class="xdetail__who">{{ partLabel(p) }}</span>
+                          <span class="xdetail__who"
+                            >{{ partLabel(p) }}
+                            @if (sameSnapshotOwner(d, p.user)) {
+                              <small
+                                >{{ p.user.displayName }} · same account, original identity
+                                retained</small
+                              >
+                            }
+                          </span>
                           <span class="xdetail__amt">{{ display(p.shareMinor, d.currency) }}</span>
                         </div>
                       }
@@ -375,7 +383,11 @@
                       <ul>
                         @for (participant of snapshot.participants; track participant.user.id) {
                           <li>
-                            {{ participant.user.displayName }}:
+                            {{ participant.user.displayName }}
+                            @if (sameSnapshotOwner(snapshot, participant.user)) {
+                              <small>same account today · original identity retained</small>
+                            }
+                            :
                             {{ display(participant.shareMinor, snapshot.currency) }}
                           </li>
                         }

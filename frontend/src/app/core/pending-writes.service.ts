@@ -9,6 +9,8 @@ export interface PendingWrite<T> {
   scope: string;
   operationId: string;
   request: T;
+  /** Absent means the original account-only financial schema; its IDs remain immutable. */
+  identityVersion?: 1;
   draft?: unknown;
   sessionVersion: number;
 }
@@ -54,7 +56,32 @@ export class PendingWritesService {
       );
     }
     if (kind !== 'group') {
+      if (stored.identityVersion !== undefined && stored.identityVersion !== 1)
+        throw new PendingWriteError(
+          'Upgrade the app to read this saved identity version. Check history before starting a separate entry.',
+        );
       const request = { ...stored.request } as Record<string, unknown>;
+      const ids =
+        kind === 'payment'
+          ? [request['payerUserId'], request['payeeUserId']]
+          : [request['paidByUserId']];
+      if (
+        ids.some((id) => typeof id !== 'string' || !id) ||
+        (kind === 'expense' &&
+          request['participantUserIds'] != null &&
+          (!Array.isArray(request['participantUserIds']) ||
+            request['participantUserIds'].some((id: unknown) => typeof id !== 'string' || !id))) ||
+        (kind === 'expense' &&
+          request['splits'] != null &&
+          (!Array.isArray(request['splits']) ||
+            request['splits'].some(
+              (row: { userId?: unknown } | null) =>
+                !row || typeof row.userId !== 'string' || !row.userId,
+            )))
+      )
+        throw new PendingWriteError(
+          'Upgrade or check history: the saved financial identities cannot be mapped safely. The original draft has not been changed.',
+        );
       const currency = request['currency'] ?? 'USD';
       const legacy = request['amountCents'];
       if (
@@ -118,6 +145,13 @@ export class PendingWritesService {
       scope,
       operationId: previous?.operationId ?? crypto.randomUUID(),
       request,
+      ...(previous
+        ? previous.identityVersion
+          ? { identityVersion: previous.identityVersion }
+          : {}
+        : kind !== 'group'
+          ? { identityVersion: 1 as const }
+          : {}),
       draft,
       sessionVersion: this.session.version,
     };

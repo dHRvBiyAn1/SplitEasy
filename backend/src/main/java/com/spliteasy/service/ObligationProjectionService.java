@@ -32,6 +32,7 @@ public class ObligationProjectionService {
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<DirectObligation> forGroup(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     return snapshot(requesterId, groupId);
   }
 
@@ -56,13 +57,14 @@ public class ObligationProjectionService {
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<DirectObligation> rawForGroup(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     return rawSnapshot(groupId);
   }
 
   private List<DirectObligation> rawSnapshot(UUID groupId) {
     Map<Pair, Long> amounts = new HashMap<>();
-    addPairs(amounts, participantRepository.sumOwedByPair(groupId), 1);
-    addPairs(amounts, paymentRepository.sumPaidByPair(groupId), -1);
+    addPairs(groupId, amounts, participantRepository.sumOwedByPair(groupId), 1);
+    addPairs(groupId, amounts, paymentRepository.sumPaidByPair(groupId), -1);
     Set<UUID> ledgerIds = new HashSet<>();
     amounts
         .keySet()
@@ -87,13 +89,15 @@ public class ObligationProjectionService {
         .toList();
   }
 
-  private void addPairs(Map<Pair, Long> amounts, List<PairAmount> rows, int sign) {
+  private void addPairs(UUID groupId, Map<Pair, Long> amounts, List<PairAmount> rows, int sign) {
+    var originals = financialParticipants.originals(groupId);
     for (PairAmount row : rows) {
+      UUID from = originals.get(row.getFromId()).canonicalParticipantId();
+      UUID to = originals.get(row.getToId()).canonicalParticipantId();
+      if (from.equals(to)) continue;
       long amount = row.getTotalCents() * sign;
-      amounts.merge(
-          new Pair(row.getFromId(), row.getToId(), row.getCurrency()), amount, Math::addExact);
-      amounts.merge(
-          new Pair(row.getToId(), row.getFromId(), row.getCurrency()), -amount, Math::addExact);
+      amounts.merge(new Pair(from, to, row.getCurrency()), amount, Math::addExact);
+      amounts.merge(new Pair(to, from, row.getCurrency()), -amount, Math::addExact);
     }
   }
 

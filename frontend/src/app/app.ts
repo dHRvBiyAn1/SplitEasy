@@ -58,7 +58,9 @@ export class App {
   protected readonly groupsOpen = signal(false);
   private readonly currentUrl = signal(this.router.url);
   protected readonly isAuthRoute = computed(() =>
-    /^\/(login|register|forgot-password|account-action)(?:[/?#]|$)/.test(this.currentUrl()),
+    /^\/(login|register|forgot-password|account-action|invitation)(?:[/?#]|$)/.test(
+      this.currentUrl(),
+    ),
   );
   protected readonly showShell = computed(() => this.auth.isAuthenticated() && !this.isAuthRoute());
   protected readonly blocked = computed(() => !!this.modal.active() || this.groupsOpen());

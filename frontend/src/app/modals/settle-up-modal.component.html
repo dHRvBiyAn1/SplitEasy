@@ -1,7 +1,12 @@
 <app-modal-shell heading="Settle up" [maxWidth]="460" (closed)="close()">
   @if (retryNotice()) {
     <p role="status">{{ retryNotice() }}</p>
-    <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="retryOriginal()">
+    <button
+      type="button"
+      class="dc-btn-outline"
+      [disabled]="saving() || draftBlocked()"
+      (click)="retryOriginal()"
+    >
       Retry original payment
     </button>
     <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
@@ -47,7 +52,12 @@
         <button type="button" class="dc-btn-outline" (click)="cancel()" [disabled]="saving()">
           Back
         </button>
-        <button type="button" class="dc-btn-accent" (click)="confirm()" [disabled]="saving()">
+        <button
+          type="button"
+          class="dc-btn-accent"
+          (click)="confirm()"
+          [disabled]="saving() || draftBlocked()"
+        >
           Record payment
         </button>
       </div>

@@ -74,11 +74,13 @@ export class GroupSettingsComponent implements OnInit {
 
   protected groupId = '';
 
-  protected readonly meId = computed(() => this.auth.user()?.id ?? '');
+  protected readonly viewerAccountId = computed(() => this.auth.user()?.id ?? '');
   /** Only the creator owns the group, so only they may delete it. */
-  protected readonly isCreator = computed(() => this.group()?.createdBy.id === this.meId());
-  protected readonly hasMyBalance = computed(() => this.hasBalance(this.meId()));
-  protected readonly canLeave = computed(() => this.blockedReason(this.meId()) === null);
+  protected readonly isCreator = computed(
+    () => this.group()?.createdBy.id === this.viewerAccountId(),
+  );
+  protected readonly hasMyBalance = computed(() => this.hasBalance(this.viewerAccountId()));
+  protected readonly canLeave = computed(() => this.blockedReason(this.viewerAccountId()) === null);
 
   constructor() {
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
@@ -158,20 +160,40 @@ export class GroupSettingsComponent implements OnInit {
     this.reload();
   }
 
-  balancesOf(userId: string): MemberBalance[] {
-    return this.memberBalances().filter((b) => b.user.id === userId);
-  }
-  hasBalance(userId: string): boolean {
-    return this.balancesOf(userId).some((b) => b.netMinor !== 0);
+  /** Account membership actions inspect its canonical financial identities, never UUID coincidence. */
+  private financialIdsFor(accountId: string): Set<string> {
+    const group = this.group();
+    if (!group?.participants) return new Set([accountId]); // Explicit pre-G01 account-only schema.
+    const ids = new Set<string>();
+    for (const p of [...group.participants, ...this.memberBalances().map((b) => b.user)]) {
+      if (p.accountId === accountId) {
+        ids.add(p.id);
+        if (p.canonicalParticipantId) ids.add(p.canonicalParticipantId);
+      }
+    }
+    if (accountId === this.viewerAccountId()) {
+      for (const id of group.ownedParticipantIds ?? []) ids.add(id);
+      if (group.viewerParticipantId) ids.add(group.viewerParticipantId);
+    }
+    return ids;
   }
 
-  /** A member's current-mode counterparties, including people who have left the group. */
-  obligationsOf(userId: string) {
+  balancesOf(accountId: string): MemberBalance[] {
+    const ids = this.financialIdsFor(accountId);
+    return this.memberBalances().filter((b) => ids.has(b.user.id));
+  }
+  hasBalance(accountId: string): boolean {
+    return this.balancesOf(accountId).some((b) => b.netMinor !== 0);
+  }
+
+  /** Membership is account-based; canonical obligations are participant-based. */
+  obligationsOf(accountId: string) {
+    const ids = this.financialIdsFor(accountId);
     return this.obligations()
-      .filter((debt) => debt.from.id === userId || debt.to.id === userId)
+      .filter((debt) => ids.has(debt.from.id) !== ids.has(debt.to.id))
       .map((debt) => ({
-        user: debt.from.id === userId ? debt.to : debt.from,
-        netMinor: debt.from.id === userId ? -debt.amountMinor : debt.amountMinor,
+        user: ids.has(debt.from.id) ? debt.to : debt.from,
+        netMinor: ids.has(debt.from.id) ? -debt.amountMinor : debt.amountMinor,
         currency: debt.currency ?? 'USD',
       }));
   }
@@ -291,7 +313,7 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.busy.set(true);
-    this.scoped(this.groups.removeMember(this.groupId, this.meId())).subscribe({
+    this.scoped(this.groups.removeMember(this.groupId, this.viewerAccountId())).subscribe({
       next: () => {
         this.dashboard.refresh();
         this.router.navigate(['/dashboard']);
@@ -341,6 +363,6 @@ export class GroupSettingsComponent implements OnInit {
   }
 
   isMe(userId: string): boolean {
-    return userId === this.meId();
+    return userId === this.viewerAccountId();
   }
 }

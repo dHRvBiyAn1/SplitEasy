@@ -4,7 +4,7 @@ import { IconComponent } from '../shared/icon.component';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
 import { avatarTint } from '../core/avatar';
 import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory, dashboardTotals, groupTotals } from './dashboard.models';
@@ -64,8 +64,13 @@ export class DashboardComponent {
     return (name ?? '').split(/\s+/).filter(Boolean)[0] ?? '';
   }
 
-  isMe(user: UserSummary | null): boolean {
-    return !!user && user.id === this.auth.user()?.id;
+  isMe(user: ParticipantSummary | null): boolean {
+    const data = this.data();
+    // Absence declares the legacy account-only schema, never a UUID-domain guess.
+    const owned =
+      data?.ownedParticipantIds ??
+      (data?.viewerParticipantId ? [data.viewerParticipantId] : [this.auth.user()?.id ?? '']);
+    return !!user && owned.includes(user.id);
   }
 
   initials(name: string): string {

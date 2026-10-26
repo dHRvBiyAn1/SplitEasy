@@ -17,7 +17,7 @@ info:
     Secure HttpOnly host cookie, bounded by 7-day idle and 30-day absolute session expiry.
 
     ## Authorization
-    Every group-scoped endpoint is restricted to group members. A non-member receives
+    Every group-scoped endpoint is restricted to group members; the separate invitation preview/accept commands use a narrowly scoped pending capability to join or claim. A non-member receives
     **403** even for a non-existent group (the API never reveals whether a group
     exists). Deleting a group is **creator-only**; the creator can neither be removed
     nor leave.
@@ -36,12 +36,25 @@ info:
     Balances derive from active and historical financial participants and sum to zero
     separately for each denomination; financial participation does not grant group access.
 
+    ## Financial identity and invitations
+    Financial IDs are stable participants, separate from authenticated accounts and access membership.
+    Existing account UUIDs map unchanged; verified claims add immutable ownership links without changing
+    original money, typed splits, revisions or retry receipts. Derived obligations canonicalize aliases
+    before netting; same-account historical payments remain history. New participant-aware clients send
+    `X-Participant-Version: 1` separately from ledger2. Incompatible guest/alias scopes fail409 before new
+    mutation for old clients; exact representable original keyed receipt recovery remains available.
+    Existing registered-account POST/members remains immediate and never auto-claims guest debt.
+    Invitation capabilities are authenticated, expiring, hashed and explicitly accepted. Group links
+    are single-use and cannot claim another participant. Sign in/register/verify, then reopen the original
+    fragment link; secrets never enter browser storage or return URLs. Phone/SMS and production SMTP
+    activation remain gated follow-ups, with no notifications/outbox implied.
+
     ## Error format
     Errors handled by the application advice use the `Error` body with HTTP status
     in both the status code and the body (`status`, `error`, `message`, `timestamp`).
     Spring Security filter responses and some framework-level parsing/path errors can
     use different bodies; `Error` is not guaranteed for every non-2xx response.
-  version: 1.1.0
+  version: 1.2.0
   contact:
     name: SplitEasy
   license:
@@ -61,6 +74,8 @@ tags:
     description: Liveness probe
   - name: Groups
     description: Group management, membership, settings
+  - name: Invitations
+    description: Group-scoped guests and explicit verified claims or single-use Join links
   - name: Expenses
     description: Expense creation, listing, editing, deletion
   - name: Balances
@@ -524,6 +539,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/LedgerVersion'
 
   /api/groups:
@@ -581,6 +597,7 @@ paths:
 
   /api/groups/{groupId}:
     parameters:
+      - $ref: '#/components/parameters/ParticipantVersion'
       - $ref: "#/components/parameters/GroupIdParam"
     get:
       operationId: getGroup
@@ -588,6 +605,8 @@ paths:
       description: Returns the group with its full member list. Members only.
       tags: [Groups]
       responses:
+        '409':
+          $ref: '#/components/responses/Conflict'
         "200":
           description: Group detail
           content:
@@ -642,6 +661,8 @@ paths:
         only — any other member (including the creator's only member, if any) gets 403.
       tags: [Groups]
       responses:
+        '409':
+          $ref: '#/components/responses/Conflict'
         "204":
           description: Group deleted
         "401":
@@ -651,6 +672,7 @@ paths:
 
   /api/groups/{groupId}/members:
     parameters:
+      - $ref: '#/components/parameters/ParticipantVersion'
       - $ref: "#/components/parameters/GroupIdParam"
     post:
       operationId: addMember
@@ -692,6 +714,7 @@ paths:
 
   /api/groups/{groupId}/members/{memberId}:
     parameters:
+      - $ref: '#/components/parameters/ParticipantVersion'
       - $ref: "#/components/parameters/GroupIdParam"
       - name: memberId
         in: path
@@ -723,6 +746,7 @@ paths:
           description: Open net or current-mode obligations, or the target is the creator
   /api/groups/{groupId}/expenses:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -823,6 +847,7 @@ paths:
 
   /api/groups/{groupId}/expenses/{expenseId}:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - name: expenseId
       in: path
@@ -963,6 +988,7 @@ paths:
 
   /api/groups/{groupId}/expenses/deleted:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -988,6 +1014,7 @@ paths:
 
   /api/groups/{groupId}/expenses/{expenseId}/history:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     - name: expenseId
@@ -1021,6 +1048,7 @@ paths:
 
   /api/groups/{groupId}/expenses/{expenseId}/restore:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     - name: expenseId
@@ -1060,6 +1088,7 @@ paths:
 
   /api/groups/{groupId}/balances:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -1096,6 +1125,7 @@ paths:
 
   /api/groups/{groupId}/balances/mine:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -1134,6 +1164,7 @@ paths:
 
   /api/groups/{groupId}/balances/obligations:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -1176,6 +1207,7 @@ paths:
 
   /api/groups/{groupId}/balances/current-obligations:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -1216,6 +1248,7 @@ paths:
 
   /api/groups/{groupId}/payments:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -1292,6 +1325,7 @@ paths:
 
   /api/groups/{groupId}/debt-simplification:
     parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
     - $ref: '#/components/parameters/GroupIdParam'
     - $ref: '#/components/parameters/LedgerVersion'
     get:
@@ -1327,6 +1361,293 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/participants:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: createParticipant
+      summary: Create a named unregistered financial participant
+      tags:
+      - Invitations
+      responses:
+        '201':
+          description: Accepted command
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateParticipantRequest'
+      description: Creates financial eligibility only, no login/membership and no mailbox/account lookup. Optional
+        scoped operation identity prevents duplicate retry creation.
+  /api/groups/{groupId}/participants/{participantId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: participantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      operationId: removeParticipant
+      summary: Deactivate a settled unclaimed guest
+      tags:
+      - Invitations
+      responses:
+        '204':
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      description: Requires zero net in every currency and no incident current-mode obligation. Revokes outstanding targeted invitations. Retains financial/history
+        facts. Linked account removal uses the membership route.
+  /api/groups/{groupId}/invitations:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listInvitations
+      summary: List invitation status without raw tokens
+      tags:
+      - Invitations
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvitationStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/groups/{groupId}/invitations/email:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: sendEmailInvitation
+      summary: Send an expiring email invitation
+      tags:
+      - Invitations
+      responses:
+        '201':
+          description: Accepted command
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: Email delivery is unavailable; no invitation is committed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailInvitationRequest'
+      description: Default24h; only token hashes persist. Uses explicitly configured native SMTP; production
+        SMTP remains deferred. EMAIL acceptance requires the current verified matching mailbox plus explicit
+        consent. A guest claim is never inferred from email lookup.
+  /api/groups/{groupId}/invitations/links:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: createGroupLink
+      summary: Generate one single-use revocable Join link
+      tags:
+      - Invitations
+      responses:
+        '201':
+          description: Accepted command
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: Works independently of SMTP. Fresh secret returned once only; uncertain generation uses metadata
+        read/revoke and deliberate replacement. Forwarding never claims existing participant debt.
+  /api/groups/{groupId}/invitations/{invitationId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: invitationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      operationId: revokeInvitation
+      summary: Revoke a pending invitation
+      tags:
+      - Invitations
+      responses:
+        '204':
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      description: Accepted ownership/membership cannot be undone by revocation. Revocation, resend, claim and
+        group deletion serialize under the group lock.
+  /api/invitations/preview:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: previewInvitation
+      summary: Explicitly review an invitation
+      tags:
+      - Invitations
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationTokenRequest'
+      description: Authenticated body-token capability, not a member-only group read. Guessed, expired, consumed,
+        revoked and wrong-account tokens fail400 with sanitized unavailable guidance. Does not consume the token.
+  /api/invitations/accept:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: acceptInvitation
+      summary: Explicitly join or claim once
+      tags:
+      - Invitations
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationTokenRequest'
+      description: Locks group then current account and rechecks actual-clock expiry, verified mailbox and active
+        session. Targeted guest requires confirmOwnership true. One concurrent winner; replayed acceptance fails400.
+        After an uncertain response read authorized group ownership/status, never automatically POST again. No
+        money is inserted or rewritten.
+
+  /api/groups/{groupId}/participants/{participantId}/reactivate:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: participantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: reactivateParticipant
+      summary: Re-add the same retained unclaimed financial participant
+      description: Member-only explicit same-ID reactivation, with its original label and no new identity, financial
+        write or delivery. Claimed aliases use registered-account re-add. Old revoked/expired tokens remain invalid;
+        a fresh invitation is required. Already active same-ID reactivation is idempotent.
+      tags:
+      - Invitations
+      responses:
+        '200':
+          description: The original participant is eligible again
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
 
@@ -1426,7 +1747,7 @@ components:
 
     UserSummary:
       type: object
-      description: Minimal user reference embedded in every resource
+      description: Actual sign-in account reference for auth, access membership, creator and authenticated recorder roles
       required: [id, email, displayName]
       properties:
         id:
@@ -1604,7 +1925,14 @@ components:
 
     GroupResponse:
       type: object
-      required: [id, name, type, createdBy, members, simplifyDebts, createdAt]
+      required:
+      - id
+      - name
+      - type
+      - createdBy
+      - members
+      - simplifyDebts
+      - createdAt
       properties:
         id:
           type: string
@@ -1612,18 +1940,46 @@ components:
         name:
           type: string
         type:
-          $ref: "#/components/schemas/GroupType"
+          $ref: '#/components/schemas/GroupType'
         createdBy:
-          $ref: "#/components/schemas/UserSummary"
+          $ref: '#/components/schemas/UserSummary'
         members:
           type: array
           items:
-            $ref: "#/components/schemas/UserSummary"
+            $ref: '#/components/schemas/UserSummary'
         simplifyDebts:
           type: boolean
         createdAt:
           type: string
           format: date-time
+        participants:
+          anyOf:
+          - type: array
+            items:
+              $ref: '#/components/schemas/ParticipantSummary'
+          - type: 'null'
+          description: Canonical active financial roster. Access members remain accounts. Old immutable create
+            receipts can omit this current metadata.
+        viewerParticipantId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        ownedParticipantIds:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+            format: uuid
+        inactiveGuests:
+          anyOf:
+          - type: array
+            items:
+              $ref: '#/components/schemas/ParticipantSummary'
+          - type: 'null'
+          description: Retained scoped unclaimed inactive identities. Explicitly reactivate the same ID for historical
+            correction/recovery; old snapshots may omit this current metadata.
 
     GroupSummary:
       type: object
@@ -1644,29 +2000,16 @@ components:
 
     SplitInput:
       type: object
-      description: 'Original per-participant input, distinct from final rounded shares. `value` is
-
-        exact transaction minor units (UNEQUAL, 0..total), basis points (PERCENTAGE, 0..10000),
-
-        positive integer units (WEIGHTS, 1..1000000000000), or signed transaction minor units
-
-        (ADJUSTMENTS, -1000000000000..1000000000000). Exact amounts sum to total;
-
-        percentages sum to 10000. Weights allocate floor(total * weight / sum(weights)),
-
-        then the payer absorbs the remainder, or the first participant in Java UUID
-
-        order if the payer is excluded. Adjustments add signed transaction minor units to that same
-
-        deterministic EQUAL allocation over the explicitly listed split participants;
-
-        adjustments must sum to zero and every final share must be nonnegative.
-
-        Explicit zero inputs remain participants. A missing/null/fractional `value`
-
-        is rejected during JSON deserialization.
-
-        '
+      description: "Original per-participant input, distinct from final rounded shares. `value` is\nexact transaction\
+        \ minor units (UNEQUAL, 0..total), basis points (PERCENTAGE, 0..10000),\npositive integer units (WEIGHTS,\
+        \ 1..1000000000000), or signed transaction minor units\n(ADJUSTMENTS, -1000000000000..1000000000000). Exact\
+        \ amounts sum to total;\npercentages sum to 10000. Weights allocate floor(total * weight / sum(weights)),\n\
+        then the payer absorbs the remainder, or the first participant in Java UUID\norder if the payer is excluded.\
+        \ Adjustments add signed transaction minor units to that same\ndeterministic EQUAL allocation over the\
+        \ explicitly listed split participants;\nadjustments must sum to zero and every final share must be nonnegative.\n\
+        Explicit zero inputs remain participants. A missing/null/fractional `value`\nis rejected during JSON deserialization.\n\
+        \ Financial userId fields are compatibility names for stable participant IDs. Do not substitute canonical\
+        \ IDs when retrying an original operation."
       required:
       - userId
       - value
@@ -1692,8 +2035,8 @@ components:
           - 'null'
           format: int64
           minimum: 0
-          description: PUT precondition; new clients always send the loaded version; required after finite
-            rollout deadline
+          description: PUT precondition; new clients always send the loaded version; required after finite rollout
+            deadline
         operationId:
           type:
           - string
@@ -1715,7 +2058,8 @@ components:
         paidByUserId:
           type: string
           format: uuid
-          description: The member who paid; must be a group member
+          description: Compatibility field name for the financial participant ID who paid; must be active in this
+            financial roster
         participantUserIds:
           anyOf:
           - type: array
@@ -1723,7 +2067,8 @@ components:
               type: string
               format: uuid
           - type: 'null'
-          description: EQUAL only — subset of members; null/empty = all members
+          description: Compatibility field name for financial participant IDs; EQUAL null/empty selects each canonical
+            active person once
         splitType:
           anyOf:
           - $ref: '#/components/schemas/SplitType'
@@ -1754,8 +2099,8 @@ components:
           format: int64
           minimum: 1
           maximum: 1000000000000
-          description: Positive integer transaction minor units; currency is required. Fractional JSON values
-            are rejected.
+          description: Positive integer transaction minor units; currency is required. Fractional JSON values are
+            rejected.
         currency:
           anyOf:
           - $ref: '#/components/schemas/Currency'
@@ -1789,6 +2134,8 @@ components:
             enum:
             - USD
             - null
+      description: ' Financial userId fields are compatibility names for stable participant IDs. Do not substitute
+        canonical IDs when retrying an original operation.'
 
     SplitShare:
       type: object
@@ -1799,7 +2146,7 @@ components:
       - shareMinor
       properties:
         user:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         shareCents:
           type:
           - integer
@@ -1923,7 +2270,7 @@ components:
           type: string
           format: date
         paidBy:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         participants:
           type: array
           items:
@@ -2005,7 +2352,7 @@ components:
           description: USD-only compatibility alias; null for non-USD values. Use explicit currency and minor-unit
             values.
         paidBy:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         participantCount:
           type: integer
           format: int64
@@ -2055,7 +2402,7 @@ components:
       - netMinor
       properties:
         user:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         netCents:
           type:
           - integer
@@ -2099,7 +2446,7 @@ components:
       - netMinor
       properties:
         user:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         netCents:
           type:
           - integer
@@ -2136,7 +2483,7 @@ components:
         groupName:
           type: string
         counterparty:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         netCents:
           type:
           - integer
@@ -2168,9 +2515,9 @@ components:
       - amountMinor
       properties:
         from:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         to:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         amountCents:
           type:
           - integer
@@ -2201,9 +2548,9 @@ components:
       - amountMinor
       properties:
         from:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         to:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         amountCents:
           type:
           - integer
@@ -2266,9 +2613,9 @@ components:
             format: uuid
           - type: 'null'
           description: "Optional retry identity. Null or omitted means each request records a\nseparate payment.\
-            \ A supplied UUID is scoped to the authenticated\nrequester and group; exact replays return the\
-            \ original result, while\nchanged payer/payee/amount conflicts with 409.\n Currency is part of\
-            \ the replay intent; a changed currency conflicts with409."
+            \ A supplied UUID is scoped to the authenticated\nrequester and group; exact replays return the original\
+            \ result, while\nchanged payer/payee/amount conflicts with 409.\n Currency is part of the replay intent;\
+            \ a changed currency conflicts with409."
         amountMinor:
           type:
           - integer
@@ -2276,8 +2623,8 @@ components:
           format: int64
           minimum: 1
           maximum: 1000000000000
-          description: Positive integer transaction minor units; currency is required. Fractional JSON values
-            are rejected.
+          description: Positive integer transaction minor units; currency is required. Fractional JSON values are
+            rejected.
         currency:
           anyOf:
           - $ref: '#/components/schemas/Currency'
@@ -2311,6 +2658,8 @@ components:
             enum:
             - USD
             - null
+      description: ' Financial userId fields are compatibility names for stable participant IDs. Do not substitute
+        canonical IDs when retrying an original operation.'
 
     PaymentResponse:
       type: object
@@ -2327,9 +2676,9 @@ components:
           type: string
           format: uuid
         payer:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         payee:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
         amountCents:
           type:
           - integer
@@ -2502,11 +2851,11 @@ components:
         description:
           type: string
         actor:
-          $ref: '#/components/schemas/UserSummary'
+          $ref: '#/components/schemas/ParticipantSummary'
           description: Expense payer, or payment payer
         counterparty:
           anyOf:
-          - $ref: '#/components/schemas/UserSummary'
+          - $ref: '#/components/schemas/ParticipantSummary'
           - type: 'null'
           description: PAYMENT only — who received; null for EXPENSE
         amountCents:
@@ -2573,6 +2922,8 @@ components:
       - totalNetMinor
       - owedMinor
       - oweMinor
+      - viewerParticipantId
+      - ownedParticipantIds
       properties:
         totalNetCents:
           type:
@@ -2582,8 +2933,8 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           deprecated: true
-          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
-            for all currencies.
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[] for
+            all currencies.
         owedCents:
           type:
           - integer
@@ -2592,8 +2943,8 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           deprecated: true
-          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
-            for all currencies.
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[] for
+            all currencies.
         owedPeopleCount:
           type: integer
         oweCents:
@@ -2604,8 +2955,8 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           deprecated: true
-          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
-            for all currencies.
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[] for
+            all currencies.
         owePeopleCount:
           type: integer
         groupCount:
@@ -2616,14 +2967,14 @@ components:
             $ref: '#/components/schemas/DashboardGroup'
         people:
           type: array
-          description: Net per (person,currency) across groups. Opposing debts may cancel only within the
-            same currency; headline totals remain group-gross.
+          description: Net per (person,currency) across groups. Opposing debts may cancel only within the same
+            currency; headline totals remain group-gross.
           items:
             $ref: '#/components/schemas/PersonBalance'
         settlements:
           type: array
-          description: Per-group/per-counterparty/per-currency current obligations; settlement currency comes
-            from this row, never a preference.
+          description: Per-group/per-counterparty/per-currency current obligations; settlement currency comes from
+            this row, never a preference.
           items:
             $ref: '#/components/schemas/Settlement'
         activity:
@@ -2650,8 +3001,8 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           deprecated: true
-          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
-            for all currencies.
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[] for
+            all currencies.
         owedMinor:
           type:
           - integer
@@ -2660,8 +3011,8 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           deprecated: true
-          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
-            for all currencies.
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[] for
+            all currencies.
         oweMinor:
           type:
           - integer
@@ -2670,8 +3021,18 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           deprecated: true
-          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[]
-            for all currencies.
+          description: Transitional USD-only scalar; null unless the entire scope is USD-only. Use totals[] for
+            all currencies.
+        viewerParticipantId:
+          type: string
+          format: uuid
+        ownedParticipantIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: All current financial participant identities owned by this authenticated account; never
+            grants group access.
 
     Currency:
       type: string
@@ -2768,7 +3129,242 @@ components:
           maximum: 9007199254740991
       description: Authoritative spending/current-mode positions for one currency in a group.
 
+    ParticipantSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type:
+          - string
+          - 'null'
+          format: email
+        displayName:
+          type: string
+        canonicalParticipantId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        accountId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+      required:
+      - id
+      - email
+      - displayName
+      description: 'Financial identity: id always remains the original participant ID. Current live canonicalParticipantId/accountId
+        resolve ownership; historical snapshots can omit them or retain past metadata and are not ownership proof.
+        Unclaimed guest email is null; invitation targets are private delivery metadata.'
+    CreateParticipantRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+      required:
+      - displayName
+    EmailInvitationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        participantId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        resend:
+          type:
+          - boolean
+          - 'null'
+      required:
+      - email
+      description: Target an exact unclaimed guest or invite only account membership. Same pending target deduplicates;
+        explicit resend rotates and revokes previous guest invitations, including a changed recipient. Optional
+        operation identity replays metadata without sending again.
+    InvitationTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+        confirmOwnership:
+          type:
+          - boolean
+          - 'null'
+      required:
+      - token
+      description: Token is body-only and memory-only in the browser. Accepting a targeted guest requires confirmOwnership
+        true after explicit review; ordinary Join uses explicit POST consent.
+    InvitationStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - EMAIL
+          - LINK
+        participantId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        participantName:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          enum:
+          - PENDING
+          - ACCEPTED
+          - REVOKED
+          - EXPIRED
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      required:
+      - id
+      - kind
+      - status
+      - createdAt
+      - expiresAt
+      description: Current-member status metadata. Never contains a raw token, email body or copyable secret.
+    InvitationLink:
+      type: object
+      properties:
+        invitation:
+          $ref: '#/components/schemas/InvitationStatus'
+        url:
+          type: string
+          description: Relative /invitation fragment URL returned once. Resolve against the frontend origin. Single-use,
+            expires after24h and can be revoked; forwarding transfers the remaining Join opportunity. Does not
+            claim any existing guest. Not stored in a retry receipt.
+      required:
+      - invitation
+      - url
+    InvitationClaimBalance:
+      type: object
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        existingNetMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        participantNetMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        resultingNetMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+      - currency
+      - existingNetMinor
+      - participantNetMinor
+      - resultingNetMinor
+    InvitationPreview:
+      type: object
+      properties:
+        invitationId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - EMAIL
+          - LINK
+        groupId:
+          type: string
+          format: uuid
+        groupName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        participant:
+          anyOf:
+          - $ref: '#/components/schemas/ParticipantSummary'
+          - type: 'null'
+        requiresOwnershipConfirmation:
+          type: boolean
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvitationClaimBalance'
+      required:
+      - invitationId
+      - kind
+      - groupId
+      - groupName
+      - expiresAt
+      - requiresOwnershipConfirmation
+      - balances
+      description: Read-only review. EMAIL requires the current verified matching account before disclosing guest
+        liabilities. Balances are a current snapshot, not a locked quote. No automatic acceptance on preview/login/navigation.
+    InvitationAccepted:
+      type: object
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        participantId:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          format: uuid
+        claimed:
+          type: boolean
+      required:
+      - groupId
+      - participantId
+      - accountId
+      - claimed
+      description: Atomic membership/roster plus optional immutable verified ownership link. Original money, IDs,
+        split inputs, revisions and operation receipts do not change.
+
   parameters:
+    ParticipantVersion:
+      name: X-Participant-Version
+      in: header
+      required: false
+      description: Send1 for participant-aware workflows, independently of ledger2. Missing or other values retain account-only compatibility; any guest/alias scope fails409 after authorization before incompatible reads or new writes. Exact representable original receipt recovery is authorized before new-write eligibility. New invitation/guest commands always require1.
+      schema: { type: string, enum: ['1'] }
     LedgerVersion:
       name: X-Ledger-Version
       in: header

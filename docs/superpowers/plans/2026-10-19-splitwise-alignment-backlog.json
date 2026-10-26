@@ -280,8 +280,16 @@
         "C01",
         "H01"
       ],
-      "status": "planned",
-      "conditional": false
+      "status": "reviewed_core_candidate",
+      "conditional": false,
+      "subsystem_plan": "docs/superpowers/plans/2026-10-26-alignment-g01.md",
+      "base_dev": "3fae8e5491717245753573e117b35ff466fbaeab",
+      "branch": "bugfix/alignment-g01-participant-invitations",
+      "integration_state": "ready_for_pr_to_dev",
+      "evidence": "docs/reviews/2026-10-26-alignment/g01-participant-invitations.md",
+      "conditional_followups": [
+        "Phone/SMS requires a selected verified channel; none is selected. Production SMTP activation remains deferred."
+      ]
     },
     {
       "id": "G02",
@@ -372,14 +380,16 @@
         "E02",
         "C01"
       ],
-      "status": "reviewed_candidate",
+      "status": "merged_into_dev",
       "conditional": false,
       "subsystem_plan": "docs/superpowers/plans/2026-10-24-alignment-h01.md",
       "implementation_gate": "Satisfied: A03/C01 merged into dev2df057c; required CI40221010706 SUCCESS. Production promotion separate.",
       "base_dev": "2df057cbbb045e7757d98fe24ded9ca8318812a2",
       "branch": "bugfix/alignment-h01-expense-recovery",
-      "integration_state": "ready_for_pr_to_dev",
-      "evidence": "docs/reviews/2026-10-25-alignment/h01-expense-recovery.md"
+      "integration_state": "merged_verified",
+      "evidence": "docs/reviews/2026-10-25-alignment/h01-expense-recovery.md",
+      "pr": 106,
+      "merge_commit": "3fae8e5491717245753573e117b35ff466fbaeab"
     },
     {
       "id": "H02",
@@ -867,52 +877,52 @@
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "required_outcome": "Keep results/retry ownership; add broader invitation flows separately.",
-      "evidence": "BE-02; F04,05"
+      "evidence": "BE-02; F04,05; Registered-account immediate add/re-add preserved; never auto-claims guest entries. docs/reviews/2026-10-26-alignment/g01-participant-invitations.md"
     },
     {
       "feature_id": "G04",
       "area": "Groups, friends and invitations",
       "tier": "Core",
       "feature": "Email/phone invitations and acceptance",
-      "audit_status": "Missing",
-      "action": "Build",
+      "audit_status": "Partial",
+      "action": "Extend",
       "primary_package": "G01",
       "supporting_packages": "A02",
       "milestone": "M2",
       "model": "gpt-6.1-sol",
       "reasoning": "high",
-      "required_outcome": "Add expiring invitations, delivery and claim/link rules with clear membership consent.",
-      "evidence": "BE-02; API09; official invitation-help"
+      "required_outcome": "Add expiring invitations, delivery and claim/link rules with clear membership consent. Phone/SMS requires a selected verified channel; none is selected.",
+      "evidence": "BE-02; API09; official invitation-help; Verified email invitations and explicit claims implemented; phone/SMS remains gated on a selected verified channel. docs/reviews/2026-10-26-alignment/g01-participant-invitations.md"
     },
     {
       "feature_id": "G05",
       "area": "Groups, friends and invitations",
       "tier": "Core",
       "feature": "Shareable group invitation links",
-      "audit_status": "Missing",
-      "action": "Build",
+      "audit_status": "Done",
+      "action": "Maintain",
       "primary_package": "G01",
       "supporting_packages": "",
       "milestone": "M2",
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "required_outcome": "Use scoped expiring/revocable invite tokens and explicit acceptance.",
-      "evidence": "API04,05,09; official join-group help"
+      "evidence": "API04,05,09; official join-group help; Single-use expiring/revocable join links; forwarded links never claim guest debt. docs/reviews/2026-10-26-alignment/g01-participant-invitations.md"
     },
     {
       "feature_id": "G06",
       "area": "Groups, friends and invitations",
       "tier": "Core",
       "feature": "Unregistered or placeholder participants",
-      "audit_status": "Missing",
-      "action": "Build",
+      "audit_status": "Done",
+      "action": "Maintain",
       "primary_package": "G01",
       "supporting_packages": "",
       "milestone": "M2",
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "required_outcome": "Model a financial participant independently from a login; safely claim placeholders without fabricating credentials.",
-      "evidence": "BE-02,04; API09; official placeholder-help"
+      "evidence": "BE-02,04; API09; official placeholder-help; Stable financial participants, pre-signup expenses, verified immutable claims and same-ID recovery implemented. docs/reviews/2026-10-26-alignment/g01-participant-invitations.md"
     },
     {
       "feature_id": "G07",
@@ -1885,11 +1895,11 @@
     "dependency_gate": "F01/F03/F04 merged through PR95-97; final CI39226477137 passed."
   },
   "current_batch": [
-    "H01"
+    "G01"
   ],
-  "implementation_base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
+  "implementation_base_dev": "3fae8e5491717245753573e117b35ff466fbaeab",
   "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
-  "current_batch_status": "reviewed_verified_ready_for_pr",
+  "current_batch_status": "reviewed_verified_core_ready_for_pr",
   "second_batch_delivery": {
     "state": "merged_dev",
     "packages": [
@@ -1945,7 +1955,7 @@
     "ci": "SUCCESS"
   },
   "fifth_batch_delivery": {
-    "state": "reviewed_verified_ready_for_pr",
+    "state": "merged_into_dev",
     "packages": [
       "H01"
     ],
@@ -1965,6 +1975,35 @@
       390
     ],
     "native_acceptance": "passed; zero page errors/overflow; cleanup true",
-    "independent_reviews": "Standards P2 delete snapshot fetch fixed; follow-up zero. Spec initial/follow-up zero."
+    "independent_reviews": "Standards P2 delete snapshot fetch fixed; follow-up zero. Spec initial/follow-up zero.",
+    "pr": 106,
+    "merge_commit": "3fae8e5491717245753573e117b35ff466fbaeab",
+    "final_dev_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/40298485115"
+  },
+  "sixth_batch_delivery": {
+    "state": "reviewed_verified_core_ready_for_pr",
+    "packages": [
+      "G01"
+    ],
+    "base_dev": "3fae8e5491717245753573e117b35ff466fbaeab",
+    "design_commit": "168377a66f95b96481315b2309620f401fe6b6fc",
+    "backend": 335,
+    "frontend": 356,
+    "frontend_files": 51,
+    "independent_http_responses": 169,
+    "migration": "V17 stable participant IDs; preserve financial facts and stored snapshots; drain old instances; compatible forward fix",
+    "evidence": "docs/reviews/2026-10-26-alignment/g01-participant-invitations.md",
+    "production_promotion_authorized": false,
+    "production_SMTP": "deferred",
+    "phone_SMS": "gated: verified channel not selected",
+    "final_http_responses": 199,
+    "native_browser_api_responses": 188,
+    "browser_widths": [
+      1280,
+      390
+    ],
+    "native_acceptance": "passed; zero page errors/page-width overflow; cleanup true",
+    "independent_reviews": "Standards FK indexes fixed; Standards follow-up zero; Spec initial/follow-up zero",
+    "backend_sha256": "4f23570214da52b95f486e1b3e7f67e5b150f38a092cac4f71baf701ac7b1cae"
   }
 }

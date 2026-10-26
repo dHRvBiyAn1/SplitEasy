@@ -1,6 +1,6 @@
 package com.spliteasy.dto.expense;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.ExpenseCategory;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,7 +14,7 @@ public record ExpenseSummary(
     UUID id,
     String description,
     long amountMinor,
-    UserSummary paidBy,
+    ParticipantSummary paidBy,
     long participantCount,
     ExpenseCategory category,
     LocalDate spentOn,

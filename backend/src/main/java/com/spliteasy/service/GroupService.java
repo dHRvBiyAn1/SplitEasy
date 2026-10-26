@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GroupService {
 
+  private final FinancialParticipantService financialParticipants;
   private final CreateOperations createOperations;
   private final GroupRepository groupRepository;
   private final GroupMembershipRepository membershipRepository;
@@ -64,15 +65,17 @@ public class GroupService {
             .orElseThrow(() -> new NotFoundException("User not found"));
     GroupType type = request.type() != null ? request.type() : GroupType.OTHER;
     Group group = groupRepository.save(new Group(request.name().trim(), type, creator));
-    membershipRepository.save(new GroupMembership(group, creator));
+    membershipRepository.saveAndFlush(new GroupMembership(group, creator));
+    financialParticipants.activate(group.getId(), requesterId);
     log.info("Group {} '{}' created by user {}", group.getId(), group.getName(), requesterId);
     // One code path for the DTO: toGroupResponse re-reads members (just the creator here).
-    return toGroupResponse(group);
+    return toGroupResponse(group, requesterId);
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public GroupResponse addMember(UUID requesterId, UUID groupId, String email) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
 
     User invitee =
         userRepository
@@ -81,12 +84,13 @@ public class GroupService {
     if (membershipRepository.existsByGroupIdAndUserId(groupId, invitee.getId())) {
       throw new ConflictException("User is already a member of this group");
     }
-    membershipRepository.save(new GroupMembership(group, invitee));
+    membershipRepository.saveAndFlush(new GroupMembership(group, invitee));
+    financialParticipants.activate(groupId, invitee.getId());
     log.info("User {} added member {} to group {}", requesterId, invitee.getId(), groupId);
-    return toGroupResponse(group);
+    return toGroupResponse(group, requesterId);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<GroupSummary> listMyGroups(UUID requesterId) {
     return membershipRepository.findGroupSummariesForUser(requesterId).stream()
         .map(
@@ -96,16 +100,17 @@ public class GroupService {
         .toList();
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public GroupResponse getGroup(UUID requesterId, UUID groupId) {
     // Membership check first: a non-member gets 403 without learning whether
     // the group exists (consistent with the other group-scoped services).
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     Group group =
         groupRepository
             .findById(groupId)
             .orElseThrow(() -> new NotFoundException("Group not found"));
-    return toGroupResponse(group);
+    return toGroupResponse(group, requesterId);
   }
 
   /**
@@ -115,6 +120,7 @@ public class GroupService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public GroupResponse updateGroup(UUID requesterId, UUID groupId, UpdateGroupRequest request) {
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     Group group =
         request.simplifyDebts() != null
             ? groupWriteGuard.lockForMember(groupId, requesterId)
@@ -122,10 +128,14 @@ public class GroupService {
                 .findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
+    // Preserve the loaded dirty-field semantics, but serialize roster compatibility before writes.
+    if (request.simplifyDebts() == null) groupWriteGuard.lockForMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
+
     if (request.simplifyDebts() != null && request.simplifyDebts() != group.isSimplifyDebts()) {
       var active =
-          membershipRepository.findByGroupIdFetchUser(groupId).stream()
-              .map(m -> m.getUser().getId())
+          financialParticipants.roster(groupId).stream()
+              .map(com.spliteasy.dto.common.ParticipantSummary::id)
               .collect(java.util.stream.Collectors.toSet());
       boolean formerExposure =
           projection.snapshot(requesterId, groupId, request.simplifyDebts()).stream()
@@ -150,7 +160,7 @@ public class GroupService {
       group.setSimplifyDebts(request.simplifyDebts());
     }
     log.info("Group {} settings updated by user {}", groupId, requesterId);
-    return toGroupResponse(group);
+    return toGroupResponse(group, requesterId);
   }
 
   /**
@@ -162,6 +172,7 @@ public class GroupService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void removeMember(UUID requesterId, UUID groupId, UUID targetUserId) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     if (!membershipRepository.existsByGroupIdAndUserId(groupId, targetUserId)) {
       throw new NotFoundException("That person is not a member of this group");
     }
@@ -183,6 +194,7 @@ public class GroupService {
     }
 
     membershipRepository.deleteByGroupIdAndUserId(groupId, targetUserId);
+    financialParticipants.deactivate(groupId, targetUserId);
     log.info("User {} removed member {} from group {}", requesterId, targetUserId, groupId);
   }
 
@@ -190,6 +202,7 @@ public class GroupService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void deleteGroup(UUID requesterId, UUID groupId) {
     Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     if (!group.getCreatedBy().getId().equals(requesterId)) {
       throw new ForbiddenException("Only the group's creator can delete it");
     }
@@ -206,7 +219,7 @@ public class GroupService {
   }
 
   /** Builds the full response, fetching members with their users in a single query. */
-  private GroupResponse toGroupResponse(Group group) {
+  private GroupResponse toGroupResponse(Group group, UUID requesterId) {
     List<UserSummary> members =
         membershipRepository.findByGroupIdFetchUser(group.getId()).stream()
             .map(m -> UserSummary.from(m.getUser()))
@@ -218,6 +231,14 @@ public class GroupService {
         UserSummary.from(group.getCreatedBy()),
         members,
         group.isSimplifyDebts(),
-        group.getCreatedAt());
+        group.getCreatedAt(),
+        financialParticipants.roster(group.getId()),
+        requesterId,
+        financialParticipants.originals(group.getId()).values().stream()
+            .filter(p -> requesterId.equals(p.accountId()))
+            .map(com.spliteasy.dto.common.ParticipantSummary::id)
+            .sorted()
+            .toList(),
+        financialParticipants.inactiveGuests(group.getId()));
   }
 }

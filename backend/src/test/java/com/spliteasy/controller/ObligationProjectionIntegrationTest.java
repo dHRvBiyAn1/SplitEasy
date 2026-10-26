@@ -196,6 +196,11 @@ class ObligationProjectionIntegrationTest extends AbstractIntegrationTest {
         "delete from group_memberships where group_id = ? and user_id = ?",
         UUID.fromString(f.group()),
         f.c().user().id());
+    // Model a pre-G01 former participant after roster backfill, not an active financial guest.
+    jdbc.update(
+        "update group_participants set active=false where group_id=? and participant_id=?",
+        UUID.fromString(f.group()),
+        f.c().user().id());
     JsonNode raw = read(f.a(), "/api/groups/" + f.group() + "/balances/obligations");
     mode(f, true, 409);
     assertThat(read(f.a(), "/api/groups/" + f.group()).path("simplifyDebts").asBoolean()).isFalse();

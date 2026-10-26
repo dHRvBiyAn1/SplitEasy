@@ -174,7 +174,12 @@
               <span class="dc-avatar prow__av" aria-hidden="true" [style]="tint(m.id)">{{
                 initials(m.displayName)
               }}</span>
-              <span class="prow__name">{{ firstName(m) }}</span>
+              <span class="prow__name"
+                >{{ firstName(m) }}
+                @if (sameOwner(m)) {
+                  <small>Historical identity · same account; original split retained</small>
+                }
+              </span>
               @if (splitType() === 'EQUAL') {
                 <label class="participant-toggle"
                   ><input
@@ -250,10 +255,18 @@
       }
       @if (retryNotice()) {
         <p role="status">{{ retryNotice() }}</p>
+        @if (unmappedOriginalIds().length) {
+          <p role="status">
+            Some original identities are absent from the current roster:
+            {{ unmappedOriginalIds().join(', ') }}. Their saved IDs, amounts and typed inputs are
+            retained. Only retry the original expense, or check history before starting a separate
+            entry.
+          </p>
+        }
         <button
           type="button"
           class="dc-btn-outline"
-          [disabled]="saving() || !ready()"
+          [disabled]="saving() || !ready() || draftBlocked()"
           (click)="retryOriginal()"
         >
           Retry original expense
