@@ -128,15 +128,16 @@
         "A02",
         "E02"
       ],
-      "status": "open_pr",
+      "status": "merged",
       "conditional": false,
       "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
       "branch": "bugfix/alignment-a03-revocable-sessions",
       "execution_plan": "2026-10-24-alignment-a03.md",
-      "integration_state": "not_merged",
+      "integration_state": "merged_dev",
       "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report.",
       "pull_request": 104,
-      "pull_request_url": "https://github.com/dHRvBiyAn1/SplitEasy/pull/104"
+      "pull_request_url": "https://github.com/dHRvBiyAn1/SplitEasy/pull/104",
+      "merge_commit": "9da74b411ab062c6e98d88ca9b2194ebb402dbf2"
     },
     {
       "id": "A04",
@@ -182,7 +183,7 @@
         "E01",
         "E02"
       ],
-      "status": "open_pr",
+      "status": "merged",
       "conditional": false,
       "legacy_currency_decision": {
         "currency": "USD",
@@ -192,10 +193,11 @@
       "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
       "branch": "bugfix/alignment-c01-currency-ledger",
       "execution_plan": "2026-10-24-alignment-c01.md",
-      "integration_state": "not_merged",
+      "integration_state": "merged_dev",
       "verification": "Independent Standards/Spec review findings fixed; combined checks and migration/native browser evidence in fourth-batch integration report.",
       "pull_request": 105,
-      "pull_request_url": "https://github.com/dHRvBiyAn1/SplitEasy/pull/105"
+      "pull_request_url": "https://github.com/dHRvBiyAn1/SplitEasy/pull/105",
+      "merge_commit": "2df057cbbb045e7757d98fe24ded9ca8318812a2"
     },
     {
       "id": "C02",
@@ -370,10 +372,14 @@
         "E02",
         "C01"
       ],
-      "status": "design_prepared",
+      "status": "reviewed_candidate",
       "conditional": false,
       "subsystem_plan": "docs/superpowers/plans/2026-10-24-alignment-h01.md",
-      "implementation_gate": "C01 and A03 integrated into verified dev; branch from that dev. No PR merge authorization implied."
+      "implementation_gate": "Satisfied: A03/C01 merged into dev2df057c; required CI40221010706 SUCCESS. Production promotion separate.",
+      "base_dev": "2df057cbbb045e7757d98fe24ded9ca8318812a2",
+      "branch": "bugfix/alignment-h01-expense-recovery",
+      "integration_state": "ready_for_pr_to_dev",
+      "evidence": "docs/reviews/2026-10-25-alignment/h01-expense-recovery.md"
     },
     {
       "id": "H02",
@@ -1206,7 +1212,7 @@
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "required_outcome": "Retain recoverable facts; define reversal/restore and historical participant visibility.",
-      "evidence": "BE-07,17,21; API21,22"
+      "evidence": "BE-07,17,21; API21,22; H01 expense candidate: docs/reviews/2026-10-25-alignment/h01-expense-recovery.md"
     },
     {
       "feature_id": "E15",
@@ -1466,7 +1472,7 @@
       "model": "gpt-6.1-sol",
       "reasoning": "high",
       "required_outcome": "Retain source facts and append durable mutation events; support meaningful restore actions.",
-      "evidence": "BE-06,17; official activity/restore help"
+      "evidence": "BE-06,17; official activity/restore help; H01 expense candidate: docs/reviews/2026-10-25-alignment/h01-expense-recovery.md"
     },
     {
       "feature_id": "H03",
@@ -1879,12 +1885,11 @@
     "dependency_gate": "F01/F03/F04 merged through PR95-97; final CI39226477137 passed."
   },
   "current_batch": [
-    "A03",
-    "C01"
+    "H01"
   ],
   "implementation_base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
   "foundation_ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39226477137",
-  "current_batch_status": "reviewed_prs_to_dev",
+  "current_batch_status": "reviewed_verified_ready_for_pr",
   "second_batch_delivery": {
     "state": "merged_dev",
     "packages": [
@@ -1922,7 +1927,7 @@
     "ci": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/40079232599"
   },
   "fourth_batch_delivery": {
-    "state": "reviewed_prs_to_dev",
+    "state": "merged_dev",
     "packages": [
       "A03",
       "C01"
@@ -1930,10 +1935,36 @@
     "base_dev": "4072aa7f79cf67fbf5193566b84ab0b6bbcf1df5",
     "migration_order": "A03 V14 before C01 V15, or same release; drain old writers",
     "evidence": "docs/reviews/2026-10-24-alignment/fourth-batch-integration.md",
-    "merge_authorized": false,
+    "merge_authorized": true,
     "pull_requests": [
       104,
       105
-    ]
+    ],
+    "dev_head": "2df057cbbb045e7757d98fe24ded9ca8318812a2",
+    "ci_url": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/40221010706",
+    "ci": "SUCCESS"
+  },
+  "fifth_batch_delivery": {
+    "state": "reviewed_verified_ready_for_pr",
+    "packages": [
+      "H01"
+    ],
+    "base_dev": "2df057cbbb045e7757d98fe24ded9ca8318812a2",
+    "migration": "V16 follows V14/V15; drain all old backend readers/writers; rollback uses compatible forward fix",
+    "evidence": "docs/reviews/2026-10-25-alignment/h01-expense-recovery.md",
+    "scope": "Expense audit/recovery only; durable global activity/pagination and group/payment corrections remain separate",
+    "backend": 322,
+    "frontend": 335,
+    "frontend_files": 43,
+    "independent_upgrade_http_responses": 71,
+    "production_promotion_authorized": false,
+    "final_http_responses": 81,
+    "native_browser_api_responses": 151,
+    "browser_widths": [
+      1280,
+      390
+    ],
+    "native_acceptance": "passed; zero page errors/overflow; cleanup true",
+    "independent_reviews": "Standards P2 delete snapshot fetch fixed; follow-up zero. Spec initial/follow-up zero."
   }
 }

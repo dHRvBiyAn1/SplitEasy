@@ -199,6 +199,7 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
         "createExpense",
         "updateExpense",
         "deleteExpense",
+        "restoreExpense",
         "payment",
         "addMember",
         "removeMember",
@@ -222,6 +223,23 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
                 f.a()),
             201,
             ExpenseResponse.class);
+    if (mutation.equals("restoreExpense")) {
+      mockMvc
+          .perform(
+              auth(
+                  delete(path(f, "/expenses/" + original.id()))
+                      .param("expectedVersion", Long.toString(original.version())),
+                  f.a()))
+          .andExpect(status().isNoContent());
+    }
+    long restoreVersion =
+        mutation.equals("restoreExpense")
+            ? read(
+                f,
+                "/expenses/" + original.id() + "/history",
+                com.spliteasy.dto.expense.ExpenseRevision[].class)[1]
+                .version()
+            : 0;
     Object[] before = read(f, "/expenses", Object[].class);
     var changed =
         new CreateExpenseRequest(
@@ -234,6 +252,10 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(json(changed));
           case "deleteExpense" -> delete(path(f, "/expenses/" + original.id()));
+          case "restoreExpense" ->
+              jsonPost(
+                  path(f, "/expenses/" + original.id() + "/restore"),
+                  Map.of("expectedVersion", restoreVersion));
           case "payment" ->
               jsonPost(
                   path(f, "/payments"),
