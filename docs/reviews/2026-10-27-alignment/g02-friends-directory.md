@@ -40,3 +40,7 @@ Zero actionable findings. Separate read-only review at965caa8 against the record
 ## Migration and rollout
 
 V18 adds an initially empty private directory table with indexed account references; existing financial tables, facts, ownership links, memberships, revisions and receipts are unchanged. Retain the table on rollback to preserve bookmarks. Existing G01 guest-data compatible-forward-fix restrictions continue. No main promotion, release tag, deployment or production SMTP configuration is part of this change. Phone/SMS remains provider-gated. Dependent G02.2 implementation waits for this slice's integration into verified dev.
+
+## PR108 typography review follow-up
+
+Automated review identified component-local typography values despite the shared-token rule. The page-heading font, body line height, caption size and balance size now live in `_tokens.scss`; Friends references these reusable roles with unchanged values. Full frontend369/52, full-source Prettier and production build passed again (552.70kB warning, unchanged budgets). Backend203-file manifest remains unchanged and its347-test result is retained. Final updated-assets native acceptance and independent follow-up reviews are next.

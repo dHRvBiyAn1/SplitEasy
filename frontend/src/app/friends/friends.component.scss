@@ -18,7 +18,7 @@
   flex-wrap: wrap;
 }
 h1 {
-  font: 900 clamp(2rem, 5vw, 3rem)/1.1 var(--font-display);
+  font: var(--type-page-heading);
   margin: 0;
 }
 h2,
@@ -28,7 +28,7 @@ h3 {
 }
 p {
   margin: 0;
-  line-height: 1.6;
+  line-height: var(--type-body-line-height);
 }
 a {
   color: var(--accent);
@@ -36,7 +36,7 @@ a {
 .eyebrow,
 .group-count {
   color: var(--ink2);
-  font-size: 0.85rem;
+  font-size: var(--type-caption-size);
 }
 .scope-note {
   display: grid;
@@ -74,10 +74,10 @@ a {
 }
 .balances > div > span {
   color: var(--ink2);
-  font-size: 0.85rem;
+  font-size: var(--type-caption-size);
 }
 .balances app-money {
-  font-size: 1.35rem;
+  font-size: var(--type-balance-size);
 }
 .source-fields {
   display: grid;
