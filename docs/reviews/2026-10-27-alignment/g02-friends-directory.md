@@ -23,7 +23,7 @@ Final corrected JAR and frozen production SPA passed **146 real HTTP checks plus
 ## Required checks
 
 - Java21: `./mvnw -s /workspace/maven-proxy-settings.xml spotless:apply spotless:check verify` passed347 tests /43 suites, failures/errors/skips0. Final JAR SHA256:eec037c0eb0de798ffecd4080722e2ce8b22ce588870305fd15dd873f549db64. Source manifest203 files matches.
-- Node22.23.4: full frontend tests369 /52 files; full-source Prettier and production build passed. Initial bundle552.54kB warns at unchanged500kB, below unchanged1MB error budget. Source163 files and dist42 files match recorded manifests.
+- Node22.23.4: full frontend tests369 /52 files; full-source Prettier and production build passed. Initial bundle552.70kB warns at unchanged500kB, below unchanged1MB error budget. Source163 files and dist42 files match recorded manifests.
 - Deployment tests14, ShellCheck and Actionlint passed. Official OpenAPI3.1 schema370 refs/44 paths and81-row CSV/JSON with owner-confirmed USD passed.
 - Exact design: [G02.1](../../superpowers/plans/2026-10-26-alignment-g02.md). Public contract: [saved friends](../../api/friends.md).
 
@@ -43,4 +43,4 @@ V18 adds an initially empty private directory table with indexed account referen
 
 ## PR108 typography review follow-up
 
-Automated review identified component-local typography values despite the shared-token rule. The page-heading font, body line height, caption size and balance size now live in `_tokens.scss`; Friends references these reusable roles with unchanged values. Full frontend369/52, full-source Prettier and production build passed again (552.70kB warning, unchanged budgets). Backend203-file manifest remains unchanged and its347-test result is retained. Final updated-assets native acceptance and independent follow-up reviews are next.
+Automated review identified component-local typography values despite the shared-token rule. The page-heading font, body line height, caption size and balance size now live in `_tokens.scss`; Friends references these reusable roles with unchanged values. Full frontend369/52, full-source Prettier and production build passed again (552.70kB warning, unchanged budgets). Backend203-file manifest remains unchanged and its347-test result is retained. Final updated-assets native acceptance passed146HTTP+70 browser API responses at1280/390, zero errors/overflow, screenshots inspected and cleanuptrue. Standards and Spec follow-ups at6b3c356 have zero remaining findings. Backend/source203 and final frontend-source163/dist42 manifests match; no backend test rerun was needed because its source is unchanged. Exact updated-head PR CI/review is the remaining gate.
