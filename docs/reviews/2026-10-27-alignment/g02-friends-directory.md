@@ -1,6 +1,6 @@
 # G02.1 — saved friends directory and authorized detail
 
-Status: implementation complete, local suites passed; final packaged native acceptance and independent reviews are publication gates. This first serial G02 PR targets dev from verified68bca60955a2c11c539a2f880e8275205215f5c1. PR107 merged at that commit, its tree equals reviewed9f220b4, and post-merge CI40347083397 passed. Personal expense CRUD and personal debt/payment/history remain later serial PRs.
+Status: implementation complete, full local verification and independent reviews passed; publication/exact-head CI is the next gate. This first serial G02 PR targets dev from verified68bca60955a2c11c539a2f880e8275205215f5c1. PR107 merged at that commit, its tree equals reviewed9f220b4, and post-merge CI40347083397 passed. Personal expense CRUD and personal debt/payment/history remain later serial PRs.
 
 ## Behavior and scope
 
@@ -18,6 +18,8 @@ UI provides desktop/mobile Friends navigation, explicit roster selection/save/re
 - Rendered routes/HTTP:13 new friend tests, plus existing shell assertions. Includes directory errors vs zero, save/remove confirmation, uncertain response review, A→B→A source/route/session cancellation, foreground coalescing, detail removal navigation and blank source cancellation.
 - Independent checkpoint packaged V17→V18 plus112 real HTTP responses passed, including actual loopback SMTP verification/guest claim, alias deduplication, old monetary IDs/values/splits/versions and immutable JSON preservation, per-currency group reconciliation and access-loss/deletion privacy. Owned resources cleaned. The first harness compared receipt nanoseconds with persisted PostgreSQL timestamp precision; it was corrected to compare persisted pre/post reads. Only createdAt differed; no application change was required.
 
+Final corrected JAR and frozen production SPA passed **146 real HTTP checks plus70 native browser API responses** at1280px and390px. Verified actual dropped successful save followed by explicit status GET without repost, even-overall opposing groups, KWD1.234 precision, settled directory retention, bookmark-only removal and retained private label after source-group deletion. Both widths had0 page errors/0 horizontal overflow; screenshots inspected and owned cleanup confirmed. An initial mobile synchronous link-count assertion was replaced with a wait for the rendered links; unchanged source/assets then passed. The owned static gateway also observed an expected canceled-asset socket during hard navigation, with no browser page error.
+
 ## Required checks
 
 - Java21: `./mvnw -s /workspace/maven-proxy-settings.xml spotless:apply spotless:check verify` passed347 tests /43 suites, failures/errors/skips0. Final JAR SHA256:eec037c0eb0de798ffecd4080722e2ce8b22ce588870305fd15dd873f549db64. Source manifest203 files matches.
@@ -29,11 +31,11 @@ UI provides desktop/mobile Friends navigation, explicit roster selection/save/re
 
 ### Standards
 
-Pending independent review against68bca60955a2c11c539a2f880e8275205215f5c1.
+Zero actionable findings. Read-only full diff review at965caa8 against pinned68bca60955a2c11c539a2f880e8275205215f5c1; no further source changes.
 
 ### Spec
 
-Pending independent review against the recorded G02.1 design.
+Zero actionable findings. Separate read-only review at965caa8 against the recorded G02.1 design and serial roadmap scope; no further source changes.
 
 ## Migration and rollout
 

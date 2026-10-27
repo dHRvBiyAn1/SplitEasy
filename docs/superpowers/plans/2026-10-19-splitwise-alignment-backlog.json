@@ -307,7 +307,7 @@
         "C01",
         "H01"
       ],
-      "status": "first_slice_candidate",
+      "status": "first_slice_reviewed_candidate",
       "conditional": false,
       "base_dev": "68bca60955a2c11c539a2f880e8275205215f5c1",
       "branch": "bugfix/alignment-g02-friends-directory",
@@ -317,7 +317,7 @@
         "authorized personal expense CRUD",
         "personal debt/payment views and friend history"
       ],
-      "verification": "Backend347/frontend369/52 and static/deployment checks passed. Final native acceptance and independent reviews are next publication gates."
+      "verification": "Backend347/frontend369/52, format/build/deployment14/lints/OpenAPI370/44 and populated V17\u2192V18+realSMTP146HTTP+70native-browser API at1280/390 passed. Standards0/Spec0. Publication/exact-head CI next."
     },
     {
       "id": "G03",
