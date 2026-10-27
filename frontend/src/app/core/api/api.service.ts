@@ -41,6 +41,8 @@ export class ApiService {
 
   private ledgerOptions(path: string) {
     return path === '/dashboard' ||
+      path === '/friends' ||
+      path.startsWith('/friends/') ||
       path === '/groups' ||
       path.startsWith('/groups/') ||
       path.startsWith('/invitations/')

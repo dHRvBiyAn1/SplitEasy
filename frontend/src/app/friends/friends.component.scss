@@ -1,0 +1,123 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.friends-page {
+  max-width: 1100px;
+  margin: auto;
+  padding: var(--sp-7) var(--sp-6) var(--sp-8);
+  display: grid;
+  gap: var(--sp-5);
+  overflow-wrap: anywhere;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+h1 {
+  font: 900 clamp(2rem, 5vw, 3rem)/1.1 var(--font-display);
+  margin: 0;
+}
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+p {
+  margin: 0;
+  line-height: 1.6;
+}
+a {
+  color: var(--accent);
+}
+.eyebrow,
+.group-count {
+  color: var(--ink2);
+  font-size: 0.85rem;
+}
+.scope-note {
+  display: grid;
+  gap: var(--sp-2);
+  color: var(--ink2);
+  max-width: 75ch;
+}
+.friend-panel {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  padding: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.friend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-5);
+}
+.balances {
+  display: grid;
+  gap: var(--sp-3);
+}
+.balances > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.balances > div > span {
+  color: var(--ink2);
+  font-size: 0.85rem;
+}
+.balances app-money {
+  font-size: 1.35rem;
+}
+.source-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+label {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+select {
+  width: 100%;
+  min-width: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+button {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+}
+.notice {
+  border-left: 3px solid var(--accent);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+}
+@media (max-width: 640px) {
+  .friends-page {
+    padding: var(--sp-5) var(--sp-4) var(--sp-7);
+  }
+  .friend-grid,
+  .source-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .friend-panel {
+    padding: var(--sp-5);
+  }
+}

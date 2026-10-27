@@ -196,7 +196,7 @@ describe('App', () => {
     fixture.detectChanges();
     httpTesting.expectNone('/api/dashboard');
   });
-  it('provides four labelled icon destinations and restores selection after an expense closes', () => {
+  it('provides saved friends in desktop and mobile navigation and restores selection after an expense closes', () => {
     signIn();
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -224,7 +224,8 @@ describe('App', () => {
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
     const dock = root.querySelector('.mobile-nav');
-    expect(dock?.querySelectorAll('app-icon').length).toBe(4);
+    expect(dock?.querySelector('a[href="/friends"]')?.textContent).toContain('Friends');
+    expect(root.querySelector('.desktop-nav a[href="/friends"]')?.textContent).toContain('Friends');
     const expense = dock?.querySelector<HTMLButtonElement>('[data-nav="expense"]');
     expect(expense).toBeTruthy();
     expense?.click();
