@@ -17,6 +17,9 @@
         >
           Groups
         </button>
+        <a routerLink="/friends" [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
+          >Friends</a
+        >
         <button type="button" (click)="modal.openSettle()">Settle up</button>
       </nav>
       <button
@@ -73,6 +76,12 @@
       >
         <app-icon name="groups" /><span>Groups</span>
       </button>
+      <a
+        routerLink="/friends"
+        data-nav="friends"
+        [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
+        ><app-icon name="groups" /><span>Friends</span></a
+      >
       <button
         type="button"
         data-nav="expense"

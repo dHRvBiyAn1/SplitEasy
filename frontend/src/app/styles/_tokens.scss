@@ -132,6 +132,10 @@ $palettes: (
 :root {
   --font-display: 'Nunito Sans', system-ui, sans-serif;
   --font-ui: 'DM Sans', system-ui, sans-serif;
+  --type-page-heading: 900 clamp(2rem, 5vw, 3rem) / 1.1 var(--font-display);
+  --type-body-line-height: 1.6;
+  --type-caption-size: 0.85rem;
+  --type-balance-size: 1.35rem;
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;

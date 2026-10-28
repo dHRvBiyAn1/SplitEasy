@@ -74,6 +74,8 @@ tags:
     description: Liveness probe
   - name: Groups
     description: Group management, membership, settings
+  - name: Friends
+    description: Private saved friends and current authorized group balances; no personal ledger yet
   - name: Invitations
     description: Group-scoped guests and explicit verified claims or single-use Join links
   - name: Expenses
@@ -91,6 +93,95 @@ security:
   - bearerAuth: []
 
 paths:
+  /api/friends:
+    parameters:
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listSavedFriends
+      summary: List my saved friends, including settled friends
+      description: Private directed bookmarks. Balances cover only currently accessible groups; no email, phone or global account lookup. No shared groups returns empty balances rather than a lifetime settlement assertion. Participant version1 required.
+      tags: [Friends]
+      responses:
+        '200':
+          description: Saved friends, retained independently of current group access or debt
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FriendSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    post:
+      operationId: saveFriend
+      summary: Save a registered person from my current group roster
+      description: Idempotent owner/account save. Requires current membership and active original participant; resolves claimed aliases to one registered account. Rejects self and unclaimed guests. Grants no membership, reciprocal relationship or ownership. No email sent. Validates capabilities before saving.
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveFriendRequest'
+      responses:
+        '200':
+          description: Saved friend, including an unchanged already-saved relationship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/friends/{friendId}:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The saved registered account's canonical primary financial participant ID; always scoped to the requester
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: getSavedFriend
+      summary: Read a saved friend's current authorized group breakdown
+      description: Unknown or another owner's saved target returns404. A saved friend never grants history access. Each group uses its selected direct/simplified mode and current claimed identities; stored financial records stay unchanged. Follow group links for existing expense history. No personal expenses or friend-level settlement are implemented here.
+      tags: [Friends]
+      responses:
+        '200':
+          description: One coherent snapshot of the bookmark and accessible group obligations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: removeSavedFriend
+      summary: Remove only my saved-friend bookmark
+      description: Idempotent even when absent. Changes no financial records, group membership, participant claims or another account's directory. Requires participant version1.
+      tags: [Friends]
+      responses:
+        '204':
+          description: My bookmark is absent
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /api/currencies:
     get:
       operationId: listCurrencies
@@ -1653,6 +1744,67 @@ paths:
 
 components:
   schemas:
+    SaveFriendRequest:
+      type: object
+      required: [groupId, participantId]
+      properties:
+        groupId: {type: string, format: uuid}
+        participantId:
+          type: string
+          format: uuid
+          description: Active original financial participant in the source group; must already have a registered owner
+    FriendBalance:
+      type: object
+      required: [currency, netMinor]
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        netMinor:
+          type: integer
+          format: int64
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          description: Positive means friend owes viewer; negative means viewer owes friend. Never net unlike currencies.
+    FriendSummary:
+      type: object
+      required: [id, displayName, createdAt, sharedGroupCount, hasOpenObligations, balances]
+      properties:
+        id: {type: string, format: uuid}
+        displayName:
+          type: string
+          description: Authorized label saved at first creation, not a live global profile/contact lookup
+        createdAt: {type: string, format: date-time}
+        sharedGroupCount: {type: integer, minimum: 0}
+        hasOpenObligations:
+          type: boolean
+          description: True when any accessible group has a nonzero obligation; may be true despite aggregate zero
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/FriendBalance'
+          description: Current accessible group totals by currency. Empty with no shared group data, never evidence of global settlement.
+    FriendGroup:
+      type: object
+      required: [id, name, simplifyDebts, balances]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        simplifyDebts: {type: boolean}
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/FriendBalance'
+    FriendDetail:
+      allOf:
+        - $ref: '#/components/schemas/FriendSummary'
+        - type: object
+          required: [sharedGroups]
+          properties:
+            sharedGroups:
+              type: array
+              items:
+                $ref: '#/components/schemas/FriendGroup'
+
     GroupType:
       type: string
       description: What a group is for (drives the UI glyph/label)

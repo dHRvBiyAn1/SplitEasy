@@ -9,7 +9,7 @@ Use **Matt Pocock's skills instead of Superpowers**, as selected by the user. Be
 
 Issues use [GitHub](docs/agents/issue-tracker.md); domain documentation uses [a single context](docs/agents/domain.md). Keep at most three active worker threads, no Astra and Sol reasoning at most high. Work branches start from `dev` and PRs target `dev`.
 
-When changing participant identity, invitations, financial ownership or their wire contracts, read the [G01 subsystem design](docs/superpowers/plans/2026-10-26-alignment-g01.md) and [identity ADR](docs/adr/0001-immutable-financial-participants.md) before coding. The core implementation is a candidate; see its verification report and remaining publication gates.
+When changing participant identity, invitations, financial ownership or their wire contracts, read the [G01 subsystem design](docs/superpowers/plans/2026-10-26-alignment-g01.md) and [identity ADR](docs/adr/0001-immutable-financial-participants.md) before coding. G01 core merged as PR107; see its verification report. Saved-friend changes also follow the [G02.1 directory design](docs/superpowers/plans/2026-10-26-alignment-g02.md).
 
 ## Overview
 
@@ -72,6 +72,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | POST | `/auth/logout`, `/me/sessions/logout-all` | revoke captured device / all account devices |
 | GET | `/health` | liveness |
 | GET/PATCH | `/me` | current server-owned name/contact/default preferences; email read-only |
+| GET/POST | `/friends` | private persistent saved friends / save a registered current group participant |
+| GET/DELETE | `/friends/{id}` | authorized current group breakdown / remove only my bookmark |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
 | GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
@@ -189,6 +191,8 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Avoid N+1**: `join fetch m.user`; member counts via one aggregate query; expense list via one query
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
+Saved friends keep a private authorized display-label snapshot and canonical registered target; they never grant group access or expose account contact fields. Detail derives only current requester-accessible group obligations, preserving currency/mode/claimed-identity rules. A no-shared-data state is distinct from settlement. Contract: [saved friends](docs/api/friends.md).
+
 ## Frontend Conventions
 
 - **Refresh ownership**: use DashboardService.revalidate() for navigation/visible-focus reads; it shares pending work per read owner. Existing mutation callers use refresh() to invalidate older reads. Active groups consume refresh notifications independently of overview HTTP success; force mutation refresh collapses and invalidates receipts, foreground refresh retains selected detail and actionable errors. Session resets cancel reads and clear loaded group/settings state.
@@ -285,6 +289,8 @@ Auth routes remain full-bleed with a named Appearance control.
 ## Data Model
 
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
+
+- **friends** (V18) — private directed `(owner_id, friend_account_id)` account pair, saved authorized display label and creation time. Survives settlement/group access loss/deletion; changes no financial facts or reciprocal directory. Target must be a registered active group financial participant when saved. Personal ledgers remain a later G02 slice.
 
 - **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR/JPY/KWD, defaultUSD; V15 extends the catalogue). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
 - **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
@@ -559,3 +565,11 @@ Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–
 - [x] G01 final native acceptance (2026-10-26) — frozen backend94d97d4 and final responsive frontend pass populated V16→V17 plus 199 HTTP/188 native-browser API responses at1280/390, zero page errors/page-width overflow and owned cleanup. Includes pre-signup KWD, actual SMTP, fragment/storage scrubbing, existing membership not proving claim, aborted and dropped-success acceptance with explicit owned-ID read review, clipboard and forwarded-link join without guest claim. The initial browser readiness mistake required no auth change; verified initial cookie restoration preserves invitations and real replacement clears secrets. A native mobile overflow was fixed with scoped shrinking/wrapping and readable table scrolling. Frontend356/full formatting/build passed again; backend335 unchanged. Separate reviews/publication are next.
 
 - [x] G01 independent review completion (2026-10-26) — added the five missing supporting foreign-key indexes to unpublished V17; no behavior or data change. Standards/Spec follow-ups have zero findings. Backend335 rerun and final4f235702 JAR pass populated upgrade plus199 HTTP/188 native browser API responses at1280/390, zero errors/page overflow and cleanup. Frontend356/51 and source157/dist40 remain verified. Publication/CI is next; production SMTP deferred and phone/SMS gated.
+
+- [x] G02.1 directory candidate (2026-10-27) — private directed registered-account bookmarks survive settlement/access loss/group deletion; current authorized canonical per-currency group detail exposes no contact lookup or new access. Explicit save/remove/status-review UI has route/session/source cancellation and foreground coalescing. Backend347/frontend369/52, formatting/build, deployment14/lints and OpenAPI370 refs pass; independent checkpoint112HTTP/realSMTP/migration passes. Final native acceptance and Standards/Spec reviews are publication gates. Evidence: `docs/reviews/2026-10-27-alignment/g02-friends-directory.md`. Personal CRUD/payment/history remain serial G02 follow-ups; production SMTP deferred.
+
+- [x] G02.1 final acceptance/review (2026-10-27) — corrected eec037c0 JAR plus frozen production SPA pass populated V17→V18, actual local SMTP claims and146HTTP/70 native browser API responses at1280/390; zero page errors/overflow, screenshots inspected and owned cleanup. Standards0/Spec0 at965caa8. Full backend347/frontend369 remain verified by source/artifact manifests. Publication/exact-head CI is next; no new PR merge, production promotion or SMTP change.
+
+- [x] PR108 typography correction (2026-10-27) — central page-heading/body/caption/balance roles replace Friends-local typography literals. Full frontend369/52, formatting and production build pass again; backend203-file source/artifact remains unchanged. Updated native acceptance and independent follow-ups gate publication of this fix.
+
+- [x] PR108 corrected-source acceptance (2026-10-27) — full frontend369/52/format/build552.70kB and updated native146HTTP+70browserAPI1280/390 pass, zero errors/overflow/cleanup. Shared typography correction accepted by Standards0/Spec0 follow-ups at6b3c356; unchanged backend347/source203 retained. Final manifests163frontend42dist match verified artifacts; exact updated-head PR CI/review is next.

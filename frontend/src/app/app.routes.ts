@@ -32,6 +32,16 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
   },
+  {
+    path: 'friends',
+    canActivate: [authGuard],
+    loadComponent: () => import('./friends/friends.component').then((m) => m.FriendsComponent),
+  },
+  {
+    path: 'friends/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./friends/friends.component').then((m) => m.FriendsComponent),
+  },
   // The dashboard is the group list now — /groups only exists to keep old links working.
   { path: 'groups', pathMatch: 'full', redirectTo: 'dashboard' },
   {

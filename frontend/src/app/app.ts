@@ -74,6 +74,7 @@ export class App {
       this.modal.active() === 'member'
     )
       return 'groups';
+    if (this.currentUrl().startsWith('/friends')) return 'friends';
     return this.currentUrl().startsWith('/profile') ? 'profile' : 'overview';
   });
   protected readonly avatarStyle = computed(() => ({

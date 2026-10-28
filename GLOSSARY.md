@@ -16,6 +16,8 @@ _Avoid_: account or user when referring only to a party in a financial record.
 
 **Participant claim**: A verified, explicit acceptance that links a previously unclaimed participant's financial records to an account.
 
+**Saved friend**: A person an account explicitly keeps in its private directory. Saving a friend grants no group access, financial ownership or reciprocal relationship.
+
 **Net balance**: The amount a participant is owed overall or owes overall in one currency. A zero net balance can still coexist with direct obligations to other people.
 
 **Direct obligation**: An amount one person owes another after their reciprocal recorded obligations are offset in the same currency.
