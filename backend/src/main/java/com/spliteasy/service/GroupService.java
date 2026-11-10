@@ -96,7 +96,13 @@ public class GroupService {
         .map(
             v ->
                 new GroupSummary(
-                    v.getId(), v.getName(), v.getType(), v.getMemberCount(), v.getSimplifyDebts()))
+                    v.getId(),
+                    v.getName(),
+                    v.getType(),
+                    v.getMemberCount(),
+                    v.getSimplifyDebts(),
+                    v.getArchivedAt(),
+                    v.getLifecycleVersion()))
         .toList();
   }
 
@@ -121,15 +127,17 @@ public class GroupService {
   public GroupResponse updateGroup(UUID requesterId, UUID groupId, UpdateGroupRequest request) {
     membershipGuard.requireMember(groupId, requesterId);
     financialParticipants.requireCompatible(groupId);
+    // Settings stay editable while archived: renaming or re-typing a group is not a new entry.
     Group group =
         request.simplifyDebts() != null
-            ? groupWriteGuard.lockForMember(groupId, requesterId)
+            ? groupWriteGuard.lockForMemberAllowingArchived(groupId, requesterId)
             : groupRepository
                 .findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Group not found"));
 
     // Preserve the loaded dirty-field semantics, but serialize roster compatibility before writes.
-    if (request.simplifyDebts() == null) groupWriteGuard.lockForMember(groupId, requesterId);
+    if (request.simplifyDebts() == null)
+      groupWriteGuard.lockForMemberAllowingArchived(groupId, requesterId);
     financialParticipants.requireCompatible(groupId);
 
     if (request.simplifyDebts() != null && request.simplifyDebts() != group.isSimplifyDebts()) {
@@ -171,7 +179,8 @@ public class GroupService {
   // The group lock keeps financial inputs stable while nested aggregate reads join this write.
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void removeMember(UUID requesterId, UUID groupId, UUID targetUserId) {
-    Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    // Leaving an archived group must stay possible: departure is not a new financial entry.
+    Group group = groupWriteGuard.lockForMemberAllowingArchived(groupId, requesterId);
     financialParticipants.requireCompatible(groupId);
     if (!membershipRepository.existsByGroupIdAndUserId(groupId, targetUserId)) {
       throw new NotFoundException("That person is not a member of this group");
@@ -198,17 +207,118 @@ public class GroupService {
     log.info("User {} removed member {} from group {}", requesterId, targetUserId, groupId);
   }
 
-  /** Deletes the group and everything under it. Creator only — the group's admin. */
+  /**
+   * Archives the group: reads, history and export keep working, new financial entries do not. Any
+   * member may archive, matching the flat settings authorization.
+   */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public GroupResponse archive(UUID requesterId, UUID groupId) {
+    Group group = groupWriteGuard.lockForMemberAllowingArchived(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
+    if (group.isArchived()) {
+      throw new ConflictException("This group is already archived");
+    }
+    group.archive();
+    log.info("Group {} archived by user {}", groupId, requesterId);
+    return toGroupResponse(group, requesterId);
+  }
+
+  /** Re-opens an archived group for new entries. Any member, mirroring archive. */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public GroupResponse unarchive(UUID requesterId, UUID groupId) {
+    Group group = groupWriteGuard.lockForMemberAllowingArchived(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
+    if (!group.isArchived()) {
+      throw new ConflictException("This group is not archived");
+    }
+    group.unarchive();
+    log.info("Group {} re-opened by user {}", groupId, requesterId);
+    return toGroupResponse(group, requesterId);
+  }
+
+  /**
+   * Recoverable deletion, creator only — the group's admin. Nothing financial is destroyed: the
+   * marker hides the group from every ordinary read while expenses, payments and history stay
+   * intact for restore. Blocked while anyone still owes anything, so a settled-up decision is never
+   * hidden behind a deletion.
+   */
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void deleteGroup(UUID requesterId, UUID groupId) {
-    Group group = groupWriteGuard.lockForMember(groupId, requesterId);
+    Group group = groupWriteGuard.lockForMemberAllowingArchived(groupId, requesterId);
     financialParticipants.requireCompatible(groupId);
-    if (!group.getCreatedBy().getId().equals(requesterId)) {
-      throw new ForbiddenException("Only the group's creator can delete it");
+    requireCreator(group, requesterId, "delete");
+    requireSettled(requesterId, groupId, group);
+    group.markDeleted();
+    log.info("Group {} deleted by creator {} (recoverable)", groupId, requesterId);
+  }
+
+  /** The creator's own recovery list: their deleted groups, newest first. */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<GroupSummary> listDeletedGroups(UUID requesterId) {
+    return groupRepository.findDeletedByCreator(requesterId).stream()
+        .map(
+            g ->
+                new GroupSummary(
+                    g.getId(),
+                    g.getName(),
+                    g.getType(),
+                    membershipRepository.countByGroupId(g.getId()),
+                    g.isSimplifyDebts(),
+                    g.getArchivedAt(),
+                    g.getLifecycleVersion()))
+        .toList();
+  }
+
+  /**
+   * Restores a deleted group at its expected lifecycle version, so a stale recovery screen cannot
+   * resurrect a group whose state has moved on. Creator only, like deletion.
+   */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public GroupResponse restore(UUID requesterId, UUID groupId, long expectedVersion) {
+    Group group = groupWriteGuard.lockForLifecycle(groupId, requesterId);
+    requireCreator(group, requesterId, "restore");
+    if (!group.isDeleted()) {
+      throw new ConflictException("This group is not deleted");
     }
-    // Memberships, expenses (+participants) and payments go with it via ON DELETE CASCADE.
-    groupRepository.delete(group);
-    log.info("Group {} deleted by creator {}", groupId, requesterId);
+    if (group.getLifecycleVersion() != expectedVersion) {
+      throw new ConflictException(
+          "This group changed since you loaded it — reload the recovery list and try again");
+    }
+    group.restore();
+    financialParticipants.requireCompatible(groupId);
+    log.info("Group {} restored by creator {}", groupId, requesterId);
+    return toGroupResponse(group, requesterId);
+  }
+
+  /** Creator-only rule, checked after membership so a non-member still gets 403 first. */
+  private void requireCreator(Group group, UUID requesterId, String action) {
+    if (!group.getCreatedBy().getId().equals(requesterId)) {
+      throw new ForbiddenException("Only the group's creator can " + action + " it");
+    }
+  }
+
+  /**
+   * Deletion requires a fully settled group: no canonical obligation for the selected mode and no
+   * non-zero net in any currency. Both come from the shared ledger reads, exactly as the
+   * member-departure guard uses them — never a hand-rolled balance sum.
+   */
+  private void requireSettled(UUID requesterId, UUID groupId, Group group) {
+    var outstanding = projection.snapshot(requesterId, groupId, group.isSimplifyDebts());
+    if (!outstanding.isEmpty()) {
+      var first = outstanding.get(0);
+      throw new ConflictException(
+          "Settle this group before deleting it — "
+              + first.from().displayName()
+              + " still owes "
+              + first.to().displayName()
+              + (outstanding.size() > 1 ? " and " + (outstanding.size() - 1) + " more" : ""));
+    }
+    boolean openNet =
+        balanceService.computeBalances(requesterId, groupId).balances().stream()
+            .anyMatch(b -> b.netMinor() != 0);
+    if (openNet) {
+      throw new ConflictException("Settle every member's balance before deleting this group");
+    }
   }
 
   /** That member's net in the group, read through the shared balance aggregation. */
@@ -239,6 +349,8 @@ public class GroupService {
             .map(com.spliteasy.dto.common.ParticipantSummary::id)
             .sorted()
             .toList(),
-        financialParticipants.inactiveGuests(group.getId()));
+        financialParticipants.inactiveGuests(group.getId()),
+        group.getArchivedAt(),
+        group.getLifecycleVersion());
   }
 }

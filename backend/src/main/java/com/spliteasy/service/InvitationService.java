@@ -131,6 +131,11 @@ public class InvitationService {
     var invite = lookup(request.token());
     User account = users.findById(actor).orElseThrow(this::unavailable);
     validate(invite, account);
+    // A deleted group is absent everywhere, so its name and balances are not previewable either.
+    // Archived groups stay readable, so a preview of one is still allowed.
+    if (groups.existsByIdAndDeletedAtIsNotNull(invite.group())) {
+      throw new NotFoundException("Group not found");
+    }
     ParticipantSummary participant =
         invite.participant() == null
             ? null
@@ -177,11 +182,17 @@ public class InvitationService {
     ParticipantContract.requireEnabled();
     // Read only candidate group identity; no managed account is loaded before its lock.
     var candidate = lookup(request.token());
-    groups.findByIdForUpdate(candidate.group()).orElseThrow(this::unavailable);
+    // Hold the group's write lock for the rest of this transaction, so the lifecycle check below
+    // cannot race an archive or deletion that is committing concurrently.
+    var group = groups.findByIdForUpdate(candidate.group()).orElseThrow(this::unavailable);
     User account = users.findLockedById(actor).orElseThrow(this::unavailable);
     requireCurrentSession(account);
     var invite = lookup(request.token());
     validate(invite, account);
+    // After validate, so an unknown, expired or revoked token still gets the generic response
+    // instead of learning this group's lifecycle state. The invitee is deliberately not a member
+    // yet, so this path cannot use the membership-based write guard.
+    requireJoinable(group);
     boolean claim = invite.participant() != null;
     if (claim) {
       requireUnclaimed(invite.group(), invite.participant());
@@ -346,5 +357,20 @@ public class InvitationService {
 
   private BadRequestException unavailable() {
     return new BadRequestException(UNAVAILABLE);
+  }
+
+  /**
+   * An invitation cannot add a member to a group that is no longer taking entries (migration V19).
+   * A deleted group reads as absent, as it does on every other route; an archived one says what to
+   * do about it, since a valid token already discloses that the group exists.
+   */
+  private void requireJoinable(com.spliteasy.entity.Group group) {
+    if (group.isDeleted()) {
+      throw new NotFoundException("Group not found");
+    }
+    if (group.isArchived()) {
+      throw new ConflictException(
+          "This group is archived — re-open it before accepting this invitation");
+    }
   }
 }

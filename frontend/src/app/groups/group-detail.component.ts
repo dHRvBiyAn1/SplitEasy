@@ -104,6 +104,9 @@ export class GroupDetailComponent implements OnInit {
   protected readonly recoveryNotice = signal<string | null>(null);
   protected readonly restoringId = signal<string | null>(null);
   protected readonly writePending = computed(() => !!this.deletingId() || !!this.restoringId());
+
+  /** Archived groups are read-only: history stays, new expenses and settlements are refused. */
+  protected readonly archived = computed(() => !!this.group()?.archivedAt);
   private recoveryRequest?: Subscription;
 
   protected groupId = ''; // read by the template for the settings link
@@ -272,12 +275,12 @@ export class GroupDetailComponent implements OnInit {
   }
 
   addExpense(): void {
-    if (this.writePending()) return;
+    if (this.writePending() || this.archived()) return;
     this.modal.openExpense(this.groupId);
   }
 
   settleUp(): void {
-    if (this.writePending()) return;
+    if (this.writePending() || this.archived()) return;
     this.modal.openSettle(undefined, this.groupId);
   }
 

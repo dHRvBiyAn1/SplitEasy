@@ -22,6 +22,12 @@
     <!-- Name -->
     <header class="gset__head">
       <app-group-art [type]="g.type" />
+      @if (archived()) {
+        <p class="gset__archived" role="status">
+          This group is archived — it stays readable, but new expenses, settlements and members are
+          turned off until it is re-opened.
+        </p>
+      }
 
       @if (!editingName()) {
         <h1 class="gset__name">{{ g.name }}</h1>
@@ -110,7 +116,13 @@
     <section class="gcard">
       <h2 class="gcard__title">Members</h2>
 
-      <button type="button" class="mrow mrow--add" (click)="addMember()">
+      <button
+        type="button"
+        class="mrow mrow--add"
+        [disabled]="archived()"
+        [attr.title]="archived() ? 'Re-open the group to add members' : null"
+        (click)="addMember()"
+      >
         <span class="mrow__plus" aria-hidden="true">
           <svg
             viewBox="0 0 24 24"
@@ -206,6 +218,48 @@
         {{ g.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}
         govern balances, settlement and who can leave. Raw expenses and payments stay unchanged.
       </p>
+      <div class="grow grow--stack">
+        <span class="grow__text">
+          <span class="grow__label">Group type</span>
+          <span class="grow__sub">
+            Only changes the illustration and grouping — balances and history stay as they are.
+          </span>
+        </span>
+        <span class="gtypes" role="group" aria-label="Group type">
+          @for (option of groupTypes; track option.value) {
+            <button
+              type="button"
+              class="gtype"
+              [class.gtype--on]="g.type === option.value"
+              [attr.aria-label]="'Group type ' + option.label"
+              [attr.aria-pressed]="g.type === option.value"
+              [disabled]="savingType()"
+              (click)="setType(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </span>
+      </div>
+
+      <div class="grow">
+        <span class="grow__text">
+          <span class="grow__label">{{ archived() ? 'Re-open group' : 'Archive group' }}</span>
+          <span class="grow__sub">
+            Archiving keeps every expense, settlement and balance readable while turning off new
+            entries. Re-open it at any time; nothing is deleted either way.
+          </span>
+        </span>
+        <button
+          type="button"
+          class="dc-btn-outline"
+          [disabled]="savingArchive()"
+          (click)="toggleArchive()"
+        >
+          {{ archived() ? 'Re-open group' : 'Archive group' }}
+        </button>
+      </div>
+
       <div class="grow">
         <span class="grow__text">
           <span class="grow__label">Simplify debts</span>
@@ -285,8 +339,10 @@
           <span class="grow__text">
             <span class="grow__label">Delete group</span>
             <span class="grow__sub">
-              Permanently deletes "{{ g.name }}" along with its expenses and settlements. This can't
-              be undone.
+              Removes "{{ g.name }}" from everyone's overview. Its expenses, settlements and history
+              are kept, so it can be restored from
+              <a routerLink="/groups/deleted">Recently deleted</a>. The group has to be settled up
+              first.
             </span>
           </span>
 
