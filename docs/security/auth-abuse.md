@@ -7,12 +7,13 @@ The application adds a small, independent protection for its single Java instanc
 | POST `/api/auth/login` | IP | 30 attempts | 5 minutes |
 | POST `/api/auth/login` | normalized email + IP | 5 attempts | 5 minutes |
 | POST `/api/auth/register` | IP | 20 attempts | 1 hour |
+| POST `/api/auth/refresh` | IP | 120 attempts | 5 minutes |
 
 The registration allowance supports shared-IP group onboarding and can be changed with `APP_AUTH_REGISTRATION_LIMIT` (positive integer). Login scopes apply together. An account's budget is local to each IP, avoiding an account-wide lockout an unrelated remote visitor could trigger. Distributed guessing across many source IPs remains an edge/monitoring concern.
 
 Every validated attempt counts before account lookup or BCrypt, including successful login/registration and failed credentials or email conflicts. Success does not clear the budget. Malformed/invalid DTOs retain their existing 400 behavior without reaching credential processing. Email keys use the same trim/lowercase normalization as authentication, and email inputs are bounded to 254 characters. Registration needs no account bucket: its IP cap also limits email rotation and repeated conflicts. Login and registration budgets are independent; existing tokens, protected routes and health requests do not consume them.
 
-Windows begin on the first attempt and expire after their fixed duration using monotonic time. A rejected request neither increases the counter nor extends its deadline. Exhaustion returns generic JSON status 429 and an integer `Retry-After` rounded up to seconds (1–300 for ordinary login limits, 1–3600 for registration). CORS exposes that header to the production frontend. Both forms show “Too many attempts. Please wait before trying again.” and allow a later manual retry; there is no automatic retry loop, identity change or logout on 429.
+Windows begin on the first attempt and expire after their fixed duration using monotonic time. A rejected request neither increases the counter nor extends its deadline. Exhaustion returns the application `ErrorResponse` JSON body with status 429 and an integer `Retry-After` rounded up to seconds (1–300 for ordinary login limits, 1–3600 for registration). CORS exposes that header to the production frontend. Both forms show “Too many attempts. Please wait before trying again.” and allow a later manual retry; there is no automatic retry loop, identity change or logout on 429.
 
 ## Client IP trust boundary
 
@@ -27,3 +28,23 @@ One synchronized in-memory map atomically checks and reserves both login scopes,
 Counters reset on process restart and are independent across instances. Keep the current single-instance deployment; introduce shared enforcement or an explicitly verified edge policy before horizontal scaling. Fixed windows also permit a burst spanning a window boundary. No new datastore, limiter dependency or schema migration is needed for the current deployment.
 
 The limiter adds no password, token, email or IP logging. It does not emit one warning per rejected attempt, avoiding an abuse-driven log flood. Existing successful authentication events and generic bad-credential logs remain unchanged. Metrics/alerting and broader account-enumeration policy are separate work: login errors stay generic; registration's existing 409 for duplicate email remains unchanged.
+
+## Account lifecycle (A02)
+
+Password-reset requests consume 20/IP/5min and 5/normalized email/5min, including
+unknown addresses and unavailable delivery. Confirmation commands share 30/IP/5min
+before challenge lookup. Authenticated verification/email-change/password commands
+share 20/IP/5min and 5/account/5min before database lookup/BCrypt. These use the same
+atomic capped 10000-bucket process-local limiter and 429/Retry-After behavior; share
+state before adding API instances. Rejected payload validation may return 400
+before attempt accounting, but cannot reach token lookup, mail or BCrypt.
+
+Public reset acceptance never guarantees account existence or final delivery.
+Disabled/misconfigured sender gives uniform 503; actual transport failures roll
+back issuance and preserve generic 202 for both known/unknown accounts. Full
+contract and SMTP configuration: [account recovery](account-recovery.md).
+
+A03 refresh attempts use an independent IP budget after the trusted-Origin and
+explicit browser-header check, before credential lookup. Missing, unknown,
+expired and reused cookies all consume it. Refresh never resets login or
+registration budgets, and protected access does not consume refresh attempts.

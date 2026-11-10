@@ -1,5 +1,7 @@
+import { groupTotals } from './dashboard/dashboard.models';
 import {
   Component,
+  HostListener,
   afterNextRender,
   computed,
   effect,
@@ -38,6 +40,7 @@ import { MoneyComponent } from './shared/money.component';
   styleUrl: './app.scss',
 })
 export class App {
+  protected readonly groupTotals = groupTotals;
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
   private readonly profile = inject(ProfileService);
@@ -46,6 +49,8 @@ export class App {
   protected readonly modal = inject(ModalService);
   private readonly router = inject(Router);
   protected readonly user = this.auth.user;
+  protected readonly overviewLoading = this.dashboard.loading;
+  protected readonly overviewUnavailable = this.dashboard.error;
   protected readonly groups = computed(() => this.dashboard.data()?.groups ?? []);
   protected readonly staleOverview = computed(
     () => this.dashboard.error() && this.dashboard.data() !== null,
@@ -53,7 +58,9 @@ export class App {
   protected readonly groupsOpen = signal(false);
   private readonly currentUrl = signal(this.router.url);
   protected readonly isAuthRoute = computed(() =>
-    /^\/(login|register)(?:[/?#]|$)/.test(this.currentUrl()),
+    /^\/(login|register|forgot-password|account-action|invitation)(?:[/?#]|$)/.test(
+      this.currentUrl(),
+    ),
   );
   protected readonly showShell = computed(() => this.auth.isAuthenticated() && !this.isAuthRoute());
   protected readonly blocked = computed(() => !!this.modal.active() || this.groupsOpen());
@@ -67,6 +74,7 @@ export class App {
       this.modal.active() === 'member'
     )
       return 'groups';
+    if (this.currentUrl().startsWith('/friends')) return 'friends';
     return this.currentUrl().startsWith('/profile') ? 'profile' : 'overview';
   });
   protected readonly avatarStyle = computed(() => ({
@@ -83,11 +91,12 @@ export class App {
       .subscribe((e) => {
         this.currentUrl.set(e.urlAfterRedirects);
         this.groupsOpen.set(false);
+        if (this.showShell()) this.dashboard.revalidate();
       });
-    inject(SessionService)
-      .changes.pipe(takeUntilDestroyed())
-      .subscribe(() => this.groupsOpen.set(false));
+    const session = inject(SessionService);
+    session.changes.pipe(takeUntilDestroyed()).subscribe(() => this.groupsOpen.set(false));
     effect(() => {
+      session.currentVersion();
       if (this.showShell()) untracked(() => this.dashboard.ensureLoaded());
     });
     effect(() => {
@@ -95,6 +104,14 @@ export class App {
     });
     afterNextRender(() => this.ribbon.init());
   }
+  @HostListener('window:focus')
+  @HostListener('document:visibilitychange')
+  revalidateVisible(): void {
+    if (document.visibilityState === 'visible' && this.showShell()) {
+      this.dashboard.revalidate();
+    }
+  }
+
   skipToMain(event: Event): void {
     event.preventDefault();
     const main = document.getElementById('main-content');
@@ -102,7 +119,7 @@ export class App {
     main?.scrollIntoView({ block: 'start' });
   }
   retryOverview(): void {
-    this.dashboard.refresh();
+    this.dashboard.revalidate();
   }
   openExpense(): void {
     this.groupsOpen.set(false);

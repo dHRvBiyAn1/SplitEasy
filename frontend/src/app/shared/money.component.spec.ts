@@ -9,13 +9,13 @@ describe('integer money presentation', () => {
   });
   it('colors net balances while keeping plain totals neutral', () => {
     const f = TestBed.createComponent(MoneyComponent);
-    f.componentRef.setInput('cents', 100);
+    f.componentRef.setInput('minor', 100);
     f.detectChanges();
     expect(f.nativeElement.classList.contains('dc-amount--owed')).toBe(false);
     f.componentRef.setInput('net', true);
     f.detectChanges();
     expect(f.nativeElement.classList.contains('dc-amount--owed')).toBe(true);
-    f.componentRef.setInput('cents', -1);
+    f.componentRef.setInput('minor', -1);
     f.detectChanges();
     expect(f.nativeElement.classList.contains('dc-amount--owes')).toBe(true);
   });

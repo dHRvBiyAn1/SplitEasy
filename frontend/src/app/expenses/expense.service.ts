@@ -1,7 +1,14 @@
+import { Currency, amountToMinor, minorToDisplay } from '../shared/currency';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
-import { CreateExpenseRequest, ExpenseResponse, ExpenseSummary } from './expense.models';
+import {
+  CreateExpenseRequest,
+  ExpenseResponse,
+  ExpenseSummary,
+  ExpenseRevision,
+  DeletedExpense,
+} from './expense.models';
 
 /** Expenses are nested under a group. One service per backend resource (AGENTS.md). */
 @Injectable({ providedIn: 'root' })
@@ -16,6 +23,24 @@ export class ExpenseService {
     return this.api.get<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}`);
   }
 
+  getHistory(groupId: string, expenseId: string): Observable<ExpenseRevision[]> {
+    return this.api.get<ExpenseRevision[]>(`/groups/${groupId}/expenses/${expenseId}/history`);
+  }
+
+  listDeleted(groupId: string): Observable<DeletedExpense[]> {
+    return this.api.get<DeletedExpense[]>(`/groups/${groupId}/expenses/deleted`);
+  }
+
+  restoreExpense(
+    groupId: string,
+    expenseId: string,
+    expectedVersion: number,
+  ): Observable<ExpenseResponse> {
+    return this.api.post<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}/restore`, {
+      expectedVersion,
+    });
+  }
+
   createExpense(groupId: string, request: CreateExpenseRequest): Observable<ExpenseResponse> {
     return this.api.post<ExpenseResponse>(`/groups/${groupId}/expenses`, request);
   }
@@ -28,14 +53,16 @@ export class ExpenseService {
     return this.api.put<ExpenseResponse>(`/groups/${groupId}/expenses/${expenseId}`, request);
   }
 
-  deleteExpense(groupId: string, expenseId: string): Observable<void> {
-    return this.api.delete<void>(`/groups/${groupId}/expenses/${expenseId}`);
+  deleteExpense(groupId: string, expenseId: string, expectedVersion?: number): Observable<void> {
+    return this.api.delete<void>(
+      `/groups/${groupId}/expenses/${expenseId}${expectedVersion === undefined ? '' : `?expectedVersion=${expectedVersion}`}`,
+    );
   }
 }
 
 /** Dollars (as typed by the user) → integer cents, avoiding binary-float drift. */
 export function dollarsToCents(dollars: number): number {
-  return Math.round(dollars * 100);
+  return amountToMinor(dollars, 'USD');
 }
 
 /** 100% expressed in basis points (hundredths of a percent) — the wire contract for splits. */
@@ -47,8 +74,6 @@ export function percentToBasisPoints(percent: number): number {
 }
 
 /** Integer cents → a display string like "12.34". */
-export function centsToDisplay(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(cents);
-  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+export function centsToDisplay(minor: number, currency: Currency = 'USD'): string {
+  return minorToDisplay(minor, currency);
 }

@@ -19,24 +19,33 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
       """
             select e.id as id,
                    e.description as description,
+                   e.version as version,
                    e.amountCents as amountCents,
+                   e.currency as currency,
                    e.category as category,
                    e.spentOn as spentOn,
                    e.createdAt as createdAt,
                    payer.id as payerId,
-                   payer.displayName as payerDisplayName,
+                   case when payer.scopeGroupId is null then coalesce(payer.currentDisplayName,payer.displayName) else payer.displayName end as payerDisplayName,
                    payer.email as payerEmail,
                    (select count(p.id) from ExpenseParticipant p where p.expense = e) as participantCount
             from Expense e
             join e.paidBy payer
-            where e.group.id = :groupId
+            where e.deletedAt is null and e.group.id = :groupId
             order by e.spentOn desc, e.createdAt desc
             """)
   List<ExpenseSummaryView> findSummariesByGroupId(@Param("groupId") UUID groupId);
 
   /** Total of every expense in a group, in cents (0 if none). Drives the "total spent" card. */
-  @Query("select coalesce(sum(e.amountCents), 0) from Expense e where e.group.id = :groupId")
-  long sumAmountByGroup(@Param("groupId") UUID groupId);
+  @Query(
+      "select e.currency as currency, sum(e.amountCents) as totalCents from Expense e where e.deletedAt is null and e.group.id = :groupId group by e.currency")
+  List<CurrencyAmount> sumAmountsByGroup(@Param("groupId") UUID groupId);
+
+  interface CurrencyAmount {
+    com.spliteasy.entity.LedgerCurrency getCurrency();
+
+    long getTotalCents();
+  }
 
   /**
    * Recent expenses across a set of groups (the user's groups) for the activity feed, newest
@@ -50,16 +59,17 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    g.name as groupName,
                    e.description as description,
                    e.amountCents as amountCents,
+                   e.currency as currency,
                    e.category as category,
                    e.spentOn as spentOn,
                    e.createdAt as createdAt,
                    payer.id as payerId,
-                   payer.displayName as payerDisplayName,
+                   case when payer.scopeGroupId is null then coalesce(payer.currentDisplayName,payer.displayName) else payer.displayName end as payerDisplayName,
                    payer.email as payerEmail
             from Expense e
             join e.paidBy payer
             join e.group g
-            where g.id in :groupIds
+            where e.deletedAt is null and g.id in :groupIds
             order by e.spentOn desc, e.createdAt desc
             """)
   List<ActivityExpenseView> findRecentByGroupIds(
@@ -86,20 +96,35 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
    */
   @Query(
       """
-            select e.paidBy.id as userId, sum(e.amountCents) as totalCents
+            select e.paidBy.id as userId, e.currency as currency, sum(e.amountCents) as totalCents
             from Expense e
-            where e.group.id = :groupId
-            group by e.paidBy.id
+            where e.deletedAt is null and e.group.id = :groupId
+            group by e.paidBy.id, e.currency
             """)
   List<UserAmount> sumPaidByGroup(@Param("groupId") UUID groupId);
 
+  @Query(
+      """
+      select distinct e from Expense e
+      join fetch e.paidBy
+      left join fetch e.participants p
+      join fetch p.user
+      where e.group.id = :groupId and e.deletedAt is not null
+      order by e.deletedAt desc, e.id
+      """)
+  List<Expense> findDeletedByGroupId(@Param("groupId") UUID groupId);
+
   /** Projection backing {@link #findSummariesByGroupId(UUID)}. */
   interface ExpenseSummaryView {
+    long getVersion();
+
     UUID getId();
 
     String getDescription();
 
     long getAmountCents();
+
+    com.spliteasy.entity.LedgerCurrency getCurrency();
 
     com.spliteasy.entity.ExpenseCategory getCategory();
 
@@ -127,6 +152,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     String getDescription();
 
     long getAmountCents();
+
+    com.spliteasy.entity.LedgerCurrency getCurrency();
 
     com.spliteasy.entity.ExpenseCategory getCategory();
 

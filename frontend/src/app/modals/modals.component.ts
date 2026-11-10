@@ -21,7 +21,7 @@ import { AddMemberModalComponent } from './add-member-modal.component';
   template: `
     @switch (modal.active()) {
       @case ('appearance') {
-        <app-modal-shell heading="Make it yours." (closed)="modal.close()"
+        <app-modal-shell heading="Make it yours." (closed)="modal.requestClose()"
           ><app-appearance-panel
         /></app-modal-shell>
       }

@@ -1,0 +1,221 @@
+<section class="friends-page" aria-labelledby="friends-heading">
+  @if (id) {
+    <a routerLink="/friends">All saved friends</a>
+  }
+  <header class="page-heading">
+    <div>
+      <p class="eyebrow">Your private directory</p>
+      <h1 id="friends-heading">
+        {{ detail()?.displayName ?? (id ? 'Friend details' : 'Your friends') }}
+      </h1>
+    </div>
+    @if (!id && !adding()) {
+      <button
+        class="dc-btn-accent"
+        type="button"
+        [disabled]="saving() || deleting() || needsReview() || !!removing()"
+        (click)="startAdd()"
+      >
+        Add friend
+      </button>
+    }
+  </header>
+  <div class="scope-note">
+    <p>
+      Balances cover current shared groups you can access. Saving a friend never grants group
+      access.
+    </p>
+    <p>Saved friends stay here after settlement or when shared groups are no longer accessible.</p>
+    <p>Positive amounts mean your friend owes you; negative amounts mean you owe your friend.</p>
+  </div>
+  @if (notice()) {
+    <p class="notice" role="status">{{ notice() }}</p>
+  }
+  @if (adding()) {
+    <section class="friend-panel" aria-labelledby="add-heading">
+      <h2 id="add-heading">Save someone from a shared group</h2>
+      <p>
+        Choose a registered person from a group you currently belong to. Guests must complete a
+        verified participant claim before you can save them.
+      </p>
+      <div class="source-fields">
+        <label
+          ><span class="dc-field-label">Source group</span
+          ><select
+            #sourceField
+            class="dc-field"
+            aria-label="Source group"
+            [value]="groupId"
+            [disabled]="saving() || needsReview()"
+            (change)="chooseGroup($any($event.target).value)"
+          >
+            <option value="">Choose a group</option>
+            @for (group of groups(); track group.id) {
+              <option [value]="group.id">{{ group.name }}</option>
+            }
+          </select></label
+        >
+        @if (groupId) {
+          <label
+            ><span class="dc-field-label">Person</span
+            ><select
+              class="dc-field"
+              aria-label="Person"
+              [value]="participantId"
+              [disabled]="sourceLoading() || saving() || needsReview()"
+              (change)="participantId = $any($event.target).value"
+            >
+              <option value="">Choose a person</option>
+              @for (person of people(); track person.id) {
+                <option [value]="person.id" [disabled]="!person.accountId">
+                  {{ person.displayName }}{{ !person.accountId ? ' — claim first' : '' }}
+                </option>
+              }
+            </select></label
+          >
+        }
+      </div>
+      @if (sourceLoading()) {
+        <p role="status">Loading source people…</p>
+      } @else if (!sourceError() && !groups().length) {
+        <p>
+          No current groups to choose from.
+          <a routerLink="/dashboard">Open your overview to create a group.</a>
+        </p>
+      } @else if (!sourceError() && groupId && !people().length) {
+        <p>No other active people are available in this group. Choose another group.</p>
+      }
+      @if (sourceError()) {
+        <p role="alert">{{ sourceError() }}</p>
+      }
+      <div class="actions">
+        <button
+          class="dc-btn-accent"
+          type="button"
+          [disabled]="!participantId || sourceLoading() || saving() || needsReview()"
+          (click)="save()"
+        >
+          Save friend
+        </button>
+        <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="cancelAdd()">
+          Cancel adding
+        </button>
+      </div>
+      @if (saving()) {
+        <p role="status">Saving friend…</p>
+      }
+    </section>
+  }
+  @if (writeError()) {
+    <p class="notice" role="alert">{{ writeError() }}</p>
+  }
+  @if (needsReview()) {
+    <button class="dc-btn-outline" type="button" [disabled]="loading()" (click)="review()">
+      Check saved status
+    </button>
+  }
+  @if (removing(); as friend) {
+    <section class="friend-panel" aria-labelledby="remove-heading">
+      <h2 #confirmation id="remove-heading" tabindex="-1">Remove {{ friend.displayName }}?</h2>
+      <p>
+        This only removes your saved friend. Balances, group membership and financial history stay
+        unchanged.
+      </p>
+      <div class="actions">
+        <button class="dc-btn-outline" type="button" [disabled]="deleting()" (click)="remove()">
+          Remove saved friend
+        </button>
+        <button class="dc-btn-ghost" type="button" [disabled]="deleting()" (click)="cancelRemove()">
+          Keep friend
+        </button>
+      </div>
+      @if (deleting()) {
+        <p role="status">Removing saved friend…</p>
+      }
+    </section>
+  }
+  @if (loading()) {
+    <p role="status">Loading saved friends…</p>
+  }
+  @if (error()) {
+    <p class="notice" role="alert">{{ error() }}</p>
+    @if (!needsReview()) {
+      <button class="dc-btn-outline" type="button" (click)="load()">Try again</button>
+    }
+  } @else if (!loading() && !id && friends().length === 0) {
+    <div class="friend-panel empty">
+      <h2>No saved friends yet</h2>
+      <p>Keep someone in your directory by choosing them from a current shared group.</p>
+    </div>
+  }
+  <div class="friend-grid">
+    @for (friend of friends(); track friend.id) {
+      <article class="friend-panel">
+        <h2>
+          <a [routerLink]="['/friends', friend.id]">{{ friend.displayName }}</a>
+        </h2>
+        <p>{{ status(friend) }}</p>
+        <div class="balances">
+          @for (balance of friend.balances; track balance.currency) {
+            <div>
+              <span>{{ balance.currency }}</span
+              ><app-money [minor]="balance.netMinor" [currency]="balance.currency" [net]="true" />
+            </div>
+          }
+        </div>
+        <p class="group-count">
+          {{ friend.sharedGroupCount }} current shared
+          {{ friend.sharedGroupCount === 1 ? 'group' : 'groups' }}
+        </p>
+        <button
+          class="dc-btn-ghost"
+          type="button"
+          [disabled]="adding() || saving() || deleting() || needsReview()"
+          (click)="requestRemove(friend, $event)"
+        >
+          Remove friend
+        </button>
+      </article>
+    }
+  </div>
+  @if (detail(); as friend) {
+    <div class="friend-panel totals">
+      <h2>Current totals by currency</h2>
+      <p>{{ status(friend) }}</p>
+      <div class="balances">
+        @for (balance of friend.balances; track balance.currency) {
+          <div>
+            <span>{{ balance.currency }}</span
+            ><app-money [minor]="balance.netMinor" [currency]="balance.currency" [net]="true" />
+          </div>
+        }
+      </div>
+      <button
+        class="dc-btn-ghost"
+        type="button"
+        [disabled]="deleting() || needsReview()"
+        (click)="requestRemove(friend, $event)"
+      >
+        Remove friend
+      </button>
+    </div>
+    <h2>Current shared groups</h2>
+    <div class="friend-grid">
+      @for (group of friend.sharedGroups; track group.id) {
+        <article class="friend-panel">
+          <h3>{{ group.name }}</h3>
+          <p>{{ group.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}</p>
+          <div class="balances">
+            @for (balance of group.balances; track balance.currency) {
+              <div>
+                <span>{{ balance.currency }}</span
+                ><app-money [minor]="balance.netMinor" [currency]="balance.currency" [net]="true" />
+              </div>
+            }
+          </div>
+          <a [routerLink]="['/groups', group.id]">Open group history and settlement</a>
+        </article>
+      }
+    </div>
+  }
+</section>

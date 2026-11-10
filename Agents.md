@@ -3,6 +3,14 @@
 Project living memory. **Read before a task; update after one** — especially
 Conventions, Data Model, and the Progress Log (append one line per shipped feature).
 
+## Agent skills
+
+Use **Matt Pocock's skills instead of Superpowers**, as selected by the user. Before planning, implementation, debugging or review, read [the engineering workflow](docs/agents/engineering-workflow.md); project-local skills live in `.agents/skills/`. Keep Ponytail's simplicity guidance. This repository's instruction file is `Agents.md`; update it without creating a second differently cased file.
+
+Issues use [GitHub](docs/agents/issue-tracker.md); domain documentation uses [a single context](docs/agents/domain.md). Keep at most three active worker threads, no Astra and Sol reasoning at most high. Work branches start from `dev` and PRs target `dev`.
+
+When changing participant identity, invitations, financial ownership or their wire contracts, read the [G01 subsystem design](docs/superpowers/plans/2026-10-26-alignment-g01.md) and [identity ADR](docs/adr/0001-immutable-financial-participants.md) before coding. G01 core merged as PR107; see its verification report. Saved-friend changes also follow the [G02.1 directory design](docs/superpowers/plans/2026-10-26-alignment-g02.md).
+
 ## Overview
 
 Expense-splitting web app: users create groups, add expenses split among members
@@ -17,9 +25,10 @@ payments and greedy debt-simplification suggestions. Balances are
 - **Frontend**: Angular 21 standalone components + signals; **Vitest** tests. Angular
   Material present but only its `--mat-sys-*` colors are remapped to tokens — screens use
   plain semantic HTML.
-- **Auth**: Spring Security + JWT (HS256, symmetric) via `oauth2-resource-server`. Access
-  tokens only (1h), intended re-login on expiry; client logout does not revoke tokens.
-  Contract and future requirements: [session lifecycle](docs/security/session-lifecycle.md).
+- **Auth**: Spring Security + HS256 JWT access (1h), persisted revocable device sessions,
+  and bounded rotating refresh credentials in a Secure HttpOnly host cookie. Each protected
+  request checks session ownership/expiry/revocation and per-user credentialVersion. Sidless
+  legacy JWTs require one re-login. Contract: [session lifecycle](docs/security/session-lifecycle.md).
 
 ## Run & Test
 
@@ -45,27 +54,38 @@ Prereqs: Java 21, Node 22+, Docker Desktop running (dev DB **and** backend tests
 - `.github/workflows/ci-cd.yml`: PR/dev checks, Node 22 Pages artifact, real backend/Caddy/Postgres smoke, main-only GHCR backend digest publication. Serialized production delivery requires repository `DEPLOY_ENABLED=true`, production environment SSH settings, Cloudflare account/project variables and Pages Edit token. Backend/tunnel health succeeds before Pages upload. `deploy/deliver.sh` implements that ordering and skips superseded main revisions. No AWS API keys required for delivery.
 - Releases use a single backend digest manifest and unique directories. Retain host lock, pre-migration pg_dump, physical release paths, failed-release pointer protection and schema-aware rollback. PostgreSQL volume identity remains unchanged. Pages and backend publication are not atomic; Pages failure leaves the healthy backend in place.
 - `deploy/compose.ci.yml` is disposable-only: Caddy port on 127.0.0.1:18080, cloudflared disabled behind a profile. Never use this override or `down --volumes` on production.
-- Daily off-host backups are configured separately; `deploy/backup.sh` supports exported `BACKUP_S3_URI`. A value placed only in Compose .env is not automatically exported to the backup script. Existing application review gaps/refresh tokens remain outside this deployment migration.
+- Daily off-host backups are configured separately; `deploy/backup.sh` supports exported `BACKUP_S3_URI`. A value placed only in Compose .env is not automatically exported to the backup script. Session rollout/rollback constraints are in `docs/security/session-lifecycle.md`.
 - CI and frontend verification use Node 22. Node 26 experimental Web Storage interferes with jsdom/Vitest localStorage; use the validated runtime.
 - First production release fcf12e6 is live: backend/tunnel and Pages activated; public API health and Angular deep links verified. Main run38649436260 succeeded on attempt2 after a transient previous-HTML check failure. Follow-up propagation retry change remains subject to dev/main promotion.
 
 ## API
 
-All under `/api`; all except `auth/*` and `health` require `Authorization: Bearer <jwt>`.
+All under `/api`; protected routes require `Authorization: Bearer <jwt>`. Public auth commands
+and health are exceptions; `/auth/logout` requires a bearer and `/auth/refresh` requires the
+secure cookie plus a trusted Origin and explicit browser header.
 Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/auth/register`, `/auth/login` | issue access token |
+| POST | `/auth/register`, `/auth/login`, `/auth/refresh` | issue one-hour access and rotate secure browser cookie |
+| GET/DELETE | `/me/sessions`, `/me/sessions/{id}` | list owned devices / revoke one |
+| POST | `/auth/logout`, `/me/sessions/logout-all` | revoke captured device / all account devices |
 | GET | `/health` | liveness |
+| GET/PATCH | `/me` | current server-owned name/contact/default preferences; email read-only |
+| GET/POST | `/friends` | private persistent saved friends / save a registered current group participant |
+| GET/DELETE | `/friends/{id}` | authorized current group breakdown / remove only my bookmark |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
 | GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
 | POST | `/groups/{g}/members` | add by email |
 | DELETE | `/groups/{g}/members/{m}` | remove a member — or leave, when `{m}` is you (409 if unsettled) |
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
-| GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | detail / full-replace edit / hard delete (204) |
+| GET/PUT/DELETE | `/groups/{g}/expenses/{e}` | active detail / full-replace edit / recoverable delete (204) |
+| GET | `/groups/{g}/expenses/deleted`, `/groups/{g}/expenses/{e}/history` | member-only recovery list / attributable revisions |
+| POST | `/groups/{g}/expenses/{e}/restore` | restore retained expense at mandatory expected version |
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
+| GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
+| GET | `/groups/{g}/balances/current-obligations` | canonical debts for the selected mode; settings departure eligibility |
 | GET/POST | `/groups/{g}/payments` | settle-up history / record |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
@@ -92,7 +112,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **UUID PKs** everywhere (`@UuidGenerator`, app-side so it works under `validate`; Postgres `uuid`).
 - **Auth abuse limits**: login 30/IP/5min and 5/(normalized email, IP)/5min; registration 20/IP/hour (`APP_AUTH_REGISTRATION_LIMIT`). Atomic process-local fixed windows cap at 10k buckets; restart resets, share enforcement before multiple instances. Prod native Caddy/Tomcat forwarding relies on private Tunnel→Caddy→Java networks; direct dev ignores forwarded headers. See `docs/security/auth-abuse.md`; 429 includes CORS-exposed Retry-After and both forms retain session state.
 - **Auth**: tokens issued in `JwtService` (claims `sub`=user UUID, `email`, `displayName`),
-  validated by the resource-server filter (`NimbusJwtDecoder` in `SecurityConfig`). Read caller as
+  plus `sid` and `credentialVersion`; validated by the resource-server filter (`NimbusJwtDecoder` in
+  `SecurityConfig`) against persisted current credential state on every protected request.
+  Sidless tokens fail closed; absent credential versions remain zero only with a valid persisted sid.
+  Refresh/revoke/login serialize on the user row; hashes only, strict reuse revokes the family. Read caller as
   `@CurrentUserId UUID` (resolver in `config/`) — not raw `Jwt`. Passwords BCrypt.
 - **Reuse these, don't re-inline**: `MembershipGuard.requireMember(groupId,userId)` (the group-membership
   check → 403); `@CurrentUserId`; `Emails.normalize()` (trim+lowercase, canonical form for lookup/storage).
@@ -100,7 +123,7 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   so a non-member gets 403 even for a nonexistent group (API never reveals existence). Followed by
   Group/Expense/Balance/Payment services.
 - **Group authz is flat, with one exception**: any member can view, rename, change settings, add
-  members, remove a settled member, and **edit/delete any expense** (matches Splitwise). The
+  members, remove a settled member, and **edit/delete expenses subject to the historical-participant guard**. The
   exception is **deleting the group — creator only** (`groups.created_by` is the closest thing to an
   admin; there is no role column). The creator can also neither be removed nor leave, so a group
   can't end up with nobody able to delete it.
@@ -108,32 +131,52 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   overlapping partial edits preserve omitted fields. Same-field edits have no version check: the
   last committed dirty write wins; assigning the loaded value is a no-op. PATCH responses reflect
   the transaction's loaded entity; use a fresh GET to observe other concurrent commits.
-- **Removing a member / leaving needs a settled balance**: blocked with **409** while that member's
-  **net in the group** is non-zero, so no debt is orphaned. The net comes from
-  `BalanceService.computeBalances` — never a second aggregation.
-- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and client in-memory retry limits: `docs/api/payment-retries.md`.
-- **Money = integer cents end-to-end** (`long`/`BIGINT`), never float. `amountCents` bounded
-  `@Positive @Max(1_000_000_000_000L)` (≤$10B) on create-expense/record-payment → 400 over cap.
-- **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`PercentageSplitStrategy`
+- **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero net in every currency and no incident canonical obligation for the selected mode. Direct mode retains offsetting pair debts; simplified mode allows zero-net intermediaries to leave. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. Historical correction still requires explicit re-add; no history is silently rewritten.
+- **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations, non-null mode PATCHes and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
+- **Canonical obligations**: `ObligationProjectionService` selects direct pair netting or deterministic greedy net matching (`NetSettlementCalculator`, amount then UUID ties). Pairwise, dashboard/People/headlines/actions and departure checks share this projection. Net balances and recorded history are unchanged. Mode PATCH locks/reauthorizes with financial writes and rejects target obligations involving former participants with 409 re-add/repair guidance. Net-derived `/debt-simplification` remains a preview with an explicit nullable direct-mode warning; an empty preview does not establish direct settlement. Settlement UI uses canonical dashboard rows without a second preview fetch.
+- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/currency/minor amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and account-owned, tab-isolated reload retry limits: `docs/api/payment-retries.md`.
+- **Money = explicit currency + integer minor units** (`long`/`BIGINT`). Catalogue: USD/EUR/GBP/INR exponent2, JPY0, KWD3. New clients send `X-Ledger-Version:2`, `currency` and positive `amountMinor` ≤1e12; floats/ambiguous inputs fail400. Legacy `amountCents` is USD-only; response cents/scalar aliases are null for non-USD/mixed scopes. Every aggregate/pair/settlement/leave check partitions by currency; dashboard/group `totals[]` are authoritative. Expense currency is immutable; preferences never relabel history or retry drafts. Outputs beyond JavaScript's exact integer range fail409. V15 follows V14; drain all old servers before non-USD writes and use a forward fix afterwards. Read [the ledger contract](docs/api/multi-currency-ledger.md) before money/rollout changes.
+- **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`Percentage`/`Weights`/`AdjustmentsSplitStrategy`
   `@Component`s selected via `Map<SplitType, SplitStrategy>` in `ExpenseService` — **no switch on type**.
   New types implement the interface. Build inputs via `SplitContext.forEqual(...)` / `.forSplits(...)`
   factories (never the raw ctor). `100%` = `TOTAL_BASIS_POINTS = 10_000`. Rounding
-  (`SplitStrategy.absorbRemainder`): floor each share, **payer absorbs leftover cents** (else first
-  id-sorted participant); shares always sum to the total. Exact inputs must be `0..amountCents`;
+  (`SplitStrategy.absorbRemainder`): floor each share, **payer absorbs leftover minor units** (else first
+  id-sorted participant); shares always sum to the total. Exact inputs must be `0..amountMinor`;
   percentage inputs must be `0..10_000`. Strategies validate bounds and sum with `BigInteger`
   before computing shares; percentage multiplication uses quotient/remainder arithmetic to
-  avoid overflow. POST/PUT reject invalid splits before changing expense or participant rows.
+  avoid overflow. Weights use positive integer units (1..1e12), with `BigInteger` multiplication/division
+  and the same remainder rule. Adjustments are signed minor units (±1e12) added to the deterministic EQUAL
+  allocation over the explicitly listed split participants; their `BigInteger` sum must be zero and
+  all final shares nonnegative. POST/PUT reject invalid splits before changing expense or participant rows.
+- **Original expense split intent** (V11): retain `expense_participants.split_value` alongside final
+  `share_cents`, including explicit zero inputs/final shares. EQUAL stores1 and returns
+  `participantUserIds`; custom modes return original typed `splits` plus `splitType`. Never reconstruct
+  percentages or weights from rounded shares. V11 converts legacy PERCENTAGE to UNEQUAL exact shares;
+  nullable `split_value` permits old-writer inserts, which read as UNEQUAL exact shares if any non-equal
+  intent is missing. Existing EQUAL participant sets are recoverable. Deploy A01 V10 before E01 V11
+  (same batch release or V10 first); never rely on out-of-order migrations. After WEIGHTS/ADJUSTMENTS
+  writes, the old binary cannot read those enum values: rollback needs a forward fix or reviewed data
+  conversion/restore. Old code editing known percentages can discard intent and safely degrades to exact.
 - **Expense edit = full-replace PUT** (reuses `CreateExpenseRequest`): shares recomputed via the same
   strategy path; participants cleared and **flushed before re-insert** (unique `(expense_id,user_id)`).
-  **Delete = hard delete** (204; FK-cascade removes participants). Balances re-aggregate, so edits/deletes
-  reflect automatically — no special-casing.
+  **Delete = recoverable marker** (204, V16), retaining shares while all ordinary reads/activity/financial queries exclude the expense. Restore always requires expectedVersion and current active payer/every share participant under the group financial lock; repeated/stale restores409 without double counting. Accepted create/replace/delete/restore records actor/time/version/optional operation UUID and complete before/after snapshots transactionally. Imported baselines have unknown recorder and migration time. E02 create receipts remain immutable and never restore. Group deletion still cascades retained facts. Drain old binaries before H01: they count deleted rows; rollback requires a compatible forward fix. Contract: [expense recovery](docs/api/expense-recovery.md).
 - **Detected concurrent writes**: Spring `OptimisticLockingFailureException` (including translated
   Hibernate stale-row failures) maps to **409** with reload/review guidance. Transactions roll back;
-  clients never automatically retry the edit. No version/ETag contract guards stale separate GET/PUTs.
+  clients never automatically retry the edit. Expense list/detail expose opaque versions; new clients send expectedVersion on PUT/DELETE, and stale versions return 409 before mutation. Missing versions are accepted only before the finite `app.expenses.version-required-from` UTC cutoff (default 2026-11-19). Every accepted PUT advances the parent version, including child-only split intent/no-op replacements. See `docs/api/retry-safe-writes.md`.
 - **Indexes** live in Flyway migrations, named `idx_<table>_<cols>` (unique constraints
   `uq_<table>_<cols>`). Every FK column is indexed; **filter+sort paths get a composite
   `(filter_col, sort_col DESC…)`** whose leftmost prefix also serves the plain filter, so
   no redundant single-column index is kept alongside it (see V7 for expenses/payments).
+- **Account lifecycle**: V13 keeps existing users unverified and stores purpose-bound SHA-256
+  challenge hashes only. User-row locks serialize expiry/replay/replacement/credential writes;
+  reset lookup selects scalar UUID then locks and rechecks current email (never preload a stale
+  user entity before waiting). Sensitive credential changes invalidate all challenges and old
+  JWTs; verification alone does not. Native SMTP defaults disabled, requires trusted HTTPS
+  origin/authenticated TLS/hostname checks/bounded timeouts, and has only an explicit owned
+  loopback test exception. Public actual-send failures stay generic202 and roll back issuance;
+  global disabled/misconfigured delivery is uniform503. E02 V12 must precede V13 or ship together.
+  Keep schema on rollback; old auth binaries accept revoked JWTs, so use a forward fix or a
+  reviewed all-instance signing-key rotation before rollback. See `docs/security/account-recovery.md`.
 - **Logging**: backend uses **Log4j2** (pom excludes `spring-boot-starter-logging`, adds
   `spring-boot-starter-log4j2`); code logs via the SLF4J API using Lombok `@Slf4j`. Level
   convention — **DEBUG** flow detail (dev only), **INFO** business events (register/login,
@@ -148,32 +191,53 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Avoid N+1**: `join fetch m.user`; member counts via one aggregate query; expense list via one query
   (payer joined + count as correlated subquery, `ExpenseRepository.findSummariesByGroupId`); detail via `join fetch`.
 
+Saved friends keep a private authorized display-label snapshot and canonical registered target; they never grant group access or expose account contact fields. Detail derives only current requester-accessible group obligations, preserving currency/mode/claimed-identity rules. A no-shared-data state is distinct from settlement. Contract: [saved friends](docs/api/friends.md).
+
 ## Frontend Conventions
+
+- **Refresh ownership**: use DashboardService.revalidate() for navigation/visible-focus reads; it shares pending work per read owner. Existing mutation callers use refresh() to invalidate older reads. Active groups consume refresh notifications independently of overview HTTP success; force mutation refresh collapses and invalidates receipts, foreground refresh retains selected detail and actionable errors. Session resets cancel reads and clear loaded group/settings state.
+- **Create retry identity**: group/expense POST use optional scoped UUID operation IDs (V12), native transactional conflict arbitration and immutable original-response snapshots. Authorize every replay; deleted groups cannot be recreated. Browser uncertain group/expense/payment drafts persist in account-owned, tab-isolated sessionStorage before dispatch; reload never sends automatically. Changed intent requires explicit acknowledgement, storage failure blocks dispatch, and session reset cancels/clears pending writes. Eager bootstrap initialization installs cleanup before any dialog opens. See `docs/api/retry-safe-writes.md`.
+
+- **Member departure controls**: settings require both net balances and canonical `/balances/current-obligations` to load before enabling removal/leave; zero net with direct obligations is “even overall”, while simplified zero-net intermediaries can depart. `/balances/obligations` retains its raw contract. Refresh failures disable removal/leave even when the old group is retained.
+- **Profile identity/preferences are server-owned**: GET/PATCH `/api/me` edits name, unverified phone, avatar and default currency. Email stays read-only. Fresh responses update shell/profile display name without replacing ID/email/token. Currency preference never changes recorded money.
+- **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
+- **Financial read/mutation errors stay actionable**: detail/delete errors are visible; explicit member/detail retries retain current-group ownership and typed draft fields. Running split totals announce changes and financial dates remain accessible.
 
 - **Expense group ownership**: each member-load callback must match the current selection generation
   (including A → B → A). Clear members, payer and split inputs on selection; gate save on completed
   member/detail loads. Existing expense edits keep their original group in both UI and component actions.
 
-- **Profile preferences belong to immutable auth user IDs**: phone, display currency, avatar color and
-  first-visit date use `spliteasy.profile.<userId>`. Linked signals synchronously reload/reset saved prefs
-  and profile edit state when identity changes, including before an immediate save. The ownerless legacy
-  `spliteasy.profile` key is discarded without migration; users re-enter those personal fields. Theme and
-  palette intentionally remain device-wide.
+- **Profile requests belong to immutable IDs and session versions**: linked signals reset loaded profile,
+  pending/error and edit state synchronously, including repeat login to the same account. Cancel HTTP with
+  `takeUntil(session.changes)` and guard callback generations. Keep Auth→Profile dependency absent.
+  `spliteasy.profile.<userId>` is retained only as an explicit owned import source; cancel leaves data intact
+  and successful import removes only that owner's record. Never import ownerless `spliteasy.profile`.
+  Original server `createdAt` replaces the device first-visit date. Theme/palette remain device-wide.
 
-- **Account session ownership**: successful login/register and every logout call `SessionService.reset()`
-  synchronously. Dashboard and global-modal services clear their state on that boundary; UI logout handlers
-  call only `AuthService.logout()`. Dashboard callbacks must match the cache generation captured before the
-  request; each refresh advances it so only the newest request owns data, error and loading. Protected
-  401 logout/redirect must match the initiating session version (even if a new login returns the same token). Modal HTTP operations use `takeUntil(session.changes)` on the entire operation,
-  after aggregation such as `toArray()`, so queued mutations and old callbacks cannot continue as a new user.
-- **Custom expense splits**: cache the normalized outgoing cents/basis-point list and reuse it for
-  the live total, validation and POST/PUT; reject negative/nonfinite/unsafe values before zero omission.
-  Round each share to the nearest hundredth with existing conversion helpers and explain this in the form.
+- **Account session ownership**: access credentials stay in memory; bootstrap renews the Secure
+  HttpOnly cookie before routing. Eager PendingWritesService initialization precedes restoration;
+  initial matching-owner restoration preserves explicit retry drafts. Login/register, logout and
+  account/device replacement reset SessionService; same-device rotation preserves it. Profile's
+  editing/import linked signals consume a computed immutable owner key so token/name refreshes
+  do not discard drafts. Native Web Locks cover complete login/register/refresh HTTP processing;
+  cross-tab notifications contain only a nonsecret marker. Capture user ID + sid + generation for
+  protected 401 renewal, share one attempt and retry once only if all still match. Never replay old
+  work under a new identity or call server logout for a stale 401. Logout uses captured bearer,
+  clears locally at once and reports unconfirmed server revocation accurately. Modal HTTP operations
+  retain takeUntil(session.changes) after whole aggregations; dashboard callbacks retain cache-generation guards.
+
+- **Custom expense splits**: cache the normalized outgoing original-input list and reuse it for the
+  live total, validation and POST/PUT. Blank excludes; explicit zero retains a participant. Restore
+  original inputs on edit (legacy responses without intent use exact shares); never add other group
+  members. Reject nonfinite/unsafe/out-of-bound inputs; only ADJUSTMENTS accepts negatives. Dollar and
+  percentage inputs round to the nearest hundredth with existing helpers; weights require positive
+  whole units. Adjustment validation mirrors Java UUID signed high/low ordering when the payer is
+  excluded, so one-cent equal remainders and amount changes match the server.
 
 - Financial member controls use full display name plus email for accessible identity (including duplicate names),
-  numeric split labels name dollars or percent, and selection buttons expose `aria-pressed`.
+  numeric split labels name dollars, percent, whole weight units or signed adjustment dollars, and selection buttons expose `aria-pressed`.
 
-- **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Browser reload/cross-tab loses the identity; consult history after an uncertain response.
+- **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Owned uncertain drafts survive cookie-backed reload without automatic dispatch; account/device replacement clears them. Consult history after an uncertain response.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - New-group member additions retain the created group ID and per-email outcomes; failed-only retries reuse that group. Keep session cancellation after the entire sequential aggregation.
@@ -193,7 +257,7 @@ and shared CSS tokens replace the earlier Evenly presentation. The editable sele
 `docs/reviews/2026-10-15-ui-redesign/implementation/verification.md`.
 
 **Standing rule:** reuse `_tokens.scss`, `.dc-*` and `.dc-amount`; never reintroduce Material presentation
-or duplicate money-status logic. `app-money` formats integer cents for the dashboard/tray, keeps plain
+or duplicate money-status logic. `app-money` formats explicit currency/minor units for the dashboard/tray, keeps plain
 totals neutral, and makes unusually long amounts keyboard-scrollable with their full text available.
 Auth routes remain full-bleed with a named Appearance control.
 
@@ -226,15 +290,29 @@ Auth routes remain full-bleed with a named Appearance control.
 
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
-- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`.
-- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER).
-- **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
-- **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0), `paid_by`→users,
-  `split_type` (V4: `EQUAL/UNEQUAL/PERCENTAGE`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
-- **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
+- **friends** (V18) — private directed `(owner_id, friend_account_id)` account pair, saved authorized display label and creation time. Survives settlement/group access loss/deletion; changes no financial facts or reciprocal directory. Target must be a registered active group financial participant when saved. Personal ledgers remain a later G02 slice.
 
-User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All three split types store into the **same `share_cents`** column (no per-type storage), and each expense's shares sum exactly to its amount.
+- **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR/JPY/KWD, defaultUSD; V15 extends the catalogue). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
+- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
+- **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
+- **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0, minor-unit storage), V15 `currency` (defaultUSD, immutable), `paid_by`→users,
+  `version` BIGINT (V12, opaque nonnegative optimistic precondition); V16 nullable `deleted_at` retains recoverable rows and shares; partial `(group_id,deleted_at DESC,id)` index serves recovery reads; `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
+- **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0); V11 nullable `split_value` BIGINT for original typed input (EQUAL1, exact minor units, basis points, weight units, signed adjustment minor units). Unique `(expense_id,user_id)`.
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0, minor-unit storage), V15 `currency` (defaultUSD), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
+
+- **expense_revisions** (V16) — primary key `(expense_id,version)`, FK to expenses (CASCADE), action, nullable captured actor JSONB, server `recorded_at`, optional operation UUID, nullable before and required after ExpenseResponse JSONB. Imported baseline has null actor and original financial dates in its snapshot. History survives expense deletion markers; explicit group deletion cascades it.
+
+- **create_operations** (V12) — primary key `(actor_id,kind,scope_id,operation_id)`, normalized submitted `intent` and original `response` snapshots. Actor references users (CASCADE); scope intentionally has no group FK so expense/group response identities survive resource deletion. Claims and resource writes commit together; no automatic expiry.
+
+- **auth_sessions / refresh_credentials** (V14) — account-owned device UUID, credential version,
+  coarse label, creation/renewal/absolute/idle expiry, revocation and bounded rotation counter;
+  refresh rows contain SHA-256 hashes and consumption timestamps only, cascading with the session.
+  Account locks serialize renewal/reuse/revoke/credential boundaries. Login cleanup retains at most 20
+  families, at most 2049 hashes each; inactive accounts retain expired rows until next login. Apply V14
+  before C01 V15 or together, without out-of-order migrations. Old binaries bypass session revocation:
+  forward-fix or review all-instance signing-key rotation plus compatible frontend rollback.
+
+User↔Group is many-to-many via memberships; creating a group auto-inserts the creator's membership. All five split types store final owed amounts in the **same `share_cents`** column, alongside original typed `split_value`, and each expense's shares sum exactly to its amount.
 
 ## Balances & Splits (the math)
 
@@ -242,48 +320,48 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   computed via a fixed number of aggregate `GROUP BY` queries (never a per-expense loop). Because shares sum to
   amounts, **group balances always sum to zero** (test invariant) — holds with expenses + payments mixed.
   **Overpayment allowed** (net-per-person model; flips sign past zero).
-- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, both public pairwise
+- **Ledger reads share a PostgreSQL `REPEATABLE_READ` snapshot**: `BalanceService`, public pairwise
   methods, dashboard and simplification set isolation at their transaction boundaries. Any existing outer
-  transaction must own that isolation too (`GroupService.removeMember` includes the settled-balance guard);
-  an inner `REQUIRED` transaction cannot upgrade its caller. Read-only alone is insufficient. Concurrency
-  regressions use real committed writes between aggregates, without a test-managed reader transaction.
-- **Three views, one source of truth** (persisted expense/payment rows): (1) `BalanceService` net-per-member;
-  (2) `DebtSimplificationService` greedy transfer suggestions; (3) `PairwiseBalanceService` who-owes-whom-to-me per
-  counterparty (drives dashboard cards, People list, settle-up, balance pills). Pairwise is **not netted across
-  people** (can show "Dan owes you $50" and "you owe Sofia $50" at once); pairwise nets sum to the member's net.
-- **`GET /api/dashboard`** assembles one payload: cross-group totals (`totalNetCents = owed − owe`), per-group
+  read transaction must own that isolation too; an inner `REQUIRED` transaction cannot upgrade its caller.
+  Guarded financial writes instead own READ COMMITTED plus the shared group-row lock, which prevents other
+  application financial writers from changing the inputs mid-check. Read-only alone is insufficient.
+  Snapshot/race regressions use real commits and PostgreSQL blocking without a test-managed request transaction.
+- **Three views, one source of truth** (persisted expense/payment rows): `BalanceService` returns unchanged
+  net-per-member balances; `DebtSimplificationService` returns a net-derived preview; `ObligationProjectionService`
+  selects direct pair debts or deterministic net matching for the group mode. `PairwiseBalanceService` maps those
+  obligations to viewer signs for dashboard cards, People, settlement and balance pills. Direct mode can show
+  "Dan owes you $50" and "you owe Sofia $50" at once; simplified mode omits zero-net intermediaries. Viewer sums
+  equal the member's unchanged net in either mode.
+- **`GET /api/dashboard`** assembles one payload: cross-group per-currency `totals[]` (`totalNetMinor = owedMinor − oweMinor`), per-group
   cards, aggregated people, per-group `Settlement[]`, and a merged recent-activity feed (expenses + payments,
-  newest first, capped 15) with per-item `viewerDeltaCents` (+lent / −borrowed; 0 for settlements).
+  newest first, capped 15) with per-item `viewerDeltaMinor` (+lent / −borrowed; 0 for settlements).
 - **Debt simplification** is read-only over balances (reuses `BalanceService.computeBalances`, inherits 403):
-  greedy max-creditor/max-debtor match, ≤N−1 transfers, excludes zero balances, no leftover cents. Acting on a
-  suggestion records a normal `Payment`. Frontend seeds the settle-up form via the **`SettlePrefill`** union
-  (`{kind:'balance'}` vs `{kind:'transaction', payerUserId, payeeUserId, amountCents}`).
-- **Split-type semantics** (default EQUAL): UNEQUAL carries `splits` in **cents** (must sum to `amountCents`);
-  PERCENTAGE carries `splits` in **basis points** (must sum to 10000). Bad sums → 400 with a clear message,
-  never 500. Frontend converts via `dollarsToCents`/`percentToBasisPoints` and gates submit on a live total.
+  deterministic max-creditor/max-debtor match with UUID ties, ≤N−1 transfers, excludes zero balances, no leftover
+  minor units in each currency. The direct-mode warning explains that this preview may leave offsetting pair obligations. Acting on a
+  suggestion records a normal `Payment`. Frontend seeds settle-up from canonical dashboard `Settlement` rows
+  through `ModalService.settlePrefill`; it does not fetch or match a second preview.
+- **Split-type semantics** (default EQUAL): UNEQUAL carries `splits` in **minor units** (must sum to `amountMinor`);
+  PERCENTAGE carries `splits` in **basis points** (sum10000); WEIGHTS carries positive whole units
+  (floor(total×weight/sum), payer absorbs remainder); ADJUSTMENTS carries signed minor units added to equal
+  allocation across the listed split users (sum0, nonnegative final shares). Bad values/totals →400.
+  Frontend gates submit on the actual serialized inputs, including after an amount change.
 
 ## Domain Rules
 
-- Monetary amounts are integer cents — never float. JSON integer fields reject floating-point tokens
+- Monetary amounts are explicit currency and integer minor units — never float. JSON integer fields reject floating-point tokens
   through `spring.jackson.deserialization.accept-float-as-int=false` before DTO validation; split
-  values are integer cents (UNEQUAL) or basis points (PERCENTAGE).
+  values are exact transaction minor units (UNEQUAL), basis points (PERCENTAGE), positive integer units (WEIGHTS), or signed transaction minor units (ADJUSTMENTS).
 - Every split sums exactly to the expense total; rounding remainder handled deterministically (payer absorbs).
 
 ## Known Gaps / TODOs
 
-- **Refresh tokens** — not implemented; 1h access tokens only, re-login on expiry. Add before real deploy.
 - **Register reveals email existence** (409 on duplicate) — fine for now; revisit if enumeration matters.
-- **Simplified settle-up is fetched per group** — `/debt-simplification` derives transfers from one
-  group's balances, so the settle-up modal fans out one request per in-scope group
-  (`DebtService.getSimplifiedDebtsForGroups`). Batch server-side if users ever join many groups.
 - **Simplify-debts is a group setting, not a view toggle** (`groups.simplify_debts`, V8, default on).
   Settle up has no switch of its own: it reads each group's flag, so a dashboard-level settle-up can
   mix simplified and direct rows. The flag rides on the dashboard payload
   (`GroupSummary` → `DashboardGroup`) — anything changing it must call `dashboard.refresh()`, or the
   modal keeps reading the cached value.
-- **Profile prefs are client-side only** (PR #23, #53) — phone/currency/avatar-color per account in
-  localStorage; theme/palette per device. "First seen here" = first-visit month. No profile-update
-  endpoint or signup-date column yet.
+- **FX conversion** remains future P03 work. Currency defaults affect new drafts only; original denominations and separate balances remain authoritative. Compatibility retirement follows deployed-client verification, separately from C01.
 
 ## Git Workflow
 
@@ -293,6 +371,11 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
   no lint errors, include a "Testing" section with end-to-end evidence.
 
 ## Progress Log
+
+- [x] Alignment F03 interactions (2026-10-19) — removed local name/login-email mutation, clarified device-only preferences, exposed detail/delete/load errors with deliberate draft-preserving retries, guarded pending dialog closure across all four mutation dialogs, and completed settlement identity/totals/date accessibility. Regression-first frontend213/backend207, formatting and production build passed; review follow-up keeps delayed DELETE conflicts attached to their original expense row after collapse/switch, with rendered success-refresh coverage. Built-app Chromium at1280/390px verified keyboard/retry/pending/payment-operation reuse, delayed-conflict ownership and successful deletion with intercepted APIs. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. Separate PR to dev; no merge/deployment or claim of real profile/currency implementation.
+
+- [x] PR #95 roster-retry race (2026-10-19) — one shared Add/Enter gate prevents member POST while roster GET is pending, retaining the email and restoring controls after success/failure. Rendered HTTP regression first observed the unwanted POST, then focused34/full frontend214, Prettier and production build passed. Existing session cancellation/pending-dialog tests remain green; no backend change or new browser run. Evidence: `docs/reviews/2026-10-19-alignment/f03-interactions.md`. No push, merge or deployment.
+
 
 *(One line per shipped feature, oldest → newest.)*
 
@@ -343,6 +426,8 @@ User↔Group is many-to-many via memberships; creating a group auto-inserts the 
 - [x] Account session isolation (#45, 2026-10-15) — shared synchronous session reset clears dashboard/modal state on login/register/logout; earlier-session dashboard callbacks and protected 401s are ignored, and pending modal reads/mutations (including queued member additions) cancel on identity changes. Regression-first HTTP/component coverage: initial14 failures and modal5 failures, then frontend80/80 (23 session cases); backend108/108, Prettier/production build, deployment12, ShellCheck/Actionlint and isolated backend/Caddy/Postgres auth/CORS/persistence smoke passed. Local browser verified Alice expiry → modal closed/login → Bob's own sidebar/group. Main PR pending; no merge/deployment.
 - [x] Consistent derived balance snapshots (2026-10-15, #38) — `fix/38-balance-snapshots`: PostgreSQL repeatable-read boundaries cover balances, pairwise, dashboard/activity, simplification and the member-removal guard. Thirteen deterministic regressions coordinate real expense/payment commits (12 behavioral failures before the fix); backend121, frontend57, formatting/build, deployment12, ShellCheck/Actionlint passed. Isolated private Caddy/backend/PostgreSQL HTTP ledger and restart-persistence smoke passed; no schema change, merge to main or deployment.
 - [x] Split overflow validation (#37, 2026-10-15) — bounded exact/percentage values, overflow-safe BigInteger sums and percentage arithmetic before shared POST/PUT persistence; preserves the 1e12 amount cap and deterministic payer remainder. Regression-first strategy/API coverage includes adversarial long inputs, unchanged rejected writes, and zero/full boundary shares. Backend125/frontend57, formatting/production build, deployment12 and ShellCheck/Actionlint passed; disposable Caddy/backend/PostgreSQL HTTP checks confirmed 24 rejected POST/PUT requests leave accounting unchanged, valid boundaries/remainder/zero-sum balances, and persistence after container recreation.
+
+- [x] Alignment F01 historical ledger (2026-10-19) — retained historical financial principals without access, blocked net-zero/bilateral departure and unsafe former-participant expense changes, and serialized group financial mutations with post-wait membership checks. Regression-first real PostgreSQL tests cover both lock orders, all waiting mutation callers and group deletion; backend229/frontend187, formatting/build passed. Separate HTTP/review evidence is recorded in `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema migration, automatic repair, optimistic stale-form guarantee, S4/F02 fix, merge or deployment.
 
 Release preparation (2026-10-15): issues #37/#38/#45 integrated through PRs #66/#67/#68 into dev. Synchronized already-released main history into dev to resolve the project-memory conflict and keep the release PR limited to the three P1 fixes. Issue branches target dev; tested releases use dev→main. No schema changes. Production deployment occurs only after the release PR is merged.
 
@@ -424,3 +509,67 @@ Release PR #71 preparation (2026-10-17): user authorized dev→main promotion, C
 - [x] #63 session lifecycle contract (2026-10-18): documented intended expiry→re-login, client-only logout limits, and requirements before refresh/revocation. Added real-filter expired/issuer/signature/algorithm rejection coverage with valid control; backend 143/143, frontend 110/110, Spotless/Prettier and production build pass. No authentication behavior/schema change.
 
 P2 integration and release preparation (2026-10-18): user authorized merging PRs #72–#93 into dev, combined final checks, then a release PR to main. All 22 exact heads retained; released main history synchronized with no tree change. Shared exception/auth/test conflicts preserve both fixes. Combined backend207/frontend187/deployment12, formatting, production build, ShellCheck/Actionlint and synthetic Chromium dashboard/split checks pass; independent integration review found no blockers. Evidence: `docs/reviews/2026-10-18-p2/integration.md`. Dev CI gates release PR creation; main merge and production deployment remain unauthorized.
+
+Splitwise alignment planning (2026-10-19): proposed design in `docs/superpowers/specs/2026-10-19-splitwise-alignment-design.md`, roadmap and first-batch execution plan in `docs/superpowers/plans/2026-10-19-splitwise-alignment*.md`, and CSV/JSON delivery map for all 81 audited features. Thirty-eight work packages prioritize financial lifecycle/projection correctness, then core foundations/social/history/offline, then Pro and conditional integrations. First batch is F01/F03/F04 with at most three streams, no Astra and Sol reasoning at most high. Planning only; no application implementation, commit, push or deployment. The audit's v0.1.0 baseline and current defects are evidence for proposed work, not shipped fixes.
+
+Engineering workflow selection (2026-10-19): user replaced Superpowers with `mattpocock/skills`. Ten upstream skill directories copied unchanged to ignored project-local `.agents/skills/` at commit `49dd158d1076134a641b33efb035946536778336`, retaining MIT license and hash manifest. Repo setup and override rules are in `docs/agents/`; alignment headers now use this workflow. No global plugin registration, application implementation, commit, push or remote changes.
+
+Alignment execution authorization (2026-10-19): user requested proceeding with the plan, confirming the documented HTTP/PostgreSQL, rendered Angular and browser test seams. F01/F03/F04 run on separate dev-based branches; commits/push/PRs to dev are in scope, while merge and production deployment remain separate. Owner also confirmed all existing amounts are USD: C01 may backfill USD later; no current transaction schema/data changed. Current inspected release is `v0.1.0` at `aa287fb` (the earlier P2 preparation note predates its authorized merge/tag).
+
+- [x] Alignment F04 API contract (2026-10-19) — documented keyed payment replays/conflicts, auth429/Retry-After, narrow overlapping-write conflict scope, OAS3.1 null/default/integer/bounds semantics, greedy wording, activity ordering, gross/net overview and nonuniform error boundaries. Official OAS3.1 schema, duplicate-key rejection and128 internal refs passed. Owned baseline-JAR HTTP confirmed missing/null primitive split values400, explicit0 valid, fractionalamount400, nullable reference defaults and null PATCH no-ops; no application behavior changed. Evidence: `docs/reviews/2026-10-19-alignment/f04-contract.md`. Companion F01/F03 behavior is documented; this documentation must integrate with or after those changes. No merge/deployment.
+
+- [x] PR #96 departure UI review follow-up (2026-10-19) — member-only raw group obligations read uses batched pair aggregates and historical identity resolution; settings gates self/other/creator removal and leave on zero net plus no bilateral debt in either simplify mode, shows each counterparty/amount, and fails closed on pending/failed refreshes. Public HTTP/rendered regressions reproduced 404/enabled-removal before the fix; backend230/frontend193 (Node22), Spotless/Prettier and production builds passed. Evidence: `docs/reviews/2026-10-19-alignment/f01-ledger.md`. No schema/dependency change, push, merge or deployment by this worker.
+
+
+PR #95–#97 review remediation (2026-10-19): user authorized fixing comments and merging into dev. Add/Enter now waits for roster retries; settings shows raw bilateral obligations and blocks net-zero departures consistently. Independent Standards/Spec delta reviews found zero remaining issues. Backend230, combined frontend220 on Node22, formatting/build and88-request packaged HTTP rehearsal passed; owned HTTP resources cleaned up. Contract has134 validated refs and includes companion implementations before merging. Final exact-head CI and #96-before-#97 order gate integration. Evidence: `docs/reviews/2026-10-19-alignment/review-remediation.md`. No main/release action is included.
+
+
+- [x] Alignment A01 server-owned profile (2026-10-19) — authenticated GET/PATCH `/api/me` persists name, unverified phone, avatar and default currency; exposes original registration date and keeps email read-only. Fresh profile responses update auth presentation without changing identity/token; synchronous session resets, HTTP cancellation and generation guards isolate account switches and repeated logins. Account-owned device preferences require explicit import; cancellation preserves their local data, ownerless data is never imported. V10 is additive and preserves existing users/money/created_at; old binaries tolerate retained columns, but rolling back the UI/API hides newly saved preferences. Keep V10 applied and retain data; dropping columns destroys preferences. Deploy V10 before E01 V11 (or both in one release); never rewrite migration history. Verification/evidence: `docs/reviews/2026-10-19-alignment/a01-profile.md`. No merge/deployment by this worker.
+
+
+- [x] A01 review follow-up (2026-10-19) — render accepted `/api/me` email in both read-only profile modes, retaining forbidden email PATCH mutation and unchanged stored auth identity. Rendered red→green covers mismatched cached/server email; an import→component-recreation regression did not reproduce the proposed stale prompt, and failed import/cancel preserve owned local data. Node22 frontend226, full-source Prettier and production build pass; backend unchanged from234 verified tests. Root owns final migration/browser rerun. No push/merge/deployment by this worker.
+- [x] Alignment E01 split intent (2026-10-19) — persist original equal/exact/percentage/weight/adjustment inputs alongside final shares, retain zero participants, restore intent on edit and recompute percentage/weight amount changes; signed adjustments sum0 over deterministic equal allocation with nonnegative final shares. V11 nullable split_value safely degrades legacy/old-writer percentages to exact shares without inference; A01 V10 must deploy before V11, and new enum writes limit rollback. Critical red→green HTTP/rendered loops; full backend241/frontend230, Spotless/Prettier/production build, controlled-HTTP Chromium1280/320 pass. Evidence: `docs/reviews/2026-10-19-alignment/e01-split-intent.md`. Candidate only; independent review, populated migration verification and PR gates remain parent-owned; no push/merge/deployment.
+- [x] Alignment F02 canonical obligations (2026-10-19) — one selected-mode projection and deterministic UUID-tied calculator align /mine, dashboard/People/headlines/actions and departure eligibility; raw obligations/history remain unchanged. Simplified zero-net intermediaries can leave; mode changes serialize with financial/member writes and reject former-participant exposure with re-add/repair guidance. Net previews warn about direct offsets; modal uses canonical dashboard rows. Regression-first HTTP/PostgreSQL and rendered Angular, backend240/frontend220, Spotless/Prettier, production builds and official OpenAPI139-ref validation passed. Evidence: `docs/reviews/2026-10-19-alignment/f02-projection.md`. No schema/currency/auth/editor change, browser claim, push, merge or deployment by this worker; independent review and packaged rehearsal remain root-owned.
+
+- [x] Alignment H06 freshness (2026-10-19) — authenticated navigation/visible-focus revalidation shares pending overview/group reads, writes retain latest-response ownership and receipt invalidation, and account boundaries cancel/clear loaded state. Independent group/settings reads, explicit stale/unavailable/retry states and retained foreground expense feedback are covered by regression-first HTTP/rendered tests; final frontend252 (including route-boundary feedback reset), full-source Prettier and production build pass. No backend/schema/dependency change. Evidence: `docs/reviews/2026-10-19-alignment/h06-freshness.md`; real two-client browser rehearsal and independent review remain root-owned. No push, PR, merge or deployment by this worker.
+- [x] Alignment E02 retry-safe writes (2026-10-21) — V12 native transactional create claims replay original group/expense responses without resurrection; opaque expense versions guard stale PUT/DELETE and advance for child-only intent. Account-owned tab sessionStorage restores uncertain group/expense/payment drafts, requires explicit changed-intent acknowledgement, blocks storage-failure writes and clears on session reset from eager bootstrap. Full backend263/frontend246, Spotless, full-source Prettier, production build and official OpenAPI148-ref validation pass. Evidence/rollout: `docs/reviews/2026-10-19-alignment/e02-retry-safe-writes.md`. V12 must precede/together V13; finite version cutoff2026-11-19; no mixed old backend writers/unsafe rollback. Candidate only; independent review, packaged migration/HTTP/browser rehearsal and PR publication remain root-owned. No push/merge/deployment by worker.
+- [x] Alignment A02 backend checkpoint (2026-10-21) — purpose-bound hashed expiring one-use mailbox challenges support reset, verification and pending email replacement; current-password sensitive commands, scalar-UUID-before-user-lock reset lookup, PostgreSQL uniqueness, credential-version JWT revocation and BCrypt byte bounds hold at HTTP seams. Native SMTP selected but disabled until owned sender/TLS/HTTPS/egress configuration; public actual-send failures stay generic202 with rollback. V13 follows E02 V12; old binaries accept revoked JWTs, so forward-fix or rotate signing keys before reviewed rollback. Backend272/Spotless/package, Compose6 and official OpenAPI166-ref checks pass. Evidence: `docs/reviews/2026-10-19-alignment/a02-account-lifecycle.md`. Frontend/independent review/packaged/browser/final PR gates remain root-coordinated; no push/merge/deployment by this worker.
+
+- [x] Alignment A02 frontend and integration review (2026-10-21) — explicit delivery-neutral recovery, memory-only mailbox confirmations and server-owned account security use existing resource services. Coherent cached token/user pairs and session generations protect cross-tab drafts and stale callbacks; a generation-aware shell initializes the replacement account. Keep one stable router outlet: recreating a fragment-cleared confirmation loses its token. Native same-route hash re-entry scrubs before parsing, requires explicit submit, preserves an already dispatched action and removes listeners/secrets on destruction; Router completion rescrubs any restored fragment without clearing the in-memory form. Invalid forms focus a single field or a linked error summary. Sequential rendered red→green and full frontend261, formatting and production build pass; independent remediation reviews have zero remaining hard/material findings. Backend272 checkpoint remains unchanged; combined280 verification and real owned SMTP/Pg/browser acceptance are recorded in the batch integration report. No production delivery/deployment or remote merge is claimed.
+
+- [x] H06 PR #102 read retry follow-up (2026-10-23) — explicit group/shell/dashboard read retries preserve selected receipts and actionable detail errors through non-forced reload/revalidation; all mutation refresh callers remain forced. Sequential rendered HTTP reds isolate shell and dashboard collapse; group retry also covers usable detail recovery. Node22 frontend 255, full-source Prettier and production build pass. Evidence: `docs/reviews/2026-10-19-alignment/h06-freshness.md`. Root owns browser/review/publication; no push, merge or deployment by this worker.
+- [x] PR #103 P2 email-change conflict feedback (2026-10-23) — documented confirmation409 now explains that the replacement address is already registered, clears the failed in-memory challenge/form and guides a new request with a different address through Account security. One rendered controlled-HTTP regression failed with the temporary fallback before the fix and passes with no auto-post/retry/profile refresh or unrelated-session mutation; full Node22 frontend262/35 files, full-source Prettier and production build pass. Backend/API and429/503/400 behavior unchanged. Evidence: `docs/reviews/2026-10-19-alignment/a02-account-lifecycle.md`; no push, review reply/resolution, merge or deployment by this worker.
+
+
+Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–#103 into dev and deferred production SMTP configuration. Preserve reviewed E02/H06/A02 changes and the verified combined integration resolutions; require updated-head CI, merge E02 V12 before A02 V13, and check final dev CI. Google Workspace is the selected future SMTP provider. Production mail remains disabled until configured; this task targets dev only.
+
+- [x] Alignment A03 candidate (2026-10-24) — persisted per-request sid enforcement, device list/selective revoke/logout-all, bounded hashed rotating HttpOnly Secure cookie renewal, credential-boundary revocation, origin/header guards and preserved limits. Memory-only access, full-response native Web Locks, nonsecret tab markers and immutable user/sid/generation retry checks preserve same-device drafts and cancel replacement-account work. Sequential HTTP/Pg/rendered regressions, backend 298/frontend 306, formatting/build, deployment 14, ShellCheck/Actionlint/Compose and official OpenAPI 183 refs pass. Root independently verified 55 packaged HTTP/upgrade/finance-preservation cases on Java-identical source. One-time legacy re-login; V14 before C01 V15; old-binary rollback requires reviewed all-instance key rotation/compatible frontend. Initial bundle warning 518.20kB remains documented. Evidence: `docs/reviews/2026-10-24-alignment/a03-sessions.md`. Independent review/native browser/publication remain root gates; no worker push/merge/deployment or production SMTP change.
+- [x] Alignment C01 currency ledger (2026-10-24) — V15 adds explicit USD/EUR/GBP/INR/JPY/KWD denomination with owner-confirmed USD backfill and original integers preserved; per-currency balances/People/headlines/simplification/settlement/departure, immutable expense currency and exact integer amount forms/formatting retain split intent and retry safety. Legacy USD aliases/drafts/immutable receipts remain compatible; mixed old backends are unsafe, V14 must precede V15, and post-currency rollback uses a forward fix. Sequential authenticated HTTP/rendered regressions, backend289/Spotless/verify/package, frontend302/40files, full-source Prettier, production build and official OpenAPI3.1/211-ref validation passed; root independently passed51 packaged HTTP checks. Build has a nonblocking511.24kB/500kB initial warning. Evidence: `docs/reviews/2026-10-19-alignment/c01-currency-ledger.md`. Compatibility retirement deferred; root owns combined migration/browser/reviews/publication. No push, merge or deployment by worker.
+- [x] A03 review follow-up (2026-10-25) — device GET/DELETE use existing AuthService and DeviceSession DTO; rendered panel keeps cancellation/UI state. Logout401 from expired access now warns that server revocation is unconfirmed, preserving the signed-out generation guard against stale replacement-account callbacks. One rendered HTTP red→green, focused19/full307/40 files, full-source Prettier and production build pass; initial518.29kB warning. Backend unchanged/no rerun; updated frozen frontend307/evidence. No push/PR/merge/deployment by worker.
+
+- [x] C01 final review corrections (2026-10-25) — dashboard currency scope includes persisted payment denominations even when reciprocal payments cancel or omit the viewer; mixed scalar aliases stay null and zero currency rows remain visible. Headerless legacy PUT against a non-USD expense returns409 upgrade guidance after authorization and before currency comparison. Catalogue DTO moved to dto.common unchanged. Two sequential authenticated HTTP red→green regressions and full Java21 backend291/Spotless/verify/package pass; frontend/OpenAPI unchanged. Corrected artifact/evidence: `docs/reviews/2026-10-19-alignment/c01-currency-ledger.md`. Root owns combined updated rehearsal and publication; no worker remote writes.
+- [x] PR104 superseded-renewal P2 (2026-10-25) — interceptor ownership includes the authentication attempt before newer login/registration responses arrive; older renewal failure cannot clear or invalidate the newer explicit sign-in. Rendered real forms under a controlled Web Locks queue reproduce both failures before fix; focused24/full308/40 files, full-source Prettier and production build pass, initial518.38kB warning. Backend unchanged/no rerun. Frozen frontend308/evidence updated; publisher owns combined browser/CI/review reply. No worker push/remote reply/merge/deployment.
+
+- [x] Batch4 integration acceptance (2026-10-25) — A03/C01 reviewed corrections pass combined backend309/frontend319, full formatting/production build and OpenAPI224 refs; populated V13→V14→V15 plus127 HTTP/169 native-browser API responses pass at1280/390 with no page errors/overflow and owned cleanup. Evidence: `docs/reviews/2026-10-24-alignment/fourth-batch-integration.md`. A03 PR104 and C01 companion target dev; merge A03 before C01, deployment separate. H01 design prepared and gated on verified integrated dev; production SMTP deferred.
+
+- [x] PR105 settled-currency group headline (2026-10-25) — complete group-balance rows retain zero-valued ledger currencies after the final settlement, including payment-only history; per-currency pairwise obligations determine each open/settled label. The new read shares route/session cancellation, retained-read retry and failure handling, independently of dashboard availability. Two sequential rendered HTTP reds→greens, full Node22 frontend322/42files, full-source Prettier and production build pass; backend/OpenAPI unchanged from combinedc1422b1. Evidence: `docs/reviews/2026-10-19-alignment/c01-currency-ledger.md`; root owns native acceptance and PR publication/CI.
+
+- [x] Final PR105 native review acceptance (2026-10-25) — the corrected combined frontend322 and unchanged backend309 pass populated V13→V14→V15 plus129 HTTP/211 real browser API responses at1280/390; actual KWD617 settlement preserves KWD Allsquare and reload with JPY open retains both independent statuses. No errors/overflow, screenshots inspected, owned cleanup. Both review threads fixed/replied/resolved by publication owner; PR104/105 target dev, no merge/deployment or SMTP setup.
+
+- [x] Alignment H01 expense recovery candidate (2026-10-25) — V16 attributable transactional financial revisions, truthful imported baselines and versioned soft-delete/restore retain original currency/shares/split intent while every financial query excludes deleted rows. Member-before-resource authorization and group-lock reauthorization preserve former-participant/session boundaries; immutable E02 receipts never restore. Named history/recovery UI supports explicit balance review, meaningful input units, scoped cancellation, foreground freshness and uncertain-response read review without automatic writes. Sequential HTTP/Pg/rendered checks, backend322/frontend335 in43files, formatting/production build, deployment14, ShellCheck/Actionlint and official OpenAPI250-ref validation pass. Root populated V15→V16 and final native acceptance passed81 HTTP/151 browserAPI responses at1280/390, with zero errors/overflow and cleanup. Evidence: `docs/reviews/2026-10-25-alignment/h01-expense-recovery.md`. All old backends must drain; rollback uses a compatible forward fix. Group cascade remains; no global activity/pagination, payment/group correction, purge or production promotion. Independent reviews/publication remain root gates.
+
+- [x] H01 independent review completion (2026-10-25) — Standards P2 lazy delete-snapshot reads now reuse the existing joined expense fetch; Standards follow-up and both Spec reviews have zero findings. Backend Spotless/verify rerun: 322 passed. Final reviewed JAR 83281e91 passes populated V15→V16 plus 81 HTTP/151 native-browser API responses at 1280/390, zero errors/overflow and owned cleanup. Unchanged frontend335/source assets remain verified. PR publication/CI is next; no production promotion or SMTP change.
+
+- [x] G01 core candidate (2026-10-26) — V17 separates immutable financial participants from accounts, preserves all old IDs/money/split/history/receipt facts, combines owned aliases before projections, and keeps financial eligibility distinct from access. Native email invitations require verified current recipient and explicit ownership consent; one-use revocable group links join only the account itself. Same-ID guest repair preserves H01 recovery and revoked-token state. Capability guards retain primary-only compatibility and exact original retry recovery. Backend335/frontend356, formatting/build, deployment14/lints and OpenAPI346 refs pass; independent populated upgrade/real SMTP169 HTTP checks pass. Evidence: `docs/reviews/2026-10-26-alignment/g01-participant-invitations.md`. Final responsive native acceptance and Standards/Spec review remain gates. Drain old servers; compatible forward fix after guest data. Production SMTP deferred; phone/SMS provider unselected. No main/deployment.
+
+- [x] G01 final native acceptance (2026-10-26) — frozen backend94d97d4 and final responsive frontend pass populated V16→V17 plus 199 HTTP/188 native-browser API responses at1280/390, zero page errors/page-width overflow and owned cleanup. Includes pre-signup KWD, actual SMTP, fragment/storage scrubbing, existing membership not proving claim, aborted and dropped-success acceptance with explicit owned-ID read review, clipboard and forwarded-link join without guest claim. The initial browser readiness mistake required no auth change; verified initial cookie restoration preserves invitations and real replacement clears secrets. A native mobile overflow was fixed with scoped shrinking/wrapping and readable table scrolling. Frontend356/full formatting/build passed again; backend335 unchanged. Separate reviews/publication are next.
+
+- [x] G01 independent review completion (2026-10-26) — added the five missing supporting foreign-key indexes to unpublished V17; no behavior or data change. Standards/Spec follow-ups have zero findings. Backend335 rerun and final4f235702 JAR pass populated upgrade plus199 HTTP/188 native browser API responses at1280/390, zero errors/page overflow and cleanup. Frontend356/51 and source157/dist40 remain verified. Publication/CI is next; production SMTP deferred and phone/SMS gated.
+
+- [x] G02.1 directory candidate (2026-10-27) — private directed registered-account bookmarks survive settlement/access loss/group deletion; current authorized canonical per-currency group detail exposes no contact lookup or new access. Explicit save/remove/status-review UI has route/session/source cancellation and foreground coalescing. Backend347/frontend369/52, formatting/build, deployment14/lints and OpenAPI370 refs pass; independent checkpoint112HTTP/realSMTP/migration passes. Final native acceptance and Standards/Spec reviews are publication gates. Evidence: `docs/reviews/2026-10-27-alignment/g02-friends-directory.md`. Personal CRUD/payment/history remain serial G02 follow-ups; production SMTP deferred.
+
+- [x] G02.1 final acceptance/review (2026-10-27) — corrected eec037c0 JAR plus frozen production SPA pass populated V17→V18, actual local SMTP claims and146HTTP/70 native browser API responses at1280/390; zero page errors/overflow, screenshots inspected and owned cleanup. Standards0/Spec0 at965caa8. Full backend347/frontend369 remain verified by source/artifact manifests. Publication/exact-head CI is next; no new PR merge, production promotion or SMTP change.
+
+- [x] PR108 typography correction (2026-10-27) — central page-heading/body/caption/balance roles replace Friends-local typography literals. Full frontend369/52, formatting and production build pass again; backend203-file source/artifact remains unchanged. Updated native acceptance and independent follow-ups gate publication of this fix.
+
+- [x] PR108 corrected-source acceptance (2026-10-27) — full frontend369/52/format/build552.70kB and updated native146HTTP+70browserAPI1280/390 pass, zero errors/overflow/cleanup. Shared typography correction accepted by Standards0/Spec0 follow-ups at6b3c356; unchanged backend347/source203 retained. Final manifests163frontend42dist match verified artifacts; exact updated-head PR CI/review is next.

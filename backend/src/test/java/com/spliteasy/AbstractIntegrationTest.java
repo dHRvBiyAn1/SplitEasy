@@ -20,7 +20,8 @@ import tools.jackson.databind.ObjectMapper;
  * throwaway Postgres via {@link TestcontainersConfiguration}. Subclasses annotate with
  * {@code @AutoConfigureMockMvc}.
  */
-@SpringBootTest
+// Compatibility fixtures remain deterministic after the production rollout deadline.
+@SpringBootTest(properties = "app.expenses.version-required-from=2099-01-01T00:00:00Z")
 @Import(TestcontainersConfiguration.class)
 public abstract class AbstractIntegrationTest {
   private static final AtomicInteger CLIENT_SEQUENCE = new AtomicInteger();

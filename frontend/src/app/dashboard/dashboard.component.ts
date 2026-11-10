@@ -1,14 +1,13 @@
 import { GroupArtComponent } from '../shared/group-art.component';
-import { MoneyComponent } from '../shared/money.component';
+import { MoneyComponent, formatMoney } from '../shared/money.component';
 import { IconComponent } from '../shared/icon.component';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { UserSummary } from '../core/auth/auth.models';
-import { centsToDisplay } from '../expenses/expense.service';
+import { ParticipantSummary } from '../groups/participant.models';
 import { avatarTint } from '../core/avatar';
 import { ModalService } from '../modals/modal.service';
-import { ActivityItem, ExpenseCategory } from './dashboard.models';
+import { ActivityItem, ExpenseCategory, dashboardTotals, groupTotals } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
 
 /** Category / payment → a glyph for the activity + expense rows. */
@@ -39,7 +38,8 @@ export class DashboardComponent {
   );
   protected readonly data = this.dashboard.data;
   protected readonly loading = this.dashboard.loading;
-  protected readonly display = centsToDisplay;
+  protected readonly totals = dashboardTotals;
+  protected readonly groupTotals = groupTotals;
 
   protected readonly firstNameOf = computed(() =>
     this.firstName(this.auth.user()?.displayName ?? ''),
@@ -50,7 +50,7 @@ export class DashboardComponent {
   }
 
   retry(): void {
-    this.dashboard.refresh();
+    this.dashboard.revalidate();
   }
 
   greeting(): string {
@@ -64,8 +64,13 @@ export class DashboardComponent {
     return (name ?? '').split(/\s+/).filter(Boolean)[0] ?? '';
   }
 
-  isMe(user: UserSummary | null): boolean {
-    return !!user && user.id === this.auth.user()?.id;
+  isMe(user: ParticipantSummary | null): boolean {
+    const data = this.data();
+    // Absence declares the legacy account-only schema, never a UUID-domain guess.
+    const owned =
+      data?.ownedParticipantIds ??
+      (data?.viewerParticipantId ? [data.viewerParticipantId] : [this.auth.user()?.id ?? '']);
+    return !!user && owned.includes(user.id);
   }
 
   initials(name: string): string {
@@ -92,7 +97,7 @@ export class DashboardComponent {
       return `${a.groupName} · settlement`;
     }
     const who = this.isMe(a.actor) ? 'You' : this.firstName(a.actor.displayName);
-    return `${who} paid $${this.display(a.amountCents)} · ${a.groupName}`;
+    return `${who} paid ${formatMoney(a.amountMinor, false, a.currency ?? 'USD')} · ${a.groupName}`;
   }
 
   activityTitle(a: ActivityItem): string {

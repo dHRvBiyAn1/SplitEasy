@@ -6,6 +6,7 @@ import { AuthResponse } from './auth.models';
 
 const authResponse: AuthResponse = {
   accessToken: 'jwt-token',
+  sessionId: 'u1-device',
   tokenType: 'Bearer',
   expiresIn: 3600,
   user: { id: 'u1', email: 'alice@example.com', displayName: 'Alice' },
@@ -24,14 +25,26 @@ describe('AuthService', () => {
     httpTesting = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => httpTesting.verify());
+  afterEach(() => {
+    httpTesting.match('/api/auth/logout').forEach((request) => request.flush(null));
+    httpTesting.verify();
+  });
+
+  it('keeps a successful login credential only in memory', () => {
+    service.login({ email: 'alice@example.com', password: 'password123' }).subscribe();
+    httpTesting.expectOne('/api/auth/login').flush(authResponse);
+    expect(service.user()?.id).toBe('u1');
+    expect(service.getToken()).toBe('jwt-token');
+    expect(localStorage.getItem('spliteasy.accessToken')).toBeNull();
+    expect(localStorage.getItem('spliteasy.user')).toBeNull();
+  });
 
   it('starts unauthenticated', () => {
     expect(service.isAuthenticated()).toBe(false);
     expect(service.getToken()).toBeNull();
   });
 
-  it('register stores token + user and flips isAuthenticated', () => {
+  it('register authenticates the returned user in memory', () => {
     service
       .register({ email: 'alice@example.com', password: 'password123', displayName: 'Alice' })
       .subscribe();
@@ -44,13 +57,22 @@ describe('AuthService', () => {
     expect(service.user()?.email).toBe('alice@example.com');
   });
 
-  it('login persists the session across a new service instance', () => {
+  it('restores through the cookie after a real service reload instead of reading a stored token', () => {
     service.login({ email: 'alice@example.com', password: 'password123' }).subscribe();
     httpTesting.expectOne('/api/auth/login').flush(authResponse);
-
-    // A fresh instance should rehydrate from localStorage.
-    const rehydrated = TestBed.inject(AuthService);
-    expect(rehydrated.getToken()).toBe('jwt-token');
+    httpTesting.verify();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(AuthService);
+    httpTesting = TestBed.inject(HttpTestingController);
+    expect(service.getToken()).toBeNull();
+    service.restore().subscribe();
+    const renewal = httpTesting.expectOne('/api/auth/refresh');
+    expect(renewal.request.withCredentials).toBe(true);
+    renewal.flush({ ...authResponse, accessToken: 'renewed-jwt' });
+    expect(service.getToken()).toBe('renewed-jwt');
   });
 
   it('logout clears token and user', () => {

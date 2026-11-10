@@ -1,12 +1,18 @@
 <div class="gd">
   <a class="gd__back" routerLink="/dashboard"><span aria-hidden="true">‹</span> Dashboard</a>
 
-  @if (loading()) {
+  @if (loading() && !group()) {
     <div class="dc-loading" role="status" aria-label="Loading group"></div>
-  } @else if (error()) {
+  } @else if (error() && !group()) {
     <p class="gd__error" role="alert">{{ error() }}</p>
     <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
   } @else if (group(); as g) {
+    @if (error()) {
+      <p class="gd__error" role="alert">{{ error() }} Showing the last loaded group.</p>
+      <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
+    } @else if (loading()) {
+      <p role="status">Refreshing group…</p>
+    }
     <header class="gd__head">
       <app-group-art [type]="g.type" />
       <div class="gd__id">
@@ -14,7 +20,12 @@
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
       </div>
       <div class="gd__actions">
-        <button type="button" class="dc-btn-outline" (click)="settleUp()">
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="settleUp()"
+          [disabled]="loading() || !!error() || writePending()"
+        >
           <svg
             viewBox="0 0 24 24"
             width="15"
@@ -30,7 +41,12 @@
           </svg>
           Settle up
         </button>
-        <button type="button" class="dc-btn-accent" (click)="addExpense()">
+        <button
+          type="button"
+          class="dc-btn-accent"
+          (click)="addExpense()"
+          [disabled]="writePending()"
+        >
           <svg
             viewBox="0 0 24 24"
             width="15"
@@ -72,32 +88,36 @@
     </header>
 
     <div class="gd__pills">
-      <span
-        class="pill pill--overall"
-        [class.pill--owed]="myNet() > 0"
-        [class.pill--owes]="myNet() < 0"
-      >
-        {{
-          myNet() > 0
-            ? 'You are owed'
-            : myNet() < 0
-              ? 'You owe'
-              : myBalances().length
-                ? 'Even overall · open balances'
-                : 'All square'
-        }}
-        @if (myNet() !== 0) {
-          <strong
-            class="dc-amount"
-            [class.dc-amount--owed]="myNet() > 0"
-            [class.dc-amount--owes]="myNet() < 0"
-          >
-            ${{ display(myNet() < 0 ? -myNet() : myNet()) }}
-          </strong>
-          overall
-        }
-      </span>
-      @for (b of myBalances(); track b.user.id) {
+      @for (total of myTotals(); track total.currency) {
+        <span
+          class="pill pill--overall"
+          [class.pill--owed]="total.netMinor > 0"
+          [class.pill--owes]="total.netMinor < 0"
+        >
+          {{ total.currency }}
+          {{
+            total.netMinor > 0
+              ? 'You are owed'
+              : total.netMinor < 0
+                ? 'You owe'
+                : total.hasOpenBalances
+                  ? 'Even overall · open balances'
+                  : 'All square'
+          }}
+          @if (total.netMinor !== 0) {
+            <strong
+              class="dc-amount"
+              [class.dc-amount--owed]="total.netMinor > 0"
+              [class.dc-amount--owes]="total.netMinor < 0"
+              >{{
+                display(total.netMinor < 0 ? -total.netMinor : total.netMinor, total.currency)
+              }}</strong
+            >
+            overall
+          }
+        </span>
+      }
+      @for (b of myBalances(); track b.user.id + (b.currency ?? 'USD')) {
         <span class="pill">
           <span class="dc-avatar pill__av" aria-hidden="true" [style]="tint(b.user.id)">{{
             initials(b.user.displayName)
@@ -105,10 +125,10 @@
           {{ pillLabel(b) }}
           <strong
             class="dc-amount"
-            [class.dc-amount--owed]="b.netCents > 0"
-            [class.dc-amount--owes]="b.netCents < 0"
+            [class.dc-amount--owed]="b.netMinor > 0"
+            [class.dc-amount--owes]="b.netMinor < 0"
           >
-            ${{ display(b.netCents < 0 ? -b.netCents : b.netCents) }}
+            {{ display(b.netMinor < 0 ? -b.netMinor : b.netMinor, b.currency) }}
           </strong>
         </span>
       }
@@ -129,10 +149,14 @@
                   (click)="toggleExpand(e)"
                   [attr.aria-expanded]="expandedId() === e.id"
                 >
-                  <span class="xrow__date" aria-hidden="true">
+                  <time
+                    class="xrow__date"
+                    [attr.datetime]="e.spentOn"
+                    [attr.aria-label]="fullDate(e.spentOn)"
+                  >
                     <span class="xrow__mon">{{ dayMon(e.spentOn) }}</span>
                     <span class="xrow__day">{{ dayNum(e.spentOn) }}</span>
-                  </span>
+                  </time>
                   <span class="xrow__ico" aria-hidden="true">{{ categoryGlyph(e.category) }}</span>
                   <span class="xrow__text">
                     <span class="xrow__title">{{ e.description }}</span>
@@ -140,29 +164,44 @@
                   </span>
                   <span class="xrow__right">
                     <span class="xrow__delta-label">{{ deltaLabel(e) }}</span>
-                    @if (e.viewerDeltaCents === 0) {
-                      <span class="xrow__amt">$0.00</span>
+                    @if (e.viewerDeltaMinor === 0) {
+                      <span class="xrow__amt">{{ display(0, e.currency) }}</span>
                     } @else {
                       <span
                         class="xrow__amt dc-amount"
-                        [class.dc-amount--owed]="e.viewerDeltaCents > 0"
-                        [class.dc-amount--owes]="e.viewerDeltaCents < 0"
-                        >${{
-                          display(e.viewerDeltaCents < 0 ? -e.viewerDeltaCents : e.viewerDeltaCents)
+                        [class.dc-amount--owed]="e.viewerDeltaMinor > 0"
+                        [class.dc-amount--owes]="e.viewerDeltaMinor < 0"
+                        >{{
+                          display(
+                            e.viewerDeltaMinor < 0 ? -e.viewerDeltaMinor : e.viewerDeltaMinor,
+                            e.currency
+                          )
                         }}</span
                       >
                     }
                   </span>
                 </button>
 
+                @if (deleteError(); as failure) {
+                  @if (failure.expenseId === e.id) {
+                    <p role="alert">
+                      Could not delete "{{ e.description }}". {{ failure.message }}
+                    </p>
+                  }
+                }
                 @if (expandedId() === e.id) {
                   <div class="xdetail">
                     @if (detailLoading()) {
                       <div class="dc-loading" role="status" aria-label="Loading details"></div>
+                    } @else if (detailError()) {
+                      <p role="alert">{{ detailError() }}</p>
+                      <button type="button" class="dc-btn-outline" (click)="retryDetail()">
+                        Retry expense
+                      </button>
                     } @else if (detail(); as d) {
                       <div class="xdetail__line xdetail__line--paid">
                         <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>
-                        <span class="xdetail__amt">${{ display(d.amountCents) }}</span>
+                        <span class="xdetail__amt">{{ display(d.amountMinor, d.currency) }}</span>
                       </div>
                       @for (p of d.participants; track p.user.id) {
                         <div class="xdetail__line">
@@ -172,19 +211,35 @@
                             [style]="tint(p.user.id)"
                             >{{ initials(p.user.displayName) }}</span
                           >
-                          <span class="xdetail__who">{{ partLabel(p) }}</span>
-                          <span class="xdetail__amt">${{ display(p.shareCents) }}</span>
+                          <span class="xdetail__who"
+                            >{{ partLabel(p) }}
+                            @if (sameSnapshotOwner(d, p.user)) {
+                              <small
+                                >{{ p.user.displayName }} · same account, original identity
+                                retained</small
+                              >
+                            }
+                          </span>
+                          <span class="xdetail__amt">{{ display(p.shareMinor, d.currency) }}</span>
                         </div>
                       }
                       <div class="xdetail__actions">
-                        <button type="button" class="dc-btn-outline" (click)="editExpense(e)">
+                        <button type="button" class="dc-btn-outline" (click)="viewHistory(e.id)">
+                          Expense history
+                        </button>
+                        <button
+                          type="button"
+                          class="dc-btn-outline"
+                          (click)="editExpense(e)"
+                          [disabled]="writePending()"
+                        >
                           Edit
                         </button>
                         <button
                           type="button"
                           class="xdetail__del"
                           (click)="deleteExpense(e)"
-                          [disabled]="deletingId() === e.id"
+                          [disabled]="writePending()"
                         >
                           <span aria-hidden="true">🗑</span> Delete expense
                         </button>
@@ -197,6 +252,165 @@
           </ul>
         </section>
       }
+    }
+
+    @if (recoveryNotice()) {
+      <p role="status">{{ recoveryNotice() }}</p>
+    }
+    <button
+      type="button"
+      class="dc-btn-outline"
+      (click)="toggleDeleted()"
+      [attr.aria-expanded]="recoveryOpen()"
+      [disabled]="writePending()"
+    >
+      Deleted expenses
+    </button>
+    @if (recoveryOpen()) {
+      <section class="gd__recovery" role="region" aria-label="Deleted expenses">
+        <h2>Deleted expenses</h2>
+        <p>
+          Review the retained payer, shares and currency. Restoring an expense changes balances.
+          Re-add any former participants first.
+        </p>
+        <button
+          type="button"
+          class="dc-btn-outline"
+          (click)="reviewDeleted()"
+          [disabled]="recoveryLoading() || writePending()"
+        >
+          Reload deleted expenses
+        </button>
+        @if (recoveryLoading()) {
+          <p role="status">Loading deleted expenses…</p>
+        }
+        @if (recoveryError()) {
+          <p role="alert">{{ recoveryError() }}</p>
+        }
+        @if (restoreError(); as failure) {
+          <p role="alert">{{ failure.message }}</p>
+        }
+        @if (!recoveryLoading() && !recoveryError() && deletedExpenses().length === 0) {
+          <p>No deleted expenses.</p>
+        }
+        @for (entry of deletedExpenses(); track entry.expense.id) {
+          <article class="gd__snapshot">
+            <h3>{{ entry.expense.description }}</h3>
+            <p>
+              Paid by {{ entry.expense.paidBy.displayName }} ·
+              {{ display(entry.expense.amountMinor, entry.expense.currency) }} ·
+              {{ fullDate(entry.expense.spentOn) }} · {{ splitLabel(entry.expense.splitType) }}
+            </p>
+            <p>
+              Deleted
+              <time [attr.datetime]="entry.deletedAt">{{ recordedDate(entry.deletedAt) }}</time>
+            </p>
+            <ul>
+              @for (participant of entry.expense.participants; track participant.user.id) {
+                <li>
+                  {{ participant.user.displayName }}:
+                  {{ display(participant.shareMinor, entry.expense.currency) }}
+                </li>
+              }
+            </ul>
+            <div class="xdetail__actions">
+              <button type="button" class="dc-btn-outline" (click)="viewHistory(entry.expense.id)">
+                Expense history
+              </button>
+              <button
+                type="button"
+                class="dc-btn-accent"
+                (click)="restoreExpense(entry.expense)"
+                [disabled]="
+                  writePending() ||
+                  loading() ||
+                  !!error() ||
+                  recoveryLoading() ||
+                  !!recoveryError() ||
+                  recoveryNeedsReview()
+                "
+              >
+                Restore expense
+              </button>
+              @if (restoringId() === entry.expense.id) {
+                <span role="status">Restoring expense…</span>
+              }
+            </div>
+          </article>
+        }
+      </section>
+    }
+
+    @if (historyId(); as expenseId) {
+      <section class="gd__history" role="region" aria-label="Expense history">
+        <h2>Expense history</h2>
+        <button type="button" class="dc-btn-outline" (click)="clearHistory()">Close history</button>
+        @if (historyLoading()) {
+          <p role="status">Loading expense history…</p>
+        } @else if (historyError()) {
+          <p role="alert">{{ historyError() }}</p>
+          <button type="button" class="dc-btn-outline" (click)="viewHistory(expenseId)">
+            Retry history
+          </button>
+        } @else {
+          <ol>
+            @for (revision of history(); track revision.version) {
+              <li>
+                <p>
+                  <strong>{{ revisionLabel(revision.action) }}</strong> ·
+                  {{ revision.actor?.displayName ?? 'Recorder unknown' }} ·
+                  <time [attr.datetime]="revision.recordedAt">{{
+                    recordedDate(revision.recordedAt)
+                  }}</time>
+                </p>
+                @if (revision.action === 'IMPORTED') {
+                  <p>Imported from existing records. Earlier recorder and edits are unknown.</p>
+                }
+                @for (snapshot of [revision.before, revision.after]; track $index) {
+                  @if (snapshot) {
+                    <div class="gd__snapshot">
+                      <p>
+                        <strong>{{ $index === 0 ? 'Before' : 'After' }}:</strong>
+                        {{ snapshot.description }} ·
+                        <span class="dc-amount">{{
+                          display(snapshot.amountMinor, snapshot.currency)
+                        }}</span>
+                      </p>
+                      <p>
+                        Paid by {{ snapshot.paidBy.displayName }} ·
+                        {{ fullDate(snapshot.spentOn) }} · {{ splitLabel(snapshot.splitType) }}
+                      </p>
+                      <ul>
+                        @for (participant of snapshot.participants; track participant.user.id) {
+                          <li>
+                            {{ participant.user.displayName }}
+                            @if (sameSnapshotOwner(snapshot, participant.user)) {
+                              <small>same account today · original identity retained</small>
+                            }
+                            :
+                            {{ display(participant.shareMinor, snapshot.currency) }}
+                          </li>
+                        }
+                      </ul>
+                      @if (snapshot.splits?.length) {
+                        <p>Original inputs ({{ splitLabel(snapshot.splitType) }}):</p>
+                        <ul aria-label="Original split inputs">
+                          @for (input of snapshot.splits; track input.userId) {
+                            <li>
+                              {{ inputName(snapshot, input.userId) }}:
+                              {{ splitInput(snapshot, input.value) }}
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </div>
+                  }
+                }
+              </li>
+            }
+          </ol>
+        }
+      </section>
     }
   }
 </div>

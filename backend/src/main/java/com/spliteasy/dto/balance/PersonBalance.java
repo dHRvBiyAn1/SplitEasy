@@ -1,9 +1,22 @@
 package com.spliteasy.dto.balance;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.spliteasy.dto.common.ParticipantSummary;
+import com.spliteasy.entity.LedgerCurrency;
 
-/**
- * A counterparty's net position with the requesting user, aggregated across all shared groups.
- * Positive {@code netCents} = they owe you; negative = you owe them.
- */
-public record PersonBalance(UserSummary user, long netCents) {}
+public record PersonBalance(ParticipantSummary user, long netMinor, LedgerCurrency currency) {
+  public PersonBalance(ParticipantSummary user, long netMinor) {
+    this(user, netMinor, LedgerCurrency.USD);
+  }
+
+  @JsonIgnore
+  public long netCents() {
+    return netMinor;
+  }
+
+  @JsonProperty("netCents")
+  public Long legacyCents() {
+    return currency == LedgerCurrency.USD ? netMinor : null;
+  }
+}

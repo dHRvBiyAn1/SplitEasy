@@ -1,13 +1,14 @@
 package com.spliteasy.dto.expense;
 
 import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import java.util.UUID;
 
 /**
- * One participant's split value for UNEQUAL/PERCENTAGE expenses. {@code value} is cents (UNEQUAL)
- * or basis points, i.e. hundredths of a percent (PERCENTAGE).
+ * Original typed input: exact cents (UNEQUAL), basis points (PERCENTAGE), positive integer units
+ * (WEIGHTS), or signed cents added to equal allocation (ADJUSTMENTS). Strategies validate each
+ * mode.
  */
 public record SplitInput(
-    @NotNull UUID userId, @PositiveOrZero @Max(1_000_000_000_000L) long value) {}
+    @NotNull UUID userId, @Min(-1_000_000_000_000L) @Max(1_000_000_000_000L) long value) {}

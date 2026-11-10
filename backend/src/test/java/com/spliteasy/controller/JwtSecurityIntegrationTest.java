@@ -28,14 +28,15 @@ class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
       "jwt-security-test-only-key-0000000000000000000000000000000000000000";
 
   private String userId;
+  private String email;
+  private String sessionId;
 
   @BeforeEach
   void registerUser() throws Exception {
-    userId =
-        register(UUID.randomUUID() + "@example.com", "password123", "JWT test")
-            .user()
-            .id()
-            .toString();
+    email = UUID.randomUUID() + "@example.com";
+    var auth = register(email, "password123", "JWT test");
+    userId = auth.user().id().toString();
+    sessionId = auth.sessionId().toString();
   }
 
   @Test
@@ -119,12 +120,93 @@ class JwtSecurityIntegrationTest extends AbstractIntegrationTest {
         .andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void credentialClaimsFailClosedAndSessionTokensStopWorkingAtCredentialChange() throws Exception {
+    String versionZero = credentialToken(userId, null, false);
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(versionZero)))
+        .andExpect(status().isOk());
+    for (Object invalid :
+        new Object[] {
+          -1, 1, "0", 0.5, true, java.util.List.of(0), java.util.Map.of("version", 0), null
+        }) {
+      mockMvc
+          .perform(
+              get("/api/me")
+                  .header("Authorization", bearer(credentialToken(userId, invalid, true))))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String invalidSubject : new String[] {"not-a-uuid", UUID.randomUUID().toString()}) {
+      mockMvc
+          .perform(
+              get("/api/me")
+                  .header("Authorization", bearer(credentialToken(invalidSubject, 0, true))))
+          .andExpect(status().isUnauthorized());
+    }
+    mockMvc
+        .perform(
+            jsonPost(
+                    "/api/me/password",
+                    java.util.Map.of(
+                        "currentPassword", "password123", "password", "jwtChangedPassword"))
+                .header("Authorization", bearer(versionZero)))
+        .andExpect(status().isNoContent());
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(versionZero)))
+        .andExpect(status().isUnauthorized());
+    var fresh = login(email, "jwtChangedPassword");
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(fresh.accessToken())))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void legacySidlessTokensAndOtherDeviceOwnersFailClosed() throws Exception {
+    for (String sid : new String[] {"", "not-a-uuid", UUID.randomUUID().toString()}) {
+      var claims =
+          new JWTClaimsSet.Builder()
+              .issuer("spliteasy")
+              .subject(userId)
+              .issueTime(Date.from(Instant.now().minusSeconds(30)))
+              .expirationTime(Date.from(Instant.now().plusSeconds(300)))
+              .claim("credentialVersion", 0L);
+      if (!sid.isEmpty()) claims.claim("sid", sid);
+      var jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims.build());
+      jwt.sign(new MACSigner(SIGNING_KEY.getBytes(StandardCharsets.UTF_8)));
+      mockMvc
+          .perform(get("/api/me").header("Authorization", bearer(jwt.serialize())))
+          .andExpect(status().isUnauthorized());
+    }
+    var stranger = register(UUID.randomUUID() + "@example.com", "password123", "Other owner");
+    sessionId = stranger.sessionId().toString();
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(credentialToken(userId, 0, true))))
+        .andExpect(status().isUnauthorized());
+  }
+
+  private String credentialToken(String subject, Object version, boolean includeVersion)
+      throws Exception {
+    var claims = new java.util.HashMap<String, Object>();
+    claims.put("iss", "spliteasy");
+    claims.put("sub", subject);
+    claims.put("sid", sessionId);
+    claims.put("iat", Instant.now().minusSeconds(30).getEpochSecond());
+    claims.put("exp", Instant.now().plusSeconds(300).getEpochSecond());
+    if (includeVersion) claims.put("credentialVersion", version);
+    var jwt =
+        new com.nimbusds.jose.JWSObject(
+            new JWSHeader(JWSAlgorithm.HS256), new com.nimbusds.jose.Payload(json(claims)));
+    jwt.sign(new MACSigner(SIGNING_KEY.getBytes(StandardCharsets.UTF_8)));
+    return jwt.serialize();
+  }
+
   private String token(String issuer, Instant expiresAt, JWSAlgorithm algorithm, String key)
       throws Exception {
     var claims =
         new JWTClaimsSet.Builder()
             .issuer(issuer)
             .subject(userId)
+            .claim("sid", sessionId)
             .issueTime(Date.from(Instant.now().minusSeconds(600)))
             .expirationTime(Date.from(expiresAt))
             .build();

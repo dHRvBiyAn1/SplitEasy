@@ -1,5 +1,12 @@
 <app-modal-shell [heading]="heading()" [maxWidth]="600" (closed)="close()">
-  <form class="mform" (submit)="$event.preventDefault(); save()">
+  <form
+    class="mform"
+    (input)="freezeCurrencyDefault()"
+    (change)="freezeCurrencyDefault()"
+    (click)="freezeCurrencyDefault()"
+    (keydown)="freezeCurrencyDefault()"
+    (submit)="$event.preventDefault(); save()"
+  >
     @if (groupOptions().length === 0 && !groupId()) {
       <p class="mform__lead">Create a group before adding an expense.</p>
       <button type="button" class="dc-btn-outline" (click)="createGroup()">Create a group</button>
@@ -33,20 +40,49 @@
         />
       </div>
 
+      <div class="mform__field">
+        <label class="dc-field-label" for="ne-currency">Currency</label>
+        <select
+          id="ne-currency"
+          class="dc-field"
+          [value]="currency()"
+          [disabled]="!!editId"
+          (change)="selectCurrency($any($event.target).value)"
+        >
+          @for (code of currencies; track code) {
+            <option [value]="code">{{ code }}</option>
+          }
+        </select>
+        @if (editId) {
+          <p class="mform__hint">
+            Currency is fixed for recorded expenses. Create a separate expense to use another
+            currency.
+          </p>
+        }
+        <p class="mform__hint">
+          {{ currency() }} uses {{ precision() }} decimal places. Enter an exact amount at this
+          precision.
+        </p>
+      </div>
       <div class="mform__grid2">
         <div class="mform__field">
-          <label class="dc-field-label" for="ne-amt">Amount</label>
+          <label class="dc-field-label" for="ne-amt">Amount ({{ currency() }})</label>
           <input
             id="ne-amt"
             class="dc-field"
-            type="number"
-            step="0.01"
-            min="0.01"
+            type="text"
+            maxlength="32"
+            [attr.step]="step()"
+            aria-describedby="ne-amount-hint"
             inputmode="decimal"
             [formControl]="amount"
             (input)="tick.update((n) => n + 1)"
-            placeholder="0.00"
+            [placeholder]="display(0)"
           />
+          <p id="ne-amount-hint" class="mform__hint">
+            Use a dot for decimals, without grouping. Maximum {{ currency() }}
+            {{ display(maxAmountMinor) }}.
+          </p>
         </div>
         <div class="mform__field">
           <label class="dc-field-label" for="ne-date">Date</label>
@@ -116,6 +152,20 @@
           >
             Percent
           </button>
+          <button
+            type="button"
+            [attr.aria-pressed]="splitType() === 'WEIGHTS'"
+            (click)="splitType.set('WEIGHTS')"
+          >
+            Weights
+          </button>
+          <button
+            type="button"
+            [attr.aria-pressed]="splitType() === 'ADJUSTMENTS'"
+            (click)="splitType.set('ADJUSTMENTS')"
+          >
+            Adjustments
+          </button>
         </div>
 
         <div class="prows">
@@ -124,7 +174,12 @@
               <span class="dc-avatar prow__av" aria-hidden="true" [style]="tint(m.id)">{{
                 initials(m.displayName)
               }}</span>
-              <span class="prow__name">{{ firstName(m) }}</span>
+              <span class="prow__name"
+                >{{ firstName(m) }}
+                @if (sameOwner(m)) {
+                  <small>Historical identity · same account; original split retained</small>
+                }
+              </span>
               @if (splitType() === 'EQUAL') {
                 <label class="participant-toggle"
                   ><input
@@ -140,36 +195,94 @@
                   aria-describedby="ne-split-precision"
                   [attr.aria-label]="
                     memberLabel(m) +
-                    (splitType() === 'PERCENTAGE'
-                      ? ' share in percent'
-                      : ' exact amount in dollars')
+                    (splitType() === 'ADJUSTMENTS'
+                      ? ' adjustment in signed ' + currency()
+                      : splitType() === 'WEIGHTS'
+                        ? ' weight in whole units'
+                        : splitType() === 'PERCENTAGE'
+                          ? ' share in percent'
+                          : ' exact amount in ' + currency())
                   "
-                  type="number"
-                  step="any"
-                  min="0"
+                  [type]="splitType() === 'WEIGHTS' ? 'number' : 'text'"
+                  maxlength="32"
+                  [attr.step]="
+                    splitType() === 'WEIGHTS' ? '1' : splitType() === 'PERCENTAGE' ? '0.01' : step()
+                  "
+                  [attr.min]="
+                    splitType() === 'ADJUSTMENTS' ? null : splitType() === 'WEIGHTS' ? '1' : '0'
+                  "
                   inputmode="decimal"
                   [value]="values()[m.id] || ''"
                   (input)="setValue(m.id, $any($event.target).value)"
-                  [placeholder]="splitType() === 'PERCENTAGE' ? '%' : '$'"
+                  [placeholder]="
+                    splitType() === 'WEIGHTS'
+                      ? 'units'
+                      : splitType() === 'PERCENTAGE'
+                        ? '%'
+                        : currency()
+                  "
                 />
               }
             </div>
           }
         </div>
         @if (splitType() !== 'EQUAL') {
-          <p class="mform__hint" id="ne-split-precision">Each share rounds to 2 decimal places.</p>
+          <p class="mform__hint" id="ne-split-precision">
+            {{
+              splitType() === 'ADJUSTMENTS'
+                ? 'Add signed ' +
+                  currency() +
+                  ' adjustments to equal shares over the entered participants. Adjustments must total zero; final shares cannot be negative. Blank excludes; enter 0 to include without adjustment. Each adjustment rounds to ' +
+                  precision() +
+                  ' decimal places.'
+                : splitType() === 'WEIGHTS'
+                  ? 'Use positive whole units, such as 1 and 2. Blank excludes a participant.'
+                  : 'Each share rounds to ' +
+                    (splitType() === 'PERCENTAGE' ? 2 : precision()) +
+                    ' decimal places. Blank excludes; 0 keeps a participant.'
+            }}
+          </p>
         }
       </div>
 
       @if (!ready() && !error()) {
-        <p role="status">Loading expense details…</p>
+        <p role="status">Loading group members and expense…</p>
+      }
+      @if (loadFailed()) {
+        <button type="button" class="dc-btn-outline" (click)="retryMembers()">
+          Retry members and expense
+        </button>
+      }
+      @if (retryNotice()) {
+        <p role="status">{{ retryNotice() }}</p>
+        @if (unmappedOriginalIds().length) {
+          <p role="status">
+            Some original identities are absent from the current roster:
+            {{ unmappedOriginalIds().join(', ') }}. Their saved IDs, amounts and typed inputs are
+            retained. Only retry the original expense, or check history before starting a separate
+            entry.
+          </p>
+        }
+        <button
+          type="button"
+          class="dc-btn-outline"
+          [disabled]="saving() || !ready() || draftBlocked()"
+          (click)="retryOriginal()"
+        >
+          Retry original expense
+        </button>
+        <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
+          Start a separate expense
+        </button>
       }
       @if (error()) {
         <p class="mform__error" role="alert">{{ error() }}</p>
       }
 
       <div class="mform__foot">
-        <p class="running" [class.running--ok]="splitValid()">{{ runningLabel() }}</p>
+        <p class="running" aria-live="polite" aria-atomic="true" [class.running--ok]="splitValid()">
+          {{ runningLabel() }}
+        </p>
         <div class="mform__actions">
           <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
           <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>

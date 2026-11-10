@@ -37,16 +37,24 @@ public class Expense {
   @JoinColumn(name = "group_id", nullable = false, updatable = false)
   private Group group;
 
+  @jakarta.persistence.Version
+  @Column(nullable = false)
+  private long version;
+
   @Column(nullable = false)
   private String description;
 
   /** Total amount in integer cents; always positive. */
+  @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+  @Column(nullable = false, length = 3)
+  private LedgerCurrency currency = LedgerCurrency.USD;
+
   @Column(name = "amount_cents", nullable = false)
   private long amountCents;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "paid_by", nullable = false)
-  private User paidBy;
+  private Participant paidBy;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "split_type", nullable = false)
@@ -63,6 +71,9 @@ public class Expense {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
   @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<ExpenseParticipant> participants = new ArrayList<>();
 
@@ -70,7 +81,7 @@ public class Expense {
       Group group,
       String description,
       long amountCents,
-      User paidBy,
+      Participant paidBy,
       SplitType splitType,
       ExpenseCategory category,
       LocalDate spentOn) {
@@ -86,13 +97,13 @@ public class Expense {
 
   /** Back-compat convenience: no category/date → {@link ExpenseCategory#OTHER} spent today. */
   public Expense(
-      Group group, String description, long amountCents, User paidBy, SplitType splitType) {
+      Group group, String description, long amountCents, Participant paidBy, SplitType splitType) {
     this(
         group, description, amountCents, paidBy, splitType, ExpenseCategory.OTHER, LocalDate.now());
   }
 
   /** Adds a participant share and keeps both sides of the relationship consistent. */
-  public ExpenseParticipant addParticipant(User user, long shareCents) {
+  public ExpenseParticipant addParticipant(Participant user, long shareCents) {
     ExpenseParticipant participant = new ExpenseParticipant(this, user, shareCents);
     participants.add(participant);
     return participant;

@@ -267,3 +267,19 @@
     font-size: 12px;
   }
 }
+
+.gd__history,
+.gd__recovery {
+  min-width: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.gd__snapshot {
+  margin-block: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}

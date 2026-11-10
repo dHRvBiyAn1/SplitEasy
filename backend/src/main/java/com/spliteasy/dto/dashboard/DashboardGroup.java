@@ -12,9 +12,30 @@ public record DashboardGroup(
     String name,
     GroupType type,
     long memberCount,
-    long totalSpentCents,
-    long youAreOwedCents,
-    long youOweCents,
-    long netCents,
+    Long totalSpentCents,
+    Long youAreOwedCents,
+    Long youOweCents,
+    Long netCents,
     /** Group setting: settle-up uses suggested netted transfers for this group. */
-    boolean simplifyDebts) {}
+    boolean simplifyDebts,
+    java.util.List<GroupCurrencyTotals> totals) {
+  @com.fasterxml.jackson.annotation.JsonProperty("totalSpentMinor")
+  public Long totalSpentMinor() {
+    return totalSpentCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("youAreOwedMinor")
+  public Long youAreOwedMinor() {
+    return youAreOwedCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("youOweMinor")
+  public Long youOweMinor() {
+    return youOweCents;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("netMinor")
+  public Long netMinor() {
+    return netCents;
+  }
+}

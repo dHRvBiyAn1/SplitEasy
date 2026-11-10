@@ -1,6 +1,6 @@
 package com.spliteasy.dto.dashboard;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.ExpenseCategory;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -21,12 +21,33 @@ public record ActivityItem(
     UUID groupId,
     String groupName,
     String description,
-    UserSummary actor,
-    UserSummary counterparty,
-    long amountCents,
-    long viewerDeltaCents,
+    ParticipantSummary actor,
+    ParticipantSummary counterparty,
+    long amountMinor,
+    long viewerDeltaMinor,
     ExpenseCategory category,
-    LocalDate date) {
+    LocalDate date,
+    com.spliteasy.entity.LedgerCurrency currency) {
+
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public long amountCents() {
+    return amountMinor;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("amountCents")
+  public Long legacyAmountCents() {
+    return currency == com.spliteasy.entity.LedgerCurrency.USD ? amountMinor : null;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public long viewerDeltaCents() {
+    return viewerDeltaMinor;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("viewerDeltaCents")
+  public Long legacyViewerdeltaCents() {
+    return currency == com.spliteasy.entity.LedgerCurrency.USD ? viewerDeltaMinor : null;
+  }
 
   public enum Kind {
     EXPENSE,

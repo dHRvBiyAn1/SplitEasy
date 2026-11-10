@@ -1,6 +1,8 @@
 package com.spliteasy.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockingDetails;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.spliteasy.AbstractIntegrationTest;
 import com.spliteasy.dto.auth.AuthResponse;
 import com.spliteasy.dto.balance.GroupBalancesResponse;
-import com.spliteasy.dto.common.ErrorResponse;
 import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.dto.expense.ExpenseResponse;
 import com.spliteasy.dto.expense.SplitInput;
@@ -19,17 +20,23 @@ import com.spliteasy.entity.SplitType;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.service.ExpenseService;
 import com.spliteasy.service.GroupService;
+import com.spliteasy.service.MembershipGuard;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -38,11 +45,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class ExpenseEditConflictIntegrationTest extends AbstractIntegrationTest {
 
   @MockitoSpyBean ExpenseRepository expenseRepository;
+  @MockitoSpyBean MembershipGuard membershipGuard;
   @Autowired ExpenseService expenseService;
   @Autowired GroupService groupService;
+  @Autowired JdbcTemplate jdbc;
 
   @Test
-  void concurrentEditsReturnOneConflictAndKeepTheWinningExpenseAndLedger() throws Exception {
+  void concurrentEditsSerializeAndKeepTheFinalExpenseAndLedger() throws Exception {
     assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
     String id = UUID.randomUUID().toString();
     AuthResponse alice = register(id + "-a@example.com", "password123", "Alice");
@@ -59,24 +68,16 @@ class ExpenseEditConflictIntegrationTest extends AbstractIntegrationTest {
             .id();
     String path = "/api/groups/" + groupId + "/expenses/" + expenseId;
 
-    CyclicBarrier bothLoaded = new CyclicBarrier(2);
-    AtomicInteger loads = new AtomicInteger();
+    CyclicBarrier bothAuthorized = new CyclicBarrier(2);
+    AtomicInteger authorizations = new AtomicInteger();
     doAnswer(
-            invocation -> {
-              // Delegate to the real Spring Data query; only coordinate after both transactions
-              // have loaded the same participant rows. No fake query results or sleeps.
-              Object expense =
-                  mockingDetails(invocation.getMock())
-                      .getMockCreationSettings()
-                      .getDefaultAnswer()
-                      .answer(invocation);
-              if (loads.incrementAndGet() <= 2) {
-                bothLoaded.await(20, TimeUnit.SECONDS);
-              }
-              return expense;
+            call -> {
+              call.callRealMethod();
+              if (authorizations.incrementAndGet() <= 2) bothAuthorized.await(20, TimeUnit.SECONDS);
+              return null;
             })
-        .when(expenseRepository)
-        .findByIdFetchAll(expenseId);
+        .when(membershipGuard)
+        .requireMember(eq(groupId), any());
 
     List<MvcResult> results;
     try (var edits = Executors.newFixedThreadPool(2)) {
@@ -105,23 +106,24 @@ class ExpenseEditConflictIntegrationTest extends AbstractIntegrationTest {
       results = List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS));
     }
 
-    // Each user edit runs once; the loser must never be retried over the winner's commit.
-    assertThat(loads).hasValue(2);
-    assertThat(results)
-        .extracting(r -> r.getResponse().getStatus())
-        .containsExactlyInAnyOrder(200, 409);
-    MvcResult winner =
-        results.stream().filter(r -> r.getResponse().getStatus() == 200).findFirst().orElseThrow();
-    MvcResult loser =
-        results.stream().filter(r -> r.getResponse().getStatus() == 409).findFirst().orElseThrow();
-    ErrorResponse conflict =
-        objectMapper.readValue(loser.getResponse().getContentAsString(), ErrorResponse.class);
-    assertThat(conflict.status()).isEqualTo(409);
-    assertThat(conflict.error()).isEqualTo("Conflict");
-    assertThat(conflict.message()).contains("Reload", "review");
+    // Financial writes serialize. Both edits may succeed; separate stale forms have no version
+    // contract.
+    assertThat(results).extracting(r -> r.getResponse().getStatus()).containsExactly(200, 200);
+    MvcResult fresh =
+        mockMvc
+            .perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
+            .andExpect(status().isOk())
+            .andReturn();
     ExpenseResponse saved =
-        objectMapper.readValue(winner.getResponse().getContentAsString(), ExpenseResponse.class);
-    boolean aliceWon = results.getFirst().getResponse().getStatus() == 200;
+        objectMapper.readValue(fresh.getResponse().getContentAsString(), ExpenseResponse.class);
+    assertThat(
+            List.of(
+                objectMapper.readValue(
+                    results.getFirst().getResponse().getContentAsString(), ExpenseResponse.class),
+                objectMapper.readValue(
+                    results.getLast().getResponse().getContentAsString(), ExpenseResponse.class)))
+        .contains(saved);
+    boolean aliceWon = saved.description().equals("Alice edit");
     assertThat(saved.description()).isEqualTo(aliceWon ? "Alice edit" : "Bob edit");
     assertThat(saved.amountCents()).isEqualTo(aliceWon ? 1800 : 2400);
     assertThat(saved.paidBy().id()).isEqualTo(aliceWon ? alice.user().id() : bob.user().id());
@@ -132,19 +134,18 @@ class ExpenseEditConflictIntegrationTest extends AbstractIntegrationTest {
     assertThat(saved.participants())
         .extracting(s -> s.shareCents())
         .containsExactly(aliceWon ? 900L : 1000L, aliceWon ? 900L : 1400L);
-    MvcResult fresh =
-        mockMvc
-            .perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
-            .andExpect(status().isOk())
-            .andReturn();
-    assertThat(
-            objectMapper.readValue(fresh.getResponse().getContentAsString(), ExpenseResponse.class))
-        .isEqualTo(saved);
     assertThat(saved.participants()).hasSize(2);
     assertThat(saved.participants()).extracting(s -> s.user().id()).doesNotHaveDuplicates();
     assertThat(saved.participants().stream().mapToLong(s -> s.shareCents()).sum())
         .isEqualTo(saved.amountCents());
-    assertThat(expenseRepository.findSummariesByGroupId(groupId)).hasSize(1);
+    mockMvc
+        .perform(
+            get("/api/groups/" + groupId + "/expenses")
+                .header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.length()")
+                .value(1));
 
     MvcResult balanceResult =
         mockMvc
@@ -158,19 +159,80 @@ class ExpenseEditConflictIntegrationTest extends AbstractIntegrationTest {
             balanceResult.getResponse().getContentAsString(), GroupBalancesResponse.class);
     assertThat(ledger.balances()).hasSize(2);
     assertThat(ledger.balances().stream().mapToLong(b -> b.netCents()).sum()).isZero();
-    ledger
-        .balances()
-        .forEach(
-            balance -> {
-              long share =
-                  saved.participants().stream()
-                      .filter(s -> s.user().id().equals(balance.user().id()))
-                      .findFirst()
-                      .orElseThrow()
-                      .shareCents();
-              long paid = balance.user().id().equals(saved.paidBy().id()) ? saved.amountCents() : 0;
-              assertThat(balance.netCents()).isEqualTo(paid - share);
-            });
+    assertThat(
+            ledger.balances().stream()
+                .collect(Collectors.toMap(b -> b.user().id(), b -> b.netCents())))
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of(
+                alice.user().id(),
+                aliceWon ? 900L : -1000L,
+                bob.user().id(),
+                aliceWon ? -900L : 1000L));
+  }
+
+  @Test
+  void detectedPersistenceConflictReturnsReloadGuidanceAndRollsBackTheEdit() throws Exception {
+    String id = UUID.randomUUID().toString();
+    AuthResponse alice = register(id + "-a@example.com", "password123", "Alice");
+    AuthResponse bob = register(id + "-b@example.com", "password123", "Bob");
+    UUID groupId =
+        groupService
+            .createGroup(alice.user().id(), new CreateGroupRequest("Persistence conflict"))
+            .id();
+    groupService.addMember(alice.user().id(), groupId, bob.user().email());
+    UUID expenseId =
+        expenseService
+            .createExpense(
+                alice.user().id(),
+                groupId,
+                new CreateExpenseRequest("Original", 600, alice.user().id(), null))
+            .id();
+    AtomicBoolean removed = new AtomicBoolean();
+    doAnswer(
+            call -> {
+              Object loaded =
+                  mockingDetails(call.getMock())
+                      .getMockCreationSettings()
+                      .getDefaultAnswer()
+                      .answer(call);
+              if (removed.compareAndSet(false, true)) {
+                // An external database writer bypasses the group protocol: exercise real stale-row
+                // translation.
+                CompletableFuture.runAsync(
+                        () -> jdbc.update("delete from expenses where id = ?", expenseId))
+                    .get(20, TimeUnit.SECONDS);
+              }
+              return loaded;
+            })
+        .when(expenseRepository)
+        .findByIdFetchAll(expenseId);
+    String path = "/api/groups/" + groupId + "/expenses/" + expenseId;
+    MvcResult conflict =
+        edit(
+            path,
+            alice,
+            new CreateExpenseRequest("Conflicting edit", 1800, alice.user().id(), null));
+    assertThat(conflict.getResponse().getStatus()).isEqualTo(409);
+    assertThat(
+            objectMapper
+                .readTree(conflict.getResponse().getContentAsString())
+                .get("message")
+                .asText())
+        .contains("Reload", "review");
+    mockMvc
+        .perform(get(path).header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
+        .andExpect(status().isNotFound());
+    var response =
+        mockMvc
+            .perform(
+                get("/api/groups/" + groupId + "/balances")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken())))
+            .andExpect(status().isOk())
+            .andReturn();
+    GroupBalancesResponse balances =
+        objectMapper.readValue(
+            response.getResponse().getContentAsString(), GroupBalancesResponse.class);
+    assertThat(balances.balances()).hasSize(2).allSatisfy(b -> assertThat(b.netCents()).isZero());
   }
 
   private MvcResult edit(String path, AuthResponse user, CreateExpenseRequest request)

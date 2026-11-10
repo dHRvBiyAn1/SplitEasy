@@ -1,12 +1,23 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  CURRENCY_EXPONENT,
+  MAX_TRANSACTION_MINOR,
+  amountToMinor,
+  minorToDisplay,
+} from '../shared/currency';
+import { MoneyComponent } from '../shared/money.component';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef, Component, computed, inject, signal } from '@angular/core';
 import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { Settlement } from '../dashboard/dashboard.models';
-import { DebtService } from '../debts/debt.service';
-import { SimplifiedDebtsResponse } from '../debts/debt.models';
-import { centsToDisplay, dollarsToCents } from '../expenses/expense.service';
+import {
+  PendingWritesService,
+  PendingWriteError,
+  UNCERTAIN_WRITE,
+} from '../core/pending-writes.service';
+import { RecordPaymentRequest } from '../payments/payment.models';
 import { PaymentService } from '../payments/payment.service';
 import { avatarTint } from '../core/avatar';
 import { ModalService } from './modal.service';
@@ -14,134 +25,78 @@ import { ModalShellComponent } from './modal-shell.component';
 
 @Component({
   selector: 'app-settle-up-modal',
-  imports: [ModalShellComponent],
+  imports: [ModalShellComponent, MoneyComponent],
   templateUrl: './settle-up-modal.component.html',
   styleUrl: './modals.scss',
 })
 export class SettleUpModalComponent {
   private readonly dashboard = inject(DashboardService);
+  private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly draftBlocked = signal(false);
+  protected readonly retryNotice = signal<string | null>(null);
   private readonly payments = inject(PaymentService);
-  private readonly debts = inject(DebtService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
+  private readonly sessionVersion = this.session.version;
+  private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly display = centsToDisplay;
+  protected readonly precision = computed(
+    () => CURRENCY_EXPONENT[this.selected()?.currency ?? 'USD'],
+  );
+  protected readonly maximum = computed(() =>
+    minorToDisplay(MAX_TRANSACTION_MINOR, this.selected()?.currency ?? 'USD'),
+  );
+  protected readonly step = computed(() =>
+    this.precision() === 0 ? '1' : '0.' + '0'.repeat(this.precision() - 1) + '1',
+  );
 
-  /** Simplified rows for the groups that ask for them (null = not loaded yet). */
-  private readonly simplified = signal<Settlement[] | null>(null);
-  protected readonly loadingSimplified = signal(false);
-
-  /** Every direct balance, scoped to one group when opened from a group's detail page. */
-  protected readonly direct = computed<Settlement[]>(() => {
+  /** The dashboard already projects the selected mode, including all settlement actions. */
+  protected readonly settlements = computed<Settlement[]>(() => {
     const all = this.dashboard.data()?.settlements ?? [];
     const gid = this.modal.settleGroupId();
     return gid ? all.filter((s) => s.groupId === gid) : all;
   });
-
-  /** Set when the simplified fetch fails, so every group falls back to direct balances. */
-  private readonly simplifyFailed = signal(false);
-
-  /** Group ids whose settings use suggested netted transfers (Advanced settings). */
-  private readonly simplifyingGroupIds = computed(() =>
-    this.simplifyFailed()
-      ? new Set<string>()
-      : new Set(
-          (this.dashboard.data()?.groups ?? []).filter((g) => g.simplifyDebts).map((g) => g.id),
-        ),
-  );
-
-  /** True when every in-scope group is on the simplified view (drives the banner copy). */
-  protected readonly allSimplified = computed(() =>
-    this.scopeGroupIds().every((id) => this.simplifyingGroupIds().has(id)),
-  );
-
-  /**
-   * Simplification is a per-group setting, so the list mixes the two: a simplifying group
-   * contributes its suggested transfers, any other contributes its direct balances as-is.
-   */
-  protected readonly settlements = computed<Settlement[]>(() => {
-    const simplifying = this.simplifyingGroupIds();
-    const simplified = this.simplified() ?? [];
-    return [
-      ...simplified.filter((s) => simplifying.has(s.groupId)),
-      ...this.direct().filter((s) => !simplifying.has(s.groupId)),
-    ];
+  protected readonly loading = this.dashboard.loading;
+  protected readonly loadFailed = this.dashboard.error;
+  protected readonly allSimplified = computed(() => {
+    const gid = this.modal.settleGroupId();
+    const groups = (this.dashboard.data()?.groups ?? []).filter((g) => !gid || g.id === gid);
+    return groups.length > 0 && groups.every((g) => g.simplifyDebts);
   });
 
-  /** Payments saved by simplifying (0 when it doesn't help — the banner hides the line). */
-  protected readonly saved = computed(() =>
-    Math.max(0, this.direct().length - this.settlements().length),
-  );
-
   protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
-  /** Editable amount for the selected row, in dollars — settle in full or partially. */
+  /** Editable amount for the selected row, in the obligation currency — settle in full or partially. */
   protected readonly amount = signal('');
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    // The group list arrives with the dashboard payload, so load once it's there.
-    effect(() => {
-      const ids = this.scopeGroupIds();
-      if (ids.length > 0 && this.simplified() === null && !this.loadingSimplified()) {
-        this.loadSimplified(ids);
-      }
+    this.destroyRef.onDestroy(() => {
+      if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
     });
-
+    try {
+      const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
+      if (pending?.draft) {
+        this.selected.set(pending.draft as Settlement);
+        this.amount.set(
+          minorToDisplay(pending.request.amountMinor, pending.request.currency ?? 'USD'),
+        );
+        this.retryNotice.set(UNCERTAIN_WRITE);
+        return;
+      }
+    } catch (err) {
+      this.draftBlocked.set(true);
+      this.retryNotice.set(
+        err instanceof PendingWriteError
+          ? err.message
+          : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
+      );
+    }
     const prefill = this.modal.settlePrefill();
     if (prefill) {
-      this.amount.set(centsToDisplay(Math.abs(prefill.netCents)));
+      this.amount.set(minorToDisplay(Math.abs(prefill.netMinor), prefill.currency ?? 'USD'));
     }
-  }
-
-  /** Groups to simplify: just this one when opened from a group, else all of mine. */
-  private scopeGroupIds(): string[] {
-    const gid = this.modal.settleGroupId();
-    if (gid) {
-      return [gid];
-    }
-    return (this.dashboard.data()?.groups ?? []).map((g) => g.id);
-  }
-
-  private loadSimplified(groupIds: string[]): void {
-    this.loadingSimplified.set(true);
-    this.debts
-      .getSimplifiedDebtsForGroups(groupIds)
-      .pipe(takeUntil(this.session.changes))
-      .subscribe({
-        next: (responses) => {
-          this.simplified.set(responses.flatMap((r) => this.toSettlements(r)));
-          this.loadingSimplified.set(false);
-        },
-        error: () => {
-          // Fall back to every direct balance rather than showing an empty modal.
-          this.simplified.set([]);
-          this.simplifyFailed.set(true);
-          this.loadingSimplified.set(false);
-        },
-      });
-  }
-
-  /**
-   * Keeps only the suggested transfers I'm part of (the others aren't mine to record) and
-   * maps them onto the Settlement shape the list/confirm views already speak:
-   * netCents > 0 = they pay me, < 0 = I pay them.
-   */
-  private toSettlements(res: SimplifiedDebtsResponse): Settlement[] {
-    const me = this.auth.user()?.id ?? '';
-    const groupName = this.groupName(res.groupId);
-    return res.transactions
-      .filter((t) => t.from.id === me || t.to.id === me)
-      .map((t) =>
-        t.to.id === me
-          ? { groupId: res.groupId, groupName, counterparty: t.from, netCents: t.amountCents }
-          : { groupId: res.groupId, groupName, counterparty: t.to, netCents: -t.amountCents },
-      );
-  }
-
-  private groupName(groupId: string): string {
-    return (this.dashboard.data()?.groups ?? []).find((g) => g.id === groupId)?.name ?? '';
   }
 
   initials(name: string): string {
@@ -159,19 +114,19 @@ export class SettleUpModalComponent {
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: Settlement): string {
-    const name = s.counterparty.displayName.split(/\s+/)[0];
-    return s.netCents > 0 ? `${name} owes you` : `You owe ${name}`;
+    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
+    return s.netMinor > 0 ? `${name} owes you` : `You owe ${name}`;
   }
 
   /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
   payingLabel(s: Settlement): string {
-    const name = s.counterparty.displayName.split(/\s+/)[0];
-    return s.netCents > 0 ? `${name} is paying you` : `You are paying ${name}`;
+    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
+    return s.netMinor > 0 ? `${name} is paying you` : `You are paying ${name}`;
   }
 
   select(s: Settlement): void {
     this.error.set(null);
-    this.amount.set(centsToDisplay(Math.abs(s.netCents)));
+    this.amount.set(minorToDisplay(Math.abs(s.netMinor), s.currency ?? 'USD'));
     this.selected.set(s);
   }
 
@@ -180,47 +135,117 @@ export class SettleUpModalComponent {
     this.error.set(null);
   }
 
-  /** Entered dollars as integer cents; NaN/blank becomes 0 so validation rejects it. */
-  protected enteredCents(): number {
-    const n = Number(this.amount());
-    return Number.isFinite(n) ? dollarsToCents(n) : 0;
+  /** Parse exact currency units; invalid precision and amounts block dispatch. */
+  protected enteredMinor(): number {
+    return amountToMinor(this.amount(), this.selected()?.currency ?? 'USD', false);
   }
 
   cancel(): void {
+    if (this.saving()) return;
     this.selected.set(null);
     this.error.set(null);
   }
 
   close(): void {
-    this.modal.close();
+    if (this.session.version !== this.sessionVersion) return;
+    this.modal.requestClose();
   }
 
   confirm(): void {
+    if (this.session.version !== this.sessionVersion) return;
     const s = this.selected();
-    if (!s || this.saving()) {
+    if (!s || this.saving() || this.draftBlocked()) {
       return;
     }
-    const cents = this.enteredCents();
-    if (cents <= 0) {
-      this.error.set('Enter an amount greater than zero.');
+    const cents = this.enteredMinor();
+    if (!Number.isSafeInteger(cents) || cents <= 0 || cents > 1_000_000_000_000) {
+      this.error.set(
+        'Enter an amount greater than zero within the selected currency precision and maximum.',
+      );
       return;
     }
-    const me = this.auth.user()?.id ?? '';
+    const me = this.dashboard.data()?.viewerParticipantId ?? this.auth.user()?.id ?? '';
+    if (
+      !me ||
+      s.counterparty.id === me ||
+      this.dashboard.data()?.ownedParticipantIds?.includes(s.counterparty.id)
+    ) {
+      this.error.set(
+        'These identities belong to the same account. Refresh obligations and review the payment.',
+      );
+      return;
+    }
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
-    const [payer, payee] = s.netCents > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
+    const [payer, payee] = s.netMinor > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
+    this.dispatch(
+      s.groupId,
+      {
+        payerUserId: payer,
+        payeeUserId: payee,
+        amountMinor: cents,
+        currency: s.currency ?? 'USD',
+      },
+      s,
+    );
+  }
+
+  private dispatch(
+    groupId: string,
+    request: Omit<RecordPaymentRequest, 'operationId'>,
+    draft: unknown,
+  ): void {
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     this.payments
-      .recordPayment(s.groupId, { payerUserId: payer, payeeUserId: payee, amountCents: cents })
-      .pipe(takeUntil(this.session.changes))
+      .recordPayment(groupId, request, draft)
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.dashboard.refresh();
           this.modal.close();
         },
         error: (err) => {
-          this.error.set(err?.error?.message ?? 'Could not record the payment.');
+          this.error.set(
+            err instanceof PendingWriteError
+              ? err.message
+              : (err?.error?.message ?? 'Could not record the payment.'),
+          );
+          this.retryNotice.set(UNCERTAIN_WRITE);
           this.saving.set(false);
+          this.modal.setMutationPending(false);
         },
       });
+  }
+
+  retryOriginal(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    try {
+      const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
+      if (!pending) return;
+      // Original IDs and amount are immutable, even if aliases were subsequently claimed.
+      this.dispatch(pending.scope, pending.request, pending.draft);
+    } catch {
+      this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
+    }
+  }
+
+  abandonRetry(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    if (
+      !window.confirm(
+        'The previous payment may already have been recorded. Check payment history first. Start a separate payment anyway?',
+      )
+    )
+      return;
+    try {
+      this.pendingWrites.abandon('payment');
+      this.retryNotice.set(null);
+      this.draftBlocked.set(false);
+      this.error.set(null);
+    } catch {
+      this.error.set(
+        'Cannot clear the saved retry identity. Enable browser storage and try again.',
+      );
+    }
   }
 }

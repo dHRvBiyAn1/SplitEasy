@@ -1,25 +1,36 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { formatMoney } from '../shared/money.component';
+import { ProfileService } from '../core/profile.service';
+import {
+  Currency,
+  CURRENCIES,
+  CURRENCY_EXPONENT,
+  MAX_TRANSACTION_MINOR,
+  amountToMinor,
+  minorToDisplay,
+} from '../shared/currency';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { avatarTint } from '../core/avatar';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
+import { financialRoster, viewerIdentity, ownedIdentities } from '../groups/group.models';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ExpenseCategory } from '../dashboard/dashboard.models';
+import { percentToBasisPoints, TOTAL_BASIS_POINTS } from '../expenses/expense.service';
 import {
-  centsToDisplay,
-  dollarsToCents,
-  percentToBasisPoints,
-  TOTAL_BASIS_POINTS,
-} from '../expenses/expense.service';
+  PendingWrite,
+  PendingWriteError,
+  PendingWritesService,
+  UNCERTAIN_WRITE,
+} from '../core/pending-writes.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { CreateExpenseRequest, SplitInput } from '../expenses/expense.models';
+import { CreateExpenseRequest, SplitInput, SplitType } from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
-
-type SplitType = 'EQUAL' | 'UNEQUAL' | 'PERCENTAGE';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
   { value: 'FOOD_DRINK', label: 'Food & drink', ico: '☕' },
@@ -40,43 +51,85 @@ const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
 })
 export class NewExpenseModalComponent {
   private readonly groups = inject(GroupService);
+  private readonly profile = inject(ProfileService);
+  protected get currencies() {
+    return CURRENCIES;
+  }
+  protected readonly currency = signal<Currency>(this.profile.prefs().currency);
+  protected readonly precision = computed(() => CURRENCY_EXPONENT[this.currency()]);
+  protected get maxAmountMinor() {
+    return MAX_TRANSACTION_MINOR;
+  }
+  protected readonly step = computed(() =>
+    this.precision() === 0 ? '1' : '0.' + '0'.repeat(this.precision() - 1) + '1',
+  );
+  private currencyChosen = false;
+  freezeCurrencyDefault(): void {
+    this.currencyChosen = true;
+  }
+  selectCurrency(value: string): void {
+    if (this.editId || !CURRENCIES.includes(value as Currency)) return;
+    this.currencyChosen = true;
+    this.currency.set(value as Currency);
+    this.tick.update((n) => n + 1);
+  }
+  private readonly pendingWrites = inject(PendingWritesService);
+  protected readonly unmappedOriginalIds = signal<string[]>([]);
+  protected readonly draftBlocked = signal(false);
+  protected readonly retryNotice = signal<string | null>(null);
+  private restored: PendingWrite<CreateExpenseRequest> | null = null;
   private readonly expenses = inject(ExpenseService);
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
+  private readonly sessionVersion = this.session.version;
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly categories = CATEGORIES;
-  protected readonly display = centsToDisplay;
+  protected readonly display = (value: number) => minorToDisplay(value, this.currency());
 
   protected readonly groupOptions = () => this.dashboard.data()?.groups ?? [];
   protected readonly groupId = signal<string | null>(null);
-  protected readonly members = signal<UserSummary[]>([]);
+  private viewerId = '';
+  private ownedIds: string[] = [];
+  protected readonly members = signal<ParticipantSummary[]>([]);
 
   protected readonly description = new FormControl('', {
     nonNullable: true,
     validators: [Validators.required],
   });
-  protected readonly amount = new FormControl<number | null>(null);
+  protected readonly amount = new FormControl<string | number | null>(null);
   protected readonly date = new FormControl(this.today(), { nonNullable: true });
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
   protected readonly paidBy = signal<string>('');
   protected readonly splitType = signal<SplitType>('EQUAL');
 
-  /** EQUAL: member ids included. UNEQUAL/PERCENTAGE: raw per-member input strings. */
+  /** EQUAL: member ids included. Custom modes: raw per-member input strings; blank excludes. */
   protected readonly included = signal<Set<string>>(new Set());
   protected readonly values = signal<Record<string, string>>({});
-  /** Round each nonnegative finite input to the nearest cent/basis point once.
-   * Keep the same positive shares for the running total, save gate and request. */
+  /** Normalize once for the running total, save gate and request; retain explicit zeros. */
   private readonly serializedSplits = computed<SplitInput[] | null>(() => {
-    const convert = this.splitType() === 'PERCENTAGE' ? percentToBasisPoints : dollarsToCents;
+    const type = this.splitType();
     const values = this.values();
     const splits: SplitInput[] = [];
     for (const member of this.members()) {
       const raw = Number(values[member.id] ?? 0);
-      const value = convert(raw);
-      if (!Number.isFinite(raw) || raw < 0 || !Number.isSafeInteger(value)) return null;
-      if (value > 0) splits.push({ userId: member.id, value });
+      const value =
+        type === 'WEIGHTS'
+          ? raw
+          : type === 'PERCENTAGE'
+            ? percentToBasisPoints(raw)
+            : amountToMinor(values[member.id]?.trim() || '0', this.currency());
+      if (
+        !Number.isFinite(raw) ||
+        (type !== 'ADJUSTMENTS' && raw < 0) ||
+        !Number.isSafeInteger(value) ||
+        Math.abs(value) > 1_000_000_000_000
+      )
+        return null;
+      if (type === 'WEIGHTS' && (values[member.id]?.trim() ?? '') !== '' && value < 1) return null;
+      if ((values[member.id]?.trim() ?? '') !== '') splits.push({ userId: member.id, value });
     }
     return splits;
   });
@@ -88,14 +141,36 @@ export class NewExpenseModalComponent {
 
   protected readonly saving = signal(false);
   protected readonly ready = signal(false);
+  protected readonly loadFailed = signal(false);
   protected readonly error = signal<string | null>(null);
 
   /** Set when opened via "Edit" — save() then PUTs instead of POSTing. */
   protected readonly editId = this.modal.editExpenseId();
   private groupRequestVersion = 0;
+  private expectedVersion: number | undefined;
 
   constructor() {
-    const preselect = this.modal.expenseGroupId();
+    effect(() => {
+      const preferred = this.profile.prefs().currency;
+      if (!this.editId && !this.restored && !this.currencyChosen && !this.amount.dirty)
+        this.currency.set(preferred);
+    });
+    this.destroyRef.onDestroy(() => {
+      if (this.session.version === this.sessionVersion) this.modal.setMutationPending(false);
+    });
+    if (!this.editId) {
+      try {
+        this.restored = this.pendingWrites.read<CreateExpenseRequest>('expense');
+      } catch (err) {
+        this.draftBlocked.set(true);
+        this.retryNotice.set(
+          err instanceof PendingWriteError
+            ? err.message
+            : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
+        );
+      }
+    }
+    const preselect = this.restored?.scope ?? this.modal.expenseGroupId();
     const first = this.groupOptions()[0]?.id ?? null;
     this.selectGroup(preselect ?? first);
   }
@@ -114,14 +189,27 @@ export class NewExpenseModalComponent {
   }
 
   selectGroup(id: string | null): void {
+    if (this.session.version !== this.sessionVersion) return;
     if (this.saving() || (this.editId && this.groupId())) {
       return;
     }
+    this.loadGroup(id);
+  }
+
+  retryMembers(): void {
+    if (this.session.version !== this.sessionVersion) return;
+    if (this.saving() || !this.loadFailed()) return;
+    this.loadGroup(this.groupId());
+  }
+
+  private loadGroup(id: string | null): void {
     const version = ++this.groupRequestVersion;
+    this.loadFailed.set(false);
     this.groupId.set(id);
     this.ready.set(false);
     this.error.set(null);
     this.members.set([]);
+    this.unmappedOriginalIds.set([]);
     this.paidBy.set('');
     this.included.set(new Set());
     this.values.set({});
@@ -130,68 +218,116 @@ export class NewExpenseModalComponent {
     }
     this.groups
       .getGroup(id)
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (g) => {
           if (version !== this.groupRequestVersion) return;
-          this.members.set(g.members);
+          this.members.set(financialRoster(g));
+          this.viewerId = viewerIdentity(g, this.auth.user()?.id ?? '');
+          this.ownedIds = ownedIdentities(g, this.auth.user()?.id ?? '');
           if (this.editId) {
-            this.prefillFromExpense(id, this.editId);
+            this.prefillFromExpense(id, this.editId, version);
           } else {
-            this.paidBy.set(this.auth.user()?.id ?? g.members[0]?.id ?? '');
-            this.included.set(new Set(g.members.map((m) => m.id)));
+            this.paidBy.set(this.viewerId || this.members()[0]?.id || '');
+            this.included.set(new Set(this.members().map((m) => m.id)));
+            if (this.restored?.scope === id) {
+              this.restoreDraft(this.restored.request);
+              this.retryNotice.set(UNCERTAIN_WRITE);
+            }
             this.ready.set(true);
           }
         },
         error: () => {
           if (version !== this.groupRequestVersion) return;
+          this.loadFailed.set(true);
           this.error.set('Could not load group members.');
         },
       });
   }
 
-  /** Load an existing expense into the form. Any custom split is re-edited as exact
-   * amounts (UNEQUAL) — lossless and always valid, so we never reconstruct percentages. */
-  private prefillFromExpense(groupId: string, expenseId: string): void {
+  /** Restore original inputs; old responses without intent are safely edited as exact shares. */
+  private prefillFromExpense(groupId: string, expenseId: string, version: number): void {
     this.expenses
       .getExpense(groupId, expenseId)
-      .pipe(takeUntil(this.session.changes))
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (e) => {
-          this.description.setValue(e.description);
-          this.amount.setValue(e.amountCents / 100);
-          this.date.setValue(e.spentOn);
+          if (version !== this.groupRequestVersion) return;
+          if (!Number.isSafeInteger(e.version) || e.version! < 0) {
+            this.loadFailed.set(true);
+            this.error.set('Reload or upgrade the app to edit this expense safely.');
+            return;
+          }
+          // Keep original alias rows and payer IDs; canonical defaults must not erase history.
+          this.members.update((roster) => {
+            const originals = [e.paidBy, ...e.participants.map((p) => p.user)];
+            return [
+              ...roster,
+              ...originals.filter(
+                (p, i) =>
+                  !roster.some((m) => m.id === p.id) &&
+                  originals.findIndex((m) => m.id === p.id) === i,
+              ),
+            ];
+          });
+          this.expectedVersion = e.version;
+          this.currency.set(e.currency ?? 'USD');
+          if (!this.description.dirty) this.description.setValue(e.description);
+          if (!this.amount.dirty)
+            this.amount.setValue(minorToDisplay(e.amountMinor, this.currency()));
+          if (!this.date.dirty) this.date.setValue(e.spentOn);
           this.category.set(e.category);
           this.paidBy.set(e.paidBy.id);
-          this.included.set(new Set(e.participants.map((p) => p.user.id)));
+          this.included.set(new Set(e.participantUserIds ?? e.participants.map((p) => p.user.id)));
           if (e.splitType === 'EQUAL') {
             this.splitType.set('EQUAL');
             this.values.set({});
           } else {
-            this.splitType.set('UNEQUAL');
+            this.splitType.set(e.splits ? e.splitType : 'UNEQUAL');
             const vals: Record<string, string> = {};
-            for (const p of e.participants) {
-              vals[p.user.id] = this.display(p.shareCents);
+            if (e.splits) {
+              for (const input of e.splits)
+                vals[input.userId] =
+                  e.splitType === 'WEIGHTS'
+                    ? String(input.value)
+                    : e.splitType === 'PERCENTAGE'
+                      ? minorToDisplay(input.value, 'USD')
+                      : this.display(input.value);
+            } else {
+              for (const p of e.participants) vals[p.user.id] = this.display(p.shareMinor);
             }
             this.values.set(vals);
           }
           this.tick.update((n) => n + 1);
           this.ready.set(true);
         },
-        error: () => this.error.set('Could not load the expense.'),
+        error: () => {
+          if (version !== this.groupRequestVersion) return;
+          this.loadFailed.set(true);
+          this.error.set('Could not load the expense.');
+        },
       });
   }
 
   meId(): string {
-    return this.auth.user()?.id ?? '';
+    return this.viewerId;
   }
 
-  firstName(u: UserSummary): string {
-    return u.id === this.meId() ? 'You' : u.displayName.split(/\s+/)[0];
+  firstName(u: ParticipantSummary): string {
+    return this.ownedIds.includes(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
   }
 
-  memberLabel(u: UserSummary): string {
-    return `${u.id === this.meId() ? 'You: ' : ''}${u.displayName} (${u.email})`;
+  sameOwner(u: ParticipantSummary): boolean {
+    return (
+      !!u.canonicalParticipantId &&
+      this.members().some(
+        (m) => m.id !== u.id && m.canonicalParticipantId === u.canonicalParticipantId,
+      )
+    );
+  }
+
+  memberLabel(u: ParticipantSummary): string {
+    return `${this.ownedIds.includes(u.id) ? 'You: ' : ''}${u.displayName}${u.email ? ` (${u.email})` : ' (guest)'}`;
   }
 
   initials(name: string): string {
@@ -219,8 +355,8 @@ export class NewExpenseModalComponent {
     this.tick.update((n) => n + 1);
   }
 
-  private amountCents(): number {
-    return dollarsToCents(this.amount.value ?? 0);
+  private amountMinor(): number {
+    return amountToMinor(this.amount.value ?? '0', this.currency(), false);
   }
 
   runningLabel(): string {
@@ -228,12 +364,23 @@ export class NewExpenseModalComponent {
     if (this.splitType() === 'EQUAL') {
       return `Split equally among ${this.included().size}`;
     }
+    if (this.splitType() === 'ADJUSTMENTS') {
+      return this.adjustmentsValid()
+        ? `Adjustments total ${formatMoney(0, false, this.currency())}; final shares nonnegative`
+        : `Adjustments must total ${formatMoney(0, false, this.currency())} and leave final shares nonnegative`;
+    }
+    if (this.splitType() === 'WEIGHTS') {
+      const splits = this.serializedSplits();
+      return splits
+        ? `${splits.reduce((sum, s) => sum + BigInt(s.value), 0n)} weight units`
+        : 'Enter positive whole weight units';
+    }
     const total = this.assignedTotal();
     if (total === undefined) return 'Enter valid nonnegative shares';
     if (this.splitType() === 'PERCENTAGE') {
-      return `${this.display(total)}% / 100%`;
+      return `${minorToDisplay(total, 'USD')}% / 100%`;
     }
-    return `$${this.display(total)} / $${this.display(this.amountCents())}`;
+    return `${formatMoney(total, false, this.currency())} / ${formatMoney(this.amountMinor(), false, this.currency())}`;
   }
 
   splitValid(): boolean {
@@ -241,20 +388,51 @@ export class NewExpenseModalComponent {
     if (this.splitType() === 'EQUAL') {
       return this.included().size >= 1;
     }
+    if (this.splitType() === 'ADJUSTMENTS') return this.adjustmentsValid();
+    if (this.splitType() === 'WEIGHTS') return (this.serializedSplits()?.length ?? 0) > 0;
     const total = this.assignedTotal();
     if (total === undefined || !Number.isSafeInteger(total)) return false;
     if (this.splitType() === 'PERCENTAGE') {
       return total === TOTAL_BASIS_POINTS;
     }
-    return this.amountCents() > 0 && total === this.amountCents();
+    return this.amountMinor() > 0 && total === this.amountMinor();
+  }
+
+  private adjustmentsValid(): boolean {
+    const splits = this.serializedSplits();
+    const amount = this.amountMinor();
+    if (!splits?.length || !Number.isSafeInteger(amount) || amount <= 0) return false;
+    if (splits.reduce((sum, s) => sum + BigInt(s.value), 0n) !== 0n) return false;
+    const base = Math.floor(amount / splits.length);
+    const remainder = amount % splits.length;
+    const recipient = splits.some((s) => s.userId === this.paidBy())
+      ? this.paidBy()
+      : [...splits].sort((a, b) => this.compareUuid(a.userId, b.userId))[0].userId;
+    return splits.every((s) => base + (s.userId === recipient ? remainder : 0) + s.value >= 0);
+  }
+
+  /** Match java.util.UUID's signed high/low ordering for the existing remainder policy. */
+  private compareUuid(a: string, b: string): number {
+    const left = a.replaceAll('-', '');
+    const right = b.replaceAll('-', '');
+    for (const offset of [0, 16]) {
+      const x = BigInt.asIntN(64, BigInt(`0x${left.slice(offset, offset + 16)}`));
+      const y = BigInt.asIntN(64, BigInt(`0x${right.slice(offset, offset + 16)}`));
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
   }
 
   canSave(): boolean {
     return (
       !!this.groupId() &&
       this.ready() &&
+      !this.draftBlocked() &&
+      this.unmappedOriginalIds().length === 0 &&
       this.description.valid &&
-      this.amountCents() > 0 &&
+      Number.isSafeInteger(this.amountMinor()) &&
+      this.amountMinor() > 0 &&
+      this.amountMinor() <= 1_000_000_000_000 &&
       !!this.paidBy() &&
       this.splitValid() &&
       !this.saving()
@@ -262,17 +440,20 @@ export class NewExpenseModalComponent {
   }
 
   close(): void {
-    this.modal.close();
+    if (this.session.version !== this.sessionVersion) return;
+    this.modal.requestClose();
   }
 
   save(): void {
+    if (this.session.version !== this.sessionVersion) return;
     if (!this.canSave()) {
       return;
     }
     const gid = this.groupId()!;
     const base = {
       description: this.description.value.trim(),
-      amountCents: this.amountCents(),
+      amountMinor: this.amountMinor(),
+      currency: this.currency(),
       paidByUserId: this.paidBy(),
       category: this.category(),
       spentOn: this.date.value,
@@ -283,20 +464,105 @@ export class NewExpenseModalComponent {
     } else {
       req = { ...base, splitType: this.splitType(), splits: this.serializedSplits()! };
     }
+    this.dispatch(gid, this.editId ? { ...req, expectedVersion: this.expectedVersion } : req);
+  }
+
+  private dispatch(gid: string, req: CreateExpenseRequest): void {
+    let pending: PendingWrite<CreateExpenseRequest> | null = null;
+    if (!this.editId) {
+      try {
+        pending = this.pendingWrites.prepare('expense', gid, req);
+        this.restored = pending;
+      } catch (error) {
+        this.error.set((error as Error).message);
+        this.retryNotice.set(UNCERTAIN_WRITE);
+        return;
+      }
+    }
     this.saving.set(true);
+    this.modal.setMutationPending(true);
     this.error.set(null);
     const save$ = this.editId
       ? this.expenses.updateExpense(gid, this.editId, req)
-      : this.expenses.createExpense(gid, req);
-    save$.pipe(takeUntil(this.session.changes)).subscribe({
+      : this.expenses.createExpense(gid, { ...req, operationId: pending!.operationId });
+    save$.pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
+        if (pending) this.pendingWrites.complete('expense', pending);
         this.dashboard.refresh();
         this.modal.close();
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not save the expense.');
+        if (!this.editId) this.retryNotice.set(UNCERTAIN_WRITE);
         this.saving.set(false);
+        this.modal.setMutationPending(false);
       },
     });
+  }
+  retryOriginal(): void {
+    if (
+      this.saving() ||
+      !this.ready() ||
+      this.session.version !== this.sessionVersion ||
+      !this.restored
+    )
+      return;
+    this.dispatch(this.restored.scope, this.restored.request);
+  }
+
+  abandonRetry(): void {
+    if (this.saving() || this.session.version !== this.sessionVersion) return;
+    if (
+      !confirm(
+        'The previous expense may already have been saved. Check expense history first. Start a separate expense anyway?',
+      )
+    )
+      return;
+    try {
+      this.pendingWrites.abandon('expense');
+      this.restored = null;
+      this.retryNotice.set(null);
+      this.draftBlocked.set(false);
+      this.unmappedOriginalIds.set([]);
+      this.error.set(null);
+    } catch {
+      this.error.set(
+        'Cannot clear the saved retry identity. Enable browser storage and try again.',
+      );
+    }
+  }
+
+  private restoreDraft(request: CreateExpenseRequest): void {
+    const originalIds = [
+      request.paidByUserId,
+      ...(request.participantUserIds ?? []),
+      ...(request.splits ?? []).map((s) => s.userId),
+    ];
+    this.unmappedOriginalIds.set(
+      [...new Set(originalIds)].filter((id) => !this.members().some((p) => p.id === id)),
+    );
+    this.description.setValue(request.description);
+    this.currency.set(request.currency ?? 'USD');
+    this.amount.setValue(
+      minorToDisplay(request.amountMinor ?? request.amountCents!, this.currency()),
+    );
+    this.date.setValue(request.spentOn ?? this.today());
+    this.category.set(request.category ?? 'OTHER');
+    this.paidBy.set(request.paidByUserId);
+    this.splitType.set(request.splitType ?? 'EQUAL');
+    this.included.set(new Set(request.participantUserIds ?? []));
+    this.values.set(
+      Object.fromEntries(
+        (request.splits ?? []).map((input) => [
+          input.userId,
+          request.splitType === 'WEIGHTS'
+            ? String(input.value)
+            : request.splitType === 'PERCENTAGE'
+              ? minorToDisplay(input.value, 'USD')
+              : this.display(input.value),
+        ]),
+      ),
+    );
+    this.tick.update((n) => n + 1);
   }
 }

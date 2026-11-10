@@ -1,6 +1,6 @@
 package com.spliteasy.dto.expense;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.entity.ExpenseCategory;
 import com.spliteasy.entity.SplitType;
 import java.time.Instant;
@@ -12,10 +12,24 @@ public record ExpenseResponse(
     UUID id,
     UUID groupId,
     String description,
-    long amountCents,
+    long amountMinor,
     SplitType splitType,
     ExpenseCategory category,
     LocalDate spentOn,
-    UserSummary paidBy,
+    ParticipantSummary paidBy,
     List<SplitShare> participants,
-    Instant createdAt) {}
+    List<UUID> participantUserIds,
+    List<SplitInput> splits,
+    Instant createdAt,
+    long version,
+    com.spliteasy.entity.LedgerCurrency currency) {
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public long amountCents() {
+    return amountMinor;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("amountCents")
+  public Long legacyAmountCents() {
+    return currency == com.spliteasy.entity.LedgerCurrency.USD ? amountMinor : null;
+  }
+}

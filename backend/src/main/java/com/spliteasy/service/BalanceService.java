@@ -2,15 +2,15 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.MemberBalance;
-import com.spliteasy.dto.common.UserSummary;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
-import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PaymentRepository;
 import com.spliteasy.repository.UserAmount;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -40,44 +40,73 @@ public class BalanceService {
 
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
-  private final GroupMembershipRepository membershipRepository;
+  private final FinancialParticipantService financialParticipants;
   private final PaymentRepository paymentRepository;
   private final MembershipGuard membershipGuard;
 
-  // Keep all aggregates and the member list on one PostgreSQL snapshot. Transaction-owning
-  // callers (simplification and member removal) must set this isolation too: REQUIRED joins them.
+  // Public reads share one snapshot; guarded writes join their stable, group-locked ledger.
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public GroupBalancesResponse computeBalances(UUID requesterId, UUID groupId) {
     membershipGuard.requireMember(groupId, requesterId);
+    financialParticipants.requireCompatible(groupId);
     log.debug("Computing balances for group {} (requested by user {})", groupId, requesterId);
 
-    Map<UUID, Long> paid = toMap(expenseRepository.sumPaidByGroup(groupId));
-    Map<UUID, Long> owed = toMap(participantRepository.sumOwedByGroup(groupId));
-    Map<UUID, Long> settledOut = toMap(paymentRepository.sumPaidByGroup(groupId));
-    Map<UUID, Long> settledIn = toMap(paymentRepository.sumReceivedByGroup(groupId));
+    return snapshot(groupId);
+  }
 
-    // Include every current member, so freshly-added or uninvolved members show 0.
+  // Invitation preview owns a verified capability; other callers first authorize membership.
+  GroupBalancesResponse snapshot(UUID groupId) {
+    Map<CurrencyUser, Long> paid = toMap(groupId, expenseRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> owed = toMap(groupId, participantRepository.sumOwedByGroup(groupId));
+    Map<CurrencyUser, Long> settledOut = toMap(groupId, paymentRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> settledIn =
+        toMap(groupId, paymentRepository.sumReceivedByGroup(groupId));
+    Set<CurrencyUser> keys = new HashSet<>(paid.keySet());
+    keys.addAll(owed.keySet());
+    keys.addAll(settledOut.keySet());
+    keys.addAll(settledIn.keySet());
+    Set<UUID> ledgerIds = keys.stream().map(CurrencyUser::userId).collect(Collectors.toSet());
+    var people = financialParticipants.resolve(groupId, ledgerIds);
+    var currencies = keys.stream().map(CurrencyUser::currency).collect(Collectors.toSet());
+    if (currencies.isEmpty()) currencies.add(com.spliteasy.entity.LedgerCurrency.USD);
     List<MemberBalance> balances =
-        membershipRepository.findByGroupIdFetchUser(groupId).stream()
-            .map(m -> m.getUser())
-            .map(
-                user -> {
-                  UUID id = user.getId();
-                  long net =
-                      paid.getOrDefault(id, 0L)
-                          - owed.getOrDefault(id, 0L)
-                          + settledOut.getOrDefault(id, 0L)
-                          - settledIn.getOrDefault(id, 0L);
-                  return new MemberBalance(UserSummary.from(user), net);
-                })
-            .sorted(Comparator.comparing((MemberBalance b) -> b.user().displayName()))
+        currencies.stream()
+            .sorted()
+            .flatMap(
+                currency ->
+                    people.values().stream()
+                        .map(
+                            user -> {
+                              var key = new CurrencyUser(currency, user.id());
+                              long net =
+                                  Math.subtractExact(
+                                      Math.addExact(
+                                          paid.getOrDefault(key, 0L),
+                                          settledOut.getOrDefault(key, 0L)),
+                                      Math.addExact(
+                                          owed.getOrDefault(key, 0L),
+                                          settledIn.getOrDefault(key, 0L)));
+                              return new MemberBalance(user, net, currency);
+                            }))
+            .sorted(
+                Comparator.comparing((MemberBalance b) -> b.currency())
+                    .thenComparing(b -> b.user().displayName()))
             .toList();
 
     return new GroupBalancesResponse(groupId, balances);
   }
 
-  private Map<UUID, Long> toMap(List<UserAmount> rows) {
+  private record CurrencyUser(com.spliteasy.entity.LedgerCurrency currency, UUID userId) {}
+
+  private Map<CurrencyUser, Long> toMap(UUID groupId, List<UserAmount> rows) {
+    var originals = financialParticipants.originals(groupId);
     return rows.stream()
-        .collect(Collectors.toMap(UserAmount::getUserId, UserAmount::getTotalCents));
+        .collect(
+            Collectors.toMap(
+                row ->
+                    new CurrencyUser(
+                        row.getCurrency(), originals.get(row.getUserId()).canonicalParticipantId()),
+                UserAmount::getTotalCents,
+                Math::addExact));
   }
 }

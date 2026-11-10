@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { BalanceService } from '../balances/balance.service';
+import { GroupBalancesResponse } from '../balances/balance.models';
 import { PersonBalance } from '../dashboard/dashboard.models';
 import { ExpenseSummary } from '../expenses/expense.models';
 import { ExpenseService } from '../expenses/expense.service';
@@ -22,17 +23,18 @@ const payload = (id: string) => ({
     simplifyDebts: true,
     createdAt: '',
   },
-  balances: [{ user: { ...user, id: `person-${id}`, displayName: `Person${id}` }, netCents: 1234 }],
+  balances: [{ user: { ...user, id: `person-${id}`, displayName: `Person${id}` }, netMinor: 1234 }],
   expenses: [
     {
       id: `expense-${id}`,
       description: `Dinner ${id}`,
-      amountCents: 2468,
+      amountMinor: 2468,
+      currency: 'USD' as const,
       paidBy: user,
       participantCount: 2,
       category: 'FOOD_DRINK' as const,
       spentOn: '2026-10-16',
-      viewerDeltaCents: 1234,
+      viewerDeltaMinor: 1234,
       createdAt: '',
     },
   ],
@@ -40,6 +42,7 @@ const payload = (id: string) => ({
 const reads = () => ({
   group: new Subject<GroupResponse>(),
   balances: new Subject<PersonBalance[]>(),
+  ledger: new Subject<GroupBalancesResponse>(),
   expenses: new Subject<ExpenseSummary[]>(),
 });
 
@@ -64,6 +67,9 @@ describe('group detail route ownership', () => {
     vi.spyOn(TestBed.inject(BalanceService), 'getMyBalances').mockImplementation(
       (id) => pending[id].balances,
     );
+    vi.spyOn(TestBed.inject(BalanceService), 'getBalances').mockImplementation(
+      (id) => pending[id].ledger,
+    );
     vi.spyOn(TestBed.inject(ExpenseService), 'listExpenses').mockImplementation(
       (id) => pending[id].expenses,
     );
@@ -73,6 +79,8 @@ describe('group detail route ownership', () => {
     const data = payload(id);
     pending[id].expenses.next(data.expenses);
     pending[id].expenses.complete();
+    pending[id].ledger.next({ groupId: id, balances: [] });
+    pending[id].ledger.complete();
     pending[id].balances.next(data.balances);
     pending[id].balances.complete();
     pending[id].group.next(data.group);
@@ -113,6 +121,8 @@ describe('group detail route ownership', () => {
       pending['b'].group.complete();
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('.gd__head')).toBeNull();
+      pending['b'].ledger.next({ groupId: 'b', balances: [] });
+      pending['b'].ledger.complete();
       pending['b'].balances.next(payload('b').balances);
       pending['b'].balances.complete();
       if (scenario !== 'success-before-b') lateA();

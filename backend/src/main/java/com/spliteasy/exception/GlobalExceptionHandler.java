@@ -1,6 +1,7 @@
 package com.spliteasy.exception;
 
 import com.spliteasy.dto.common.ErrorResponse;
+import jakarta.persistence.OptimisticLockException;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -43,6 +44,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(body(HttpStatus.BAD_REQUEST, message));
   }
 
+  @ExceptionHandler(DeliveryUnavailableException.class)
+  public ResponseEntity<ErrorResponse> handleDeliveryUnavailable(DeliveryUnavailableException ex) {
+    return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+  }
+
   @ExceptionHandler(TooManyRequestsException.class)
   public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -75,9 +81,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return build(HttpStatus.CONFLICT, ex.getMessage());
   }
 
-  @ExceptionHandler(OptimisticLockingFailureException.class)
-  public ResponseEntity<ErrorResponse> handleOptimisticConflict(
-      OptimisticLockingFailureException ex) {
+  @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
+  public ResponseEntity<ErrorResponse> handleOptimisticConflict(RuntimeException ex) {
     log.warn("Concurrent update conflict: {}", ex.getMessage());
     return build(
         HttpStatus.CONFLICT,

@@ -1,9 +1,8 @@
 package com.spliteasy.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mockingDetails;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,13 +13,14 @@ import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.dto.group.AddMemberRequest;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.payment.RecordPaymentRequest;
-import com.spliteasy.repository.UserRepository;
+import com.spliteasy.service.MembershipGuard;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
@@ -30,7 +30,7 @@ import tools.jackson.databind.JsonNode;
 
 @AutoConfigureMockMvc
 class PaymentFlowIntegrationTest extends AbstractIntegrationTest {
-  @MockitoSpyBean UserRepository userRepository;
+  @MockitoSpyBean MembershipGuard membershipGuard;
 
   private record Fixture(AuthResponse alice, AuthResponse bob, String group) {}
 
@@ -171,18 +171,19 @@ class PaymentFlowIntegrationTest extends AbstractIntegrationTest {
   void concurrentRetriesReturnOneOutcomeOrConflict(boolean changedPayload) throws Exception {
     var f = fixture();
     UUID id = UUID.randomUUID();
-    CyclicBarrier bothValidated = new CyclicBarrier(2);
-    // Both requests must pass the replay lookup before either inserts (no test transaction).
+    CyclicBarrier bothAuthorized = new CyclicBarrier(2);
+    AtomicInteger authorizations = new AtomicInteger();
+    // Coordinate before the shared group lock; the second request rechecks after waiting.
     doAnswer(
             call -> {
-              bothValidated.await(10, TimeUnit.SECONDS);
-              return mockingDetails(call.getMock())
-                  .getMockCreationSettings()
-                  .getDefaultAnswer()
-                  .answer(call);
+              call.callRealMethod();
+              if (authorizations.incrementAndGet() <= 2) {
+                bothAuthorized.await(10, TimeUnit.SECONDS);
+              }
+              return null;
             })
-        .when(userRepository)
-        .findAllById(any());
+        .when(membershipGuard)
+        .requireMember(eq(UUID.fromString(f.group())), eq(f.bob().user().id()));
     try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
       var first = executor.submit(() -> operation(f, f.bob().accessToken(), f.group(), id, 100));
       var second =

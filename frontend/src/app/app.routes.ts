@@ -12,10 +12,35 @@ export const routes: Routes = [
     loadComponent: () => import('./auth/register.component').then((m) => m.RegisterComponent),
   },
   {
+    path: 'invitation',
+    loadComponent: () =>
+      import('./invitations/invitation.component').then((m) => m.InvitationComponent),
+  },
+  {
+    path: 'account-action',
+    loadComponent: () =>
+      import('./auth/account-action.component').then((m) => m.AccountActionComponent),
+  },
+  {
+    path: 'forgot-password',
+    loadComponent: () =>
+      import('./auth/forgot-password.component').then((m) => m.ForgotPasswordComponent),
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./dashboard/dashboard.component').then((m) => m.DashboardComponent),
+  },
+  {
+    path: 'friends',
+    canActivate: [authGuard],
+    loadComponent: () => import('./friends/friends.component').then((m) => m.FriendsComponent),
+  },
+  {
+    path: 'friends/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./friends/friends.component').then((m) => m.FriendsComponent),
   },
   // The dashboard is the group list now — /groups only exists to keep old links working.
   { path: 'groups', pathMatch: 'full', redirectTo: 'dashboard' },

@@ -1,33 +1,57 @@
+import { DeviceSessionsComponent } from './device-sessions.component';
+import { CURRENCIES } from '../shared/currency';
+import { AccountSecurityComponent } from './account-security.component';
 import { AppearancePanelComponent } from '../shared/appearance-panel.component';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { SessionService } from '../core/auth/session.service';
 import { AuthService } from '../core/auth/auth.service';
 import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../core/profile.service';
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, AppearancePanelComponent],
+  imports: [
+    ReactiveFormsModule,
+    AppearancePanelComponent,
+    AccountSecurityComponent,
+    DeviceSessionsComponent,
+  ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
 export class ProfileComponent {
+  private readonly session = inject(SessionService);
   private readonly auth = inject(AuthService);
   private readonly profile = inject(ProfileService);
   private readonly router = inject(Router);
 
   protected readonly user = this.auth.user;
+  protected readonly loading = this.profile.loading;
+  protected readonly saving = this.profile.saving;
+  protected readonly error = this.profile.error;
+  protected readonly loaded = this.profile.data;
+  protected readonly legacyPrefs = this.profile.legacyPrefs;
+  private readonly owner = computed(() => `${this.session.currentVersion()}:${this.user()?.id}`);
+  protected readonly importDismissed = linkedSignal({
+    source: this.owner,
+    computation: () => false,
+  });
+  protected readonly name = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.maxLength(100)],
+  });
   protected readonly prefs = this.profile.prefs;
   protected readonly editing = linkedSignal({
-    source: () => this.user()?.id,
+    source: this.owner,
     computation: () => false,
   });
 
-  protected readonly currencies: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
+  protected get currencies() {
+    return CURRENCIES;
+  }
   protected readonly avatarColors = AVATAR_COLORS;
 
-  protected readonly name = new FormControl('', { nonNullable: true });
-  protected readonly email = new FormControl('', { nonNullable: true });
   protected readonly phone = new FormControl('', { nonNullable: true });
   protected readonly currency = signal<Currency>('USD');
   protected readonly avatarColor = signal<string>(AVATAR_COLORS[0]);
@@ -51,6 +75,7 @@ export class ProfileComponent {
   });
 
   memberSince(): string {
+    if (!this.prefs().joinedAt) return '—';
     return new Date(this.prefs().joinedAt).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
@@ -58,12 +83,12 @@ export class ProfileComponent {
   }
 
   currencyLabel(c: Currency): string {
-    return `${c} (${CURRENCY_SYMBOL[c]})`;
+    return CURRENCY_SYMBOL[c] === c ? c : `${c} (${CURRENCY_SYMBOL[c]})`;
   }
 
   startEdit(): void {
-    this.name.setValue(this.user()?.displayName ?? '');
-    this.email.setValue(this.user()?.email ?? '');
+    if (!this.loaded() || this.loading() || this.saving()) return;
+    this.name.setValue(this.loaded()!.displayName);
     this.phone.setValue(this.prefs().phone);
     this.currency.set(this.prefs().currency);
     this.avatarColor.set(this.prefs().avatarColor);
@@ -71,23 +96,35 @@ export class ProfileComponent {
   }
 
   cancel(): void {
-    this.editing.set(false);
+    if (!this.saving()) this.editing.set(false);
+  }
+
+  refresh(): void {
+    this.profile.refresh();
+  }
+
+  importLegacy(): void {
+    this.profile.importLegacy(() => this.importDismissed.set(true));
   }
 
   save(): void {
-    if (!this.editing()) return;
-    const displayName = this.name.value.trim();
-    const email = this.email.value.trim();
-    this.auth.updateProfile({
-      ...(displayName ? { displayName } : {}),
-      ...(email ? { email } : {}),
-    });
-    this.profile.update({
-      phone: this.phone.value.trim(),
-      currency: this.currency(),
-      avatarColor: this.avatarColor(),
-    });
-    this.editing.set(false);
+    if (
+      !this.editing() ||
+      this.saving() ||
+      this.name.invalid ||
+      !this.name.value.trim() ||
+      this.phone.value.length > 50
+    )
+      return;
+    this.profile.update(
+      {
+        displayName: this.name.value.trim(),
+        phone: this.phone.value.trim(),
+        preferredCurrency: this.currency(),
+        avatarColor: this.avatarColor(),
+      },
+      () => this.editing.set(false),
+    );
   }
 
   signOut(): void {

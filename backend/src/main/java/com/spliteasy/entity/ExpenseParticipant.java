@@ -36,13 +36,17 @@ public class ExpenseParticipant {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false, updatable = false)
-  private User user;
+  private Participant user;
 
   /** What this participant owes for the expense, in integer cents. */
   @Column(name = "share_cents", nullable = false)
   private long shareCents;
 
-  public ExpenseParticipant(Expense expense, User user, long shareCents) {
+  /** Original typed input; null means an older writer did not retain split intent. */
+  @Column(name = "split_value")
+  private Long splitValue;
+
+  public ExpenseParticipant(Expense expense, Participant user, long shareCents) {
     this.expense = expense;
     this.user = user;
     this.shareCents = shareCents;

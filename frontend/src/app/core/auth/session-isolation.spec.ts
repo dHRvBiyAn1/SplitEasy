@@ -1,3 +1,4 @@
+import { testJwt } from './auth-test-fixture';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -14,10 +15,12 @@ import { AddMemberModalComponent } from '../../modals/add-member-modal.component
 import { SettleUpModalComponent } from '../../modals/settle-up-modal.component';
 import { AuthResponse } from './auth.models';
 import { authInterceptor } from './auth.interceptor';
+import { ProfileService } from '../profile.service';
 import { AuthService } from './auth.service';
 
 const alice: AuthResponse = {
-  accessToken: 'alice-token',
+  accessToken: testJwt('alice'),
+  sessionId: 'alice-device',
   tokenType: 'Bearer',
   expiresIn: 3600,
   user: { id: 'alice', displayName: 'Alice', email: 'alice@example.com' },
@@ -25,13 +28,14 @@ const alice: AuthResponse = {
 const bob: AuthResponse = {
   ...alice,
   accessToken: 'bob-token',
+  sessionId: 'bob-device',
   user: { id: 'bob', displayName: 'Bob', email: 'bob@example.com' },
 };
 const aliceDashboard: DashboardResponse = {
-  totalNetCents: 0,
-  owedCents: 0,
+  totalNetMinor: 0,
+  owedMinor: 0,
   owedPeopleCount: 0,
-  oweCents: 0,
+  oweMinor: 0,
   owePeopleCount: 0,
   groupCount: 1,
   groups: [
@@ -40,10 +44,10 @@ const aliceDashboard: DashboardResponse = {
       name: 'Alice private group',
       type: 'HOME',
       memberCount: 1,
-      totalSpentCents: 0,
-      youAreOwedCents: 0,
-      youOweCents: 0,
-      netCents: 0,
+      totalSpentMinor: 0,
+      youAreOwedMinor: 0,
+      youOweMinor: 0,
+      netMinor: 0,
       simplifyDebts: true,
     },
   ],
@@ -76,8 +80,6 @@ describe('account session isolation', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('spliteasy.accessToken', alice.accessToken);
-    localStorage.setItem('spliteasy.user', JSON.stringify(alice.user));
     TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -89,12 +91,23 @@ describe('account session isolation', () => {
     requests = TestBed.inject(HttpTestingController);
     http = TestBed.inject(HttpClient);
     auth = TestBed.inject(AuthService);
+    auth.login({ email: alice.user.email, password: 'fixture-password' }).subscribe();
+    requests.expectOne('/api/auth/login').flush(alice);
     dashboard = TestBed.inject(DashboardService);
     modal = TestBed.inject(ModalService);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
 
-  afterEach(() => requests.verify());
+  afterEach(() => {
+    try {
+      requests.match('/api/auth/logout').forEach((request) => request.flush(null));
+      for (const request of requests.match('/api/me'))
+        if (!request.cancelled) request.flush({}, { status: 503, statusText: 'Unavailable' });
+      requests.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
+  });
 
   function login(response: AuthResponse = bob): void {
     auth.login({ email: response.user.email, password: 'test-password' }).subscribe();
@@ -146,36 +159,35 @@ describe('account session isolation', () => {
     fixture.destroy();
   });
 
-  it.each(['member', 'expense', 'settle'] as const)(
-    'cancels pending %s modal reads on logout',
-    (kind) => {
-      if (kind === 'member') modal.openAddMember('alice-group');
-      else if (kind === 'expense') modal.openExpense('alice-group');
-      else modal.openSettle(undefined, 'alice-group');
-      const components = {
-        member: AddMemberModalComponent,
-        expense: NewExpenseModalComponent,
-        settle: SettleUpModalComponent,
-      };
-      const fixture = TestBed.createComponent<unknown>(components[kind]);
-      fixture.detectChanges();
-      const read = requests.expectOne(
-        kind === 'settle'
-          ? '/api/groups/alice-group/debt-simplification'
-          : '/api/groups/alice-group',
-      );
+  it.each(['member', 'expense'] as const)('cancels pending %s modal reads on logout', (kind) => {
+    if (kind === 'member') modal.openAddMember('alice-group');
+    else modal.openExpense('alice-group');
+    const components = {
+      member: AddMemberModalComponent,
+      expense: NewExpenseModalComponent,
+      settle: SettleUpModalComponent,
+    };
+    const fixture = TestBed.createComponent<unknown>(components[kind]);
+    fixture.detectChanges();
+    const read = requests.expectOne('/api/groups/alice-group');
 
-      auth.logout();
-      expect(read.cancelled).toBe(true);
-      expect(modal.active()).toBeNull();
-      fixture.destroy();
-    },
-  );
+    auth.logout();
+    expect(read.cancelled).toBe(true);
+    expect(modal.active()).toBeNull();
+    fixture.destroy();
+  });
 
   it('fetches and renders Bob’s shell after Alice’s protected request expires', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     fixture.detectChanges();
     fixture.nativeElement.querySelector('.mobile-nav [data-nav=groups]').click();
     fixture.detectChanges();
@@ -183,6 +195,7 @@ describe('account session isolation', () => {
 
     http.get('/api/groups').subscribe({ error: () => {} });
     requests.expectOne('/api/groups').flush({}, unauthorized);
+    requests.expectOne('/api/auth/refresh').flush({}, unauthorized);
     fixture.detectChanges();
     expect(auth.user()).toBeNull();
     expect(navigate).toHaveBeenCalledWith(['/login']);
@@ -190,6 +203,13 @@ describe('account session isolation', () => {
 
     login();
     fixture.detectChanges();
+    requests.expectOne('/api/me').flush({
+      ...bob.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     const bobRequest = requests.expectOne('/api/dashboard');
     expect(bobRequest.request.headers.get('Authorization')).toBe('Bearer bob-token');
     bobRequest.flush(bobDashboard);
@@ -212,7 +232,7 @@ describe('account session isolation', () => {
           groupId: 'alice-group',
           groupName: 'Alice private group',
           counterparty: alice.user,
-          netCents: 100,
+          netMinor: 100,
         },
         'alice-group',
       );
@@ -229,6 +249,7 @@ describe('account session isolation', () => {
       } else {
         http.get('/api/groups').subscribe({ error: () => {} });
         requests.expectOne('/api/groups').flush({}, unauthorized);
+        requests.expectOne('/api/auth/refresh').flush({}, unauthorized);
       }
 
       expect(dashboard.data()).toBeNull();
@@ -246,6 +267,13 @@ describe('account session isolation', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     modal.openGroup();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-new-group-modal')).not.toBeNull();
@@ -288,7 +316,7 @@ describe('account session isolation', () => {
     dashboard.refresh();
     requests.expectOne('/api/dashboard').flush(bobDashboard);
 
-    aliceRequest.flush(aliceDashboard);
+    expect(aliceRequest.cancelled).toBe(true);
     expect(dashboard.data()).toEqual(bobDashboard);
     expect(auth.user()).toEqual(bob.user);
   });
@@ -301,7 +329,7 @@ describe('account session isolation', () => {
     dashboard.ensureLoaded();
     const bobRequest = requests.expectOne('/api/dashboard');
 
-    aliceRequest.flush({}, { status, statusText: 'Old request failed' });
+    expect(aliceRequest.cancelled, `old ${status} response must be cancelled`).toBe(true);
     expect(auth.user()).toEqual(bob.user);
     expect(dashboard.data()).toBeNull();
     expect(dashboard.loading()).toBe(true);
@@ -319,7 +347,7 @@ describe('account session isolation', () => {
       dashboard.refresh();
       requests.expectOne('/api/dashboard').flush(bobDashboard);
 
-      aliceRequest.flush({}, { status, statusText: 'Old request failed' });
+      expect(aliceRequest.cancelled, `old ${status} response must be cancelled`).toBe(true);
       expect(auth.user()).toEqual(bob.user);
       expect(dashboard.data()).toEqual(bobDashboard);
       expect(dashboard.loading()).toBe(false);
@@ -350,16 +378,33 @@ describe('account session isolation', () => {
     const second = requests.expectOne('/api/dashboard');
     first.flush({}, unauthorized);
     second.flush({}, unauthorized);
+    requests.expectOne('/api/auth/refresh').flush({}, unauthorized);
     expect(auth.isAuthenticated()).toBe(false);
     expect(auth.getToken()).toBeNull();
     expect(navigate).toHaveBeenCalledExactlyOnceWith(['/login']);
   });
 
-  it('keeps the current session’s cache and modal when editing profile labels', () => {
+  it('keeps the current session’s cache and modal when updating server preferences', () => {
     dashboard.ensureLoaded();
     requests.expectOne('/api/dashboard').flush(aliceDashboard);
     modal.openGroup();
-    auth.updateProfile({ displayName: 'Alice updated' });
+    const profile = TestBed.inject(ProfileService);
+    TestBed.tick();
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
+    profile.update({ phone: '+1 234' });
+    requests.expectOne('/api/me').flush({
+      ...alice.user,
+      phone: '+1 234',
+      avatarColor: '#12A57E',
+      preferredCurrency: 'USD',
+      createdAt: '2020-01-01T00:00:00Z',
+    });
     dashboard.ensureLoaded();
     requests.expectNone('/api/dashboard');
     expect(dashboard.data()).toEqual(aliceDashboard);

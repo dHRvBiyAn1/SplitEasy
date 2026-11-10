@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { Subject, finalize, takeUntil } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
 import { SessionService } from '../core/auth/session.service';
 import { DashboardResponse } from './dashboard.models';
@@ -13,7 +13,11 @@ import { DashboardResponse } from './dashboard.models';
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
   private readonly api = inject(ApiService);
+  private readonly session = inject(SessionService);
   private cacheVersion = 0;
+  private readonly readRequests = new Subject<boolean>();
+  /** true invalidates pending reads after writes; false shares foreground work. */
+  readonly refreshes = this.readRequests.asObservable();
 
   private readonly _data = signal<DashboardResponse | null>(null);
   private readonly _loading = signal(false);
@@ -23,26 +27,36 @@ export class DashboardService {
   readonly error = this._error.asReadonly();
 
   constructor() {
-    inject(SessionService)
-      .changes.pipe(takeUntilDestroyed())
-      .subscribe(() => this.clear());
+    this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => this.clear());
   }
 
   /** Fetch only if we don't already have data and aren't mid-flight. */
   ensureLoaded(): void {
     if (this._data() === null && !this._loading() && !this._error()) {
-      this.refresh();
+      this.revalidate();
     }
+  }
+
+  /** Navigation/foreground reads share the current pending request. */
+  revalidate(): void {
+    this.readRequests.next(false);
+    if (!this._loading()) this.fetch();
   }
 
   /** Force a re-fetch (after a mutation). */
   refresh(): void {
+    this.readRequests.next(true);
+    this.fetch();
+  }
+
+  private fetch(): void {
     const version = ++this.cacheVersion;
     this._loading.set(true);
     this._error.set(false);
     this.api
       .get<DashboardResponse>('/dashboard')
       .pipe(
+        takeUntil(this.session.changes),
         finalize(() => {
           if (version === this.cacheVersion) this._loading.set(false);
         }),

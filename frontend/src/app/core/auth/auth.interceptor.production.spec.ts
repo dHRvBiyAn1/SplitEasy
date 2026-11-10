@@ -1,3 +1,4 @@
+import { storeTestSession, testJwt } from './auth-test-fixture';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -18,7 +19,7 @@ describe('production API authentication', () => {
         provideRouter([]),
       ],
     });
-    localStorage.setItem('spliteasy.accessToken', 'production-test-jwt');
+    storeTestSession({ id: 'u1', email: 'alice@example.com', displayName: 'Alice' });
   });
 
   afterEach(() => TestBed.inject(HttpTestingController).verify());
@@ -29,7 +30,7 @@ describe('production API authentication', () => {
     const logout = vi.spyOn(TestBed.inject(AuthService), 'logout');
     http.get('https://api.split-easy.io/api/groups').subscribe();
     const privateRequest = requests.expectOne('https://api.split-easy.io/api/groups');
-    expect(privateRequest.request.headers.get('Authorization')).toBe('Bearer production-test-jwt');
+    expect(privateRequest.request.headers.get('Authorization')).toBe('Bearer ' + testJwt('u1'));
     privateRequest.flush([]);
     for (const url of [
       'https://api.split-easy.io/api/auth/login',

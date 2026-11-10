@@ -43,6 +43,43 @@ public class AuthRateLimiter {
         new Budget(new Key("login", ip, Emails.normalize(email)), 5));
   }
 
+  public void recovery(String email, String ip) {
+    take(
+        LOGIN_WINDOW,
+        new Budget(new Key("recovery", ip, ""), 20),
+        new Budget(new Key("recovery", "", Emails.normalize(email)), 5));
+  }
+
+  public void confirmation(String ip) {
+    take(LOGIN_WINDOW, new Budget(new Key("confirmation", ip, ""), 30));
+  }
+
+  public void sensitive(java.util.UUID userId, String ip) {
+    take(
+        LOGIN_WINDOW,
+        new Budget(new Key("sensitive", ip, ""), 20),
+        new Budget(new Key("sensitive", "", userId.toString()), 5));
+  }
+
+  public void invitation(java.util.UUID userId, java.util.UUID groupId, String ip) {
+    take(
+        REGISTER_WINDOW,
+        new Budget(new Key("invitation-ip", ip, ""), 100),
+        new Budget(new Key("invitation-account", "", userId.toString()), 30),
+        new Budget(new Key("invitation-group", "", groupId.toString()), 100));
+  }
+
+  public void invitationToken(java.util.UUID userId, String ip) {
+    take(
+        LOGIN_WINDOW,
+        new Budget(new Key("invitation-token-ip", ip, ""), 100),
+        new Budget(new Key("invitation-token-account", "", userId.toString()), 30));
+  }
+
+  public void refresh(String ip) {
+    take(LOGIN_WINDOW, new Budget(new Key("refresh", ip, ""), 120));
+  }
+
   public void register(String ip) {
     take(REGISTER_WINDOW, new Budget(new Key("register", ip, ""), registrationLimit));
   }

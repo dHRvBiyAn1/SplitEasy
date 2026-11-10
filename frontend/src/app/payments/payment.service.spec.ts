@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -9,18 +10,20 @@ describe('PaymentService', () => {
   let httpTesting: HttpTestingController;
 
   beforeEach(() => {
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(PaymentService);
     httpTesting = TestBed.inject(HttpTestingController);
+    storeTestSession({ id: 'u1', email: 'owner@example.test', displayName: 'Owner' });
   });
 
   afterEach(() => httpTesting.verify());
 
-  function send(amountCents = 800, group = 'g1', payerUserId = 'u1', payeeUserId = 'u2') {
+  function send(amountMinor = 800, group = 'g1', payerUserId = 'u1', payeeUserId = 'u2') {
     service
-      .recordPayment(group, { payerUserId, payeeUserId, amountCents })
+      .recordPayment(group, { payerUserId, payeeUserId, amountMinor })
       .subscribe({ error: () => {} });
     return httpTesting.expectOne(`/api/groups/${group}/payments`);
   }
@@ -29,7 +32,8 @@ describe('PaymentService', () => {
     const pending = service.recordPayment('g1', {
       payerUserId: 'u1',
       payeeUserId: 'u2',
-      amountCents: 800,
+      amountMinor: 800,
+      currency: 'USD' as const,
     });
     pending.subscribe({ error: () => {} });
     const first = httpTesting.expectOne('/api/groups/g1/payments');
@@ -48,22 +52,29 @@ describe('PaymentService', () => {
     repeat.flush({});
   });
 
-  it('starts a new operation when any submitted intent field changes', () => {
-    const requests: [number, string, string, string][] = [
-      [800, 'g1', 'u1', 'u2'],
+  it('blocks every changed uncertain intent field and preserves the original retry identity', () => {
+    const original = send();
+    const originalBody = original.request.body;
+    original.error(new ProgressEvent('error'));
+    const changes: [number, string, string, string][] = [
       [900, 'g1', 'u1', 'u2'],
-      [900, 'g2', 'u1', 'u2'],
-      [900, 'g2', 'u3', 'u2'],
-      [900, 'g2', 'u3', 'u4'],
+      [800, 'g2', 'u1', 'u2'],
+      [800, 'g1', 'u3', 'u2'],
+      [800, 'g1', 'u1', 'u4'],
     ];
-    const ids = requests.map((args) => {
-      const req = send(...args);
-      const id = req.request.body.operationId;
-      expect(id).toEqual(expect.any(String));
-      req.error(new ProgressEvent('error'));
-      return id;
-    });
-    expect(new Set(ids).size).toBe(requests.length);
+    for (const [amountMinor, group, payerUserId, payeeUserId] of changes) {
+      let error: Error | undefined;
+      service.recordPayment(group, { payerUserId, payeeUserId, amountMinor }).subscribe({
+        error: (failure) => {
+          error = failure;
+        },
+      });
+      expect(error?.message).toContain('may already have been saved');
+      httpTesting.expectNone((request) => request.method === 'POST');
+    }
+    const retry = send();
+    expect(retry.request.body).toEqual(originalBody);
+    retry.flush({});
   });
 
   it('clears pending operation on session reset and cancels old requests', () => {
@@ -81,7 +92,8 @@ describe('PaymentService', () => {
     const old = service.recordPayment('g1', {
       payerUserId: 'u1',
       payeeUserId: 'u2',
-      amountCents: 800,
+      amountMinor: 800,
+      currency: 'USD' as const,
     });
     TestBed.inject(SessionService).reset();
     old.subscribe();
@@ -97,14 +109,15 @@ describe('PaymentService', () => {
 
   it('records a payment with payer/payee/amount', () => {
     service
-      .recordPayment('g1', { payerUserId: 'u1', payeeUserId: 'u2', amountCents: 800 })
+      .recordPayment('g1', { payerUserId: 'u1', payeeUserId: 'u2', amountMinor: 800 })
       .subscribe();
     const req = httpTesting.expectOne('/api/groups/g1/payments');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
       payerUserId: 'u1',
       payeeUserId: 'u2',
-      amountCents: 800,
+      amountMinor: 800,
+      currency: 'USD' as const,
       operationId: expect.any(String),
     });
     expect(req.request.body.operationId).toMatch(/^[0-9a-f-]{36}$/);

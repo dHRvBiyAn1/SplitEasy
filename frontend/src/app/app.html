@@ -17,6 +17,9 @@
         >
           Groups
         </button>
+        <a routerLink="/friends" [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
+          >Friends</a
+        >
         <button type="button" (click)="modal.openSettle()">Settle up</button>
       </nav>
       <button
@@ -44,7 +47,20 @@
         ><button type="button" class="dc-btn-ghost" (click)="retryOverview()">Try again</button>
       </div>
     }
-    <main id="main-content" class="shell__main" tabindex="-1"><router-outlet /></main>
+  } @else {
+    <button
+      type="button"
+      class="auth-appearance dc-btn-outline"
+      aria-label="Appearance"
+      (click)="modal.openAppearance()"
+    >
+      <app-icon name="appearance" /><span>Appearance</span>
+    </button>
+  }
+  <main id="main-content" [class]="showShell() ? 'shell__main' : 'app-content'" tabindex="-1">
+    <router-outlet />
+  </main>
+  @if (showShell()) {
     <nav class="mobile-nav dc-glass" aria-label="Mobile and tablet navigation">
       <a
         routerLink="/dashboard"
@@ -60,6 +76,12 @@
       >
         <app-icon name="groups" /><span>Groups</span>
       </button>
+      <a
+        routerLink="/friends"
+        data-nav="friends"
+        [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
+        ><app-icon name="groups" /><span>Friends</span></a
+      >
       <button
         type="button"
         data-nav="expense"
@@ -75,16 +97,6 @@
         ><app-icon name="profile" /><span>Profile</span></a
       >
     </nav>
-  } @else {
-    <button
-      type="button"
-      class="auth-appearance dc-btn-outline"
-      aria-label="Appearance"
-      (click)="modal.openAppearance()"
-    >
-      <app-icon name="appearance" /><span>Appearance</span>
-    </button>
-    <main id="main-content" class="app-content" tabindex="-1"><router-outlet /></main>
   }
 </div>
 @if (groupsOpen() && showShell()) {
@@ -97,13 +109,22 @@
           (click)="groupsOpen.set(false)"
           ><app-group-art [type]="g.type" /><span
             ><strong>{{ g.name }}</strong
-            ><small>{{ g.memberCount }} members</small
-            ><app-money [cents]="g.netCents" [net]="true" /></span
+            ><small>{{ g.memberCount }} members</small>
+            @for (total of groupTotals(g); track total.currency) {
+              <app-money [minor]="total.netMinor" [currency]="total.currency" [net]="true" />
+            }</span
           ><app-icon name="arrow"
         /></a>
       }
       @if (groups().length === 0) {
-        <p class="tray-empty">A trip, a home, a dinner club. Start your first group.</p>
+        @if (overviewLoading()) {
+          <p role="status">Loading groups…</p>
+        } @else if (overviewUnavailable()) {
+          <p role="alert">Groups are unavailable. Try loading your overview again.</p>
+          <button type="button" class="dc-btn-outline" (click)="retryOverview()">Try again</button>
+        } @else {
+          <p class="tray-empty">A trip, a home, a dinner club. Start your first group.</p>
+        }
       }
       <button
         type="button"

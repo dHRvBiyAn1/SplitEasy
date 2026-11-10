@@ -43,8 +43,8 @@ public class Group {
   private User createdBy;
 
   /**
-   * Whether settle-up uses suggested greedy payments for this group (migration V8). A group-wide
-   * setting, not a per-viewer one: it changes which payments are suggested.
+   * Selects canonical net-matched or direct pair obligations (migration V8). Governs debt views,
+   * settlement actions and departure eligibility without rewriting recorded history.
    */
   @Column(name = "simplify_debts", nullable = false)
   private boolean simplifyDebts = true;

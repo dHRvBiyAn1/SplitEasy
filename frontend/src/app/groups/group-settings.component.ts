@@ -2,15 +2,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { GroupArtComponent } from '../shared/group-art.component';
-import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { BalanceService, describeBalance } from '../balances/balance.service';
-import { MemberBalance } from '../balances/balance.models';
+import { DirectObligation, MemberBalance } from '../balances/balance.models';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { centsToDisplay } from '../expenses/expense.service';
+import { Currency } from '../shared/currency';
+import { formatMoney } from '../shared/money.component';
 import { ModalService } from '../modals/modal.service';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
@@ -20,8 +21,8 @@ type Confirming = 'leave' | 'delete' | null;
 
 /**
  * Group settings, opened from the gear in the group header. Renders inside the app shell, so
- * the sidebar stays put. Member balances come from the shared /balances endpoint — the same
- * numbers the group page shows — and gate who can be removed and whether you can leave.
+ * the sidebar stays put. Net balances and current-mode obligations together gate member
+ * removal and leaving. Raw history remains unchanged when the mode changes.
  */
 @Component({
   selector: 'app-group-settings',
@@ -51,13 +52,16 @@ export class GroupSettingsComponent implements OnInit {
   private readonly dashboard = inject(DashboardService);
   protected readonly modal = inject(ModalService);
 
-  protected readonly display = centsToDisplay;
+  protected readonly display = (amount: number, currency: Currency = 'USD', net = false) =>
+    formatMoney(amount, net, currency);
   protected readonly describe = describeBalance;
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
   protected readonly memberBalances = signal<MemberBalance[]>([]);
+  protected readonly obligations = signal<DirectObligation[]>([]);
+  protected readonly financialsReady = signal(false);
 
   /** Inline rename: the pencil swaps the heading for this field and becomes a save button. */
   protected readonly editingName = signal(false);
@@ -70,24 +74,31 @@ export class GroupSettingsComponent implements OnInit {
 
   protected groupId = '';
 
-  protected readonly meId = computed(() => this.auth.user()?.id ?? '');
+  protected readonly viewerAccountId = computed(() => this.auth.user()?.id ?? '');
   /** Only the creator owns the group, so only they may delete it. */
-  protected readonly isCreator = computed(() => this.group()?.createdBy.id === this.meId());
-  protected readonly myNet = computed(() => this.netOf(this.meId()));
-  protected readonly canLeave = computed(() => !this.isCreator() && this.myNet() === 0);
+  protected readonly isCreator = computed(
+    () => this.group()?.createdBy.id === this.viewerAccountId(),
+  );
+  protected readonly hasMyBalance = computed(() => this.hasBalance(this.viewerAccountId()));
+  protected readonly canLeave = computed(() => this.blockedReason(this.viewerAccountId()) === null);
 
   constructor() {
-    // A modal action (add member) refreshes the dashboard; re-read so the list stays in step.
-    let initial = true;
-    effect(() => {
-      this.dashboard.data();
-      if (initial) {
-        initial = false;
-        return;
-      }
-      if (this.groupId) {
-        this.reload();
-      }
+    this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.group.set(null);
+      this.memberBalances.set([]);
+      this.obligations.set([]);
+      this.financialsReady.set(false);
+      this.editingName.set(false);
+      this.nameControl.reset('');
+      this.savingName.set(false);
+      this.savingSimplify.set(false);
+      this.confirming.set(null);
+      this.busy.set(false);
+      this.error.set(null);
+      this.loading.set(false);
+    });
+    this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe((force) => {
+      if (this.groupId) this.reload(force);
     });
   }
 
@@ -111,48 +122,102 @@ export class GroupSettingsComponent implements OnInit {
     });
   }
 
-  private reload(): void {
+  private reload(force = true): void {
+    if (!force && this.loadRequest && !this.loadRequest.closed) return;
     this.loadRequest?.unsubscribe();
+    this.financialsReady.set(false);
+    this.memberBalances.set([]);
+    this.obligations.set([]);
     this.loading.set(true);
     this.error.set(null);
     this.loadRequest = this.scoped(
       forkJoin({
         group: this.groups.getGroup(this.groupId),
         balances: this.balances.getBalances(this.groupId),
+        obligations: this.balances.getCurrentObligations(this.groupId),
       }),
     ).subscribe({
       next: (res) => {
         this.group.set(res.group);
         this.memberBalances.set(res.balances.balances);
+        this.obligations.set(res.obligations);
+        this.financialsReady.set(true);
         this.loading.set(false);
       },
       error: (err) => {
+        if (err?.status === 403 || err?.status === 404) this.group.set(null);
         this.error.set(
           err?.status === 403
             ? 'You are not a member of this group.'
-            : 'Could not load this group and its balances.',
+            : 'Could not load this group, its balances and obligations.',
         );
         this.loading.set(false);
       },
     });
   }
 
-  /** That member's net in this group; 0 when they have no activity yet. */
-  netOf(userId: string): number {
-    return this.memberBalances().find((b) => b.user.id === userId)?.netCents ?? 0;
+  retry(): void {
+    this.reload();
+  }
+
+  /** Account membership actions inspect its canonical financial identities, never UUID coincidence. */
+  private financialIdsFor(accountId: string): Set<string> {
+    const group = this.group();
+    if (!group?.participants) return new Set([accountId]); // Explicit pre-G01 account-only schema.
+    const ids = new Set<string>();
+    for (const p of [...group.participants, ...this.memberBalances().map((b) => b.user)]) {
+      if (p.accountId === accountId) {
+        ids.add(p.id);
+        if (p.canonicalParticipantId) ids.add(p.canonicalParticipantId);
+      }
+    }
+    if (accountId === this.viewerAccountId()) {
+      for (const id of group.ownedParticipantIds ?? []) ids.add(id);
+      if (group.viewerParticipantId) ids.add(group.viewerParticipantId);
+    }
+    return ids;
+  }
+
+  balancesOf(accountId: string): MemberBalance[] {
+    const ids = this.financialIdsFor(accountId);
+    return this.memberBalances().filter((b) => ids.has(b.user.id));
+  }
+  hasBalance(accountId: string): boolean {
+    return this.balancesOf(accountId).some((b) => b.netMinor !== 0);
+  }
+
+  /** Membership is account-based; canonical obligations are participant-based. */
+  obligationsOf(accountId: string) {
+    const ids = this.financialIdsFor(accountId);
+    return this.obligations()
+      .filter((debt) => ids.has(debt.from.id) !== ids.has(debt.to.id))
+      .map((debt) => ({
+        user: ids.has(debt.from.id) ? debt.to : debt.from,
+        netMinor: ids.has(debt.from.id) ? -debt.amountMinor : debt.amountMinor,
+        currency: debt.currency ?? 'USD',
+      }));
   }
 
   /** Why this member can't be removed, or null when they can be. */
   blockedReason(userId: string): string | null {
+    if (!this.financialsReady()) {
+      return 'Balances and obligations are unavailable';
+    }
     if (this.group()?.createdBy.id === userId) {
       return 'Created this group';
     }
-    const net = this.netOf(userId);
-    if (net > 0) {
-      return `Is owed $${this.display(net)}`;
+    const balances = this.balancesOf(userId).filter((b) => b.netMinor !== 0);
+    if (balances.length > 1)
+      return (
+        'Outstanding balances: ' +
+        balances.map((b) => this.display(b.netMinor, b.currency, true)).join('; ')
+      );
+    if (balances.length === 1) {
+      const balance = balances[0];
+      return `${balance.netMinor > 0 ? 'Is owed' : 'Owes'} ${this.display(Math.abs(balance.netMinor), balance.currency)}`;
     }
-    if (net < 0) {
-      return `Owes $${this.display(-net)}`;
+    if (this.obligationsOf(userId).length) {
+      return 'Has outstanding obligations';
     }
     return null;
   }
@@ -206,7 +271,7 @@ export class GroupSettingsComponent implements OnInit {
     this.scoped(this.groups.removeMember(this.groupId, userId)).subscribe({
       next: () => {
         this.busy.set(false);
-        this.dashboard.refresh(); // effect() re-reads this group
+        this.dashboard.refresh(); // also re-reads this group
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not remove that member.');
@@ -228,8 +293,7 @@ export class GroupSettingsComponent implements OnInit {
       next: (updated) => {
         this.group.set(updated);
         this.savingSimplify.set(false);
-        // Settle-up reads this flag off the dashboard payload, so refresh it too.
-        this.dashboard.refresh();
+        this.dashboard.refresh(); // also rechecks group eligibility independently
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not change that setting.');
@@ -249,7 +313,7 @@ export class GroupSettingsComponent implements OnInit {
       return;
     }
     this.busy.set(true);
-    this.scoped(this.groups.removeMember(this.groupId, this.meId())).subscribe({
+    this.scoped(this.groups.removeMember(this.groupId, this.viewerAccountId())).subscribe({
       next: () => {
         this.dashboard.refresh();
         this.router.navigate(['/dashboard']);
@@ -299,6 +363,6 @@ export class GroupSettingsComponent implements OnInit {
   }
 
   isMe(userId: string): boolean {
-    return userId === this.meId();
+    return userId === this.viewerAccountId();
   }
 }

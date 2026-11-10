@@ -2,20 +2,27 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { GroupArtComponent } from '../shared/group-art.component';
-import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
-import { UserSummary } from '../core/auth/auth.models';
+import { ParticipantSummary } from '../groups/participant.models';
 import { BalanceService } from '../balances/balance.service';
 import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { centsToDisplay } from '../expenses/expense.service';
+import { Currency } from '../shared/currency';
+import { formatMoney } from '../shared/money.component';
 import { ExpenseService } from '../expenses/expense.service';
-import { ExpenseResponse, ExpenseSummary, SplitShare } from '../expenses/expense.models';
+import {
+  ExpenseResponse,
+  ExpenseSummary,
+  SplitShare,
+  ExpenseRevision,
+  DeletedExpense,
+} from '../expenses/expense.models';
 import { ModalService } from '../modals/modal.service';
 import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { GroupService } from './group.service';
-import { GroupResponse } from './group.models';
+import { financialRoster, ownedIdentities, viewerIdentity, GroupResponse } from './group.models';
 
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
   FOOD_DRINK: '☕',
@@ -61,27 +68,66 @@ export class GroupDetailComponent implements OnInit {
   private readonly dashboard = inject(DashboardService);
   protected readonly modal = inject(ModalService);
 
-  protected readonly display = centsToDisplay;
+  protected readonly display = (amount: number, currency: Currency = 'USD') =>
+    formatMoney(amount, false, currency);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly group = signal<GroupResponse | null>(null);
   protected readonly myBalances = signal<PersonBalance[]>([]);
+  private readonly ledgerCurrencies = signal<Currency[]>([]);
   protected readonly expenses = signal<ExpenseSummary[]>([]);
 
   /** The expense whose detail row is expanded, plus its fetched full breakdown. */
   protected readonly expandedId = signal<string | null>(null);
   protected readonly detail = signal<ExpenseResponse | null>(null);
   protected readonly detailLoading = signal(false);
+  protected readonly detailError = signal<string | null>(null);
+  protected readonly deleteError = signal<{ expenseId: string; message: string } | null>(null);
   protected readonly deletingId = signal<string | null>(null);
   /** Fetched details, kept so re-expanding a row is instant (no spinner flash). */
   private detailRequest?: Subscription;
   private readonly detailCache = new Map<string, ExpenseResponse>();
 
+  protected readonly historyId = signal<string | null>(null);
+  protected readonly history = signal<ExpenseRevision[]>([]);
+  protected readonly historyLoading = signal(false);
+  protected readonly historyError = signal<string | null>(null);
+  private historyRequest?: Subscription;
+
+  protected readonly recoveryOpen = signal(false);
+  protected readonly deletedExpenses = signal<DeletedExpense[]>([]);
+  protected readonly recoveryLoading = signal(false);
+  protected readonly recoveryError = signal<string | null>(null);
+  protected readonly restoreError = signal<{ expenseId: string; message: string } | null>(null);
+  protected readonly recoveryNeedsReview = signal(false);
+  protected readonly recoveryNotice = signal<string | null>(null);
+  protected readonly restoringId = signal<string | null>(null);
+  protected readonly writePending = computed(() => !!this.deletingId() || !!this.restoringId());
+  private recoveryRequest?: Subscription;
+
   protected groupId = ''; // read by the template for the settings link
 
   /** My net in this group = sum of the pairwise nets (positive = I'm owed overall). */
-  protected readonly myNet = computed(() => this.myBalances().reduce((s, b) => s + b.netCents, 0));
+  protected readonly myTotals = computed(() => {
+    const amounts = new Map<Currency, number>(
+      this.ledgerCurrencies().map((currency) => [currency, 0]),
+    );
+    for (const balance of this.myBalances()) {
+      const currency = balance.currency ?? 'USD';
+      amounts.set(currency, (amounts.get(currency) ?? 0) + balance.netMinor);
+    }
+    if (!amounts.size) amounts.set('USD', 0);
+    return [...amounts]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, netMinor]) => ({
+        currency,
+        netMinor,
+        hasOpenBalances: this.myBalances().some(
+          (balance) => (balance.currency ?? 'USD') === currency && balance.netMinor !== 0,
+        ),
+      }));
+  });
 
   /** Expenses grouped by "MONTH YEAR", newest month first (list already sorted desc). */
   protected readonly months = computed<MonthGroup[]>(() => {
@@ -99,18 +145,27 @@ export class GroupDetailComponent implements OnInit {
   });
 
   constructor() {
-    // Reload group-scoped data whenever the shared dashboard payload changes
-    // (a modal action calls dashboard.refresh(), so this stays in sync).
-    let initial = true;
-    effect(() => {
-      this.dashboard.data();
-      if (initial) {
-        initial = false;
-        return;
-      }
-      if (this.groupId) {
-        this.reload();
-      }
+    this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.clearHistory();
+      this.clearRecovery();
+      this.recoveryNotice.set(null);
+      this.group.set(null);
+      this.myBalances.set([]);
+      this.ledgerCurrencies.set([]);
+      this.expenses.set([]);
+      this.detailCache.clear();
+      this.expandedId.set(null);
+      this.detail.set(null);
+      this.detailLoading.set(false);
+      this.detailError.set(null);
+      this.deleteError.set(null);
+      this.deletingId.set(null);
+      this.error.set(null);
+      this.loading.set(false);
+    });
+    // Group reads do not depend on the overview request succeeding.
+    this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe((force) => {
+      if (this.groupId) this.reload(force);
     });
   }
 
@@ -123,9 +178,15 @@ export class GroupDetailComponent implements OnInit {
         return;
       }
       this.scopeChanges.next();
+      this.clearHistory();
+      this.clearRecovery();
+      this.recoveryNotice.set(null);
       this.group.set(null);
       this.myBalances.set([]);
+      this.ledgerCurrencies.set([]);
       this.expenses.set([]);
+      this.detailError.set(null);
+      this.deleteError.set(null);
       this.deletingId.set(null);
       this.groupId = id;
       this.loading.set(true);
@@ -136,29 +197,66 @@ export class GroupDetailComponent implements OnInit {
     });
   }
 
-  private reload(): void {
+  private reload(force = true): void {
+    if (this.writePending()) return;
+    if (!force && this.loadRequest && !this.loadRequest.closed) return;
     this.loadRequest?.unsubscribe();
-    this.detailRequest?.unsubscribe();
-    this.detailCache.clear();
-    this.expandedId.set(null);
-    this.detail.set(null);
-    this.detailLoading.set(false);
+    if (this.recoveryOpen() && (force || !this.recoveryRequest || this.recoveryRequest.closed)) {
+      this.loadDeleted(true);
+    }
+    const historyId = this.historyId();
+    if (!force && historyId && !this.historyLoading() && !this.historyError()) {
+      this.viewHistory(historyId, true);
+    }
+    if (force) {
+      this.clearHistory();
+      this.detailRequest?.unsubscribe();
+      this.detailCache.clear();
+      this.expandedId.set(null);
+      this.detail.set(null);
+      this.detailLoading.set(false);
+    }
     this.loading.set(true);
     this.error.set(null);
     this.loadRequest = this.scoped(
       forkJoin({
         group: this.groups.getGroup(this.groupId),
         balances: this.balances.getMyBalances(this.groupId),
+        ledger: this.balances.getBalances(this.groupId),
         expenses: this.expensesApi.listExpenses(this.groupId),
       }),
     ).subscribe({
       next: (res) => {
         this.group.set(res.group);
         this.myBalances.set(res.balances);
+        this.ledgerCurrencies.set(res.ledger.balances.map((balance) => balance.currency ?? 'USD'));
         this.expenses.set(res.expenses);
         this.loading.set(false);
+        this.detailCache.clear();
+        const selected = res.expenses.find((e) => e.id === this.expandedId());
+        if (selected && !this.detailError()) {
+          this.expandedId.set(null);
+          this.toggleExpand(selected, true);
+        } else if (!selected) {
+          this.expandedId.set(null);
+          this.detail.set(null);
+          this.detailLoading.set(false);
+        }
       },
       error: (err) => {
+        if (err?.status === 403 || err?.status === 404) {
+          this.detailRequest?.unsubscribe();
+          this.clearHistory();
+          this.clearRecovery();
+          this.recoveryNotice.set(null);
+          this.group.set(null);
+          this.myBalances.set([]);
+          this.ledgerCurrencies.set([]);
+          this.expenses.set([]);
+          this.detailCache.clear();
+          this.expandedId.set(null);
+          this.detail.set(null);
+        }
         this.error.set(
           err?.status === 403
             ? 'You are not a member of this group.'
@@ -170,20 +268,24 @@ export class GroupDetailComponent implements OnInit {
   }
 
   retry(): void {
-    this.reload();
+    this.reload(false);
   }
 
   addExpense(): void {
+    if (this.writePending()) return;
     this.modal.openExpense(this.groupId);
   }
 
   settleUp(): void {
+    if (this.writePending()) return;
     this.modal.openSettle(undefined, this.groupId);
   }
 
   /** Expand a row to show its split, or collapse it if it's already open. */
-  toggleExpand(e: ExpenseSummary): void {
+  toggleExpand(e: ExpenseSummary, preserveHistory = false): void {
+    if (!preserveHistory) this.clearHistory();
     this.detailRequest?.unsubscribe();
+    this.detailError.set(null);
     if (this.expandedId() === e.id) {
       this.expandedId.set(null);
       this.detail.set(null);
@@ -206,48 +308,263 @@ export class GroupDetailComponent implements OnInit {
         }
         this.detailLoading.set(false);
       },
-      error: () => this.detailLoading.set(false),
+      error: () => {
+        this.detailLoading.set(false);
+        this.detailError.set('Could not load this expense.');
+      },
     });
   }
 
+  retryDetail(): void {
+    const expense = this.expenses().find((e) => e.id === this.expandedId());
+    if (!expense || this.detailLoading()) return;
+    this.expandedId.set(null);
+    this.toggleExpand(expense);
+  }
+
   editExpense(e: ExpenseSummary): void {
+    if (this.writePending()) return;
     this.modal.openExpense(this.groupId, e.id);
   }
 
   deleteExpense(e: ExpenseSummary): void {
-    if (this.deletingId()) {
+    if (this.writePending()) {
       return;
     }
-    if (!confirm(`Delete "${e.description}"? This can't be undone.`)) {
+    if (!Number.isSafeInteger(e.version) || e.version! < 0) {
+      this.deleteError.set({
+        expenseId: e.id,
+        message: 'Reload or upgrade the app before deleting this expense safely.',
+      });
       return;
     }
+    if (
+      !confirm(
+        `Delete "${e.description}"? You can restore it from Deleted expenses while this group exists.`,
+      )
+    ) {
+      return;
+    }
+    this.deleteError.set(null);
     this.deletingId.set(e.id);
-    this.scoped(this.expensesApi.deleteExpense(this.groupId, e.id)).subscribe({
+    this.scoped(this.expensesApi.deleteExpense(this.groupId, e.id, e.version)).subscribe({
       next: () => {
         this.expandedId.set(null);
         this.detail.set(null);
         this.deletingId.set(null);
         this.dashboard.refresh(); // effect() re-pulls this group's expenses + balances
       },
-      error: () => this.deletingId.set(null),
+      error: (err) => {
+        this.deletingId.set(null);
+        this.deleteError.set({
+          expenseId: e.id,
+          message: err?.error?.message ?? 'Could not delete this expense. Please try again.',
+        });
+      },
     });
+  }
+
+  private clearRecovery(): void {
+    this.recoveryRequest?.unsubscribe();
+    this.recoveryOpen.set(false);
+    this.deletedExpenses.set([]);
+    this.recoveryLoading.set(false);
+    this.recoveryError.set(null);
+    this.restoreError.set(null);
+    this.recoveryNeedsReview.set(false);
+    this.restoringId.set(null);
+  }
+
+  toggleDeleted(): void {
+    if (this.recoveryOpen()) {
+      this.clearRecovery();
+    } else {
+      this.recoveryOpen.set(true);
+      this.loadDeleted();
+    }
+  }
+
+  reviewDeleted(): void {
+    if (this.writePending()) return;
+    this.recoveryNotice.set(null);
+    this.restoreError.set(null);
+    this.recoveryNeedsReview.set(false);
+    this.dashboard.refresh();
+  }
+
+  loadDeleted(preserveFeedback = false): void {
+    if (this.writePending()) return;
+    this.recoveryRequest?.unsubscribe();
+    this.recoveryLoading.set(true);
+    this.recoveryError.set(null);
+    this.recoveryRequest = this.scoped(this.expensesApi.listDeleted(this.groupId)).subscribe({
+      next: (expenses) => {
+        this.deletedExpenses.set(expenses);
+        this.recoveryLoading.set(false);
+        if (!preserveFeedback) {
+          this.restoreError.set(null);
+          this.recoveryNeedsReview.set(false);
+        }
+      },
+      error: (err) => {
+        this.recoveryLoading.set(false);
+        if (err?.status === 403 || err?.status === 404) {
+          this.deletedExpenses.set([]);
+          this.clearHistory();
+        }
+        this.recoveryError.set(
+          err?.error?.message ?? 'Could not load deleted expenses. Reload before restoring.',
+        );
+      },
+    });
+  }
+
+  restoreExpense(expense: ExpenseResponse): void {
+    if (
+      this.writePending() ||
+      this.loading() ||
+      this.error() ||
+      this.recoveryLoading() ||
+      this.recoveryError() ||
+      this.recoveryNeedsReview()
+    )
+      return;
+    if (!Number.isSafeInteger(expense.version) || expense.version! < 0) {
+      this.restoreError.set({
+        expenseId: expense.id,
+        message: 'Reload or upgrade the app before restoring this expense safely.',
+      });
+      this.recoveryNeedsReview.set(true);
+      return;
+    }
+    this.restoreError.set(null);
+    this.recoveryNotice.set(null);
+    this.restoringId.set(expense.id);
+    this.scoped(
+      this.expensesApi.restoreExpense(this.groupId, expense.id, expense.version!),
+    ).subscribe({
+      next: () => {
+        this.restoringId.set(null);
+        this.deletedExpenses.update((expenses) =>
+          expenses.filter((entry) => entry.expense.id !== expense.id),
+        );
+        this.recoveryNotice.set('Expense restored. Balances have been recalculated.');
+        this.dashboard.refresh();
+      },
+      error: (err) => {
+        this.restoringId.set(null);
+        this.recoveryNeedsReview.set(true);
+        this.restoreError.set({
+          expenseId: expense.id,
+          message:
+            !err?.status || err.status >= 500
+              ? 'Could not confirm restoration. Reload deleted expenses and review current balances before trying again.'
+              : (err?.error?.message ??
+                'Could not restore this expense. Reload and review the latest changes.'),
+        });
+      },
+    });
+  }
+
+  splitLabel(type: ExpenseResponse['splitType']): string {
+    return {
+      EQUAL: 'Equal',
+      UNEQUAL: 'Exact amounts',
+      PERCENTAGE: 'Percentages',
+      WEIGHTS: 'Weights',
+      ADJUSTMENTS: 'Adjustments',
+    }[type];
+  }
+
+  splitInput(snapshot: ExpenseResponse, value: number): string {
+    if (snapshot.splitType === 'PERCENTAGE') return `${value / 100}%`;
+    if (snapshot.splitType === 'WEIGHTS') return String(value);
+    return this.display(value, snapshot.currency);
+  }
+
+  clearHistory(): void {
+    this.historyRequest?.unsubscribe();
+    this.historyId.set(null);
+    this.history.set([]);
+    this.historyLoading.set(false);
+    this.historyError.set(null);
+  }
+
+  viewHistory(expenseId: string, refresh = false): void {
+    if (!refresh) this.clearHistory();
+    this.historyId.set(expenseId);
+    this.historyLoading.set(true);
+    this.historyRequest = this.scoped(
+      this.expensesApi.getHistory(this.groupId, expenseId),
+    ).subscribe({
+      next: (history) => {
+        this.history.set(history);
+        this.historyLoading.set(false);
+      },
+      error: (err) => {
+        this.historyLoading.set(false);
+        this.historyError.set(
+          err?.error?.message ?? 'Could not load expense history. Please try again.',
+        );
+      },
+    });
+  }
+
+  revisionLabel(action: ExpenseRevision['action']): string {
+    return {
+      IMPORTED: 'Imported baseline',
+      CREATED: 'Created',
+      REPLACED: 'Replaced',
+      DELETED: 'Deleted',
+      RESTORED: 'Restored',
+    }[action];
+  }
+
+  recordedDate(iso: string): string {
+    return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  inputName(snapshot: ExpenseResponse, userId: string): string {
+    return (
+      snapshot.participants.find((participant) => participant.user.id === userId)?.user
+        .displayName ?? 'Participant'
+    );
   }
 
   /** Detail-row label: "You owe" / "Priya owes" for each participant's share. */
   partLabel(p: SplitShare): string {
-    return p.user.id === this.meId() ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
+    return this.isOwned(p.user.id) ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
   }
 
   meId(): string {
-    return this.auth.user()?.id ?? '';
+    const group = this.group();
+    return group ? viewerIdentity(group, this.auth.user()?.id ?? '') : '';
   }
 
-  firstName(u: UserSummary): string {
-    return u.id === this.meId() ? 'You' : u.displayName.split(/\s+/)[0];
+  private isOwned(participantId: string): boolean {
+    const group = this.group();
+    return !!group && ownedIdentities(group, this.auth.user()?.id ?? '').includes(participantId);
+  }
+
+  sameSnapshotOwner(snapshot: ExpenseResponse, participant: ParticipantSummary): boolean {
+    return (
+      !!participant.canonicalParticipantId &&
+      snapshot.participants.some(
+        (row) =>
+          row.user.id !== participant.id &&
+          row.user.canonicalParticipantId === participant.canonicalParticipantId,
+      )
+    );
+  }
+
+  firstName(u: ParticipantSummary): string {
+    return this.isOwned(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
   }
 
   memberNames(g: GroupResponse): string {
-    return g.members.map((m) => this.firstName(m)).join(', ');
+    return financialRoster(g)
+      .map((m) => this.firstName(m))
+      .join(', ');
   }
 
   typeLabel(g: GroupResponse): string {
@@ -274,7 +591,7 @@ export class GroupDetailComponent implements OnInit {
 
   pillLabel(b: PersonBalance): string {
     const name = b.user.displayName.split(/\s+/)[0];
-    return b.netCents > 0 ? `${name} owes you` : `you owe ${name}`;
+    return b.netMinor > 0 ? `${name} owes you` : `you owe ${name}`;
   }
 
   categoryGlyph(c: ExpenseCategory): string {
@@ -282,13 +599,13 @@ export class GroupDetailComponent implements OnInit {
   }
 
   paidSub(e: ExpenseSummary): string {
-    const who = e.paidBy.id === this.meId() ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
-    return `${who} paid $${this.display(e.amountCents)}`;
+    const who = this.isOwned(e.paidBy.id) ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
+    return `${who} paid ${this.display(e.amountMinor, e.currency)}`;
   }
 
   deltaLabel(e: ExpenseSummary): string {
-    if (e.viewerDeltaCents > 0) return 'you lent';
-    if (e.viewerDeltaCents < 0) return 'you borrowed';
+    if (e.viewerDeltaMinor > 0) return 'you lent';
+    if (e.viewerDeltaMinor < 0) return 'you borrowed';
     return 'not involved';
   }
 
@@ -296,6 +613,14 @@ export class GroupDetailComponent implements OnInit {
     return new Date(iso + 'T00:00:00')
       .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       .toUpperCase();
+  }
+
+  fullDate(iso: string): string {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
 
   dayNum(iso: string): string {

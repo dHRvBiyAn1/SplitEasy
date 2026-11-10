@@ -139,7 +139,9 @@ Group routes are member-only — non-members get **403, even for nonexistent gro
 | `GET/PUT/DELETE` | `/groups/{g}/expenses/{e}` | detail / full-replace edit / delete |
 | `GET` | `/groups/{g}/balances` · `…/balances/mine` | net per member / pairwise to me |
 | `GET/POST` | `/groups/{g}/payments` | settle-up history / record |
-| `GET` | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
+| `GET` | `/groups/{g}/balances/obligations` | raw pair debts, independent of mode |
+| `GET` | `/groups/{g}/balances/current-obligations` | selected-mode debts and departure blockers |
+| `GET` | `/groups/{g}/debt-simplification` | net-derived preview; warns in direct mode |
 
 Concurrent writes that Spring recognizes as optimistic-lock/stale-state conflicts return
 **409 Conflict** using the standard error body:
@@ -213,7 +215,7 @@ SplitEasy/
 
 ## 🧭 Engineering principles
 
-1. **One source of truth.** Balances derive from rows; the three balance views (net, pairwise, simplified) all read the same persisted data.
+1. **One source of truth.** Balances derive from recorded rows. Direct mode nets within each pair; simplified mode matches net debtors and creditors with stable UUID ties. Dashboard, People, group balances, settlement actions and departure eligibility share the selected projection. Changing modes never rewrites history; newly exposed former-participant obligations require re-adding and repairing first. A net-derived preview in direct mode may leave offsetting direct debts.
 2. **Integer cents, end to end.** No floats near money — `Math.round` at the input edge, `BIGINT` in the DB.
 3. **Reuse over re-derivation.** `MembershipGuard`, `@CurrentUserId`, `Emails.normalize`, `.dc-amount`, `SplitContext` factories — one way to do each thing.
 4. **Boring queries, fast pages.** Aggregate `GROUP BY`s, `join fetch`, correlated-subquery counts — no N+1s, verified in tests.

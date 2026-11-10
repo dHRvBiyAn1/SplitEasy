@@ -1,3 +1,4 @@
+import { storeTestSession } from '../core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -17,10 +18,13 @@ describe('new group member results', () => {
   let refresh: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     requests = TestBed.inject(HttpTestingController);
+    storeTestSession({ id: 'owner', email: 'owner@example.test', displayName: 'Owner' });
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     refresh = vi.spyOn(TestBed.inject(DashboardService), 'refresh').mockImplementation(() => {});
     TestBed.inject(ModalService).openGroup();
@@ -60,6 +64,15 @@ describe('new group member results', () => {
       (element: any) => element.textContent.trim() === label,
     ) as HTMLButtonElement;
   }
+
+  it('releases pending feedback if a dispatched group dialog is destroyed', () => {
+    input('#ng-name', 'Weekend');
+    fixture.componentInstance.save();
+    const request = requests.expectOne('/api/groups');
+    fixture.destroy();
+    expect(request.cancelled).toBe(true);
+    expect(TestBed.inject(ModalService).mutationPending()).toBe(false);
+  });
 
   it('reports mixed results and retries failed emails in the existing group', () => {
     create([

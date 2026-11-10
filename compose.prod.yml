@@ -39,11 +39,25 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       APP_JWT_SECRET: ${APP_JWT_SECRET:?Set a random APP_JWT_SECRET of at least 32 bytes}
       APP_CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the HTTPS origin}
+      # Optional native SMTP. Enable only after sender/TLS/delivery review.
+      APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-false}
+      APP_MAIL_FROM: ${APP_MAIL_FROM:-}
+      APP_MAIL_FRONTEND_URL: ${PUBLIC_ORIGIN}
+      APP_MAIL_ALLOW_INSECURE_LOCAL: "false"
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_CHECKSERVERIDENTITY: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE:-false}
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=15.0 -XX:+ExitOnOutOfMemoryError"
     depends_on:
       postgres:
         condition: service_healthy
-    networks: [app, database]
+    networks: [app, database, mail_egress]
     mem_limit: 1024m
     read_only: true
     tmpfs: ["/tmp:size=128m,mode=1777"]
@@ -111,6 +125,9 @@ networks:
   edge:
   database:
     internal: true
+  # Default remains closed; native SMTP setup explicitly opts this backend-only network in.
+  mail_egress:
+    internal: ${APP_MAIL_EGRESS_INTERNAL:-true}
 
 volumes:
   postgres-data:

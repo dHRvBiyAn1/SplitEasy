@@ -1,9 +1,26 @@
 package com.spliteasy.dto.balance;
 
-import com.spliteasy.dto.common.UserSummary;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.spliteasy.dto.common.ParticipantSummary;
+import com.spliteasy.entity.LedgerCurrency;
 
-/**
- * A member's net position in a group, in integer cents. Positive = the member is owed money;
- * negative = the member owes money; 0 = settled.
- */
-public record MemberBalance(UserSummary user, long netCents) {}
+public record MemberBalance(ParticipantSummary user, long netMinor, LedgerCurrency currency) {
+  public MemberBalance(ParticipantSummary user, long netMinor) {
+    this(user, netMinor, LedgerCurrency.USD);
+  }
+
+  public MemberBalance(com.spliteasy.dto.common.UserSummary user, long netMinor) {
+    this(ParticipantSummary.from(user), netMinor, LedgerCurrency.USD);
+  }
+
+  @JsonIgnore
+  public long netCents() {
+    return netMinor;
+  }
+
+  @JsonProperty("netCents")
+  public Long legacyNetCents() {
+    return currency == LedgerCurrency.USD ? netMinor : null;
+  }
+}

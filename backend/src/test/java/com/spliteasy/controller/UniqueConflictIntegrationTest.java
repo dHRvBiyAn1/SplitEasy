@@ -2,9 +2,11 @@ package com.spliteasy.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import com.spliteasy.AbstractIntegrationTest;
 import com.spliteasy.dto.auth.AuthResponse;
@@ -12,15 +14,18 @@ import com.spliteasy.dto.auth.RegisterRequest;
 import com.spliteasy.dto.group.AddMemberRequest;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.group.GroupResponse;
+import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.GlobalExceptionHandler;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.UserRepository;
+import com.spliteasy.service.MembershipGuard;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
@@ -38,6 +43,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class UniqueConflictIntegrationTest extends AbstractIntegrationTest {
 
   @MockitoSpyBean UserRepository userRepository;
+  @MockitoSpyBean MembershipGuard membershipGuard;
   @MockitoSpyBean GroupMembershipRepository membershipRepository;
   @MockitoSpyBean GlobalExceptionHandler exceptionHandler;
   @Autowired JdbcTemplate jdbcTemplate;
@@ -62,7 +68,7 @@ class UniqueConflictIntegrationTest extends AbstractIntegrationTest {
     List<MvcResult> results =
         race(() -> mockMvc.perform(jsonPost("/api/auth/register", request)).andReturn());
 
-    assertConflict(results, 201, "Email is already registered");
+    assertConflict(results, 201, "Email is already registered", true);
     assertThat(
             jdbcTemplate.queryForObject(
                 "select count(*) from users where email = ?", Long.class, email))
@@ -84,9 +90,16 @@ class UniqueConflictIntegrationTest extends AbstractIntegrationTest {
         objectMapper
             .readValue(created.getResponse().getContentAsString(), GroupResponse.class)
             .id();
-    doAnswer(afterAbsentPrechecks(new CyclicBarrier(2)))
-        .when(membershipRepository)
-        .existsByGroupIdAndUserId(groupId, invitee.user().id());
+    CyclicBarrier bothAuthorized = new CyclicBarrier(2);
+    AtomicInteger authorizations = new AtomicInteger();
+    doAnswer(
+            call -> {
+              call.callRealMethod();
+              if (authorizations.incrementAndGet() <= 2) bothAuthorized.await(20, TimeUnit.SECONDS);
+              return null;
+            })
+        .when(membershipGuard)
+        .requireMember(eq(groupId), eq(owner.user().id()));
 
     List<MvcResult> results =
         race(
@@ -99,15 +112,19 @@ class UniqueConflictIntegrationTest extends AbstractIntegrationTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
                     .andReturn());
 
-    assertConflict(results, 200, "User is already a member of this group");
+    assertConflict(results, 200, "User is already a member of this group", false);
+    var response =
+        mockMvc
+            .perform(
+                get("/api/groups/" + groupId)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+            .andReturn();
     assertThat(
-            jdbcTemplate.queryForObject(
-                "select count(*) from group_memberships where group_id = ? and user_id = ?",
-                Long.class,
-                groupId,
-                invitee.user().id()))
-        .isEqualTo(1L);
-    assertThat(membershipRepository.countByGroupId(groupId)).isEqualTo(2L);
+            objectMapper
+                .readValue(response.getResponse().getContentAsString(), GroupResponse.class)
+                .members())
+        .extracting(u -> u.id())
+        .containsExactlyInAnyOrder(owner.user().id(), invitee.user().id());
   }
 
   private Answer<Object> afterAbsentPrechecks(CyclicBarrier barrier) {
@@ -135,8 +152,8 @@ class UniqueConflictIntegrationTest extends AbstractIntegrationTest {
     }
   }
 
-  private void assertConflict(List<MvcResult> results, int success, String message)
-      throws Exception {
+  private void assertConflict(
+      List<MvcResult> results, int success, String message, boolean integrity) throws Exception {
     assertThat(results)
         .extracting(result -> result.getResponse().getStatus())
         .containsExactlyInAnyOrder(success, 409);
@@ -145,8 +162,13 @@ class UniqueConflictIntegrationTest extends AbstractIntegrationTest {
             .filter(result -> result.getResponse().getStatus() == 409)
             .findFirst()
             .orElseThrow();
-    assertThat(conflict.getResolvedException()).isInstanceOf(DataIntegrityViolationException.class);
-    verify(exceptionHandler).handleDataIntegrity(any(DataIntegrityViolationException.class));
+    if (integrity) {
+      assertThat(conflict.getResolvedException())
+          .isInstanceOf(DataIntegrityViolationException.class);
+      verify(exceptionHandler).handleDataIntegrity(any(DataIntegrityViolationException.class));
+    } else {
+      assertThat(conflict.getResolvedException()).isInstanceOf(ConflictException.class);
+    }
     var body = objectMapper.readTree(conflict.getResponse().getContentAsString());
     assertThat(body.get("status").asInt()).isEqualTo(409);
     assertThat(body.get("error").asText()).isEqualTo("Conflict");
