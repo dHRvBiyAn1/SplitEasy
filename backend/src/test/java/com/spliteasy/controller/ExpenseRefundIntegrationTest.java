@@ -139,6 +139,11 @@ class ExpenseRefundIntegrationTest extends AbstractIntegrationTest {
     assertThat(allocated).containsEntry(alice, 1002L).containsEntry(bob, 999L);
     assertThat(allocated.values().stream().mapToLong(Long::longValue).sum()).isEqualTo(3000);
 
+    // The refund receipt is storage-faithful too: a later read returns the identical document.
+    var listed = read(f, f.alice().accessToken(), "/expenses/" + expense + "/refunds");
+    assertThat(listed.size()).isEqualTo(1);
+    assertThat(listed.get(0)).isEqualTo(created);
+
     var after = nets(f, "USD");
     assertThat(after).containsEntry(alice, 4668L).containsEntry(bob, -2334L);
     assertThat(after).containsEntry(carol, -2334L);

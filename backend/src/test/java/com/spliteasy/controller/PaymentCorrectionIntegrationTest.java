@@ -133,8 +133,17 @@ class PaymentCorrectionIntegrationTest extends AbstractIntegrationTest {
     assertThat(created.get("recordedBy").get("id").asText())
         .isEqualTo(f.bob().user().id().toString());
 
+    // The payee reads back exactly what the recorder received: a settlement has no viewer-scoped
+    // field, so the whole document must match, recordedBy included. This is how a payee sees a
+    // correction, so keep the cross-account read rather than re-reading as Bob.
     var detail = read(f, f.alice().accessToken(), "/payments/" + created.get("id").asText());
+    assertThat(detail.get("recordedBy").get("id").asText())
+        .isEqualTo(f.bob().user().id().toString());
     assertThat(detail).isEqualTo(created);
+    // The receipt is storage-faithful: PostgreSQL keeps microseconds and rounds, so a create
+    // response carrying nanoseconds would disagree with the row it describes.
+    assertThat(java.time.Instant.parse(created.get("createdAt").asText()).getNano() % 1000)
+        .isZero();
   }
 
   Map<String, Object> correction(Fixture f, String payerId, long minor, long expectedVersion) {

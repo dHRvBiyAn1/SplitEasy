@@ -21,6 +21,18 @@ it records a transfer the two people made themselves, and the UI says so where a
 `recordedBy` is the authenticated requester, independent of who paid. A payment recorded before the
 recorder was captured reports `null` rather than a guess.
 
+A settlement has **no viewer-scoped field**. Any member of the group reads exactly the document the
+recorder received, `recordedBy` included — there is no redaction by viewer, which is what lets a
+payee see a correction the other party made. Same for a refund.
+
+Timestamps are **storage-faithful**: `createdAt` is truncated to microseconds before the row is
+written, so a create receipt is byte-identical to a later read of the same entry. PostgreSQL
+`timestamptz` keeps microseconds and *rounds*, so returning an unrounded `Instant.now()` would make
+a receipt disagree with the row it describes by up to a microsecond — and it did, on a
+nanosecond-resolution clock. This matters beyond cosmetics: E02 keyed create receipts and the
+`ledger_revisions` snapshots store the response document, so a drifting timestamp would make a
+stored receipt disagree with the live entry.
+
 ## Correction, undo and restore
 
 | Route | Contract |

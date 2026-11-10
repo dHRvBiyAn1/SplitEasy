@@ -169,7 +169,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
   expense correction cannot restate it. Readers subtract refunds per currency from paid, owed, pair
   obligations and group gross spend; balances still sum to zero. Refund retries use the V12 claim;
   there is no refund edit or restore. Revisions for both live in one `ledger_revisions` table
-  through `LedgerHistory`, the same mechanism `ExpenseHistory` gives expenses. Contract:
+  through `LedgerHistory`, the same mechanism `ExpenseHistory` gives expenses. A settlement and a refund have **no viewer-scoped field** — any member reads the document the
+  recorder received, `recordedBy` included — and `createdAt` is truncated to microseconds before the
+  write, so a create receipt is byte-identical to a later read (PostgreSQL rounds, so an unrounded
+  `Instant.now()` drifts a receipt off its own row). Contract:
   [payment corrections and refunds](docs/api/payment-corrections-and-refunds.md).
 - **Money = explicit currency + integer minor units** (`long`/`BIGINT`). Catalogue: USD/EUR/GBP/INR exponent2, JPY0, KWD3. New clients send `X-Ledger-Version:2`, `currency` and positive `amountMinor` ≤1e12; floats/ambiguous inputs fail400. Legacy `amountCents` is USD-only; response cents/scalar aliases are null for non-USD/mixed scopes. Every aggregate/pair/settlement/leave check partitions by currency; dashboard/group `totals[]` are authoritative. Expense currency is immutable; preferences never relabel history or retry drafts. Outputs beyond JavaScript's exact integer range fail409. V15 follows V14; drain all old servers before non-USD writes and use a forward fix afterwards. Read [the ledger contract](docs/api/multi-currency-ledger.md) before money/rollout changes.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`Percentage`/`Weights`/`AdjustmentsSplitStrategy`

@@ -97,6 +97,7 @@ public class ExpenseRefund {
     this.refundedOn = refundedOn;
     this.note = note;
     this.recordedBy = recordedBy;
-    this.createdAt = Instant.now();
+    // Storage-faithful, for the same reason as Payment: microsecond precision, no rounding drift.
+    this.createdAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
   }
 }

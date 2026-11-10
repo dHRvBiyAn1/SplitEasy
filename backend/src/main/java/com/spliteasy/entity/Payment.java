@@ -85,7 +85,9 @@ public class Payment {
     this.payer = payer;
     this.payee = payee;
     this.amountCents = amountCents;
-    this.createdAt = Instant.now();
+    // PostgreSQL timestamptz keeps microseconds and rounds, so an unrounded Instant.now() would
+    // make this create receipt disagree with the row it describes. Store what we return.
+    this.createdAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     this.paidOn = java.time.LocalDate.ofInstant(this.createdAt, java.time.ZoneOffset.UTC);
   }
 }
