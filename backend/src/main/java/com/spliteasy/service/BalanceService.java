@@ -42,6 +42,7 @@ public class BalanceService {
   private final ExpenseParticipantRepository participantRepository;
   private final FinancialParticipantService financialParticipants;
   private final PaymentRepository paymentRepository;
+  private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
   private final MembershipGuard membershipGuard;
 
   // Public reads share one snapshot; guarded writes join their stable, group-locked ledger.
@@ -61,10 +62,18 @@ public class BalanceService {
     Map<CurrencyUser, Long> settledOut = toMap(groupId, paymentRepository.sumPaidByGroup(groupId));
     Map<CurrencyUser, Long> settledIn =
         toMap(groupId, paymentRepository.sumReceivedByGroup(groupId));
+    // A refund reverses expense economics: the receiving payer paid less, and each participant
+    // owes less by their stored allocation. Both sums cancel, so balances still sum to zero.
+    Map<CurrencyUser, Long> refundReceived =
+        toMap(groupId, refundRepository.sumReceivedByGroup(groupId));
+    Map<CurrencyUser, Long> refundAllocated =
+        toMap(groupId, refundRepository.sumAllocatedByGroup(groupId));
     Set<CurrencyUser> keys = new HashSet<>(paid.keySet());
     keys.addAll(owed.keySet());
     keys.addAll(settledOut.keySet());
     keys.addAll(settledIn.keySet());
+    keys.addAll(refundReceived.keySet());
+    keys.addAll(refundAllocated.keySet());
     Set<UUID> ledgerIds = keys.stream().map(CurrencyUser::userId).collect(Collectors.toSet());
     var people = financialParticipants.resolve(groupId, ledgerIds);
     var currencies = keys.stream().map(CurrencyUser::currency).collect(Collectors.toSet());
@@ -81,10 +90,14 @@ public class BalanceService {
                               long net =
                                   Math.subtractExact(
                                       Math.addExact(
-                                          paid.getOrDefault(key, 0L),
+                                          Math.subtractExact(
+                                              paid.getOrDefault(key, 0L),
+                                              refundReceived.getOrDefault(key, 0L)),
                                           settledOut.getOrDefault(key, 0L)),
                                       Math.addExact(
-                                          owed.getOrDefault(key, 0L),
+                                          Math.subtractExact(
+                                              owed.getOrDefault(key, 0L),
+                                              refundAllocated.getOrDefault(key, 0L)),
                                           settledIn.getOrDefault(key, 0L)));
                               return new MemberBalance(user, net, currency);
                             }))

@@ -38,15 +38,11 @@ CREATE TABLE expense_refunds (
     received_by  UUID        NOT NULL REFERENCES participants (id),
     refunded_on  DATE        NOT NULL,
     note         VARCHAR(280),
+    -- Retry identity lives in the V12 create_operations claim, not a column here.
     recorded_by  UUID        REFERENCES users (id),
-    operation_id UUID,
     created_at   TIMESTAMPTZ NOT NULL,
     version      BIGINT      NOT NULL DEFAULT 0 CHECK (version >= 0),
-    deleted_at   TIMESTAMPTZ,
-    CONSTRAINT chk_expense_refunds_operation_identity
-        CHECK ((recorded_by IS NULL) = (operation_id IS NULL)),
-    CONSTRAINT uq_expense_refunds_group_requester_operation
-        UNIQUE (group_id, recorded_by, operation_id)
+    deleted_at   TIMESTAMPTZ
 );
 
 CREATE INDEX idx_expense_refunds_expense ON expense_refunds (expense_id);
