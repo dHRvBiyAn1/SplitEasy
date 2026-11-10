@@ -51,6 +51,12 @@ export const routes: Routes = [
       import('./groups/group-detail.component').then((m) => m.GroupDetailComponent),
   },
   {
+    path: 'groups/:id/payments',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./payments/payment-history.component').then((m) => m.PaymentHistoryComponent),
+  },
+  {
     path: 'groups/:id/settings',
     canActivate: [authGuard],
     loadComponent: () =>
