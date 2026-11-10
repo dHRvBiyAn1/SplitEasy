@@ -76,7 +76,10 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/DELETE | `/friends/{id}` | authorized current group breakdown / remove only my bookmark |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
-| GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
+| GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / recoverable delete (**creator only**, settled groups only) |
+| POST | `/groups/{g}/archive`, `/groups/{g}/unarchive` | make read-only / re-open — any member, 409 on wrong state |
+| GET | `/groups/deleted` | my recoverable deleted groups with their lifecycle versions (creator only) |
+| POST | `/groups/{g}/restore` | restore a deleted group at its mandatory expected lifecycle version |
 | POST | `/groups/{g}/members` | add by email |
 | DELETE | `/groups/{g}/members/{m}` | remove a member — or leave, when `{m}` is you (409 if unsettled) |
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
@@ -127,6 +130,20 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **403 before 404, uniformly**: every group-scoped op calls `requireMember` *before* loading by id,
   so a non-member gets 403 even for a nonexistent group (API never reveals existence). Followed by
   Group/Expense/Balance/Payment services.
+- **Group lifecycle** (V19): archive makes a group read-only — reads, balances, history and export
+  keep working while every new financial entry is refused 409 (expense create/replace/delete/restore,
+  payments, add member, invitations, guest participants). Leaving and settings edits (rename, type,
+  simplify-debts) stay available, because neither is a new entry; saving a private friend bookmark
+  does too. `GroupWriteGuard.lockForMember` enforces the archived rule for every entry path;
+  `lockForMemberAllowingArchived` is the deliberate exception list and `lockForLifecycle` is restore
+  only. Delete is a **recoverable creator-only marker** gated on a settled group: a canonical
+  obligation for the selected mode or any non-zero net in any currency returns 409 naming it.
+  `MembershipGuard.requireMember` turns a deleted group into 404 *after* the membership check, so a
+  member reads it as absent and a non-member still gets 403 before 404; the write guard repeats the
+  check under the row lock, because memberships survive deletion and a write that waited for the
+  deleting transaction must still fail closed. Restore requires the expected `lifecycleVersion`,
+  is creator-only, and leaves an archived group archived. A surviving E02 create claim cannot
+  resurrect a deleted group: its replay authorization reads the group as absent (404).
 - **Group authz is flat, with one exception**: any member can view, rename, change settings, add
   members, remove a settled member, and **edit/delete expenses subject to the historical-participant guard**. The
   exception is **deleting the group — creator only** (`groups.created_by` is the closest thing to an
@@ -319,7 +336,7 @@ UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 - **friends** (V18) — private directed `(owner_id, friend_account_id)` account pair, saved authorized display label and creation time. Survives settlement/group access loss/deletion; changes no financial facts or reciprocal directory. Target must be a registered active group financial participant when saved. Personal ledgers remain a later G02 slice.
 
 - **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR/JPY/KWD, defaultUSD; V15 extends the catalogue). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
-- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
+- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection); V19 adds nullable `archived_at` (read-only state), nullable `deleted_at` (recoverable deletion) and `lifecycle_version` BIGINT (≥0, default 0, opaque restore precondition). Partial `(created_by, deleted_at DESC, id)` index serves the creator's recovery list. Memberships, expenses, payments and revisions are retained on deletion; only an explicit purge would cascade.
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0, minor-unit storage), V15 `currency` (defaultUSD, immutable), `paid_by`→users,
   `version` BIGINT (V12, opaque nonnegative optimistic precondition); V16 nullable `deleted_at` retains recoverable rows and shares; partial `(group_id,deleted_at DESC,id)` index serves recovery reads; `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
@@ -614,4 +631,23 @@ Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–
 
 - [x] PR108 corrected-source acceptance (2026-10-27) — full frontend369/52/format/build552.70kB and updated native146HTTP+70browserAPI1280/390 pass, zero errors/overflow/cleanup. Shared typography correction accepted by Standards0/Spec0 follow-ups at6b3c356; unchanged backend347/source203 retained. Final manifests163frontend42dist match verified artifacts; exact updated-head PR CI/review is next.
 
-- [x] Alignment B01 payment detail, corrections and refunds (2026-11-10) — V20 adds a user-chosen payment date, method, note, opaque version and recoverable delete, with correction/undo/restore always requiring the version they saw and writing one attributable revision through the shared `ledger_revisions` mechanism; every payment aggregate now excludes undone settlements. Refunds are a separately modelled positive entry referencing their expense, allocated pro rata over its stored shares with the payer absorbing the remainder and the allocation stored, subtracted per currency from balances, obligations and group totals; retries reuse the V12 claim. New `groups/:id/payments` screen plus a Record refund entry point on an expense receipt. Backend 364 (`spotless:check verify`), frontend 378, Prettier and production build pass; OpenAPI 3.1 valid with 465 refs. Drain old backends before V20 writes; rollback keeps the schema and needs a forward fix. No merge or deployment.
+- [x] Alignment M0/M1 + H01/G01/G02.1 production release (2026-11-10) — PR110 promoted dev `ebd10a2` to main `9316f6e`, carrying 102 commits, 13 work packages and migrations V10→V18. Pre-merge gate: backend 347 (Spotless/verify), frontend 369/52, Prettier, production build 552.70kB, deployment14, ShellCheck and actionlint clean. Rehearsed V1–V9 baseline plus seeded legacy data then V10→V18 on disposable PostgreSQL16: money totals/row counts unchanged, USD backfilled, legacy PERCENTAGE converted to UNEQUAL exact shares, EQUAL `split_value=1`, explicit zero participant retained, three imported revision baselines with null actor, participants/links 1:1 with users, zero orphan FKs, per-currency zero-sum. Run42797481252 succeeded on all four jobs with backend/tunnel activation before Pages publication. Live verification: `/api/health` UP, protected route 401, non-API path 404, Angular root and deep links 200; deployed backend fingerprinted by A02 `password-reset-requests` 400 and A03 `refresh` 403 against a 404 control, and the served `main-K3LBEH7E.js` contains friends/invitation/sessions/currencies/account-action/restore. Old binaries are not blocked by Flyway (future applied migrations are tolerated) and an old-shaped write records no revision row; single-container recreate in `deploy.sh` leaves no overlap window, so never hand-start a second backend during delivery. Rollback past V15 is forward-fix only. Production SMTP remains unconfigured, so A02 recovery and G01 email invitations are present but inert. No release tag was created; v0.1.0 remains the latest tag. Remaining sequencing: `docs/superpowers/plans/2026-11-10-alignment-remaining-delivery.md`.
+
+- [x] Alignment G03 group lifecycle (2026-11-10) — V19 adds archived/deleted markers and an opaque
+  `lifecycle_version`. Archive makes a group read-only while preserving every read; delete becomes a
+  recoverable creator-only state gated on a settled group, replacing the destructive cascade, and
+  restore requires the expected version. Deleted groups read as 404 for members (403 still precedes
+  404 for outsiders) and vanish from `/groups` and `/dashboard`; the creator recovers them from
+  `GET /groups/deleted`. The write guard repeats the deleted check under the row lock, so a financial
+  write that waited for the deleting transaction fails closed, and a surviving E02 create claim cannot
+  resurrect a deleted group. Frontend gains archive/re-open, a five-way group-type selector on the
+  existing PATCH path, disabled entry actions while archived and a `groups/deleted` recovery route.
+  Regression-first: 11 new HTTP lifecycle cases plus 8 rendered cases; four existing tests updated to
+  the new contract (hard-delete 403→404 read, two fixtures settled before deleting, and the deletion
+  race re-pointed at the lock the soft delete actually takes). Backend 358 (347 before this work), frontend 377/53 (369 before), Spotless,
+  full-source Prettier, production build 553.49kB and OpenAPI (48 paths, 58 operations, no missing
+  refs) pass. Drain old backends before V19: they ignore the markers and would write into an archived
+  or deleted group; rollback keeps the schema and needs a forward fix. No purge, no payment/expense
+  lifecycle change, no merge or deployment.
+
+- [x] Alignment B01 payment detail, corrections and refunds (2026-11-10) — V20 adds a user-chosen payment date, method, note, opaque version and recoverable delete, with correction/undo/restore always requiring the version they saw and writing one attributable revision through the shared `ledger_revisions` mechanism; every payment aggregate now excludes undone settlements. Refunds are a separately modelled positive entry referencing their expense, allocated pro rata over its stored shares with the payer absorbing the remainder and the allocation stored, subtracted per currency from balances, obligations and group totals; retries reuse the V12 claim. New `groups/:id/payments` screen plus a Record refund entry point on an expense receipt. Merged with G03 on dev: V19 and V20 coexist and apply in sequence. Backend 377 (`spotless:check verify`; 358 before this work), frontend 386/55 (377 before), Prettier and production build 554.90kB pass; OpenAPI 3.1 valid with 491 refs. Drain old backends before V20 writes; rollback keeps the schema and needs a forward fix. No merge or deployment.

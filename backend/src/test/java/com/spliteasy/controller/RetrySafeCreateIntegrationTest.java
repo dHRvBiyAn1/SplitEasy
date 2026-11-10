@@ -458,20 +458,48 @@ class RetrySafeCreateIntegrationTest extends AbstractIntegrationTest {
                         key))
                 .header("Authorization", bearer(other.accessToken())))
         .andExpect(status().isCreated());
+    // Deleting a group requires it to be settled (V19): both equal splits leave `other` owing
+    // 1200 in total, so settle that first through a normal payment.
+    mockMvc
+        .perform(
+            jsonPost(
+                    "/api/groups/" + group + "/payments",
+                    Map.of(
+                        "payerUserId",
+                        other.user().id(),
+                        "payeeUserId",
+                        actor.user().id(),
+                        "amountCents",
+                        1200))
+                .header("Authorization", bearer(other.accessToken())))
+        .andExpect(status().isCreated());
     mockMvc
         .perform(delete("/api/groups/" + group).header("Authorization", auth))
         .andExpect(status().isNoContent());
+
+    // The create claim outlives the group by design (create_operations.scope_id has no group FK),
+    // so the replay path must fail closed rather than replay its original 201 and resurrect a
+    // deleted group. Its authorization reaches a soft-deleted group, which reads as absent.
     mockMvc
         .perform(
             jsonPost("/api/groups", Map.of("name", "Trip", "operationId", key))
                 .header("Authorization", auth))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isNotFound());
     mockMvc
         .perform(jsonPost(url, request).header("Authorization", auth))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isNotFound());
     mockMvc
         .perform(get("/api/groups").header("Authorization", auth))
         .andExpect(jsonPath("$.length()").value(0));
+    // It stayed deleted: still recoverable by its creator, and still absent as a live group.
+    mockMvc
+        .perform(get("/api/groups/deleted").header("Authorization", auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(group));
+    mockMvc
+        .perform(get("/api/groups/" + group).header("Authorization", auth))
+        .andExpect(status().isNotFound());
   }
 
   @Test

@@ -746,20 +746,151 @@ paths:
           description: Target debt mode exposes former-participant obligations; re-add and repair first
     delete:
       operationId: deleteGroup
-      summary: Delete a group
+      summary: Delete a group (recoverable)
       description: |
-        Permanently deletes the group and its expenses/payments (cascade). Creator
-        only — any other member (including the creator's only member, if any) gets 403.
+        Marks the group deleted (migration V19). Nothing financial is destroyed: expenses,
+        payments, shares, split intent and revisions are retained, and the creator can restore
+        the group at its lifecycle version. Every ordinary read then treats the group as absent,
+        so a member gets 404 and a non-member still gets 403 before 404.
+
+        Creator only — any other member gets 403, checked after membership. The group must be
+        settled: a canonical obligation for the selected mode, or any non-zero net in any
+        currency, returns 409 naming the outstanding obligation.
       tags: [Groups]
       responses:
         '409':
           $ref: '#/components/responses/Conflict'
+          description: Group is not settled; settle the named obligations before deleting
         "204":
-          description: Group deleted
+          description: Group marked deleted and recoverable
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/groups/{groupId}/archive:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    post:
+      operationId: archiveGroup
+      summary: Make a group read-only
+      description: |
+        Archives the group: reads, balances, history and export keep working while every new
+        financial entry is refused with 409 — expense create/replace/delete/restore, payments,
+        adding members, invitations and guest participants. Leaving the group and settings edits
+        (rename, type, simplify-debts) stay available, because neither is a new entry.
+
+        Any member may archive, matching the flat settings authorization. Archiving an already
+        archived group returns 409. Advances the lifecycle version.
+      tags: [Groups]
+      responses:
+        '200':
+          description: Archived group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: Group is already archived
+
+  /api/groups/{groupId}/unarchive:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    post:
+      operationId: unarchiveGroup
+      summary: Re-open an archived group
+      description: |
+        Clears the archived marker so new entries are accepted again. Any member, mirroring
+        archive. Re-opening a group that is not archived returns 409. Advances the lifecycle
+        version; no financial data changes either way.
+      tags: [Groups]
+      responses:
+        '200':
+          description: Re-opened group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: Group is not archived
+
+  /api/groups/deleted:
+    get:
+      operationId: listDeletedGroups
+      summary: List my recoverable deleted groups
+      description: |
+        The authenticated creator's own deleted groups, newest first, each carrying the
+        lifecycleVersion a restore must quote back. Only groups this account created are
+        listed: another member of a deleted group sees an empty list, never its existence.
+      tags: [Groups]
+      responses:
+        '200':
+          description: Deleted groups this account created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/groups/{groupId}/restore:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    post:
+      operationId: restoreGroup
+      summary: Restore a deleted group at its expected version
+      description: |
+        Clears the deletion marker under the group write lock, returning the group exactly as it
+        was: members, expenses, payments and history are unchanged, and an archived group stays
+        archived. expectedVersion is mandatory, so a stale recovery screen cannot resurrect a
+        group whose state moved on; a mismatch, or a group that is not deleted, returns 409
+        without any change. Creator only, checked after membership, so a non-member gets 403.
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreGroupRequest'
+      responses:
+        '200':
+          description: Restored group at its new lifecycle version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: Stale expectedVersion, or the group is not deleted
 
   /api/groups/{groupId}/members:
     parameters:
@@ -2497,6 +2628,19 @@ components:
           - type: 'null'
           description: Retained scoped unclaimed inactive identities. Explicitly reactivate the same ID for historical
             correction/recovery; old snapshots may omit this current metadata.
+        archivedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Set while the group is read-only; null when it is open. Old immutable create receipts can
+            omit this current metadata.
+        lifecycleVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque precondition advanced by archive, unarchive, delete and restore. Quote it back on
+            restore. Old immutable create receipts can omit it, which reads as the initial version.
 
     GroupSummary:
       type: object
@@ -2514,6 +2658,29 @@ components:
           format: int64
         simplifyDebts:
           type: boolean
+        archivedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Set while the group is read-only; null when it is open. Deleted groups are absent from
+            the ordinary list entirely.
+        lifecycleVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque lifecycle precondition; the recovery list carries the value a restore must quote back.
+
+    RestoreGroupRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The lifecycleVersion the client last read. Mandatory; a mismatch returns 409 and changes
+            nothing.
 
     SplitInput:
       type: object

@@ -15,6 +15,7 @@ import { formatMoney } from '../shared/money.component';
 import { ModalService } from '../modals/modal.service';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
+import { GroupType } from '../dashboard/dashboard.models';
 
 /** Which destructive action is showing its inline "Yes, …/Cancel" confirm. */
 type Confirming = 'leave' | 'delete' | null;
@@ -69,6 +70,19 @@ export class GroupSettingsComponent implements OnInit {
   protected readonly savingName = signal(false);
 
   protected readonly savingSimplify = signal(false);
+  protected readonly savingType = signal(false);
+  protected readonly savingArchive = signal(false);
+
+  /** Archived groups are read-only: history stays readable, new entries are refused. */
+  protected readonly archived = computed(() => !!this.group()?.archivedAt);
+
+  protected readonly groupTypes: { value: GroupType; label: string }[] = [
+    { value: 'HOME', label: 'Home' },
+    { value: 'TRIP', label: 'Trip' },
+    { value: 'DINING', label: 'Dining' },
+    { value: 'EVENT', label: 'Event' },
+    { value: 'OTHER', label: 'Other' },
+  ];
   protected readonly confirming = signal<Confirming>(null);
   protected readonly busy = signal(false);
 
@@ -92,6 +106,8 @@ export class GroupSettingsComponent implements OnInit {
       this.nameControl.reset('');
       this.savingName.set(false);
       this.savingSimplify.set(false);
+      this.savingType.set(false);
+      this.savingArchive.set(false);
       this.confirming.set(null);
       this.busy.set(false);
       this.error.set(null);
@@ -112,6 +128,8 @@ export class GroupSettingsComponent implements OnInit {
       this.group.set(null);
       this.savingName.set(false);
       this.savingSimplify.set(false);
+      this.savingType.set(false);
+      this.savingArchive.set(false);
       this.busy.set(false);
       this.groupId = id;
       this.loading.set(true);
@@ -260,6 +278,7 @@ export class GroupSettingsComponent implements OnInit {
 
   // ── Members ───────────────────────────────────────────────────────────────
   addMember(): void {
+    if (this.archived()) return; // A new participant is a new entry.
     this.modal.openAddMember(this.groupId);
   }
 
@@ -302,6 +321,53 @@ export class GroupSettingsComponent implements OnInit {
     });
   }
 
+  /** Group type uses the same partial PATCH path as rename and simplify-debts. */
+  setType(type: GroupType): void {
+    const g = this.group();
+    if (!g || this.savingType() || g.type === type) {
+      return;
+    }
+    this.savingType.set(true);
+    this.scoped(this.groups.updateGroup(this.groupId, { type })).subscribe({
+      next: (updated) => {
+        this.group.set(updated);
+        this.savingType.set(false);
+        this.dashboard.refresh(); // the sidebar and cards carry the glyph
+      },
+      error: (err) => {
+        this.error.set(err?.error?.message ?? 'Could not change the group type.');
+        this.savingType.set(false);
+      },
+    });
+  }
+
+  /** Archiving stops new entries; re-opening restores them. Any member, like other settings. */
+  toggleArchive(): void {
+    if (this.savingArchive() || !this.group()) {
+      return;
+    }
+    const wasArchived = this.archived();
+    this.savingArchive.set(true);
+    this.error.set(null);
+    const request = wasArchived
+      ? this.groups.unarchiveGroup(this.groupId)
+      : this.groups.archiveGroup(this.groupId);
+    this.scoped(request).subscribe({
+      next: (updated) => {
+        this.group.set(updated);
+        this.savingArchive.set(false);
+        this.dashboard.refresh(); // cards and the tray show the archived state
+      },
+      error: (err) => {
+        this.error.set(
+          err?.error?.message ??
+            (wasArchived ? 'Could not re-open the group.' : 'Could not archive the group.'),
+        );
+        this.savingArchive.set(false);
+      },
+    });
+  }
+
   // ── Danger zone ───────────────────────────────────────────────────────────
   ask(which: Confirming): void {
     this.error.set(null);
@@ -334,7 +400,8 @@ export class GroupSettingsComponent implements OnInit {
     this.scoped(this.groups.deleteGroup(this.groupId)).subscribe({
       next: () => {
         this.dashboard.refresh();
-        this.router.navigate(['/dashboard']);
+        // Land on the recovery list: deletion is reversible, and this is where to reverse it.
+        this.router.navigate(['/groups/deleted']);
       },
       error: (err) => {
         this.error.set(err?.error?.message ?? 'Could not delete the group.');

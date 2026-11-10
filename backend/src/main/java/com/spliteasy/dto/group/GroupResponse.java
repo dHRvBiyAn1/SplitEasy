@@ -17,7 +17,9 @@ public record GroupResponse(
     List<com.spliteasy.dto.common.ParticipantSummary> participants,
     UUID viewerParticipantId,
     List<UUID> ownedParticipantIds,
-    List<com.spliteasy.dto.common.ParticipantSummary> inactiveGuests) {
+    List<com.spliteasy.dto.common.ParticipantSummary> inactiveGuests,
+    Instant archivedAt,
+    long lifecycleVersion) {
   public GroupResponse(
       UUID id,
       String name,
@@ -27,5 +29,34 @@ public record GroupResponse(
       boolean simplifyDebts,
       Instant createdAt) {
     this(id, name, type, createdBy, members, simplifyDebts, createdAt, null, null, null, null);
+  }
+
+  /** Callers that predate the lifecycle state: an open group at its initial version. */
+  public GroupResponse(
+      UUID id,
+      String name,
+      GroupType type,
+      UserSummary createdBy,
+      List<UserSummary> members,
+      boolean simplifyDebts,
+      Instant createdAt,
+      List<com.spliteasy.dto.common.ParticipantSummary> participants,
+      UUID viewerParticipantId,
+      List<UUID> ownedParticipantIds,
+      List<com.spliteasy.dto.common.ParticipantSummary> inactiveGuests) {
+    this(
+        id,
+        name,
+        type,
+        createdBy,
+        members,
+        simplifyDebts,
+        createdAt,
+        participants,
+        viewerParticipantId,
+        ownedParticipantIds,
+        inactiveGuests,
+        null,
+        0L);
   }
 }
