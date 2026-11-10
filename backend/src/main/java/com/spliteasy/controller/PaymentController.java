@@ -38,4 +38,51 @@ public class PaymentController {
       @CurrentUserId UUID userId, @PathVariable UUID groupId) {
     return paymentService.listPayments(userId, groupId);
   }
+
+  @GetMapping("/deleted")
+  public List<com.spliteasy.dto.payment.DeletedPayment> deleted(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return paymentService.listDeleted(userId, groupId);
+  }
+
+  @GetMapping("/{paymentId}")
+  public PaymentResponse getPayment(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId, @PathVariable UUID paymentId) {
+    return paymentService.getPayment(userId, groupId, paymentId);
+  }
+
+  @GetMapping("/{paymentId}/history")
+  public List<com.spliteasy.dto.payment.LedgerRevision<PaymentResponse>> history(
+      @CurrentUserId UUID userId, @PathVariable UUID groupId, @PathVariable UUID paymentId) {
+    return paymentService.getHistory(userId, groupId, paymentId);
+  }
+
+  @org.springframework.web.bind.annotation.PutMapping("/{paymentId}")
+  public PaymentResponse correctPayment(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @PathVariable UUID paymentId,
+      @Valid @RequestBody com.spliteasy.dto.payment.CorrectPaymentRequest request) {
+    return paymentService.correctPayment(userId, groupId, paymentId, request);
+  }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/{paymentId}")
+  @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deletePayment(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @PathVariable UUID paymentId,
+      @org.springframework.web.bind.annotation.RequestParam(required = false) Long expectedVersion,
+      @org.springframework.web.bind.annotation.RequestParam(required = false) UUID operationId) {
+    paymentService.deletePayment(userId, groupId, paymentId, expectedVersion, operationId);
+  }
+
+  @PostMapping("/{paymentId}/restore")
+  public PaymentResponse restorePayment(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @PathVariable UUID paymentId,
+      @Valid @RequestBody com.spliteasy.dto.payment.RestorePaymentRequest request) {
+    return paymentService.restorePayment(userId, groupId, paymentId, request);
+  }
 }
