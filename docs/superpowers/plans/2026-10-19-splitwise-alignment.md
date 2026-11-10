@@ -10,7 +10,15 @@
 
 **Spec:** [Proposed design](../specs/2026-10-19-splitwise-alignment-design.md).
 
-## Current delivery checkpoint (25 October 2026)
+## Current delivery checkpoint (10 November 2026)
+
+G02.1 merged as PR108. Thirteen packages are delivered and `dev` is 102 commits ahead of
+`main`, so none of them is released. Sequencing for the remaining 24 packages, the
+production release gate and the decision calendar are in the
+[remaining delivery plan](2026-11-10-alignment-remaining-delivery.md). Package contracts
+below are unchanged.
+
+## Earlier checkpoint (25 October 2026)
 
 A03 and C01 have reviewed PRs to `dev`: [A03 #104](https://github.com/dHRvBiyAn1/SplitEasy/pull/104) and [C01 #105](https://github.com/dHRvBiyAn1/SplitEasy/pull/105). The C01 companion carries their combined integration and the [fourth-batch verification](../../reviews/2026-10-24-alignment/fourth-batch-integration.md). Apply V14 before V15 or together and drain old writers before cutover. Publication does not authorize merge or deployment. Production Google Workspace SMTP remains deferred.
 
