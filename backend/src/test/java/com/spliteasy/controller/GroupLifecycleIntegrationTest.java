@@ -19,12 +19,15 @@ import com.spliteasy.dto.group.RestoreGroupRequest;
 import com.spliteasy.dto.group.UpdateGroupRequest;
 import com.spliteasy.dto.payment.RecordPaymentRequest;
 import com.spliteasy.entity.GroupType;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -443,5 +446,107 @@ class GroupLifecycleIntegrationTest extends AbstractIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.type").value(type.name()));
     }
+  }
+
+  /** Invitation routes are behind the participant capability header. */
+  private MockHttpServletRequestBuilder capable(
+      MockHttpServletRequestBuilder request, String token) {
+    return request
+        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+        .header("X-Participant-Version", "1");
+  }
+
+  private String linkToken(String token, String groupId) throws Exception {
+    MvcResult created =
+        mockMvc
+            .perform(
+                capable(jsonPost("/api/groups/" + groupId + "/invitations/links", Map.of()), token))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper
+        .readTree(created.getResponse().getContentAsString())
+        .get("url")
+        .asText()
+        .split("&token=")[1];
+  }
+
+  private long recoverableVersion(String token, String groupId) throws Exception {
+    MvcResult list =
+        mockMvc
+            .perform(get("/api/groups/deleted").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+            .andExpect(status().isOk())
+            .andReturn();
+    for (JsonNode row : objectMapper.readTree(list.getResponse().getContentAsString())) {
+      if (groupId.equals(row.get("id").asText())) return row.get("lifecycleVersion").asLong();
+    }
+    throw new IllegalStateException("group is not recoverable");
+  }
+
+  @Test
+  void archivedGroupRefusesInvitationAcceptanceAndAddsNobody() throws Exception {
+    AuthResponse owner = register("g03-inv-owner@example.com", "password123", "Owner");
+    AuthResponse joining = register("g03-inv-joiner@example.com", "password123", "Joiner");
+    String groupId = createGroup(owner.accessToken(), "Invited");
+    String token = linkToken(owner.accessToken(), groupId);
+
+    archive(owner.accessToken(), groupId, 200);
+
+    // A pending invitation cannot add a member to a read-only group.
+    mockMvc
+        .perform(
+            capable(
+                jsonPost("/api/invitations/accept", Map.of("token", token)), joining.accessToken()))
+        .andExpect(status().isConflict());
+
+    // Nothing was written: no membership, no participant, and the invitee is still an outsider.
+    mockMvc
+        .perform(capable(get("/api/groups/" + groupId), owner.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.members", hasSize(1)))
+        .andExpect(jsonPath("$.participants", hasSize(1)));
+    mockMvc
+        .perform(capable(get("/api/groups/" + groupId), joining.accessToken()))
+        .andExpect(status().isForbidden());
+
+    // Re-opening the group lets the same invitation through.
+    unarchive(owner.accessToken(), groupId, 200);
+    mockMvc
+        .perform(
+            capable(
+                jsonPost("/api/invitations/accept", Map.of("token", token)), joining.accessToken()))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(capable(get("/api/groups/" + groupId), owner.accessToken()))
+        .andExpect(jsonPath("$.members", hasSize(2)));
+  }
+
+  @Test
+  void deletedGroupRefusesInvitationAcceptanceAndPreview() throws Exception {
+    AuthResponse owner = register("g03-inv-del-owner@example.com", "password123", "Owner");
+    AuthResponse joining = register("g03-inv-del-joiner@example.com", "password123", "Joiner");
+    String groupId = createGroup(owner.accessToken(), "Doomed Invite");
+    String token = linkToken(owner.accessToken(), groupId);
+
+    mockMvc
+        .perform(
+            delete("/api/groups/" + groupId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+        .andExpect(status().isNoContent());
+
+    // A deleted group reads as absent on the token paths too, so neither discloses nor joins it.
+    for (String route : List.of("/api/invitations/preview", "/api/invitations/accept")) {
+      mockMvc
+          .perform(capable(jsonPost(route, Map.of("token", token)), joining.accessToken()))
+          .andExpect(status().isNotFound());
+    }
+
+    // Restoring shows the acceptance left no membership behind.
+    long version = recoverableVersion(owner.accessToken(), groupId);
+    mockMvc
+        .perform(
+            jsonPost("/api/groups/" + groupId + "/restore", new RestoreGroupRequest(version))
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.members", hasSize(1)));
   }
 }
