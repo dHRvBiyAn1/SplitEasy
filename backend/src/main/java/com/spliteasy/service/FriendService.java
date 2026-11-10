@@ -69,7 +69,8 @@ public class FriendService {
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public FriendSummary save(UUID owner, SaveFriendRequest request) {
-    writes.lockForMember(request.groupId(), owner);
+    // A private bookmark is not a group entry, so an archived group can still be saved from.
+    writes.lockForMemberAllowingArchived(request.groupId(), owner);
     ParticipantContract.requireEnabled();
     var original = participants.originals(request.groupId()).get(request.participantId());
     if (original == null

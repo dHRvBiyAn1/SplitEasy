@@ -44,6 +44,13 @@ export const routes: Routes = [
   },
   // The dashboard is the group list now — /groups only exists to keep old links working.
   { path: 'groups', pathMatch: 'full', redirectTo: 'dashboard' },
+  // Before groups/:id, so the literal path is never matched as a group id.
+  {
+    path: 'groups/deleted',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./groups/deleted-groups.component').then((m) => m.DeletedGroupsComponent),
+  },
   {
     path: 'groups/:id',
     canActivate: [authGuard],

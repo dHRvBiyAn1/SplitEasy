@@ -52,6 +52,52 @@ public class Group {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
+  /** Set while the group is read-only: reads and export keep working, new entries do not. */
+  @Column(name = "archived_at")
+  private Instant archivedAt;
+
+  /** Recoverable deletion. Every ordinary read treats a marked group as gone (migration V19). */
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
+  /** Opaque precondition for restore; advances on each archive/unarchive/delete/restore. */
+  @Column(name = "lifecycle_version", nullable = false)
+  private long lifecycleVersion;
+
+  public boolean isArchived() {
+    return archivedAt != null;
+  }
+
+  public boolean isDeleted() {
+    return deletedAt != null;
+  }
+
+  /** One place advances the precondition, so no lifecycle write can forget to. */
+  private void advance() {
+    this.lifecycleVersion++;
+  }
+
+  public void archive() {
+    this.archivedAt = Instant.now();
+    advance();
+  }
+
+  public void unarchive() {
+    this.archivedAt = null;
+    advance();
+  }
+
+  public void markDeleted() {
+    this.deletedAt = Instant.now();
+    advance();
+  }
+
+  /** Restores the group; an archived group stays archived until it is explicitly re-opened. */
+  public void restore() {
+    this.deletedAt = null;
+    advance();
+  }
+
   public Group(String name, GroupType type, User createdBy) {
     this.name = name;
     this.type = type;

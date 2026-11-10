@@ -18,13 +18,17 @@
       <div class="gd__id">
         <h1 class="gd__name">{{ g.name }}</h1>
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
+        @if (archived()) {
+          <p class="gd__sub" role="status">Archived — read-only until it is re-opened.</p>
+        }
       </div>
       <div class="gd__actions">
         <button
           type="button"
           class="dc-btn-outline"
           (click)="settleUp()"
-          [disabled]="loading() || !!error() || writePending()"
+          [disabled]="loading() || !!error() || writePending() || archived()"
+          [attr.title]="archived() ? 'This group is archived — re-open it to settle up' : null"
         >
           <svg
             viewBox="0 0 24 24"
@@ -45,7 +49,8 @@
           type="button"
           class="dc-btn-accent"
           (click)="addExpense()"
-          [disabled]="writePending()"
+          [disabled]="writePending() || archived()"
+          [attr.title]="archived() ? 'This group is archived — re-open it to add expenses' : null"
         >
           <svg
             viewBox="0 0 24 24"

@@ -5,6 +5,7 @@ import com.spliteasy.dto.group.AddMemberRequest;
 import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.group.GroupResponse;
 import com.spliteasy.dto.group.GroupSummary;
+import com.spliteasy.dto.group.RestoreGroupRequest;
 import com.spliteasy.dto.group.UpdateGroupRequest;
 import com.spliteasy.service.GroupService;
 import jakarta.validation.Valid;
@@ -50,6 +51,12 @@ public class GroupController {
     return groupService.listMyGroups(userId);
   }
 
+  /** Declared before {@code /{groupId}} so the literal path is never read as a group id. */
+  @GetMapping("/deleted")
+  public List<GroupSummary> listDeletedGroups(@CurrentUserId UUID userId) {
+    return groupService.listDeletedGroups(userId);
+  }
+
   @GetMapping("/{groupId}")
   public GroupResponse getGroup(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
     return groupService.getGroup(userId, groupId);
@@ -72,7 +79,31 @@ public class GroupController {
     groupService.removeMember(userId, groupId, memberId);
   }
 
-  /** Deletes the group and its expenses/payments. Creator only. */
+  /** Makes the group read-only: reads and export keep working, new entries do not. */
+  @PostMapping("/{groupId}/archive")
+  public GroupResponse archiveGroup(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return groupService.archive(userId, groupId);
+  }
+
+  /** Re-opens an archived group for new entries. */
+  @PostMapping("/{groupId}/unarchive")
+  public GroupResponse unarchiveGroup(@CurrentUserId UUID userId, @PathVariable UUID groupId) {
+    return groupService.unarchive(userId, groupId);
+  }
+
+  /** Restores a recoverably deleted group at its expected lifecycle version. Creator only. */
+  @PostMapping("/{groupId}/restore")
+  public GroupResponse restoreGroup(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID groupId,
+      @Valid @RequestBody RestoreGroupRequest request) {
+    return groupService.restore(userId, groupId, request.expectedVersion());
+  }
+
+  /**
+   * Recoverable deletion of the group. Creator only; nothing financial is destroyed, and the group
+   * must be settled first.
+   */
   @DeleteMapping("/{groupId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deleteGroup(@CurrentUserId UUID userId, @PathVariable UUID groupId) {

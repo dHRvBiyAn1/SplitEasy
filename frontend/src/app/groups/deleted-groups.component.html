@@ -1,0 +1,48 @@
+<div class="dc-page">
+  <header class="dgroups__head">
+    <h1 class="dc-page-title">Recently deleted</h1>
+    <a class="dc-btn-ghost" routerLink="/dashboard">Back to overview</a>
+  </header>
+
+  <p class="dc-body">
+    Deleting a group keeps its expenses, settlements and history. Restore one to put it back exactly
+    as it was.
+  </p>
+
+  @if (error()) {
+    <p class="dc-caption" role="alert">{{ error() }}</p>
+    <button type="button" class="dc-btn-outline" (click)="reload()">Reload</button>
+  }
+
+  @if (loading()) {
+    <p class="dc-caption">Loading your deleted groups…</p>
+  } @else if (!rows().length && !error()) {
+    <p class="dc-caption">Nothing deleted — every group you created is still active.</p>
+  } @else {
+    <ul class="dgroups">
+      @for (row of rows(); track row.id) {
+        <li class="dgroups__row">
+          <app-group-art [type]="row.type" />
+          <span class="dgroups__text">
+            <span class="dc-body">{{ row.name }}</span>
+            <span class="dc-caption">
+              {{ row.memberCount }} {{ row.memberCount === 1 ? 'member' : 'members' }}
+              @if (row.archivedAt) {
+                · was archived
+              }
+            </span>
+          </span>
+          <button
+            type="button"
+            class="dc-btn-outline"
+            [attr.aria-label]="'Restore ' + row.name"
+            [disabled]="restoring() === row.id"
+            (click)="restore(row)"
+          >
+            {{ restoring() === row.id ? 'Restoring…' : 'Restore' }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
