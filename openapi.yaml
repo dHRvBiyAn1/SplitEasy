@@ -1414,6 +1414,371 @@ paths:
           $ref: '#/components/responses/Conflict'
           description: Operation ID was previously used for a different payment
 
+  /api/groups/{groupId}/payments/deleted:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedPayments
+      summary: List the group's recoverable settlements
+      description: Member-only. Undone settlements, most recently undone first. They count towards no balance,
+        obligation or feed, and each carries the version a restore must state.
+      tags: [Payments]
+      responses:
+        '200':
+          description: Recoverable settlements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeletedPayment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/payments/{paymentId}:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getPayment
+      summary: One active settlement with its version
+      description: Member-only, 403 before 404, so a non-member gets 403 even for a payment id that does not exist.
+      tags: [Payments]
+      responses:
+        '200':
+          description: The active settlement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    put:
+      operationId: correctPayment
+      summary: Correct a recorded settlement at its expected version
+      description: Full replacement of the correctable facts, namely payer, payee, amount, financial date, method and note.
+        expectedVersion is always required; a stale version is 409 before any mutation. The currency is immutable and
+        a changed one is 409. Payer and payee must differ and both must be active financial participants, otherwise
+        409 instructs explicit re-add. Serializes with other financial writes on the group row. One accepted
+        correction advances the version once and writes exactly one CORRECTED revision holding both snapshots; the
+        original is retained, never rewritten. On an uncertain response reload and review — never retry automatically.
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrectPaymentRequest'
+      responses:
+        '200':
+          description: The corrected settlement at its new version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deletePayment
+      summary: Undo a recorded settlement, recoverably
+      description: Marks the settlement deleted at the stated expectedVersion, which is always required. The row and
+        its revisions are retained and it is excluded from every balance, obligation and feed. A stale version is 409,
+        so a retried undo never reverses twice.
+      tags: [Payments]
+      parameters:
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: operationId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Undone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/payments/{paymentId}/restore:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: restorePayment
+      summary: Restore an undone settlement at its expected version
+      description: Always requires expectedVersion. Both parties must be active financial participants, otherwise 409
+        instructs explicit re-add. Restores the unchanged amount, currency, date, method and note, advances the
+        version once and writes one RESTORED revision. An already-active or stale command is 409 without another
+        revision or financial change, so a repeated restore never counts twice.
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestorePaymentRequest'
+      responses:
+        '200':
+          description: The restored settlement at its new version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/payments/{paymentId}/history:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getPaymentHistory
+      summary: One settlement's attributable revisions
+      description: Member-only, oldest version first, covering active and undone settlements. An imported baseline
+        has a null actor, because the recorder of a payment made before B01 is genuinely unknown and is never invented.
+      tags: [Payments]
+      responses:
+        '200':
+          description: The settlement's revisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentRevision'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/refunds:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: listRefunds
+      summary: Money returned out of one expense
+      description: Member-only, 403 before 404. Live refunds on the expense, newest financial date first.
+      tags: [Expenses]
+      responses:
+        '200':
+          description: The expense's refunds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RefundResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    post:
+      operationId: recordRefund
+      summary: Record money returned out of this expense
+      description: A refund reverses this expense's own allocation, so it carries no split input of its own. The
+        amount is positive, stated in the expense's immutable currency, and at most what is left unrefunded,
+        otherwise 400 with the remainder, and the ledger is unchanged. The expense must be active and every
+        participant currently active, otherwise 409 instructs explicit re-add. The allocation is computed pro rata
+        over the stored shares, with the receiving payer absorbing the remainder, and is stored, so a later expense
+        correction cannot restate a refund that already happened. Optional operationId is a keyed retry — an identical
+        repeat returns the original 201 without reversing twice; a changed intent is 409. Recording a refund moves no
+        real money.
+      tags: [Expenses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordRefundRequest'
+            example:
+              amountMinor: 3000
+              currency: USD
+              refundedOn: '2026-03-06'
+              note: Restaurant returned part of the bill
+              operationId: 550e8400-e29b-41d4-a716-446655440009
+      responses:
+        '201':
+          description: The recorded refund with its stored allocation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/refunds/{refundId}:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: refundId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      operationId: deleteRefund
+      summary: Undo a recorded refund, recoverably
+      description: Marks the refund deleted at the stated expectedVersion, which is always required. The pre-refund
+        balances return exactly once; the row, its allocation and its revisions are retained. A stale version is 409.
+        B01 has no refund edit or restore route — correct a wrong refund by undoing it and recording a new one.
+      tags: [Expenses]
+      parameters:
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '204':
+          description: Undone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/refunds/{refundId}/history:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: refundId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getRefundHistory
+      summary: One refund's attributable revisions
+      description: Member-only, oldest version first, covering live and undone refunds.
+      tags: [Expenses]
+      responses:
+        '200':
+          description: The refund's revisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RefundRevision'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /api/groups/{groupId}/debt-simplification:
     parameters:
     - $ref: '#/components/parameters/ParticipantVersion'
@@ -2258,6 +2623,22 @@ components:
           - $ref: '#/components/schemas/Currency'
           - type: 'null'
           description: Required with amountMinor. Expense PUT cannot change the recorded currency.
+        paidOn:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: The user-chosen financial date. Omitted means the server's recording date at UTC.
+        method:
+          oneOf:
+          - $ref: '#/components/schemas/PaymentMethod'
+          - type: 'null'
+          description: Omitted means OTHER.
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
       oneOf:
       - required:
         - currency
@@ -2852,6 +3233,279 @@ components:
           minimum: 1
           maximum: 9007199254740991
           description: Integer minor units in the explicit currency.
+        paidOn:
+          type: string
+          format: date
+          description: The user-chosen financial date, distinct from createdAt. Backfilled from createdAt at UTC for
+            payments recorded before B01.
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
+        recordedBy:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+          description: Who recorded the settlement, independent of who paid. Null for a payment recorded before the
+            recorder was captured; never inferred.
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque optimistic precondition. Send it as expectedVersion when correcting, deleting or
+            restoring this payment.
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Set when the settlement has been undone. A deleted payment is excluded from every balance,
+            obligation and feed, and keeps its revisions.
+
+    PaymentMethod:
+      type: string
+      enum: [CASH, BANK_TRANSFER, CARD, ONLINE, OTHER]
+      description: How the people involved moved the money themselves. Descriptive metadata only. SplitEasy records
+        a settlement and never transfers funds.
+
+    CorrectPaymentRequest:
+      type: object
+      required: [payerUserId, payeeUserId, amountMinor, paidOn, expectedVersion]
+      properties:
+        payerUserId:
+          type: string
+          format: uuid
+        payeeUserId:
+          type: string
+          format: uuid
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+        currency:
+          oneOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          description: Optional and immutable. Omit it, or send the payment's own currency; any other value is 409.
+        paidOn:
+          type: string
+          format: date
+        method:
+          oneOf:
+          - $ref: '#/components/schemas/PaymentMethod'
+          - type: 'null'
+          description: Omitted means OTHER.
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Recorded on the revision for attribution. It is not a replay contract, because expectedVersion already
+            makes a repeated correction 409 rather than applying twice.
+
+    RestorePaymentRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+
+    DeletedPayment:
+      type: object
+      required: [payment, deletedAt]
+      properties:
+        payment:
+          $ref: '#/components/schemas/PaymentResponse'
+        deletedAt:
+          type: string
+          format: date-time
+
+    PaymentRevision:
+      type: object
+      required: [action, recordedAt, version, after]
+      properties:
+        action:
+          type: string
+          enum: [IMPORTED, CREATED, CORRECTED, DELETED, RESTORED]
+        actor:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+          description: Null for an imported baseline, whose recorder is genuinely unknown.
+        recordedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        before:
+          oneOf:
+          - $ref: '#/components/schemas/PaymentResponse'
+          - type: 'null'
+        after:
+          $ref: '#/components/schemas/PaymentResponse'
+
+    RecordRefundRequest:
+      type: object
+      required: [amountMinor, currency, refundedOn]
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+          description: Positive minor units, at most what is left unrefunded on the expense.
+        currency:
+          $ref: '#/components/schemas/Currency'
+          description: Must equal the expense's immutable currency; any other value is 400.
+        refundedOn:
+          type: string
+          format: date
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Keyed retry. An identical repeat returns the original 201, while a changed intent is 409.
+
+    RefundShare:
+      type: object
+      required: [user, shareMinor, currency]
+      properties:
+        user:
+          $ref: '#/components/schemas/ParticipantSummary'
+        shareMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How much this participant's expense debt falls because of the refund.
+        shareCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+
+    RefundResponse:
+      type: object
+      required: [id, expenseId, amountMinor, currency, receivedBy, refundedOn, createdAt, version, participants]
+      properties:
+        id:
+          type: string
+          format: uuid
+        expenseId:
+          type: string
+          format: uuid
+          description: The expense this refund reverses.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        amountCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        receivedBy:
+          $ref: '#/components/schemas/ParticipantSummary'
+          description: Who got the money back, the expense's payer at the moment of the refund, stored explicitly.
+        refundedOn:
+          type: string
+          format: date
+        note:
+          type:
+          - string
+          - 'null'
+        recordedBy:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        participants:
+          type: array
+          description: The stored allocation, pro rata by the expense's own shares with the receiving payer absorbing
+            the remainder. The shares sum exactly to amountMinor.
+          items:
+            $ref: '#/components/schemas/RefundShare'
+
+    RefundRevision:
+      type: object
+      required: [action, recordedAt, version, after]
+      properties:
+        action:
+          type: string
+          enum: [IMPORTED, CREATED, CORRECTED, DELETED, RESTORED]
+        actor:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+        recordedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        before:
+          oneOf:
+          - $ref: '#/components/schemas/RefundResponse'
+          - type: 'null'
+        after:
+          $ref: '#/components/schemas/RefundResponse'
 
     DashboardGroup:
       type: object
