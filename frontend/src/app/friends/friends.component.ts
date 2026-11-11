@@ -20,9 +20,10 @@ import { GroupService } from '../groups/group.service';
 import { financialRoster, GroupSummary, ownedIdentities } from '../groups/group.models';
 import { ParticipantSummary } from '../groups/participant.models';
 import { MoneyComponent } from '../shared/money.component';
+import { PersonalExpensesComponent } from './personal-expenses.component';
 @Component({
   selector: 'app-friends',
-  imports: [RouterLink, MoneyComponent],
+  imports: [RouterLink, MoneyComponent, PersonalExpensesComponent],
   templateUrl: './friends.component.html',
   styleUrl: './friends.component.scss',
 })
@@ -42,6 +43,8 @@ export class FriendsComponent {
   private readonly destroyRef = inject(DestroyRef);
   protected readonly friends = signal<FriendSummary[]>([]);
   protected readonly detail = signal<FriendDetail | null>(null);
+  // Outlives the detail's refresh-time clearing so an open personal-expense form is not destroyed.
+  protected readonly personal = signal<{ id: string; name: string } | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected id = '';
@@ -53,6 +56,7 @@ export class FriendsComponent {
       this.cancelAdd();
       this.friends.set([]);
       this.detail.set(null);
+      this.personal.set(null);
       this.removing.set(null);
       this.removeTrigger = null;
       this.deleting.set(false);
@@ -74,6 +78,7 @@ export class FriendsComponent {
       this.needsReview.set(false);
       this.notice.set(null);
       this.id = params.get('id') ?? '';
+      this.personal.set(null);
       this.loading.set(false);
       this.load();
     });
@@ -113,7 +118,10 @@ export class FriendsComponent {
       .subscribe({
         next: (v) => {
           if (Array.isArray(v)) this.friends.set(v);
-          else this.detail.set(v);
+          else {
+            this.detail.set(v);
+            this.personal.set({ id: v.id, name: v.displayName });
+          }
           this.loading.set(false);
           if (review) {
             this.needsReview.set(false);
@@ -122,6 +130,7 @@ export class FriendsComponent {
         },
         error: (err) => {
           this.loading.set(false);
+          this.personal.set(null);
           this.error.set(
             this.id && (err.status === 404 || err.status === 403)
               ? 'Saved friend unavailable. Return to your directory and review current access.'

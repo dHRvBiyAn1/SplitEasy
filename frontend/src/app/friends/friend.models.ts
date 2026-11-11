@@ -13,4 +13,6 @@ export interface FriendSummary {
 }
 export interface FriendDetail extends FriendSummary {
   sharedGroups: { id: string; name: string; simplifyDebts: boolean; balances: FriendBalance[] }[];
+  /** Non-group personal expenses only; `balances` is the sum of every scope. */
+  personalBalances: FriendBalance[];
 }

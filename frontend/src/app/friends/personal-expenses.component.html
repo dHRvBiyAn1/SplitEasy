@@ -1,0 +1,248 @@
+<section class="personal" aria-labelledby="personal-heading">
+  <div class="personal-head">
+    <div>
+      <h2 id="personal-heading">Personal expenses</h2>
+      <p>
+        Money between you and {{ friendName() }} only, kept outside every group. Either of you can
+        add, edit or delete an entry.
+      </p>
+    </div>
+    @if (!formOpen()) {
+      <button
+        class="dc-btn-accent"
+        type="button"
+        [disabled]="saving() || deleting() !== null || needsReview() || loading() || !!error()"
+        (click)="startAdd()"
+      >
+        Add personal expense
+      </button>
+    }
+  </div>
+
+  @if (notice()) {
+    <p role="status">{{ notice() }}</p>
+  }
+  @if (error()) {
+    <p role="alert">{{ error() }}</p>
+    <button class="dc-btn-outline" type="button" [disabled]="loading()" (click)="load()">
+      Try again
+    </button>
+  }
+  @if (retryNotice()) {
+    <p role="alert">{{ retryNotice() }}</p>
+    @if (restored) {
+      <div class="actions">
+        <button
+          class="dc-btn-outline"
+          type="button"
+          [disabled]="saving() || draftBlocked()"
+          (click)="retryOriginal()"
+        >
+          Retry the original draft
+        </button>
+        <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="reviewEntries()">
+          Check entries
+        </button>
+        @if (needsReview()) {
+          <button
+            class="dc-btn-ghost"
+            type="button"
+            [disabled]="saving()"
+            (click)="startSeparate()"
+          >
+            Start a separate entry
+          </button>
+        }
+      </div>
+    }
+  }
+
+  @if (formOpen()) {
+    <form class="personal-form" (submit)="$event.preventDefault(); save()">
+      <h3>{{ editing ? 'Edit personal expense' : 'Add personal expense' }}</h3>
+      <label>
+        <span class="dc-field-label">Description</span>
+        <input
+          class="dc-field"
+          aria-label="Description"
+          [value]="description()"
+          [disabled]="saving()"
+          (input)="description.set($any($event.target).value)"
+        />
+      </label>
+      <div class="row">
+        <label>
+          <span class="dc-field-label">Amount</span>
+          <input
+            class="dc-field"
+            aria-label="Amount"
+            inputmode="decimal"
+            [value]="amount()"
+            [disabled]="saving()"
+            (input)="amount.set($any($event.target).value)"
+          />
+        </label>
+        <label>
+          <span class="dc-field-label">Currency</span>
+          <select
+            class="dc-field"
+            aria-label="Currency"
+            [value]="currency()"
+            [disabled]="saving() || !!editing"
+            (change)="currency.set($any($event.target).value)"
+          >
+            @for (code of currencies; track code) {
+              <option [value]="code">{{ code }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span class="dc-field-label">Date</span>
+          <input
+            class="dc-field"
+            type="date"
+            aria-label="Date"
+            [value]="date()"
+            [disabled]="saving()"
+            (input)="date.set($any($event.target).value)"
+          />
+        </label>
+      </div>
+      <fieldset>
+        <legend class="dc-field-label">Who paid?</legend>
+        <button
+          class="dc-btn-outline"
+          type="button"
+          [attr.aria-pressed]="paidByMe()"
+          [disabled]="saving()"
+          (click)="paidByMe.set(true)"
+        >
+          You paid
+        </button>
+        <button
+          class="dc-btn-outline"
+          type="button"
+          [attr.aria-pressed]="!paidByMe()"
+          [disabled]="saving()"
+          (click)="paidByMe.set(false)"
+        >
+          {{ friendName() }} paid
+        </button>
+      </fieldset>
+      <fieldset>
+        <legend class="dc-field-label">How to split</legend>
+        <button
+          class="dc-btn-outline"
+          type="button"
+          [attr.aria-pressed]="split() === 'EQUAL'"
+          [disabled]="saving()"
+          (click)="split.set('EQUAL')"
+        >
+          Split equally
+        </button>
+        <button
+          class="dc-btn-outline"
+          type="button"
+          [attr.aria-pressed]="split() === 'UNEQUAL'"
+          [disabled]="saving()"
+          (click)="split.set('UNEQUAL')"
+        >
+          Exact amounts
+        </button>
+      </fieldset>
+      @if (split() === 'UNEQUAL') {
+        <div class="row">
+          <label>
+            <span class="dc-field-label">Your share</span>
+            <input
+              class="dc-field"
+              aria-label="Your share"
+              inputmode="decimal"
+              [value]="mine()"
+              [disabled]="saving()"
+              (input)="mine.set($any($event.target).value)"
+            />
+          </label>
+          <label>
+            <span class="dc-field-label">{{ friendName() }}'s share</span>
+            <input
+              class="dc-field"
+              aria-label="Their share"
+              inputmode="decimal"
+              [value]="theirs()"
+              [disabled]="saving()"
+              (input)="theirs.set($any($event.target).value)"
+            />
+          </label>
+        </div>
+      }
+      <p role="status" aria-live="polite">
+        @if (split() === 'EQUAL') {
+          Split equally between the two of you.
+        } @else {
+          Shares total
+          <app-money [minor]="shareTotal()" [currency]="currency()" />
+          of <app-money [minor]="amountMinor()" [currency]="currency()" />
+        }
+      </p>
+      <div class="actions">
+        <button class="dc-btn-accent" type="submit" [disabled]="!canSave()">
+          {{ editing ? 'Save changes' : 'Add expense' }}
+        </button>
+        <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="cancelForm()">
+          Cancel
+        </button>
+      </div>
+      @if (saving()) {
+        <p role="status">Saving personal expense…</p>
+      }
+    </form>
+  }
+
+  @if (loading()) {
+    <p role="status">Loading personal expenses…</p>
+  } @else if (!error() && !expenses().length) {
+    <p class="empty">No personal expenses with {{ friendName() }} yet.</p>
+  } @else if (expenses().length) {
+    <ul class="personal-list">
+      @for (row of expenses(); track row.id) {
+        <li>
+          <div>
+            <strong>{{ row.description }}</strong>
+            <p>
+              {{ row.spentOn }} ·
+              {{ row.paidBy.id === paidByMeId() ? 'You paid' : row.paidBy.displayName + ' paid' }}
+            </p>
+          </div>
+          <app-money [minor]="row.amountMinor" [currency]="row.currency ?? 'USD'" />
+          <app-money
+            [minor]="row.viewerDeltaMinor"
+            [currency]="row.currency ?? 'USD'"
+            [net]="true"
+          />
+          <div class="actions">
+            <button
+              class="dc-btn-ghost"
+              type="button"
+              [disabled]="saving() || deleting() !== null || needsReview()"
+              (click)="edit(row.id)"
+            >
+              Edit
+            </button>
+            <button
+              class="dc-btn-ghost"
+              type="button"
+              [disabled]="saving() || deleting() !== null || needsReview()"
+              (click)="remove(row)"
+            >
+              Delete
+            </button>
+          </div>
+          @if (deleting() === row.id) {
+            <p role="status">Deleting…</p>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>
