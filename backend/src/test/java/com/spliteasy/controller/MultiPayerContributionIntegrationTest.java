@@ -308,6 +308,57 @@ class MultiPayerContributionIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  void dashboardActivityAndCsvExportReadContributionsNotJustThePrimaryPayer() throws Exception {
+    create(expense(9000, a, contributions(a, 6000, b, 3000), null));
+
+    // Dashboard feed: viewer delta = what they paid minus their share (shares are 3000 each).
+    for (var row : List.of(List.of(a, 3000L), List.of(b, 0L), List.of(c, -3000L))) {
+      var user = (AuthResponse) row.get(0);
+      JsonNode dashboard =
+          objectMapper.readTree(
+              mockMvc
+                  .perform(
+                      get("/api/dashboard")
+                          .header(HttpHeaders.AUTHORIZATION, bearer(user.accessToken())))
+                  .andExpect(status().isOk())
+                  .andReturn()
+                  .getResponse()
+                  .getContentAsString());
+      assertThat(dashboard.path("activity").get(0).path("viewerDeltaMinor").asLong())
+          .as(user.user().email())
+          .isEqualTo((Long) row.get(1));
+    }
+
+    // CSV: one row per person, paid = contribution, net = paid - owed, sums reconcile.
+    String csv =
+        mockMvc
+            .perform(
+                get("/api/groups/history/export")
+                    .param("groupId", groupUrl.substring(groupUrl.lastIndexOf('/') + 1))
+                    .header(HttpHeaders.AUTHORIZATION, bearer(a.accessToken())))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var rows = HistoryIntegrationTest.parseCsv(csv);
+    var header = rows.get(0);
+    long paid = 0, net = 0;
+    Map<String, Long> paidBy = new HashMap<>();
+    for (var row : rows.subList(1, rows.size())) {
+      long p = Long.parseLong(row.get(header.indexOf("paid_minor")));
+      long o = Long.parseLong(row.get(header.indexOf("owed_minor")));
+      assertThat(Long.parseLong(row.get(header.indexOf("net_minor")))).isEqualTo(p - o);
+      paidBy.put(row.get(header.indexOf("participant_name")), p);
+      paid += p;
+      net += p - o;
+    }
+    assertThat(rows).hasSize(4);
+    assertThat(paid).isEqualTo(9000);
+    assertThat(net).isZero();
+    assertThat(paidBy).containsEntry("Ann", 6000L).containsEntry("Ben", 3000L);
+  }
+
+  @Test
   void keyedRetryReplaysContributionsAndRejectsChangedOnes() throws Exception {
     String key = "\"operationId\":\"" + UUID.randomUUID() + "\"";
     JsonNode first = create(expense(9000, a, contributions(b, 3000, a, 6000), key));

@@ -454,16 +454,6 @@ public class ExpenseService {
         .toList();
   }
 
-  /**
-   * The requesting member's net for one expense: positive = they lent (paid more than their share),
-   * negative = they borrowed (their share), 0 = not involved. Shared by the group expense list and
-   * the dashboard activity feed so both read the same everywhere.
-   */
-  static long viewerDelta(UUID viewerId, UUID payerId, long amountCents, long viewerShareCents) {
-    long paid = viewerId.equals(payerId) ? amountCents : 0L;
-    return paid - viewerShareCents;
-  }
-
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public ExpenseResponse getExpense(UUID requesterId, UUID groupId, UUID expenseId) {
     membershipGuard.requireMember(groupId, requesterId);

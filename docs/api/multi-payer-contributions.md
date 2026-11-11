@@ -45,6 +45,8 @@ no contribution row, and readers now take paid amounts from contributions. Rollb
 multi-payer write only needs the old binary; after one, an old binary treats the primary payer as
 having paid everything (still zero-sum, wrong attribution), so roll back with a forward fix.
 
-Known follow-ups: the dashboard activity feed still values an item's `viewerDeltaMinor` from the
-primary payer (H03), refunds credit the primary payer (B01), and the CSV export switches to
-contributions when H05 lands.
+The dashboard activity feed's `viewerDeltaMinor` is the viewer's contributions minus their share,
+and the history CSV export's `paid_minor` is each person's contribution (one row per person,
+`net_minor = paid_minor - owed_minor`); both are identical to before for single-payer expenses.
+Friend-scope history also matches contributors. Known follow-up: refunds credit the primary payer
+(B01).
