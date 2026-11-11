@@ -1,7 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../core/api/api.service';
-import { CreateExpenseRequest, ExpenseResponse, ExpenseSummary } from '../expenses/expense.models';
+import {
+  CreateExpenseRequest,
+  DeletedExpense,
+  ExpenseResponse,
+  ExpenseSummary,
+} from '../expenses/expense.models';
 import { FriendDetail, FriendSummary } from './friend.models';
 @Injectable({ providedIn: 'root' })
 export class FriendService {
@@ -46,5 +51,17 @@ export class FriendService {
     return this.api.delete<void>(
       `/friends/${friendId}/expenses/${expenseId}?expectedVersion=${expectedVersion}`,
     );
+  }
+  deletedPersonalExpenses(friendId: string): Observable<DeletedExpense[]> {
+    return this.api.get<DeletedExpense[]>(`/friends/${friendId}/expenses/deleted`);
+  }
+  restorePersonalExpense(
+    friendId: string,
+    expenseId: string,
+    expectedVersion: number,
+  ): Observable<ExpenseResponse> {
+    return this.api.post<ExpenseResponse>(`/friends/${friendId}/expenses/${expenseId}/restore`, {
+      expectedVersion,
+    });
   }
 }

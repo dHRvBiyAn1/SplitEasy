@@ -150,6 +150,12 @@
           Exact amounts
         </button>
       </fieldset>
+      @if (convertedFrom()) {
+        <p role="status">
+          This expense was split by {{ convertedFrom() }}. It is shown as the exact amounts each of
+          you owes; saving keeps those amounts.
+        </p>
+      }
       @if (split() === 'UNEQUAL') {
         <div class="row">
           <label>
@@ -244,5 +250,56 @@
         </li>
       }
     </ul>
+  }
+
+  <button
+    class="dc-btn-ghost"
+    type="button"
+    [attr.aria-expanded]="deletedOpen()"
+    (click)="toggleDeleted()"
+  >
+    Recently deleted
+  </button>
+  @if (deletedOpen()) {
+    <section aria-label="Recently deleted personal expenses">
+      @if (deletedLoading()) {
+        <p role="status">Loading deleted personal expenses…</p>
+      }
+      @if (deletedError()) {
+        <p role="alert">{{ deletedError() }}</p>
+        <button
+          class="dc-btn-outline"
+          type="button"
+          [disabled]="deletedLoading()"
+          (click)="loadDeleted()"
+        >
+          Reload deleted
+        </button>
+      } @else if (!deletedLoading() && !deletedEntries().length) {
+        <p class="empty">No deleted personal expenses.</p>
+      }
+      <ul class="personal-list">
+        @for (entry of deletedEntries(); track entry.expense.id) {
+          <li>
+            <div>
+              <strong>{{ entry.expense.description }}</strong>
+              <p>{{ entry.expense.spentOn }}</p>
+            </div>
+            <app-money
+              [minor]="entry.expense.amountMinor"
+              [currency]="entry.expense.currency ?? 'USD'"
+            />
+            <button
+              class="dc-btn-outline"
+              type="button"
+              [disabled]="!!restoring() || deletedLoading()"
+              (click)="restore(entry)"
+            >
+              Restore
+            </button>
+          </li>
+        }
+      </ul>
+    </section>
   }
 </section>

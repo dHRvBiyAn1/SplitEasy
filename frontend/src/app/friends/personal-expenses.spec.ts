@@ -199,6 +199,79 @@ describe('personal expenses with one saved friend', () => {
     expect(sessionStorage.getItem(key!)).toBeNull();
   });
 
+  it('opens a percentage entry as exact amounts and never silently resets its shares', async () => {
+    await openFriend();
+    button('Edit').click();
+    http.expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'GET' }).flush({
+      ...entry,
+      splitType: 'PERCENTAGE',
+      splits: [
+        { userId: 'me', value: 2500 },
+        { userId: 'pat', value: 7500 },
+      ],
+      participants: [
+        { user: { id: 'me' }, shareMinor: 250 },
+        { user: { id: 'pat' }, shareMinor: 750 },
+      ],
+    });
+    harness.detectChanges();
+    expect(text()).toContain('was split by percentages');
+    expect(input('Your share').value).toBe('2.50');
+    expect(input('Their share').value).toBe('7.50');
+    button('Save changes').click();
+    const put = http.expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'PUT' });
+    expect(put.request.body.splitType).toBe('UNEQUAL');
+    expect(put.request.body.splits).toEqual([
+      { userId: 'me', value: 250 },
+      { userId: 'pat', value: 750 },
+    ]);
+    put.flush({ ...entry, version: 2 });
+    harness.detectChanges();
+    http.expectOne('/api/friends/pat').flush(friend);
+    http.expectOne('/api/friends/pat/expenses').flush([entry]);
+  });
+
+  it('lists recently deleted entries and restores at the seen version, keeping a stale 409 visible', async () => {
+    await openFriend();
+    button('Recently deleted').click();
+    http.expectOne({ url: '/api/friends/pat/expenses/deleted', method: 'GET' }).flush([
+      {
+        expense: { ...entry, id: 'gone', description: 'Taxi', version: 3 },
+        deletedAt: '2026-11-11T10:00:00Z',
+      },
+    ]);
+    harness.detectChanges();
+    expect(text()).toContain('Taxi');
+    button('Restore').click();
+    http
+      .expectOne({ url: '/api/friends/pat/expenses/gone/restore', method: 'POST' })
+      .flush({ message: 'This expense changed.' }, { status: 409, statusText: 'Conflict' });
+    harness.detectChanges();
+    expect(text()).toContain('This expense changed.');
+    expect(text()).toContain('Taxi');
+
+    button('Reload deleted').click();
+    http.expectOne({ url: '/api/friends/pat/expenses/deleted', method: 'GET' }).flush([
+      {
+        expense: { ...entry, id: 'gone', description: 'Taxi', version: 4 },
+        deletedAt: '2026-11-11T10:00:00Z',
+      },
+    ]);
+    harness.detectChanges();
+    button('Restore').click();
+    const ok = http.expectOne({ url: '/api/friends/pat/expenses/gone/restore', method: 'POST' });
+    expect(ok.request.body).toEqual({ expectedVersion: 4 });
+    ok.flush({ ...entry, id: 'gone' });
+    harness.detectChanges();
+    expect(text()).toContain('Personal expense restored.');
+    expect(text()).not.toContain('Taxi');
+    // The refresh also re-reads the open deleted list.
+    http.expectOne({ url: '/api/friends/pat/expenses/deleted', method: 'GET' }).flush([]);
+    http.expectOne('/api/friends/pat').flush(friend);
+    http.expectOne('/api/friends/pat/expenses').flush([entry]);
+    harness.detectChanges();
+  });
+
   it('drops the previous friend on switch and clears on session reset', async () => {
     await openFriend();
     await harness.navigateByUrl('/friends');

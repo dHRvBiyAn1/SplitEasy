@@ -18,7 +18,7 @@ import {
   PendingWritesService,
   UNCERTAIN_WRITE,
 } from '../core/pending-writes.service';
-import { CreateExpenseRequest, ExpenseSummary } from '../expenses/expense.models';
+import { CreateExpenseRequest, DeletedExpense, ExpenseSummary } from '../expenses/expense.models';
 import { FriendService } from './friend.service';
 
 /**
@@ -55,6 +55,13 @@ export class PersonalExpensesComponent {
   protected readonly draftBlocked = signal(false);
   protected readonly retryNotice = signal<string | null>(null);
   protected readonly formOpen = signal(false);
+  protected readonly convertedFrom = signal<string | null>(null);
+  protected readonly deletedOpen = signal(false);
+  protected readonly deletedEntries = signal<DeletedExpense[]>([]);
+  protected readonly deletedLoading = signal(false);
+  protected readonly deletedError = signal<string | null>(null);
+  protected readonly restoring = signal<string | null>(null);
+  private deletedRequest?: Subscription;
   protected editing: string | null = null;
   private expectedVersion: number | undefined;
   protected restored: PendingWrite<CreateExpenseRequest> | null = null;
@@ -86,10 +93,17 @@ export class PersonalExpensesComponent {
       this.load(id);
       this.restoreDraft(id);
     });
-    this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe(() => this.load());
+    this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.load();
+      if (this.deletedOpen() && !this.restoring()) this.loadDeleted();
+    });
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
       this.request?.unsubscribe();
       this.detailRequest?.unsubscribe();
+      this.deletedRequest?.unsubscribe();
+      this.deletedEntries.set([]);
+      this.deletedOpen.set(false);
+      this.restoring.set(null);
       this.expenses.set([]);
       this.loading.set(false);
       this.formOpen.set(false);
@@ -125,6 +139,11 @@ export class PersonalExpensesComponent {
   private reset(): void {
     this.request?.unsubscribe();
     this.detailRequest?.unsubscribe();
+    this.deletedRequest?.unsubscribe();
+    this.deletedEntries.set([]);
+    this.deletedOpen.set(false);
+    this.deletedError.set(null);
+    this.restoring.set(null);
     this.expenses.set([]);
     this.loading.set(false);
     this.error.set(null);
@@ -137,6 +156,7 @@ export class PersonalExpensesComponent {
 
   private resetForm(): void {
     this.formOpen.set(false);
+    this.convertedFrom.set(null);
     this.editing = null;
     this.expectedVersion = undefined;
     this.description.set('');
@@ -203,9 +223,17 @@ export class PersonalExpensesComponent {
           this.date.set(e.spentOn);
           this.paidByMe.set(e.paidBy.id === this.me());
           this.expectedVersion = e.version;
-          const custom = e.splitType === 'UNEQUAL' && e.splits;
-          this.split.set(custom ? 'UNEQUAL' : 'EQUAL');
-          this.applyShares(e.splits, e.participants);
+          // Only equal and exact are editable here; every other type opens as its stored exact
+          // shares so saving never silently resets what was agreed.
+          this.split.set(e.splitType === 'EQUAL' ? 'EQUAL' : 'UNEQUAL');
+          this.convertedFrom.set(
+            e.splitType === 'EQUAL' || e.splitType === 'UNEQUAL'
+              ? null
+              : { PERCENTAGE: 'percentages', WEIGHTS: 'weights', ADJUSTMENTS: 'adjustments' }[
+                  e.splitType
+                ],
+          );
+          this.applyShares(e.splitType === 'UNEQUAL' ? e.splits : null, e.participants);
         },
         error: () => {
           if (this.editing !== id) return;
@@ -352,6 +380,73 @@ export class PersonalExpensesComponent {
     this.needsReview.set(false);
     this.resetForm();
     this.formOpen.set(true);
+  }
+
+  protected toggleDeleted(): void {
+    if (this.deletedOpen()) {
+      this.deletedRequest?.unsubscribe();
+      this.deletedOpen.set(false);
+      return;
+    }
+    this.deletedOpen.set(true);
+    this.loadDeleted();
+  }
+
+  protected loadDeleted(): void {
+    if (this.session.version !== this.sessionVersion) return;
+    this.deletedRequest?.unsubscribe();
+    this.deletedLoading.set(true);
+    this.deletedError.set(null);
+    this.deletedRequest = this.service
+      .deletedPersonalExpenses(this.friendId())
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.deletedEntries.set(rows);
+          this.deletedLoading.set(false);
+        },
+        error: () => {
+          this.deletedEntries.set([]);
+          this.deletedLoading.set(false);
+          this.deletedError.set(
+            'Could not load deleted personal expenses. Try again to review them.',
+          );
+        },
+      });
+  }
+
+  protected restore(entry: DeletedExpense): void {
+    const version = entry.expense.version;
+    if (this.restoring() || this.deletedLoading()) return;
+    if (version === undefined || !Number.isSafeInteger(version)) {
+      this.deletedError.set(
+        'Reload deleted expenses before restoring, so it is not applied twice.',
+      );
+      return;
+    }
+    this.restoring.set(entry.expense.id);
+    this.deletedError.set(null);
+    this.service
+      .restorePersonalExpense(this.friendId(), entry.expense.id, version)
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.restoring.set(null);
+          this.deletedEntries.update((rows) =>
+            rows.filter((r) => r.expense.id !== entry.expense.id),
+          );
+          this.notice.set('Personal expense restored.');
+          this.dashboard.refresh();
+        },
+        error: (err) => {
+          this.restoring.set(null);
+          this.deletedError.set(
+            !err?.status || err.status >= 500
+              ? 'Could not confirm the restore. Reload deleted expenses and check entries before trying again.'
+              : (err?.error?.message ?? 'Could not restore this expense. Reload and review it.'),
+          );
+        },
+      });
   }
 
   protected remove(row: ExpenseSummary): void {
