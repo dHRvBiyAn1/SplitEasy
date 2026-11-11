@@ -17,7 +17,7 @@ The plan named `MembershipGuard`/`GroupWriteGuard` for refusing ledgers on group
 ## Evidence
 
 - Backend `./mvnw -B spotless:check verify`: 384 tests, 0 failures (379 before). `PersonalLedgerIntegrationTest` has 5 HTTP/PostgreSQL cases: friend detail in both accounts, ledger never a group (15 group routes x 2 members -> 404, outsider 403, absent from `/groups` and dashboard groups while totals/people include it), authorization matrix, ledger contract (currency, intent, replay, versions, delete/restore), concurrent first-write claim.
-- Frontend (Node 22.17.1): 392 tests in 56 files, 0 failures (386 before); production build 554.95 kB (budget warning pre-existing, was 554.90). Prettier is clean for `src`; `angular.json` and two tsconfig files fail the whole-tree check on `dev` and were not touched.
+- Frontend (Node 22.17.1): 394 tests in 56 files, 0 failures (386 before); production build 554.95 kB (budget warning pre-existing, was 554.90). Prettier is clean for `src`; `angular.json` and two tsconfig files fail the whole-tree check on `dev` and were not touched.
 - OpenAPI additions sit after the existing friends paths and next to `FriendDetail`; official-schema validation was not re-run here.
 - Not verified: packaged populated V20→V21 rehearsal, native browser pass at 1280/390, deployment scripts, independent review axes.
 
@@ -31,4 +31,9 @@ Drain old backends before personal writes: an old binary would list a ledger as 
 - API: `/friends/{id}/expenses` family (needs `X-Participant-Version: 1`); `FriendDetail.personalBalances`.
 - Conventions: group routes refuse personal ledgers with 404 via `PersonalLedgerRouteGuard`; `/groups` and dashboard cards exclude them while totals/People include them; saved-friend removal never revokes ledger access.
 - Frontend: `personal-expenses.component` is hosted outside the friend detail `@if` and reloads on `dashboard.refreshes`.
-- Progress Log: `[x] Alignment G02.2 personal expenses (2026-11-11)` — hidden pair ledger (V21) + friend-scoped expense CRUD + UI; backend 384, frontend 392/56.
+- Progress Log: `[x] Alignment G02.2 personal expenses (2026-11-11)` — hidden pair ledger (V21) + friend-scoped expense CRUD + UI; backend 384, frontend 394/56.
+
+## Review follow-up (PR #115, two Codex P2)
+
+- Edit lost split intent: only EQUAL/UNEQUAL are editable, so PERCENTAGE/WEIGHTS/ADJUSTMENTS entries now open as UNEQUAL exact amounts from stored shares (legacy UNEQUAL without `splits` too), with a visible note; saving keeps those amounts.
+- Recovery: "Recently deleted" list with Restore at the seen `expectedVersion`; a 409/5xx stays visible with a reload action; success refreshes balances and the open list. Rendered red→green for both.
