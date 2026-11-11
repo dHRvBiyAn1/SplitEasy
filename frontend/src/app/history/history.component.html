@@ -1,0 +1,66 @@
+<section class="history-page" aria-labelledby="history-heading">
+  <a [routerLink]="['/groups', groupId]">Back to this group</a>
+  <header class="page-heading">
+    <div>
+      <p class="eyebrow">Ledger</p>
+      <h1 id="history-heading">History</h1>
+    </div>
+    <button class="dc-btn-outline" type="button" [disabled]="exportBusy()" (click)="download()">
+      {{ exportBusy() ? 'Preparing CSV…' : 'Download CSV' }}
+    </button>
+  </header>
+
+  <form class="filter" (submit)="$event.preventDefault(); applyFilter()">
+    <label>
+      From
+      <input type="date" name="from" [value]="from" (input)="from = $any($event.target).value" />
+    </label>
+    <label>
+      To
+      <input type="date" name="to" [value]="to" (input)="to = $any($event.target).value" />
+    </label>
+    <button class="dc-btn" type="submit">Apply</button>
+    <button class="dc-btn-outline" type="button" (click)="clearFilter()">Clear</button>
+  </form>
+
+  @if (exportError()) {
+    <p class="write-error" role="alert">{{ exportError() }}</p>
+  }
+
+  @if (loading()) {
+    <p role="status">Loading history…</p>
+  } @else {
+    @if (error()) {
+      <div class="retry" role="alert">
+        <p>{{ error() }}</p>
+        <button class="dc-btn" type="button" (click)="nextCursor() ? loadMore() : load()">
+          Try again
+        </button>
+      </div>
+    }
+    @if (!items().length && !error()) {
+      <p>No history in this range.</p>
+    }
+    <ul class="ledger">
+      @for (item of items(); track item.id) {
+        <li class="entry">
+          <div class="entry-main">
+            <p class="parties">
+              <strong>{{ item.description }}</strong>
+            </p>
+            <app-money [minor]="item.amountMinor" [currency]="item.currency"></app-money>
+          </div>
+          <p class="meta">
+            <time [attr.datetime]="item.financialDate">{{ item.financialDate }}</time>
+            · {{ typeLabel[item.type] }}
+          </p>
+        </li>
+      }
+    </ul>
+    @if (nextCursor() && !error()) {
+      <button class="dc-btn-outline" type="button" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    }
+  }
+</section>

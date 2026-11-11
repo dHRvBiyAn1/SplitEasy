@@ -2470,6 +2470,96 @@ paths:
           $ref: '#/components/responses/Conflict'
 
   # --- h05 paths (insert below; parallel batch plan rule 3) ---
+  /api/groups/history:
+    get:
+      operationId: listHistory
+      tags: [History]
+      summary: Bounded keyset history of the caller's groups
+      description: Active expenses, settlements and refunds in (financialDate DESC, id DESC) order. Default
+        limit 50, maximum 100; pass nextCursor back unchanged. Only current non-deleted groups of the caller
+        are read; a groupId the caller is not in is 403 before anything else. from/to are inclusive
+        calendar dates; updatedAfter (inclusive) and updatedBefore (exclusive) use revision time.
+      parameters:
+      - name: groupId
+        in: query
+        schema: {type: string, format: uuid}
+      - name: friendId
+        in: query
+        description: A saved friend; narrows to entries both people take part in.
+        schema: {type: string, format: uuid}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      - name: updatedAfter
+        in: query
+        schema: {type: string, format: date-time}
+      - name: updatedBefore
+        in: query
+        schema: {type: string, format: date-time}
+      - name: cursor
+        in: query
+        schema: {type: string}
+      - name: limit
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/groups/history/export:
+    get:
+      operationId: exportHistoryCsv
+      tags: [History]
+      summary: Stream the filtered history as CSV
+      description: One row per participant per entry, streamed and never buffered. Columns are transaction_id,
+        type, financial_date, group_name, description, currency, amount_minor, amount, participant_id,
+        participant_name, paid_minor, owed_minor, settlement_minor, net_minor, net, last_changed_by. Text cells
+        beginning with = + - @ tab or CR are prefixed with an apostrophe. Net minor units sum to zero per
+        currency; count each transaction_id's amount_minor once.
+      parameters:
+      - name: groupId
+        in: query
+        schema: {type: string, format: uuid}
+      - name: friendId
+        in: query
+        description: A saved friend; narrows to entries both people take part in.
+        schema: {type: string, format: uuid}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      - name: updatedAfter
+        in: query
+        schema: {type: string, format: date-time}
+      - name: updatedBefore
+        in: query
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: CSV attachment.
+          content:
+            text/csv:
+              schema: {type: string}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # --- e03 paths (insert below; parallel batch plan rule 3) ---
 
@@ -4575,6 +4665,33 @@ components:
     # --- g02-2 schemas (insert below; parallel batch plan rule 3) ---
 
     # --- h05 schemas (insert below; parallel batch plan rule 3) ---
+    HistoryItem:
+      type: object
+      required: [type, id, groupId, groupName, financialDate, description, currency, amountMinor, updatedAt]
+      properties:
+        type: {type: string, enum: [EXPENSE, PAYMENT, REFUND]}
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        groupName:
+          type: [string, 'null']
+          description: Null for a personal-ledger entry, which is not a group.
+        financialDate: {type: string, format: date}
+        description: {type: string}
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor: {type: integer, format: int64}
+        updatedAt: {type: string, format: date-time}
+    HistoryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+        nextCursor:
+          type: [string, 'null']
 
     # --- e03 schemas (insert below; parallel batch plan rule 3) ---
 
