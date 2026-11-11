@@ -2796,6 +2796,17 @@ components:
           - $ref: '#/components/schemas/Currency'
           - type: 'null'
           description: Required with amountMinor. Expense PUT cannot change the recorded currency.
+        contributions:
+          anyOf:
+          - type: array
+            items:
+              $ref: '#/components/schemas/ContributionInput'
+            minItems: 1
+          - type: 'null'
+          description: Who paid what. Null/omitted keeps the single-payer contract (paidByUserId paid
+            everything). A present list must include paidByUserId, sum exactly to the amount and name
+            unique active financial participants. A full-replace PUT without contributions on an
+            expense with several payers returns409.
         paidOn:
           type:
           - string
@@ -3019,6 +3030,13 @@ components:
           minimum: 1
           maximum: 9007199254740991
           description: Integer minor units in the explicit currency.
+        contributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contribution'
+          description: Who paid what, ordered by display name. Always present on current reads; a
+            replayed pre-E03 create receipt may omit it (that expense has one payer). paidBy stays the
+            primary payer.
 
     ExpenseSummary:
       type: object
@@ -3028,6 +3046,7 @@ components:
       - amountCents
       - paidBy
       - participantCount
+      - payerCount
       - category
       - spentOn
       - viewerDeltaCents
@@ -3062,6 +3081,10 @@ components:
         participantCount:
           type: integer
           format: int64
+        payerCount:
+          type: integer
+          format: int64
+          description: Number of contributors; 1 for a single-payer expense.
         category:
           $ref: '#/components/schemas/ExpenseCategory'
         spentOn:
@@ -3095,7 +3118,7 @@ components:
           maximum: 9007199254740991
           description: 'The requesting member''s net for this expense: positive = they lent
 
-            (paid more than their share), negative = they borrowed, 0 = not involved
+            (contributed more than their share), negative = they borrowed, 0 = not involved
 
             '
 
@@ -4342,6 +4365,37 @@ components:
     # --- h05 schemas (insert below; parallel batch plan rule 3) ---
 
     # --- e03 schemas (insert below; parallel batch plan rule 3) ---
+    Contribution:
+      type: object
+      required: [user, amountMinor, currency]
+      properties:
+        user:
+          $ref: '#/components/schemas/ParticipantSummary'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Minor units this participant actually paid towards the expense.
+        currency:
+          $ref: '#/components/schemas/Currency'
+      description: Money one financial participant paid, as stored. Contributions sum exactly to the
+        expense amount; paidBy stays the primary payer and rounding recipient.
+    ContributionInput:
+      type: object
+      required: [userId, amountMinor]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Active financial participant who paid.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+      description: Optional per-payer input. A present list is nonempty, duplicate-free, includes
+        paidByUserId, names only active financial participants, and sums exactly to amountMinor.
 
   parameters:
     ParticipantVersion:

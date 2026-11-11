@@ -16,6 +16,7 @@ public record ExpenseSummary(
     long amountMinor,
     ParticipantSummary paidBy,
     long participantCount,
+    long payerCount,
     ExpenseCategory category,
     LocalDate spentOn,
     long viewerDeltaMinor,

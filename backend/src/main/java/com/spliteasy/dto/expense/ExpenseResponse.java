@@ -22,7 +22,8 @@ public record ExpenseResponse(
     List<SplitInput> splits,
     Instant createdAt,
     long version,
-    com.spliteasy.entity.LedgerCurrency currency) {
+    com.spliteasy.entity.LedgerCurrency currency,
+    List<Contribution> contributions) {
   @com.fasterxml.jackson.annotation.JsonIgnore
   public long amountCents() {
     return amountMinor;

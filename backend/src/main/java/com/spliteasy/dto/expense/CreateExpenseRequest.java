@@ -18,6 +18,8 @@ import java.util.UUID;
  * @param splits all non-EQUAL types: original per-participant values (see {@link SplitInput})
  * @param category null defaults to {@link ExpenseCategory#OTHER}
  * @param spentOn null defaults to today
+ * @param contributions null: {@code paidByUserId} paid everything; otherwise who paid what, summing
+ *     to the amount and including {@code paidByUserId} (the primary payer and rounding recipient)
  */
 public record CreateExpenseRequest(
     @NotBlank @Size(max = 200) String description,
@@ -31,7 +33,13 @@ public record CreateExpenseRequest(
     UUID operationId,
     @jakarta.validation.constraints.PositiveOrZero Long expectedVersion,
     @Positive @Max(1_000_000_000_000L) Long amountMinor,
-    com.spliteasy.entity.LedgerCurrency currency) {
+    com.spliteasy.entity.LedgerCurrency currency,
+    // Omitted when null so a single-payer retry intent stays byte-identical to pre-E03 claims.
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        @Valid
+        @Size(min = 1)
+        List<@NotNull ContributionInput> contributions) {
 
   @com.fasterxml.jackson.annotation.JsonIgnore
   @jakarta.validation.constraints.AssertTrue(
@@ -49,6 +57,35 @@ public record CreateExpenseRequest(
 
   public com.spliteasy.entity.LedgerCurrency resolvedCurrency() {
     return currency == null ? com.spliteasy.entity.LedgerCurrency.USD : currency;
+  }
+
+  public CreateExpenseRequest(
+      String description,
+      Long amountCents,
+      UUID paidByUserId,
+      List<UUID> participantUserIds,
+      SplitType splitType,
+      List<SplitInput> splits,
+      ExpenseCategory category,
+      LocalDate spentOn,
+      UUID operationId,
+      Long expectedVersion,
+      Long amountMinor,
+      com.spliteasy.entity.LedgerCurrency currency) {
+    this(
+        description,
+        amountCents,
+        paidByUserId,
+        participantUserIds,
+        splitType,
+        splits,
+        category,
+        spentOn,
+        operationId,
+        expectedVersion,
+        amountMinor,
+        currency,
+        null);
   }
 
   public CreateExpenseRequest(

@@ -2,6 +2,7 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.MemberBalance;
+import com.spliteasy.repository.ExpenseContributionRepository;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.PaymentRepository;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BalanceService {
 
   private final ExpenseRepository expenseRepository;
+  private final ExpenseContributionRepository contributionRepository;
   private final ExpenseParticipantRepository participantRepository;
   private final FinancialParticipantService financialParticipants;
   private final PaymentRepository paymentRepository;
@@ -57,7 +60,13 @@ public class BalanceService {
 
   // Invitation preview owns a verified capability; other callers first authorize membership.
   GroupBalancesResponse snapshot(UUID groupId) {
-    Map<CurrencyUser, Long> paid = toMap(groupId, expenseRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> paid =
+        toMap(
+            groupId,
+            Stream.concat(
+                    expenseRepository.sumPaidByGroup(groupId).stream(),
+                    contributionRepository.sumPaidMultiByGroup(groupId).stream())
+                .toList());
     Map<CurrencyUser, Long> owed = toMap(groupId, participantRepository.sumOwedByGroup(groupId));
     Map<CurrencyUser, Long> settledOut = toMap(groupId, paymentRepository.sumPaidByGroup(groupId));
     Map<CurrencyUser, Long> settledIn =
