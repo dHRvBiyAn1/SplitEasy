@@ -119,7 +119,8 @@
       <h2 #confirmation id="remove-heading" tabindex="-1">Remove {{ friend.displayName }}?</h2>
       <p>
         This only removes your saved friend. Balances, group membership and financial history stay
-        unchanged.
+        unchanged. Personal expenses you share stay with both of you, and either of you can still
+        open and change them.
       </p>
       <div class="actions">
         <button class="dc-btn-outline" type="button" [disabled]="deleting()" (click)="remove()">
@@ -190,6 +191,17 @@
           </div>
         }
       </div>
+      @if (friend.personalBalances.length) {
+        <h3>Personal expenses only</h3>
+        <div class="balances">
+          @for (balance of friend.personalBalances; track balance.currency) {
+            <div>
+              <span>{{ balance.currency }}</span
+              ><app-money [minor]="balance.netMinor" [currency]="balance.currency" [net]="true" />
+            </div>
+          }
+        </div>
+      }
       <button
         class="dc-btn-ghost"
         type="button"
@@ -217,5 +229,8 @@
         </article>
       }
     </div>
+  }
+  @if (personal(); as friend) {
+    <app-personal-expenses [friendId]="friend.id" [friendName]="friend.name" />
   }
 </section>
