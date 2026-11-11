@@ -206,6 +206,23 @@ class PaymentCorrectionIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  void keyedRetryAfterACorrectionReplaysTheOriginalReceiptWithoutRecordingAgain() throws Exception {
+    var f = fixture();
+    Map<String, Object> body = new HashMap<>(payment(f, 5000));
+    body.put("operationId", UUID.randomUUID());
+    var created = recordPayment(f, f.alice().accessToken(), body);
+    String id = created.get("id").asText();
+    correct(f, f.alice().accessToken(), id, correction(f, f.bob().user().id().toString(), 3000, 0));
+
+    // The original response was lost; the client retries the identical keyed create.
+    var replayed = recordPayment(f, f.alice().accessToken(), body);
+
+    assertThat(replayed).isEqualTo(created);
+    assertThat(read(f, f.alice().accessToken(), "/payments").size()).isEqualTo(1);
+    assertThat(net(f, f.alice().accessToken(), f.bob().user().id().toString())).isEqualTo(3000);
+  }
+
+  @Test
   void staleCorrectionIsConflictAndLeavesTheLedgerUnchanged() throws Exception {
     var f = fixture();
     var created = recordPayment(f, f.alice().accessToken(), payment(f, 5000));

@@ -10,7 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 /**
  * Refunds reverse expense economics, so every aggregate here is subtracted by its caller. All
- * exclude soft-deleted refunds; a deleted refund keeps its row and its revisions.
+ * exclude soft-deleted refunds; a deleted refund keeps its row and its revisions. Group aggregates
+ * also skip refunds of a deleted expense, so they return with it on restore.
  */
 public interface ExpenseRefundRepository extends JpaRepository<ExpenseRefund, UUID> {
 
@@ -27,7 +28,7 @@ public interface ExpenseRefundRepository extends JpaRepository<ExpenseRefund, UU
       """
       select r.receivedBy.id as userId, r.currency as currency, sum(r.amountCents) as totalCents
       from ExpenseRefund r
-      where r.group.id = :groupId and r.deletedAt is null
+      where r.group.id = :groupId and r.deletedAt is null and r.expense.deletedAt is null
       group by r.receivedBy.id, r.currency
       """)
   List<UserAmount> sumReceivedByGroup(@Param("groupId") UUID groupId);
@@ -38,6 +39,7 @@ public interface ExpenseRefundRepository extends JpaRepository<ExpenseRefund, UU
       select p.user.id as userId, p.refund.currency as currency, sum(p.shareCents) as totalCents
       from ExpenseRefundParticipant p
       where p.refund.group.id = :groupId and p.refund.deletedAt is null
+        and p.refund.expense.deletedAt is null
       group by p.user.id, p.refund.currency
       """)
   List<UserAmount> sumAllocatedByGroup(@Param("groupId") UUID groupId);
@@ -49,7 +51,7 @@ public interface ExpenseRefundRepository extends JpaRepository<ExpenseRefund, UU
              p.refund.receivedBy.id as toId, sum(p.shareCents) as totalCents
       from ExpenseRefundParticipant p
       where p.refund.group.id = :groupId and p.refund.deletedAt is null
-        and p.user.id <> p.refund.receivedBy.id
+        and p.refund.expense.deletedAt is null and p.user.id <> p.refund.receivedBy.id
       group by p.user.id, p.refund.receivedBy.id, p.refund.currency
       """)
   List<PairAmount> sumByPair(@Param("groupId") UUID groupId);
@@ -59,7 +61,7 @@ public interface ExpenseRefundRepository extends JpaRepository<ExpenseRefund, UU
       """
       select r.currency as currency, sum(r.amountCents) as totalCents
       from ExpenseRefund r
-      where r.group.id = :groupId and r.deletedAt is null
+      where r.group.id = :groupId and r.deletedAt is null and r.expense.deletedAt is null
       group by r.currency
       """)
   List<ExpenseRepository.CurrencyAmount> sumAmountsByGroup(@Param("groupId") UUID groupId);

@@ -227,6 +227,24 @@ class ExpenseRefundIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  void deletingAnExpenseAlsoRemovesItsLiveRefundsFromEveryAggregate() throws Exception {
+    var f = fixture();
+    String expense = dinner(f, 10000, "USD");
+    postRefund(f, f.bob().accessToken(), expense, refund(3000, "USD", null));
+    long version = read(f, f.alice().accessToken(), "/expenses/" + expense).get("version").asLong();
+
+    mockMvc
+        .perform(
+            delete("/api/groups/" + f.group() + "/expenses/" + expense)
+                .param("expectedVersion", Long.toString(version))
+                .header(HttpHeaders.AUTHORIZATION, bearer(f.alice().accessToken())))
+        .andExpect(status().isNoContent());
+
+    assertThat(nets(f, "USD").values()).allMatch(net -> net == 0L);
+    assertThat(read(f, f.alice().accessToken(), "/balances/obligations").size()).isZero();
+  }
+
+  @Test
   void deletingARefundRestoresThePreRefundBalancesOnce() throws Exception {
     var f = fixture();
     String expense = dinner(f, 10000, "USD");

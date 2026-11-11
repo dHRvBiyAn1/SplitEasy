@@ -298,18 +298,24 @@ public class PaymentService {
   }
 
   private PaymentResponse replay(Payment payment, RecordPaymentRequest request) {
-    if (!payment.getPayer().getId().equals(request.payerUserId())
-        || !payment.getPayee().getId().equals(request.payeeUserId())
-        || payment.getAmountCents() != request.resolvedAmountMinor()
-        || payment.getCurrency() != request.resolvedCurrency()
-        || (request.paidOn() != null && !request.paidOn().equals(payment.getPaidOn()))
-        || payment.getMethod() != request.resolvedMethod()
-        || !java.util.Objects.equals(payment.getNote(), request.note())) {
+    // Compare against the original receipt, not the live row: a later correction must not turn an
+    // identical retry of the create into a conflict (E02 immutable receipts).
+    PaymentResponse receipt =
+        history.list(LedgerHistory.Subject.PAYMENT, payment.getId(), PaymentResponse.class).stream()
+            .findFirst()
+            .map(LedgerRevision::after)
+            .orElseGet(() -> PaymentResponse.from(payment));
+    if (!receipt.payer().id().equals(request.payerUserId())
+        || !receipt.payee().id().equals(request.payeeUserId())
+        || receipt.amountMinor() != request.resolvedAmountMinor()
+        || receipt.currency() != request.resolvedCurrency()
+        || (request.paidOn() != null && !request.paidOn().equals(receipt.paidOn()))
+        || receipt.method() != request.resolvedMethod()
+        || !java.util.Objects.equals(receipt.note(), request.note())) {
       throw new ConflictException("Operation ID already used for a different payment");
     }
-    var response = PaymentResponse.from(payment);
-    com.spliteasy.config.ParticipantContract.requireReceipt(mapper.valueToTree(response));
-    return response;
+    com.spliteasy.config.ParticipantContract.requireReceipt(mapper.valueToTree(receipt));
+    return receipt;
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
