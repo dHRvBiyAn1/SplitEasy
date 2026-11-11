@@ -10,7 +10,13 @@
 
 **Spec:** [Proposed design](../specs/2026-10-19-splitwise-alignment-design.md).
 
-## Current delivery checkpoint (10 November 2026)
+## Current delivery checkpoint (11 November 2026)
+
+M0/M1 plus H01/G01/G02.1 are live as `v0.2.0`. G03 (PR111) and B01 (PR112) are merged to `dev`
+and unreleased: 15 of 37 packages delivered. Remaining waves, file ownership and reserved
+migrations are in the [parallel batch plan](2026-11-11-alignment-parallel-batches.md).
+
+## Earlier checkpoint (10 November 2026)
 
 G02.1 merged as PR108. Thirteen packages are delivered and `dev` is 102 commits ahead of
 `main`, so none of them is released. Sequencing for the remaining 24 packages, the

@@ -12,6 +12,15 @@ Global constraints, dependency/ownership rules, delivery workflow, verification
 commands, migration policy and release gates are unchanged and are not repeated here.
 Read them in the roadmap before starting any batch.
 
+## Status update (11 November 2026)
+
+R1 is done: PR110 released `dev` `ebd10a2` to `main` `9316f6e`, tagged `v0.2.0`, with V10→V18
+applied and live checks passed. SMTP stays deferred by owner decision. Batch 5 progress: G03 merged
+(PR111, V19) and B01 merged (PR112, V20) to `dev`, both unreleased. G02.2 is planned (V21).
+**The batch table below is superseded** by the
+[parallel batch plan](2026-11-11-alignment-parallel-batches.md), which assigns file ownership and
+migration numbers so three agents can work at once.
+
 ## Verified state
 
 Measured on `dev` at `ebd10a2` on 10 November 2026, Docker available, Node 22.17.1:
@@ -39,11 +48,11 @@ V15, and old binaries must drain before V15/V16/V17 writes. Each further batch a
 migrations to that single untested cutover, so the release gate comes before Batch 5,
 not after M2.
 
-- [ ] Confirm combined suites, formatting, production build, deployment tests and lints on the exact `dev` head
-- [ ] Rehearse V10→V18 on a disposable copy restored from a production `pg_dump`, with reconciled row counts and per-currency totals
-- [ ] Verify the last released binary cannot write after cutover (drain, not overlap); record the forward-fix path, since post-V15/V16/V17 rollback is not schema-compatible
-- [ ] Create the `dev` → `main` release PR; merging it invokes production delivery and needs the then-current authorization
-- [ ] After delivery: public health, Angular deep links, one owned-account financial flow per currency, deployment job, release tag
+- [x] Confirm combined suites, formatting, production build, deployment tests and lints on the exact `dev` head
+- [x] Rehearse V10→V18 on a disposable copy restored from a production `pg_dump`, with reconciled row counts and per-currency totals
+- [x] Verify the last released binary cannot write after cutover (drain, not overlap); record the forward-fix path, since post-V15/V16/V17 rollback is not schema-compatible
+- [x] Create the `dev` → `main` release PR; merging it invokes production delivery and needs the then-current authorization
+- [x] After delivery: public health, Angular deep links, one owned-account financial flow per currency, deployment job, release tag
 - [ ] Configure Google Workspace SMTP (owned sender, TLS, egress) so A02 and G01 stop being dark; verify a real recovery mail and a real invitation
 
 R1 is a gate, not an implementation package. No application behavior changes in it.
