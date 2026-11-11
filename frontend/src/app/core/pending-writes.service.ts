@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
 
-export type WriteKind = 'group' | 'expense' | 'payment';
+export type WriteKind = 'group' | 'expense' | 'payment' | 'refund';
 export interface PendingWrite<T> {
   owner: string;
   scope: string;

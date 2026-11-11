@@ -89,7 +89,12 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
 | GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
 | GET | `/groups/{g}/balances/current-obligations` | canonical debts for the selected mode; settings departure eligibility |
-| GET/POST | `/groups/{g}/payments` | settle-up history / record |
+| GET/POST | `/groups/{g}/payments` | settle-up history (financial date order) / record with date, method, note |
+| GET/PUT/DELETE | `/groups/{g}/payments/{p}` | active detail / correction at expected version / recoverable undo (204) |
+| GET | `/groups/{g}/payments/deleted`, `/groups/{g}/payments/{p}/history` | member-only recovery list / attributable revisions |
+| POST | `/groups/{g}/payments/{p}/restore` | restore an undone settlement at its expected version |
+| GET/POST | `/groups/{g}/expenses/{e}/refunds` | money returned out of that expense / record one, keyed |
+| DELETE/GET | `/groups/{g}/expenses/{e}/refunds/{r}`, `.../refunds/{r}/history` | recoverable undo (204) / revisions |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
 
 ## Architecture
@@ -152,6 +157,23 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations, non-null mode PATCHes and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
 - **Canonical obligations**: `ObligationProjectionService` selects direct pair netting or deterministic greedy net matching (`NetSettlementCalculator`, amount then UUID ties). Pairwise, dashboard/People/headlines/actions and departure checks share this projection. Net balances and recorded history are unchanged. Mode PATCH locks/reauthorizes with financial writes and rejects target obligations involving former participants with 409 re-add/repair guidance. Net-derived `/debt-simplification` remains a preview with an explicit nullable direct-mode warning; an empty preview does not establish direct settlement. Settlement UI uses canonical dashboard rows without a second preview fetch.
 - **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/currency/minor amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and account-owned, tab-isolated reload retry limits: `docs/api/payment-retries.md`.
+- **Payment detail, corrections and refunds** (V20): a settlement records a user-chosen `paid_on`
+  (distinct from `created_at`, and the list's sort key), a `method` enum, a `note` and the real
+  recorder, plus an opaque `version` and a recoverable `deleted_at`. Correct/undo/restore always
+  require `expectedVersion` — payments never had versions, so there is no legacy writer and no
+  cutoff; stale is 409 before mutation, which is what stops a retry reversing twice. Currency is
+  immutable (409). Every payment aggregate excludes deleted rows. A **refund** is a separate entry
+  with a positive amount and a reference to the expense it refunds — no existing positive-amount
+  CHECK is relaxed. It takes no split input: the server allocates pro rata over the expense's stored
+  shares (`BigInteger`, payer absorbs the remainder) and **stores** the allocation, so a later
+  expense correction cannot restate it. Readers subtract refunds per currency from paid, owed, pair
+  obligations and group gross spend; balances still sum to zero. Refund retries use the V12 claim;
+  there is no refund edit or restore. Revisions for both live in one `ledger_revisions` table
+  through `LedgerHistory`, the same mechanism `ExpenseHistory` gives expenses. A settlement and a refund have **no viewer-scoped field** — any member reads the document the
+  recorder received, `recordedBy` included — and `createdAt` is truncated to microseconds before the
+  write, so a create receipt is byte-identical to a later read (PostgreSQL rounds, so an unrounded
+  `Instant.now()` drifts a receipt off its own row). Contract:
+  [payment corrections and refunds](docs/api/payment-corrections-and-refunds.md).
 - **Money = explicit currency + integer minor units** (`long`/`BIGINT`). Catalogue: USD/EUR/GBP/INR exponent2, JPY0, KWD3. New clients send `X-Ledger-Version:2`, `currency` and positive `amountMinor` ≤1e12; floats/ambiguous inputs fail400. Legacy `amountCents` is USD-only; response cents/scalar aliases are null for non-USD/mixed scopes. Every aggregate/pair/settlement/leave check partitions by currency; dashboard/group `totals[]` are authoritative. Expense currency is immutable; preferences never relabel history or retry drafts. Outputs beyond JavaScript's exact integer range fail409. V15 follows V14; drain all old servers before non-USD writes and use a forward fix afterwards. Read [the ledger contract](docs/api/multi-currency-ledger.md) before money/rollout changes.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`Percentage`/`Weights`/`AdjustmentsSplitStrategy`
   `@Component`s selected via `Map<SplitType, SplitStrategy>` in `ExpenseService` — **no switch on type**.
@@ -215,6 +237,13 @@ Saved friends keep a private authorized display-label snapshot and canonical reg
 - **Refresh ownership**: use DashboardService.revalidate() for navigation/visible-focus reads; it shares pending work per read owner. Existing mutation callers use refresh() to invalidate older reads. Active groups consume refresh notifications independently of overview HTTP success; force mutation refresh collapses and invalidates receipts, foreground refresh retains selected detail and actionable errors. Session resets cancel reads and clear loaded group/settings state.
 - **Create retry identity**: group/expense POST use optional scoped UUID operation IDs (V12), native transactional conflict arbitration and immutable original-response snapshots. Authorize every replay; deleted groups cannot be recreated. Browser uncertain group/expense/payment drafts persist in account-owned, tab-isolated sessionStorage before dispatch; reload never sends automatically. Changed intent requires explicit acknowledgement, storage failure blocks dispatch, and session reset cancels/clears pending writes. Eager bootstrap initialization installs cleanup before any dialog opens. See `docs/api/retry-safe-writes.md`.
 
+- **Payment history screen**: `groups/:id/payments` is the settlement ledger — financial date,
+  method, note, amount via `app-money`, recorder, and per-row correct / undo / restore / revisions.
+  Both reads land together so a half-loaded ledger never looks settled. A 409 keeps the form open
+  with the user's values and says to reload; mutations call `dashboard.refresh()` and the screen
+  reloads once through `refreshes`, never twice. An expense receipt carries the **Record refund**
+  entry point, which guards the unrefunded remainder before dispatch and keeps its keyed retry draft
+  (`PendingWritesService` kind `refund`). Settle up keeps only its record-a-payment job.
 - **Member departure controls**: settings require both net balances and canonical `/balances/current-obligations` to load before enabling removal/leave; zero net with direct obligations is “even overall”, while simplified zero-net intermediaries can depart. `/balances/obligations` retains its raw contract. Refresh failures disable removal/leave even when the old group is retained.
 - **Profile identity/preferences are server-owned**: GET/PATCH `/api/me` edits name, unverified phone, avatar and default currency. Email stays read-only. Fresh responses update shell/profile display name without replacing ID/email/token. Currency preference never changes recorded money.
 - **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
@@ -315,9 +344,23 @@ UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0, minor-unit storage), V15 `currency` (defaultUSD, immutable), `paid_by`→users,
   `version` BIGINT (V12, opaque nonnegative optimistic precondition); V16 nullable `deleted_at` retains recoverable rows and shares; partial `(group_id,deleted_at DESC,id)` index serves recovery reads; `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
 - **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0); V11 nullable `split_value` BIGINT for original typed input (EQUAL1, exact minor units, basis points, weight units, signed adjustment minor units). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0, minor-unit storage), V15 `currency` (defaultUSD), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0, minor-unit storage), V15 `currency` (defaultUSD), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately. V20 adds `paid_on` DATE (user-chosen financial date, backfilled from `created_at` at UTC), `method` (8-value-style enum CASH/BANK_TRANSFER/CARD/ONLINE/OTHER, default OTHER), `note` (max 280), `version` BIGINT (opaque nonnegative precondition) and nullable `deleted_at`; composite `(group_id, paid_on DESC, created_at DESC)` serves the ordered history and a partial `(group_id, deleted_at DESC, id)` the recovery read. V20 also relaxes V9's paired-null operation check to `operation_id IS NULL OR recorded_by IS NOT NULL`, so an unkeyed payment still names its recorder.
 
 - **expense_revisions** (V16) — primary key `(expense_id,version)`, FK to expenses (CASCADE), action, nullable captured actor JSONB, server `recorded_at`, optional operation UUID, nullable before and required after ExpenseResponse JSONB. Imported baseline has null actor and original financial dates in its snapshot. History survives expense deletion markers; explicit group deletion cascades it.
+
+- **expense_refunds / expense_refund_participants** (V20) — money returned out of one expense:
+  positive `amount_cents`, immutable `currency` matching the expense, `received_by`→participants (the
+  expense's payer at the time), `refunded_on`, `note`, `recorded_by`, `created_at`, `version`,
+  nullable `deleted_at`; child rows hold the stored pro-rata allocation (`share_cents` ≥ 0, unique
+  per `(refund_id, participant_id)`), summing exactly to the amount. Both cascade from their expense
+  and group. Retry identity lives in V12 `create_operations`, not a column here.
+
+- **ledger_revisions** (V20) — attributable revisions for settlements and refunds in one table:
+  exactly one of `payment_id`/`refund_id` set (CHECK), both cascading, with `version` unique per
+  subject, action (IMPORTED/CREATED/CORRECTED/DELETED/RESTORED), nullable captured actor JSONB,
+  server `recorded_at`, optional operation UUID, nullable before and required after JSONB snapshots.
+  Pre-B01 payments get one IMPORTED baseline with a null actor — their recorder is unknown, never
+  invented.
 
 - **create_operations** (V12) — primary key `(actor_id,kind,scope_id,operation_id)`, normalized submitted `intent` and original `response` snapshots. Actor references users (CASCADE); scope intentionally has no group FK so expense/group response identities survive resource deletion. Claims and resource writes commit together; no automatic expiry.
 
@@ -609,3 +652,5 @@ Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–
   refs) pass. Drain old backends before V19: they ignore the markers and would write into an archived
   or deleted group; rollback keeps the schema and needs a forward fix. No purge, no payment/expense
   lifecycle change, no merge or deployment.
+
+- [x] Alignment B01 payment detail, corrections and refunds (2026-11-10) — V20 adds a user-chosen payment date, method, note, opaque version and recoverable delete, with correction/undo/restore always requiring the version they saw and writing one attributable revision through the shared `ledger_revisions` mechanism; every payment aggregate now excludes undone settlements. Refunds are a separately modelled positive entry referencing their expense, allocated pro rata over its stored shares with the payer absorbing the remainder and the allocation stored, subtracted per currency from balances, obligations and group totals; retries reuse the V12 claim. New `groups/:id/payments` screen plus a Record refund entry point on an expense receipt. Merged with G03 on dev: V19 and V20 coexist and apply in sequence. Backend 377 (`spotless:check verify`; 358 before this work), frontend 386/55 (377 before), Prettier and production build 554.90kB pass; OpenAPI 3.1 valid with 491 refs. Drain old backends before V20 writes; rollback keeps the schema and needs a forward fix. No merge or deployment.

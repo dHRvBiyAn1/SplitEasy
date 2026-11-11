@@ -66,6 +66,9 @@
           </svg>
           Add expense
         </button>
+        <a class="dc-btn-outline" [routerLink]="['/groups', groupId, 'payments']">
+          Payment history
+        </a>
         <a
           class="gd__gear"
           [routerLink]="['/groups', groupId, 'settings']"
@@ -235,6 +238,14 @@
                         <button
                           type="button"
                           class="dc-btn-outline"
+                          (click)="startRefund(d)"
+                          [disabled]="writePending()"
+                        >
+                          Record refund
+                        </button>
+                        <button
+                          type="button"
+                          class="dc-btn-outline"
                           (click)="editExpense(e)"
                           [disabled]="writePending()"
                         >
@@ -249,6 +260,75 @@
                           <span aria-hidden="true">🗑</span> Delete expense
                         </button>
                       </div>
+                      @if (refunds().length) {
+                        <ul class="xrefunds">
+                          @for (refund of refunds(); track refund.id) {
+                            <li>
+                              Refunded {{ display(refund.amountMinor, refund.currency) }} to
+                              {{ firstName(refund.receivedBy) }} on {{ refund.refundedOn }}
+                              @if (refund.note) {
+                                · {{ refund.note }}
+                              }
+                            </li>
+                          }
+                        </ul>
+                      }
+                      @if (refundFor() === d.id) {
+                        <form
+                          class="xrefund-form"
+                          data-test="refund-form"
+                          (submit)="$event.preventDefault(); saveRefund(d)"
+                        >
+                          <p>
+                            Money the seller returned out of this expense. It reverses this
+                            expense's own split, so each person owes less by their share.
+                          </p>
+                          <label
+                            ><span class="dc-field-label">Refund amount in {{ d.currency }}</span>
+                            <input
+                              type="text"
+                              inputmode="decimal"
+                              data-test="refund-amount"
+                              [value]="refundAmount"
+                              (input)="refundAmount = $any($event.target).value"
+                            />
+                          </label>
+                          <label
+                            ><span class="dc-field-label">Date of the refund</span>
+                            <input
+                              type="date"
+                              data-test="refund-date"
+                              [value]="refundedOn"
+                              (input)="refundedOn = $any($event.target).value"
+                            />
+                          </label>
+                          <label
+                            ><span class="dc-field-label">Note (optional)</span>
+                            <input
+                              type="text"
+                              maxlength="280"
+                              [value]="refundNote"
+                              (input)="refundNote = $any($event.target).value"
+                            />
+                          </label>
+                          @if (refundError()) {
+                            <p role="alert">{{ refundError() }}</p>
+                          }
+                          <div class="xdetail__actions">
+                            <button type="submit" class="dc-btn-accent" [disabled]="refundSaving()">
+                              Save refund
+                            </button>
+                            <button
+                              type="button"
+                              class="dc-btn-outline"
+                              [disabled]="refundSaving()"
+                              (click)="cancelRefund()"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      }
                     }
                   </div>
                 }

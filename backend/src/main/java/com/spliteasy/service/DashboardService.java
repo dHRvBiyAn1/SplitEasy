@@ -51,6 +51,7 @@ public class DashboardService {
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
   private final PaymentRepository paymentRepository;
+  private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
 
   // One snapshot for nested pairwise reads, group totals, expense shares and the activity feed.
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -68,11 +69,16 @@ public class DashboardService {
       financialParticipants.requireCompatible(g.id());
       List<PersonBalance> pairwise = pairwiseService.compute(userId, g.id());
       Map<com.spliteasy.entity.LedgerCurrency, Long> spent =
-          expenseRepository.sumAmountsByGroup(g.id()).stream()
-              .collect(
-                  Collectors.toMap(
-                      ExpenseRepository.CurrencyAmount::getCurrency,
-                      ExpenseRepository.CurrencyAmount::getTotalCents));
+          new LinkedHashMap<>(
+              expenseRepository.sumAmountsByGroup(g.id()).stream()
+                  .collect(
+                      Collectors.toMap(
+                          ExpenseRepository.CurrencyAmount::getCurrency,
+                          ExpenseRepository.CurrencyAmount::getTotalCents)));
+      // Refunded money was not spent, so a group's gross total nets it out per currency.
+      for (var refunded : refundRepository.sumAmountsByGroup(g.id())) {
+        spent.merge(refunded.getCurrency(), -refunded.getTotalCents(), Math::addExact);
+      }
       var currencies = new java.util.TreeSet<>(spent.keySet());
       currencies.addAll(paymentRepository.findCurrenciesByGroupId(g.id()));
       for (PersonBalance pb : pairwise) {

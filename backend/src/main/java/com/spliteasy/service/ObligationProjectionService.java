@@ -25,6 +25,7 @@ public class ObligationProjectionService {
   private final BalanceService balanceService;
   private final ExpenseParticipantRepository participantRepository;
   private final PaymentRepository paymentRepository;
+  private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
   private final FinancialParticipantService financialParticipants;
   private final GroupRepository groupRepository;
   private final MembershipGuard membershipGuard;
@@ -65,6 +66,8 @@ public class ObligationProjectionService {
     Map<Pair, Long> amounts = new HashMap<>();
     addPairs(groupId, amounts, participantRepository.sumOwedByPair(groupId), 1);
     addPairs(groupId, amounts, paymentRepository.sumPaidByPair(groupId), -1);
+    // A refund lowers each participant's debt to the payer who received the money back.
+    addPairs(groupId, amounts, refundRepository.sumByPair(groupId), -1);
     Set<UUID> ledgerIds = new HashSet<>();
     amounts
         .keySet()

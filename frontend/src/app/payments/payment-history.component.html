@@ -1,0 +1,246 @@
+<section class="payments-page" aria-labelledby="payments-heading">
+  <a [routerLink]="['/groups', groupId]">Back to this group</a>
+  <header class="page-heading">
+    <div>
+      <p class="eyebrow">Settlement ledger</p>
+      <h1 id="payments-heading">Payment history</h1>
+    </div>
+  </header>
+  <div class="scope-note">
+    <p>
+      A settlement here is a record of money the two of you moved yourselves. Recording, correcting
+      or undoing one does not move any money.
+    </p>
+    <p>A correction keeps the original in this settlement's history; nothing is rewritten.</p>
+  </div>
+
+  @if (notice()) {
+    <p class="notice" role="status">{{ notice() }}</p>
+  }
+  @if (writeError()) {
+    <p class="write-error" role="alert">{{ writeError() }}</p>
+  }
+
+  @if (loading()) {
+    <p role="status">Loading settlements…</p>
+  } @else if (error()) {
+    <div class="retry" role="alert">
+      <p>{{ error() }}</p>
+      <button class="dc-btn" type="button" (click)="load(true)">Try again</button>
+    </div>
+  } @else {
+    <h2>Recorded settlements</h2>
+    @if (!payments().length) {
+      <p>No settlements recorded in this group yet.</p>
+    }
+    <ul class="ledger">
+      @for (payment of payments(); track payment.id) {
+        <li class="entry">
+          <div class="entry-main">
+            <p class="parties">
+              <strong>{{ payment.payer.displayName }}</strong> paid
+              <strong>{{ payment.payee.displayName }}</strong>
+            </p>
+            <app-money
+              [minor]="payment.amountMinor"
+              [currency]="payment.currency ?? 'USD'"
+            ></app-money>
+          </div>
+          <p class="meta">
+            <time [attr.datetime]="payment.paidOn">{{ payment.paidOn }}</time>
+            · {{ methodLabel[payment.method] }}
+            @if (payment.recordedBy) {
+              · Recorded by {{ payment.recordedBy.displayName }}
+            }
+          </p>
+          @if (payment.note) {
+            <p class="note">{{ payment.note }}</p>
+          }
+          <div class="entry-actions">
+            <button
+              class="dc-btn"
+              type="button"
+              [attr.data-test]="'correct-' + payment.id"
+              [disabled]="saving()"
+              (click)="startCorrection(payment)"
+            >
+              Correct
+            </button>
+            <button
+              class="dc-btn"
+              type="button"
+              [attr.data-test]="'undo-' + payment.id"
+              [disabled]="saving()"
+              (click)="requestUndo(payment)"
+            >
+              Undo
+            </button>
+            <button
+              class="dc-btn"
+              type="button"
+              [attr.data-test]="'revisions-' + payment.id"
+              [attr.aria-expanded]="revisionsFor() === payment.id"
+              (click)="toggleRevisions(payment)"
+            >
+              History
+            </button>
+          </div>
+
+          @if (confirming()?.id === payment.id) {
+            <div class="confirm" role="group" aria-label="Confirm undo">
+              <p>
+                Undo this settlement? It stops counting towards balances and stays here so you can
+                restore it.
+              </p>
+              <button
+                class="dc-btn-accent"
+                type="button"
+                data-test="confirm-undo"
+                [disabled]="saving()"
+                (click)="undo()"
+              >
+                Undo settlement
+              </button>
+              <button class="dc-btn" type="button" [disabled]="saving()" (click)="cancelUndo()">
+                Keep it
+              </button>
+            </div>
+          }
+
+          @if (editing()?.id === payment.id) {
+            <form
+              class="correction"
+              data-test="correct-form"
+              (submit)="$event.preventDefault(); saveCorrection()"
+            >
+              <h3>Correct this settlement</h3>
+              <label
+                ><span class="dc-field-label">Who paid</span>
+                <select [value]="payerId" (change)="payerId = $any($event.target).value">
+                  @for (person of people(); track person.id) {
+                    <option [value]="person.id">
+                      {{ person.displayName }} ({{ person.email }})
+                    </option>
+                  }
+                </select>
+              </label>
+              <label
+                ><span class="dc-field-label">Who received it</span>
+                <select [value]="payeeId" (change)="payeeId = $any($event.target).value">
+                  @for (person of people(); track person.id) {
+                    <option [value]="person.id">
+                      {{ person.displayName }} ({{ person.email }})
+                    </option>
+                  }
+                </select>
+              </label>
+              <label
+                ><span class="dc-field-label">Amount in {{ payment.currency ?? 'USD' }}</span>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  data-test="correct-amount"
+                  [value]="amount"
+                  (input)="amount = $any($event.target).value"
+                />
+              </label>
+              <label
+                ><span class="dc-field-label">Date of the payment</span>
+                <input
+                  type="date"
+                  data-test="correct-date"
+                  [value]="paidOn"
+                  (input)="paidOn = $any($event.target).value"
+                />
+              </label>
+              <label
+                ><span class="dc-field-label">How it was paid</span>
+                <select [value]="method" (change)="method = $any($event.target).value">
+                  @for (option of methods; track option) {
+                    <option [value]="option">{{ methodLabel[option] }}</option>
+                  }
+                </select>
+              </label>
+              <label
+                ><span class="dc-field-label">Note (optional)</span>
+                <input
+                  type="text"
+                  maxlength="280"
+                  [value]="note"
+                  (input)="note = $any($event.target).value"
+                />
+              </label>
+              <div class="correction-actions">
+                <button class="dc-btn-accent" type="submit" [disabled]="saving()">
+                  Save correction
+                </button>
+                <button
+                  class="dc-btn"
+                  type="button"
+                  [disabled]="saving()"
+                  (click)="cancelCorrection()"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          }
+
+          @if (revisionsFor() === payment.id) {
+            <div class="revisions">
+              @if (revisionsError()) {
+                <p role="alert">{{ revisionsError() }}</p>
+              }
+              <ol>
+                @for (revision of revisions(); track revision.version) {
+                  <li>
+                    {{ actionLabel[revision.action] }} by
+                    {{ revision.actor?.displayName ?? 'an unknown earlier recorder' }} ·
+                    <time [attr.datetime]="revision.recordedAt">{{ revision.recordedAt }}</time> ·
+                    <app-money
+                      [minor]="revision.after.amountMinor"
+                      [currency]="revision.after.currency ?? 'USD'"
+                    ></app-money>
+                  </li>
+                }
+              </ol>
+            </div>
+          }
+        </li>
+      }
+    </ul>
+
+    @if (undone().length) {
+      <h2>Undone settlements</h2>
+      <ul class="ledger">
+        @for (entry of undone(); track entry.payment.id) {
+          <li class="entry entry--undone">
+            <div class="entry-main">
+              <p class="parties">
+                <strong>{{ entry.payment.payer.displayName }}</strong> paid
+                <strong>{{ entry.payment.payee.displayName }}</strong>
+              </p>
+              <app-money
+                [minor]="entry.payment.amountMinor"
+                [currency]="entry.payment.currency ?? 'USD'"
+              ></app-money>
+            </div>
+            <p class="meta">
+              Undone <time [attr.datetime]="entry.deletedAt">{{ entry.deletedAt }}</time> · not
+              counted in balances
+            </p>
+            <button
+              class="dc-btn"
+              type="button"
+              [attr.data-test]="'restore-' + entry.payment.id"
+              [disabled]="saving()"
+              (click)="restore(entry)"
+            >
+              Restore
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

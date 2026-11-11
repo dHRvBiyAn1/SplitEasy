@@ -1,0 +1,83 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.payments-page {
+  max-width: 1000px;
+  margin: auto;
+  padding: var(--sp-7) var(--sp-6) var(--sp-8);
+  display: grid;
+  gap: var(--sp-5);
+  overflow-wrap: anywhere;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.scope-note p,
+.meta,
+.note {
+  color: var(--ink-soft);
+  margin: 0;
+}
+.ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-4);
+}
+.entry {
+  background: var(--surface-raised);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4) var(--sp-5);
+  display: grid;
+  gap: var(--sp-2);
+}
+.entry--undone {
+  opacity: 0.85;
+}
+.entry-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.parties {
+  margin: 0;
+}
+.entry-actions,
+.correction-actions,
+.confirm {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.correction {
+  display: grid;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.correction label {
+  display: grid;
+  gap: var(--sp-1);
+}
+.revisions ol {
+  margin: var(--sp-2) 0 0;
+  padding-left: var(--sp-5);
+  display: grid;
+  gap: var(--sp-1);
+}
+.notice,
+.write-error,
+.retry {
+  margin: 0;
+}
+.write-error {
+  color: var(--neg-strong);
+}

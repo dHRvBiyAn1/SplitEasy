@@ -9,7 +9,7 @@ import { ParticipantSummary } from '../groups/participant.models';
 import { BalanceService } from '../balances/balance.service';
 import { PersonBalance, ExpenseCategory } from '../dashboard/dashboard.models';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { Currency } from '../shared/currency';
+import { Currency, CURRENCY_EXPONENT } from '../shared/currency';
 import { formatMoney } from '../shared/money.component';
 import { ExpenseService } from '../expenses/expense.service';
 import {
@@ -22,6 +22,8 @@ import {
 import { ModalService } from '../modals/modal.service';
 import { avatarTint, groupGlyphTint } from '../core/avatar';
 import { GroupService } from './group.service';
+import { PaymentService } from '../payments/payment.service';
+import { RefundResponse } from '../payments/payment.models';
 import { financialRoster, ownedIdentities, viewerIdentity, GroupResponse } from './group.models';
 
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
@@ -285,6 +287,103 @@ export class GroupDetailComponent implements OnInit {
   }
 
   /** Expand a row to show its split, or collapse it if it's already open. */
+  // --- refunds: money the seller returned out of one expense ---------------
+  private readonly payments = inject(PaymentService);
+  private refundRequest?: Subscription;
+  protected readonly refunds = signal<RefundResponse[]>([]);
+  protected readonly refundFor = signal<string | null>(null);
+  protected readonly refundSaving = signal(false);
+  protected readonly refundError = signal<string | null>(null);
+  protected refundAmount = '';
+  protected refundedOn = '';
+  protected refundNote = '';
+
+  startRefund(expense: ExpenseResponse): void {
+    if (this.writePending()) return;
+    this.refundFor.set(expense.id);
+    this.refundError.set(null);
+    this.refundAmount = '';
+    this.refundedOn = expense.spentOn;
+    this.refundNote = '';
+    this.loadRefunds(expense);
+  }
+
+  private loadRefunds(expense: ExpenseResponse): void {
+    this.refundRequest?.unsubscribe();
+    this.refunds.set([]);
+    this.refundRequest = this.payments
+      .listRefunds(this.groupId, expense.id)
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (refunds) => this.refunds.set(refunds),
+        error: () => this.refundError.set('Could not load this expense\u2019s refunds. Try again.'),
+      });
+  }
+
+  cancelRefund(): void {
+    if (this.refundSaving()) return;
+    this.refundFor.set(null);
+    this.refundError.set(null);
+  }
+
+  /** The remainder guard runs here too, so an impossible refund never leaves the browser. */
+  saveRefund(expense: ExpenseResponse): void {
+    if (this.refundSaving()) return;
+    const currency = expense.currency ?? 'USD';
+    const minor = this.toMinorUnits(this.refundAmount, currency);
+    const remaining =
+      expense.amountMinor - this.refunds().reduce((sum, r) => sum + r.amountMinor, 0);
+    if (minor === null || minor <= 0) {
+      this.refundError.set('Enter a refund amount greater than zero.');
+      return;
+    }
+    if (minor > remaining) {
+      this.refundError.set(
+        `Only ${this.display(remaining, currency)} is left to refund on this expense.`,
+      );
+      return;
+    }
+    if (!this.refundedOn) {
+      this.refundError.set('Choose the date of the refund.');
+      return;
+    }
+    this.refundSaving.set(true);
+    this.refundError.set(null);
+    this.payments
+      .recordRefund(this.groupId, expense.id, {
+        amountMinor: minor,
+        currency,
+        refundedOn: this.refundedOn,
+        note: this.refundNote.trim() ? this.refundNote.trim() : null,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (refund) => {
+          this.refundSaving.set(false);
+          this.refundFor.set(null);
+          this.refunds.update((existing) => [refund, ...existing]);
+          this.dashboard.refresh();
+        },
+        error: (err) => {
+          this.refundSaving.set(false);
+          this.refundError.set(
+            err.status === 400
+              ? 'This refund is larger than what is left to refund, or in the wrong currency. Reload and review the expense.'
+              : 'Could not record this refund. Review the amount and try again.',
+          );
+        },
+      });
+  }
+
+  private toMinorUnits(value: string, currency: Currency): number | null {
+    const text = value.trim();
+    if (!text) return null;
+    const parsed = Number(text);
+    if (!Number.isFinite(parsed)) return null;
+    const minor = Math.round(parsed * 10 ** CURRENCY_EXPONENT[currency]);
+    return Number.isSafeInteger(minor) ? minor : null;
+  }
+
   toggleExpand(e: ExpenseSummary, preserveHistory = false): void {
     if (!preserveHistory) this.clearHistory();
     this.detailRequest?.unsubscribe();
