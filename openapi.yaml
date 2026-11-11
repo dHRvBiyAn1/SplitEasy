@@ -2238,6 +2238,12 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  # --- g02-2 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- h05 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- e03 paths (insert below; parallel batch plan rule 3) ---
+
 components:
   schemas:
     SaveFriendRequest:
@@ -4330,6 +4336,12 @@ components:
       - claimed
       description: Atomic membership/roster plus optional immutable verified ownership link. Original money, IDs,
         split inputs, revisions and operation receipts do not change.
+
+    # --- g02-2 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h05 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- e03 schemas (insert below; parallel batch plan rule 3) ---
 
   parameters:
     ParticipantVersion:

@@ -1,0 +1,156 @@
+{
+  "releaseCommit": "2a3a1af8af81148bb0fd83ad029f089fac07b9b4",
+  "productionRun": "https://github.com/dHRvBiyAn1/SplitEasy/actions/runs/39012646574",
+  "mainBundle": "main-IFBH5XRF.js",
+  "routes": [
+    {
+      "route": "/login",
+      "status": 200,
+      "releaseMainBundle": "main-IFBH5XRF.js"
+    },
+    {
+      "route": "/register",
+      "status": 200,
+      "releaseMainBundle": "main-IFBH5XRF.js"
+    },
+    {
+      "route": "/groups/00000000-0000-0000-0000-000000000000",
+      "status": 200,
+      "releaseMainBundle": "main-IFBH5XRF.js"
+    }
+  ],
+  "matchingAssets": 25,
+  "assets": [
+    {
+      "asset": "chunk-2YH2SOGW.js",
+      "status": 200,
+      "sha256": "f71a30a96768be471f65c8918e0a36a988c2cae60d2a3ff0732fe72035b14c78"
+    },
+    {
+      "asset": "chunk-5OSMFAXS.js",
+      "status": 200,
+      "sha256": "1ed9114fd052e0242845a537e02925e045b7752306af3cf4a9d5d459e7b4921f"
+    },
+    {
+      "asset": "chunk-6RQUKJ3N.js",
+      "status": 200,
+      "sha256": "dd894f92f91e4ba8518f7aec45c7ab8a6a27380732fdc2cea8dcf2a5308e2239"
+    },
+    {
+      "asset": "chunk-ABXQZ5JF.js",
+      "status": 200,
+      "sha256": "1477014dcc2871c9ef1cdc7824c3b7418529a1b93342161b29e94d1adb9ea05a"
+    },
+    {
+      "asset": "chunk-ELA4BXFO.js",
+      "status": 200,
+      "sha256": "1c4f686d4606162b7425c25d3d196184a36f49201666cce3ef210178ad07f936"
+    },
+    {
+      "asset": "chunk-F37BNVLH.js",
+      "status": 200,
+      "sha256": "f11d9e6fb3199765ada1ceae1cb6d4fec21428b8953e425713043359c5270700"
+    },
+    {
+      "asset": "chunk-GJPYFZ6V.js",
+      "status": 200,
+      "sha256": "119f6fef4155d1dbc4b468be5ddfcaba67830106d9e3cfdf5bb42ba3082b39df"
+    },
+    {
+      "asset": "chunk-J3WNAU7F.js",
+      "status": 200,
+      "sha256": "3051fc96e9588d31c5af34e9706acb966e9ffb6003849c2f84b6c8b68b9c89e4"
+    },
+    {
+      "asset": "chunk-LGUTCOVQ.js",
+      "status": 200,
+      "sha256": "5597922bef6b476d7b4260e34a679e0ca01827995e3f8b1d37ffd99a33e49bad"
+    },
+    {
+      "asset": "chunk-PR3YBYDT.js",
+      "status": 200,
+      "sha256": "c510b76b81d66aa6e0396dcf2e65e16158dcdda14fb9ed5f7ff8055e55d8d3dd"
+    },
+    {
+      "asset": "chunk-QBAUGDAH.js",
+      "status": 200,
+      "sha256": "7ae8d6b7c833ec153b6c74d0c80acff35c692c86eee2cf8a88f048db1cdec092"
+    },
+    {
+      "asset": "chunk-R3CVHEZJ.js",
+      "status": 200,
+      "sha256": "d7cbbfccfbedbc56b417019ce76fbe70054d2311c0ed918c780a7b121a299803"
+    },
+    {
+      "asset": "chunk-WG7B45GL.js",
+      "status": 200,
+      "sha256": "b3bacd2fa2daffda40e3075037739ee4d49a754f34b0e78f10166723a8429c25"
+    },
+    {
+      "asset": "chunk-WON2UYDE.js",
+      "status": 200,
+      "sha256": "7811ee3a15fd1416f7868b9624ecfc264e92fb49c5fa4dac1bbde8b5ead55856"
+    },
+    {
+      "asset": "chunk-Z2YOKLT3.js",
+      "status": 200,
+      "sha256": "0c94798e372a106d5192f0031e673b130690d3a04539df3c0d0c8097f1985409"
+    },
+    {
+      "asset": "fonts/dm-sans-400.woff2",
+      "status": 200,
+      "sha256": "1c2aeffbd854a32b48492ea460277ce8f575fb6ceaffac7371a0cce5df37c2e6"
+    },
+    {
+      "asset": "fonts/dm-sans-500.woff2",
+      "status": 200,
+      "sha256": "dbc923a94b5eeaa3d3b752ea0b09aa8860bd2b5d14e16feb2bc850109a150c21"
+    },
+    {
+      "asset": "fonts/dm-sans-600.woff2",
+      "status": 200,
+      "sha256": "826b60949648f39bde10174e228edf7f7b303015cbb306f23661582626aec909"
+    },
+    {
+      "asset": "fonts/dm-sans-700.woff2",
+      "status": 200,
+      "sha256": "5cb413918444171b38e51e24e987e431efef88a14d211b179568390a4370d1ef"
+    },
+    {
+      "asset": "fonts/nunito-sans-700.woff2",
+      "status": 200,
+      "sha256": "e10c9ff3f5f5171812fb1eef3cb89a9457c535b422517ec45d36b4452f6a8b0c"
+    },
+    {
+      "asset": "fonts/nunito-sans-800.woff2",
+      "status": 200,
+      "sha256": "52ab3489c4d35664e58d443dfbe0755a3f1a2841e799f74593d26ce9ed6e7535"
+    },
+    {
+      "asset": "fonts/nunito-sans-900.woff2",
+      "status": 200,
+      "sha256": "0586e83ef5f677d1c650b8d1bc70d1d480f9bb8d2ba2d3f0899f025c6d750a2b"
+    },
+    {
+      "asset": "main-IFBH5XRF.js",
+      "status": 200,
+      "sha256": "31c81351f2c518fc972559ae1ce04bc581dbde723cfd8a3bb229ca6a200bac23"
+    },
+    {
+      "asset": "polyfills-RV3JTMEC.js",
+      "status": 200,
+      "sha256": "ada6406bce793942b50bd47a7b63d72f69c8964fbc785e25043eedb19da4a32d"
+    },
+    {
+      "asset": "styles-QMEU3J2H.css",
+      "status": 200,
+      "sha256": "f4c9738921968e7223f24195d99516154695424612eb010b7ec6ef6079e7b63e"
+    }
+  ],
+  "healthStatus": 200,
+  "health": {
+    "status": "UP",
+    "service": "spliteasy",
+    "timestamp": "2026-10-17T07:43:46.382375119Z"
+  }
+}

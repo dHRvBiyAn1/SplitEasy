@@ -74,5 +74,9 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./profile/profile.component').then((m) => m.ProfileComponent),
   },
+  // --- g02-2 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h05 routes (insert below; parallel batch plan rule 3) ---
+
   { path: '**', redirectTo: 'dashboard' },
 ];
