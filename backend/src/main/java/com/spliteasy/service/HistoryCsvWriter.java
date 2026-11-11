@@ -65,14 +65,17 @@ final class HistoryCsvWriter {
   /** A free-text cell: neutralised against spreadsheet formulas, then quoted when needed. */
   static String text(String value) {
     if (value == null || value.isEmpty()) return "";
-    char first = value.charAt(0);
+    // Spreadsheets skip leading blanks before parsing a formula, so look past them.
+    int at = 0;
+    while (at < value.length() && (value.charAt(at) == ' ' || value.charAt(at) == '\t')) at++;
+    char first = at < value.length() ? value.charAt(at) : ' ';
     String safe =
         (first == '='
                 || first == '+'
                 || first == '-'
                 || first == '@'
-                || first == '\t'
-                || first == '\r')
+                || value.charAt(0) == '\t'
+                || value.charAt(0) == '\r')
             ? "'" + value
             : value;
     return quote(safe);
