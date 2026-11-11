@@ -77,6 +77,11 @@ export const routes: Routes = [
   // --- g02-2 routes (insert below; parallel batch plan rule 3) ---
 
   // --- h05 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'groups/:id/history',
+    canActivate: [authGuard],
+    loadComponent: () => import('./history/history.component').then((m) => m.HistoryComponent),
+  },
 
   { path: '**', redirectTo: 'dashboard' },
 ];

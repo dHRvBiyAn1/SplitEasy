@@ -11,7 +11,8 @@ public record FriendDetail(
     int sharedGroupCount,
     boolean hasOpenObligations,
     List<FriendBalance> balances,
-    List<SharedGroup> sharedGroups) {
+    List<SharedGroup> sharedGroups,
+    List<FriendBalance> personalBalances) {
   public record SharedGroup(
       UUID id, String name, boolean simplifyDebts, List<FriendBalance> balances) {}
 }
