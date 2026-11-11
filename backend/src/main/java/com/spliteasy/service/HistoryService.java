@@ -8,6 +8,7 @@ import com.spliteasy.exception.NotFoundException;
 import com.spliteasy.repository.FriendRepository;
 import com.spliteasy.repository.HistoryQuery;
 import com.spliteasy.repository.HistoryQuery.Cursor;
+import com.spliteasy.repository.PersonalLedgerRepository;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ public class HistoryService {
   private final HistoryQuery query;
   private final MembershipGuard membershipGuard;
   private final FriendRepository friends;
+  private final PersonalLedgerRepository personalLedgers;
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public HistoryPage page(UUID viewer, HistoryFilter filter, String cursor, Integer limit) {
@@ -57,7 +59,12 @@ public class HistoryService {
   void authorize(UUID viewer, HistoryFilter filter) {
     if (filter.from() != null && filter.to() != null && filter.from().isAfter(filter.to()))
       throw new BadRequestException("from must not be after to");
-    if (filter.groupId() != null) membershipGuard.requireMember(filter.groupId(), viewer);
+    if (filter.groupId() != null) {
+      membershipGuard.requireMember(filter.groupId(), viewer);
+      // A personal ledger is not a group: read as absent, like every other group-scoped route.
+      if (personalLedgers.isMemberOfPersonal(filter.groupId(), viewer))
+        throw new NotFoundException("Group not found");
+    }
     if (filter.friendId() != null && friends.find(viewer, filter.friendId()).isEmpty())
       throw new NotFoundException("Saved friend not found");
   }

@@ -62,7 +62,7 @@ public class HistoryQuery {
   private static String scope(UUID viewer, HistoryFilter filter, List<Object> args) {
     StringBuilder sql =
         new StringBuilder(
-            "SELECT g.id,g.name FROM group_memberships gm JOIN groups g ON g.id=gm.group_id"
+            "SELECT g.id,CASE WHEN g.kind='PERSONAL' THEN NULL ELSE g.name END AS name FROM group_memberships gm JOIN groups g ON g.id=gm.group_id"
                 + " WHERE gm.user_id=? AND g.deleted_at IS NULL");
     args.add(viewer);
     if (filter.groupId() != null) {

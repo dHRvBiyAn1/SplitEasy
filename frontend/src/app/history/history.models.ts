@@ -6,7 +6,7 @@ export interface HistoryItem {
   type: HistoryType;
   id: string;
   groupId: string;
-  groupName: string;
+  groupName: string | null;
   financialDate: string;
   description: string;
   currency: Currency;

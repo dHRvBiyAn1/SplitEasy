@@ -10,12 +10,16 @@ Fixed:
 - A payer outside the split had no CSV row, so paid totals did not reconcile; a payer row is now emitted. Test added.
 - Removed V22: the keyset runs over a UNION CTE, so the refund index would not serve ordering; V22 is released unused.
 
+## Review follow-ups
+- Codex P2: CSV text guard now looks past leading spaces/tabs (unit regression, red on old code).
+- Personal ledgers (G02.2): a `groupId` that is the viewer's personal ledger is 404 (403 first for non-members); personal entries stay in account-wide/friend history with a null `groupName` / empty CSV `group_name`.
+
 ## Frontend
 `history/*` (models, `HistoryService`, `HistoryComponent`), route `groups/:id/history`, link on group detail. The CSV read uses `HttpClient` with a blob response because `ApiService` is JSON-only (not in this row).
 
 ## Testing
-- Backend `HistoryIntegrationTest`: 8 passing; full `spotless:check verify` 387 passing.
-- Frontend Node 22: 391 tests / 56 files passing (5 new), Prettier clean, production build ok (initial bundle 555.02 kB, existing 500 kB budget warning).
+- Backend `HistoryIntegrationTest` 9 + `HistoryCsvWriterTest` 2; full `spotless:check verify` 395 passing (after merging dev with G02.2).
+- Frontend Node 22: 399 tests / 57 files passing (5 new history specs), Prettier clean, production build ok (initial bundle 555.08 kB, existing 500 kB budget warning).
 - OpenAPI parses; two paths and two schemas added under the H05 anchors.
 - Not verified: native browser run, very large (>100k rows) export timing, friend-scope plan performance.
 

@@ -4672,7 +4672,9 @@ components:
         type: {type: string, enum: [EXPENSE, PAYMENT, REFUND]}
         id: {type: string, format: uuid}
         groupId: {type: string, format: uuid}
-        groupName: {type: string}
+        groupName:
+          type: [string, 'null']
+          description: Null for a personal-ledger entry, which is not a group.
         financialDate: {type: string, format: date}
         description: {type: string}
         currency:

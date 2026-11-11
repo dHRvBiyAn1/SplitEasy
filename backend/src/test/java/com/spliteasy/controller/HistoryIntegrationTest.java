@@ -24,6 +24,8 @@ import tools.jackson.databind.JsonNode;
 /** H05: bounded cursor history over expenses, settlements and refunds, plus CSV export. */
 @AutoConfigureMockMvc
 class HistoryIntegrationTest extends AbstractIntegrationTest {
+  @org.springframework.beans.factory.annotation.Autowired
+  org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   record Fixture(AuthResponse alice, AuthResponse bob, AuthResponse carol, String group) {}
 
@@ -413,6 +415,67 @@ class HistoryIntegrationTest extends AbstractIntegrationTest {
     assertThat(rows.stream().mapToLong(r -> Long.parseLong(r.get("net_minor"))).sum()).isZero();
     assertThat(rows.stream().mapToLong(r -> Long.parseLong(r.get("paid_minor"))).sum())
         .isEqualTo(1000);
+  }
+
+  /** Alice and Bob saved each other; one personal expense between them. Returns its id. */
+  String personalExpense(AuthResponse alice, AuthResponse bob, String sharedGroup)
+      throws Exception {
+    for (var pair : List.of(List.of(alice, bob), List.of(bob, alice))) {
+      mockMvc
+          .perform(
+              jsonPost(
+                      "/api/friends",
+                      Map.of("groupId", sharedGroup, "participantId", pair.get(1).user().id()))
+                  .header(HttpHeaders.AUTHORIZATION, bearer(pair.get(0).accessToken()))
+                  .header("X-Ledger-Version", "2")
+                  .header("X-Participant-Version", "1"))
+          .andExpect(status().isOk());
+    }
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("description", "Coffee");
+    body.put("amountMinor", 600);
+    body.put("currency", "USD");
+    body.put("paidByUserId", alice.user().id());
+    body.put("participantUserIds", List.of(alice.user().id(), bob.user().id()));
+    body.put("spentOn", "2026-03-05");
+    MvcResult r =
+        mockMvc
+            .perform(
+                jsonPost("/api/friends/" + bob.user().id() + "/expenses", body)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken()))
+                    .header("X-Ledger-Version", "2")
+                    .header("X-Participant-Version", "1"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper.readTree(r.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  @Test
+  void personalLedgerIsRefusedAsAGroupScopeButItsEntriesStayInAccountHistory() throws Exception {
+    var f = fixture("Shared");
+    String coffee = personalExpense(f.alice(), f.bob(), f.group());
+    String ledger =
+        jdbc.queryForObject("SELECT group_id FROM expenses WHERE id=?::uuid", String.class, coffee);
+
+    assertThat(history(f.alice(), Map.of("groupId", ledger)).getResponse().getStatus())
+        .isEqualTo(404);
+    assertThat(csv(f.alice(), Map.of("groupId", ledger), 404)).isEmpty();
+    assertThat(history(f.carol(), Map.of("groupId", ledger)).getResponse().getStatus())
+        .isEqualTo(403);
+
+    JsonNode account = page(f.alice(), Map.of());
+    assertThat(ids(account)).contains(coffee);
+    account
+        .get("items")
+        .forEach(
+            i -> {
+              if (i.get("id").asText().equals(coffee))
+                assertThat(i.get("groupName").isNull()).isTrue();
+            });
+    var rows = csv(f.alice(), Map.of(), 200);
+    assertThat(rows.stream().filter(r -> r.get("transaction_id").equals(coffee)))
+        .hasSize(2)
+        .allSatisfy(r -> assertThat(r.get("group_name")).isEmpty());
   }
 
   @Test
