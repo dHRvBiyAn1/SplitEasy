@@ -52,6 +52,7 @@ public class DashboardService {
   private final ExpenseParticipantRepository participantRepository;
   private final PaymentRepository paymentRepository;
   private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
+  private final com.spliteasy.repository.PersonalLedgerRepository personalLedgers;
 
   // One snapshot for nested pairwise reads, group totals, expense shares and the activity feed.
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -130,6 +131,18 @@ public class DashboardService {
               g.simplifyDebts(),
               totals));
     }
+    // Personal ledgers (V21) are not groups: no card, settle-up row or activity, but their money
+    // still belongs in People and the per-currency totals.
+    List<Settlement> ledgerRows = new ArrayList<>(settlements);
+    for (UUID ledger : personalLedgers.ledgersOf(userId)) {
+      for (PersonBalance pb : pairwiseService.compute(userId, ledger)) {
+        ledgerRows.add(new Settlement(ledger, null, pb.user(), pb.netMinor(), pb.currency()));
+        peopleNet.merge(
+            new PersonCurrency(pb.user().id(), pb.currency()), pb.netMinor(), Math::addExact);
+        peopleInfo.putIfAbsent(pb.user().id(), pb.user());
+        allCurrencies.add(pb.currency());
+      }
+    }
     List<PersonBalance> people =
         peopleNet.entrySet().stream()
             .filter(e -> e.getValue() != 0)
@@ -146,7 +159,7 @@ public class DashboardService {
         allCurrencies.stream()
             .map(
                 currency -> {
-                  var rows = settlements.stream().filter(s -> s.currency() == currency).toList();
+                  var rows = ledgerRows.stream().filter(s -> s.currency() == currency).toList();
                   long owed =
                       rows.stream()
                           .filter(s -> s.netMinor() > 0)
@@ -187,14 +200,14 @@ public class DashboardService {
                 Comparator.comparingLong((Settlement s) -> Math.abs(s.netMinor())).reversed()));
     int owedPeople =
         (int)
-            settlements.stream()
+            ledgerRows.stream()
                 .filter(s -> s.netMinor() > 0)
                 .map(s -> s.counterparty().id())
                 .distinct()
                 .count();
     int owePeople =
         (int)
-            settlements.stream()
+            ledgerRows.stream()
                 .filter(s -> s.netMinor() < 0)
                 .map(s -> s.counterparty().id())
                 .distinct()

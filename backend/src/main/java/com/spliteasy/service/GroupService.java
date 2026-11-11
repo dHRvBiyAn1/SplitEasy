@@ -43,6 +43,7 @@ public class GroupService {
 
   private final PairwiseBalanceService pairwiseBalanceService;
   private final ObligationProjectionService projection;
+  private final com.spliteasy.repository.PersonalLedgerRepository personalLedgers;
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
@@ -92,7 +93,10 @@ public class GroupService {
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<GroupSummary> listMyGroups(UUID requesterId) {
+    // A personal ledger (V21) is never a group; its money reaches friend and dashboard totals.
+    var personal = personalLedgers.ledgersOf(requesterId);
     return membershipRepository.findGroupSummariesForUser(requesterId).stream()
+        .filter(v -> !personal.contains(v.getId()))
         .map(
             v ->
                 new GroupSummary(

@@ -64,6 +64,21 @@ public class Group {
   @Column(name = "lifecycle_version", nullable = false)
   private long lifecycleVersion;
 
+  /** GROUP, or PERSONAL for a hidden pair ledger that group routes never expose (migration V21). */
+  @Column(nullable = false, updatable = false)
+  private String kind = "GROUP";
+
+  public boolean isPersonal() {
+    return "PERSONAL".equals(kind);
+  }
+
+  /** The hidden ledger behind one pair's non-group expenses; never listed as a group. */
+  public static Group personalLedger(User creator) {
+    Group ledger = new Group("Personal ledger", creator);
+    ledger.kind = "PERSONAL";
+    return ledger;
+  }
+
   public boolean isArchived() {
     return archivedAt != null;
   }

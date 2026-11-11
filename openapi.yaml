@@ -154,7 +154,7 @@ paths:
     get:
       operationId: getSavedFriend
       summary: Read a saved friend's current authorized group breakdown
-      description: Unknown or another owner's saved target returns404. A saved friend never grants history access. Each group uses its selected direct/simplified mode and current claimed identities; stored financial records stay unchanged. Follow group links for existing expense history. No personal expenses or friend-level settlement are implemented here.
+      description: Unknown or another owner's saved target returns404. A saved friend never grants history access. Each group uses its selected direct/simplified mode and current claimed identities; stored financial records stay unchanged. Follow group links for existing expense history. Non-group personal expenses appear only in `personalBalances`; friend-level settlement is not implemented.
       tags: [Friends]
       responses:
         '200':
@@ -2239,6 +2239,235 @@ paths:
           $ref: '#/components/responses/Conflict'
 
   # --- g02-2 paths (insert below; parallel batch plan rule 3) ---
+  /api/friends/{friendId}/expenses:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listPersonalExpenses
+      summary: List non-group expenses shared with one saved friend
+      description: Personal expenses live in a hidden pair ledger, never a group. Any member reads
+        the same spent-date-ordered list, including after either account removes the bookmark, because
+        the money is jointly owned. No ledger exists yet returns an empty list; an unsaved target is
+        403 and an outsider never learns whether a ledger exists.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: Expense summaries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    post:
+      operationId: createPersonalExpense
+      summary: Create a non-group expense with one saved friend
+      description: Creates the pair ledger on demand. Same body, split strategies, keyed `operationId`
+        replay, currency rules and 201 receipt as the group create route. The payer and every split
+        participant must be one of the two accounts, otherwise 400 before any write. The friend bookmark
+        authorizes creating the ledger only.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '201':
+          description: The created personal expense, byte-identical to a later read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/friends/{friendId}/expenses/deleted:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedPersonalExpenses
+      summary: List this pair's recoverable deleted expenses
+      description: Member-only recovery read with the same retained rows, versions and revision
+        history as the group recovery list. No ledger returns an empty list.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: Deleted expenses with their lifecycle versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeletedExpense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/friends/{friendId}/expenses/{expenseId}:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - name: expenseId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: getPersonalExpense
+      summary: Read one personal expense
+      description: Member-only detail with the recorded split intent; an expense from another ledger
+        is 404 so no scope leaks.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: Expense detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    put:
+      operationId: replacePersonalExpense
+      summary: Full-replace a personal expense
+      description: Identical to the group replace path, including `expectedVersion` (stale is 409
+        before mutation), re-derived shares and retained revision history. Currency is immutable.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '200':
+          description: The replaced personal expense
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deletePersonalExpense
+      summary: Recoverably delete a personal expense
+      description: Marks the entry deleted at the expected version and moves the pair's balances
+        once; financial reads everywhere exclude it until an explicit restore.
+      tags:
+      - Friends
+      parameters:
+        - name: expectedVersion
+          in: query
+          required: false
+          schema: {type: integer, format: int64, minimum: 0}
+        - name: operationId
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/friends/{friendId}/expenses/{expenseId}/restore:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - name: expenseId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: restorePersonalExpense
+      summary: Restore a retained personal expense
+      description: Requires the version the reader saw; a repeated or stale restore is 409 without
+        counting twice. Both accounts must still be participants.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreExpenseRequest'
+      responses:
+        '200':
+          description: Restored expense with its advanced version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   # --- h05 paths (insert below; parallel batch plan rule 3) ---
   /api/groups/history:
@@ -2390,12 +2619,18 @@ components:
       allOf:
         - $ref: '#/components/schemas/FriendSummary'
         - type: object
-          required: [sharedGroups]
+          required: [sharedGroups, personalBalances]
           properties:
             sharedGroups:
               type: array
               items:
                 $ref: '#/components/schemas/FriendGroup'
+            personalBalances:
+              type: array
+              description: Non-group personal expense totals by currency, kept separate from
+                group scopes so neither is implied to belong to the other. `balances` is their sum.
+              items:
+                $ref: '#/components/schemas/FriendBalance'
 
     GroupType:
       type: string
