@@ -22,6 +22,6 @@ No migration (V24 unused): a settlement between two friends is a normal `Payment
 
 ## Not verified
 
-Post-review gate on the branch up to date with dev (includes E03-B #118): backend 409 tests (spotless:check verify); frontend 418 tests in 61 files, Prettier clean, production build 560.10 kB. New `modals/friend-settlement.spec.ts` (real services, HTTP): a friend settle-up POSTs `/api/friends/pat/payments` and no `/groups` URL; a group settle-up still POSTs `/api/groups/g1/payments`. Note: importing `PAYMENT_METHOD_LABEL` from the friend component broke the existing payments spec in the full bundle (undefined at runtime), so the method label is formatted locally.
+Post-review gate on the branch up to date with dev (includes E03-B #118): backend 409 tests (spotless:check verify); frontend 420 tests in 61 files (after the two Codex fixes: Back on a friend settle-up closes the modal; a slower revisions response is cancelled), Prettier clean, production build 560.16 kB; backend unchanged since its 409-test run. New `modals/friend-settlement.spec.ts` (real services, HTTP): a friend settle-up POSTs `/api/friends/pat/payments` and no `/groups` URL; a group settle-up still POSTs `/api/groups/g1/payments`. Note: importing `PAYMENT_METHOD_LABEL` from the friend component broke the existing payments spec in the full bundle (undefined at runtime), so the method label is formatted locally.
 
 No real-browser run and no populated-DB rehearsal. Personal payment correction (PUT) has HTTP coverage but no UI.

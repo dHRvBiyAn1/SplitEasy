@@ -156,4 +156,29 @@ describe('personal payments with one saved friend', () => {
     harness.detectChanges();
     expect(text()).toContain('CREATED');
   });
+
+  it('ignores a slower revision response for a payment the reader moved off', async () => {
+    await open([payment, { ...payment, id: 'pay-2', note: 'Coffee' }]);
+    const revisionButtons = () =>
+      [...root().querySelectorAll<HTMLButtonElement>('button')].filter(
+        (b) => b.textContent?.trim() === 'Revisions',
+      );
+    revisionButtons()[0].click();
+    const first = http.expectOne('/api/friends/pat/payments/pay-1/history');
+    revisionButtons()[1].click();
+    http.expectOne('/api/friends/pat/payments/pay-2/history').flush([
+      {
+        action: 'CORRECTED',
+        actor: me,
+        recordedAt: 't',
+        version: 2,
+        before: null,
+        after: payment,
+      },
+    ]);
+    expect(first.cancelled).toBe(true);
+    harness.detectChanges();
+    expect(text()).toContain('CORRECTED');
+    expect(text()).not.toContain('CREATED');
+  });
 });

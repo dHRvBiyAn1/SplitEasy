@@ -69,4 +69,20 @@ describe('settle-up modal scopes', () => {
     expect(http.match((r) => r.url.includes('/friends'))).toHaveLength(0);
     post.flush({});
   });
+
+  it('closes instead of falling back to an unrelated list when the reader goes Back', async () => {
+    const modal = TestBed.inject(ModalService);
+    modal.openSettle({
+      friendId: 'pat',
+      groupName: 'Personal',
+      counterparty: pat,
+      netMinor: -500,
+      currency: 'USD',
+    });
+    const el = await render();
+    [...el.querySelectorAll<HTMLButtonElement>('button')]
+      .find((b) => b.textContent?.trim() === 'Back')!
+      .click();
+    expect(modal.active()).toBeNull();
+  });
 });

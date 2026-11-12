@@ -37,6 +37,7 @@ export class PersonalPaymentsComponent {
   private readonly destroyRef = inject(DestroyRef);
   private request?: Subscription;
   private deletedRequest?: Subscription;
+  private revisionsRequest?: Subscription;
 
   protected readonly payments = signal<PaymentResponse[]>([]);
   protected readonly error = signal<string | null>(null);
@@ -59,6 +60,7 @@ export class PersonalPaymentsComponent {
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
       this.request?.unsubscribe();
       this.deletedRequest?.unsubscribe();
+      this.revisionsRequest?.unsubscribe();
       this.payments.set([]);
       this.deleted.set([]);
       this.deletedOpen.set(false);
@@ -150,7 +152,9 @@ export class PersonalPaymentsComponent {
     }
     this.revisionsOf.set(p.id);
     this.revisions.set([]);
-    this.service
+    // Only the newest request may fill the list, or a slow earlier one shows the wrong payment.
+    this.revisionsRequest?.unsubscribe();
+    this.revisionsRequest = this.service
       .personalPaymentHistory(this.friendId(), p.id)
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({

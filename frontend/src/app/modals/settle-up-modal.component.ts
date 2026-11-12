@@ -144,6 +144,8 @@ export class SettleUpModalComponent {
 
   cancel(): void {
     if (this.saving()) return;
+    // A friend settlement has no list to go back to.
+    if (this.selected()?.friendId) return this.modal.requestClose();
     this.selected.set(null);
     this.error.set(null);
   }
