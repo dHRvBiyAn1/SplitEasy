@@ -399,6 +399,30 @@ class RecurrenceIntegrationTest extends AbstractIntegrationTest {
     assertThat(spentOn(alice, g)).hasSize(31);
   }
 
+  @Test
+  void aClosedAccountsScheduleHaltsForReviewAndItCannotBeReminded() throws Exception {
+    var alice = account("Alice");
+    var bob = account("Bob");
+    String g = group(alice, bob);
+    // Alice creates the schedule; Bob is the payer and only participant, so nobody owes anything.
+    var s = create(alice, g, schedule(template(bob, 1000, bob), "DAILY", "2026-03-01", "UTC"));
+    String id = s.path("id").asText();
+    send(alice, jsonPost("/api/me/closure", Map.of("currentPassword", "password123")), 204);
+
+    runner.run();
+    assertThat(spentOn(bob, g)).isEmpty();
+    var halted = send(bob, get("/api/groups/" + g + "/recurring/" + id), 200);
+    assertThat(halted.path("status").asText()).isEqualTo("NEEDS_REVIEW");
+    assertThat(halted.path("reviewReason").asText()).isNotBlank();
+
+    send(
+        bob,
+        jsonPost(
+            "/api/groups/" + g + "/reminders",
+            Map.of("debtorId", alice.user().id(), "currency", "USD")),
+        409);
+  }
+
   long unread(AuthResponse who) throws Exception {
     return send(who, get("/api/notifications/unread-count"), 200).path("count").asLong();
   }
