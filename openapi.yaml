@@ -2568,6 +2568,106 @@ paths:
   # --- g02-3 paths (insert below; parallel batch plan rule 3) ---
 
   # --- h03 paths (insert below; parallel batch plan rule 3) ---
+  /api/activity:
+    get:
+      operationId: listActivity
+      tags: [Activity]
+      summary: Durable activity events, newest first
+      description: Committed events written with each financial or lifecycle change (starting at V25, no
+        backfill). Keyset on seq descending; default limit 50, maximum 100. Without groupId, every
+        non-deleted group the caller currently belongs to, personal ledgers included with a null groupName.
+        With groupId, membership is checked first (403 before 404); a deleted group or a personal-ledger
+        groupId is 404.
+      parameters:
+      - {name: groupId, in: query, schema: {type: string, format: uuid}}
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ActivityPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/notifications:
+    get:
+      operationId: listNotifications
+      tags: [Activity]
+      summary: The caller's own notifications, newest first
+      description: Recipients are current group members except the actor, filtered by preferences. Former
+        members keep past notifications but receive no new ones.
+      parameters:
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: unreadOnly, in: query, schema: {type: boolean, default: false}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /api/notifications/unread-count:
+    get:
+      operationId: unreadNotificationCount
+      tags: [Activity]
+      summary: Number of unread notifications
+      responses:
+        '200':
+          description: The count.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count: {type: integer, format: int64}
+  /api/notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [Activity]
+      summary: Mark one of the caller's notifications read
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204': {description: Marked read (idempotent).}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [Activity]
+      summary: Mark every unread notification read
+      responses:
+        '204': {description: Done.}
+  /api/me/notification-preferences:
+    get:
+      operationId: getNotificationPreferences
+      tags: [Activity]
+      summary: In-app notification preferences (all true when never saved)
+      responses:
+        '200':
+          description: Preferences.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPreferences'}
+    put:
+      operationId: putNotificationPreferences
+      tags: [Activity]
+      summary: Replace the three notification switches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationPreferences'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPreferences'}
+        '400': {$ref: '#/components/responses/BadRequest'}
 
 components:
   schemas:
@@ -4760,6 +4860,59 @@ components:
     # --- g02-3 schemas (insert below; parallel batch plan rule 3) ---
 
     # --- h03 schemas (insert below; parallel batch plan rule 3) ---
+    ActivityItem:
+      type: object
+      required: [id, seq, groupId, groupName, kind, subjectId, actor, summary, occurredAt]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer, format: int64}
+        groupId: {type: string, format: uuid}
+        groupName:
+          type: [string, 'null']
+          description: Null for a personal-ledger event.
+        kind:
+          type: string
+          description: EXPENSE_/PAYMENT_/REFUND_ + CREATED, REPLACED, DELETED or RESTORED; GROUP_ARCHIVED,
+            GROUP_UNARCHIVED, GROUP_DELETED, GROUP_RESTORED; MEMBER_ADDED, MEMBER_REMOVED, MEMBER_LEFT.
+        subjectId: {type: [string, 'null'], format: uuid}
+        actor:
+          type: [object, 'null']
+          description: The recorder (UserSummary), distinct from the payer.
+        summary:
+          type: object
+          description: Small snapshot, for example description, amountMinor, currency, payer, payee, version.
+        occurredAt: {type: string, format: date-time}
+    ActivityPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ActivityItem'}
+        nextCursor: {type: [string, 'null']}
+    NotificationItem:
+      type: object
+      required: [id, readAt, createdAt, event]
+      properties:
+        id: {type: string, format: uuid}
+        readAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+        event: {$ref: '#/components/schemas/ActivityItem'}
+    NotificationPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/NotificationItem'}
+        nextCursor: {type: [string, 'null']}
+    NotificationPreferences:
+      type: object
+      required: [expenses, payments, groupChanges]
+      properties:
+        expenses: {type: boolean}
+        payments: {type: boolean, description: Settlements and refunds.}
+        groupChanges: {type: boolean}
 
   parameters:
     ParticipantVersion:
