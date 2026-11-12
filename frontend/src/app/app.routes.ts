@@ -99,5 +99,11 @@ export const routes: Routes = [
       import('./notification/notifications.component').then((m) => m.NotificationsComponent),
   },
 
+  // --- b02 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- a04 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h04 routes (insert below; parallel batch plan rule 3) ---
+
   { path: '**', redirectTo: 'dashboard' },
 ];

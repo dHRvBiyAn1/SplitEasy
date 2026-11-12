@@ -2863,6 +2863,12 @@ paths:
               schema: {$ref: '#/components/schemas/NotificationPreferences'}
         '400': {$ref: '#/components/responses/BadRequest'}
 
+  # --- b02 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- a04 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- h04 paths (insert below; parallel batch plan rule 3) ---
+
 components:
   schemas:
     SaveFriendRequest:
@@ -5107,6 +5113,12 @@ components:
         expenses: {type: boolean}
         payments: {type: boolean, description: Settlements and refunds.}
         groupChanges: {type: boolean}
+
+    # --- b02 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- a04 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h04 schemas (insert below; parallel batch plan rule 3) ---
 
   parameters:
     ParticipantVersion:
