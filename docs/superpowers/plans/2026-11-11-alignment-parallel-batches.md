@@ -68,6 +68,8 @@ Interactions:
 
 ## Wave 7 — now
 
+Design and final ownership: [Wave 7 package plans](2026-11-12-alignment-wave7.md) (H03 leaves the dashboard feed alone this wave).
+
 | Package | Owns | Must not touch |
 | --- | --- | --- |
 | **E03-B** multi-payer editor | `modals/new-expense-modal.*`, `expenses/*` models/service, expense detail rendering in `groups/group-detail.*` | Friends UI, backend ledger |
