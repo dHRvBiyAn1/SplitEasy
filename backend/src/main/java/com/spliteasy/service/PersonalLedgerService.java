@@ -6,6 +6,12 @@ import com.spliteasy.dto.expense.DeletedExpense;
 import com.spliteasy.dto.expense.ExpenseResponse;
 import com.spliteasy.dto.expense.ExpenseSummary;
 import com.spliteasy.dto.expense.RestoreExpenseRequest;
+import com.spliteasy.dto.payment.CorrectPaymentRequest;
+import com.spliteasy.dto.payment.DeletedPayment;
+import com.spliteasy.dto.payment.LedgerRevision;
+import com.spliteasy.dto.payment.PaymentResponse;
+import com.spliteasy.dto.payment.RecordPaymentRequest;
+import com.spliteasy.dto.payment.RestorePaymentRequest;
 import com.spliteasy.entity.Group;
 import com.spliteasy.entity.GroupMembership;
 import com.spliteasy.exception.BadRequestException;
@@ -42,6 +48,7 @@ public class PersonalLedgerService {
   private final UserRepository users;
   private final FinancialParticipantService participants;
   private final ExpenseService expenses;
+  private final PaymentService payments;
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<ExpenseSummary> list(UUID requester, UUID friend) {
@@ -86,6 +93,71 @@ public class PersonalLedgerService {
   public ExpenseResponse restore(
       UUID requester, UUID friend, UUID expense, RestoreExpenseRequest request) {
     return expenses.restoreExpense(requester, existing(requester, friend), expense, request);
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<PaymentResponse> listPayments(UUID requester, UUID friend) {
+    return ledger(requester, friend)
+        .map(id -> payments.listPayments(requester, id))
+        .orElse(List.of());
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<DeletedPayment> deletedPayments(UUID requester, UUID friend) {
+    return ledger(requester, friend)
+        .map(id -> payments.listDeleted(requester, id))
+        .orElse(List.of());
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public PaymentResponse getPayment(UUID requester, UUID friend, UUID payment) {
+    return payments.getPayment(requester, existingPayment(requester, friend), payment);
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<LedgerRevision<PaymentResponse>> paymentHistory(
+      UUID requester, UUID friend, UUID payment) {
+    return payments.getHistory(requester, existingPayment(requester, friend), payment);
+  }
+
+  // One transaction, like create: a rejected payment must not leave a new empty ledger behind.
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public PaymentResponse recordPayment(UUID requester, UUID friend, RecordPaymentRequest request) {
+    var ledger = ledger(requester, friend);
+    requirePair(requester, friend, request.payerUserId(), request.payeeUserId());
+    return payments.recordPayment(
+        requester, ledger.orElseGet(() -> open(requester, friend)), request);
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public PaymentResponse correctPayment(
+      UUID requester, UUID friend, UUID payment, CorrectPaymentRequest request) {
+    UUID ledger = existingPayment(requester, friend);
+    requirePair(requester, friend, request.payerUserId(), request.payeeUserId());
+    return payments.correctPayment(requester, ledger, payment, request);
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public void deletePayment(
+      UUID requester, UUID friend, UUID payment, Long expectedVersion, UUID operationId) {
+    payments.deletePayment(
+        requester, existingPayment(requester, friend), payment, expectedVersion, operationId);
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  public PaymentResponse restorePayment(
+      UUID requester, UUID friend, UUID payment, RestorePaymentRequest request) {
+    return payments.restorePayment(requester, existingPayment(requester, friend), payment, request);
+  }
+
+  private void requirePair(UUID requester, UUID friend, UUID payer, UUID payee) {
+    if (!(payer.equals(requester) && payee.equals(friend))
+        && !(payer.equals(friend) && payee.equals(requester)))
+      throw new BadRequestException("A personal payment must be between you and this friend.");
+  }
+
+  private UUID existingPayment(UUID requester, UUID friend) {
+    return ledger(requester, friend).orElseThrow(() -> new NotFoundException("Payment not found"));
   }
 
   /**
