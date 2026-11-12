@@ -3,6 +3,7 @@ package com.spliteasy.service;
 import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.repository.UserRepository;
+import com.spliteasy.util.Emails;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,10 +31,18 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class AccountClosureService {
   static final String CLOSED_NAME = "Closed account";
+  private static final String TOMBSTONE_DOMAIN = "@closed.invalid";
+
+  /** Closed-account tombstones live in this namespace, so nobody may register or claim it. */
+  static void requireNotReserved(String email) {
+    if (Emails.normalize(email).endsWith(TOMBSTONE_DOMAIN))
+      throw new BadRequestException("This email address cannot be used");
+  }
 
   private final UserRepository users;
   private final PasswordEncoder passwords;
   private final BalanceService balances;
+  private final PairwiseBalanceService pairwise;
   private final GroupWriteGuard writeGuard;
   private final JdbcTemplate jdbc;
   private final ObjectMapper mapper;
@@ -60,7 +69,7 @@ public class AccountClosureService {
     requireSettled(userId, groups);
 
     String oldEmail = user.getEmail();
-    String tombstone = "closed+" + userId + "@closed.invalid";
+    String tombstone = "closed+" + userId + TOMBSTONE_DOMAIN;
     for (UUID group : groups) {
       List<UUID> heirs =
           jdbc.queryForList(
@@ -120,9 +129,11 @@ public class AccountClosureService {
   private void requireSettled(UUID userId, List<UUID> groups) {
     List<String> open = new ArrayList<>();
     for (UUID group : groups) {
+      // Net zero is not enough: direct mode keeps offsetting pair debts that payments still need.
       boolean unsettled =
           balances.computeBalances(userId, group).balances().stream()
-              .anyMatch(b -> userId.equals(b.user().accountId()) && b.netMinor() != 0);
+                  .anyMatch(b -> userId.equals(b.user().accountId()) && b.netMinor() != 0)
+              || pairwise.compute(userId, group).stream().anyMatch(p -> p.netMinor() != 0);
       if (unsettled) open.add(label(userId, group));
     }
     if (!open.isEmpty())
@@ -154,8 +165,13 @@ public class AccountClosureService {
     String[] cols = columns.split(",");
     String cast = jsonb ? "?::jsonb" : "?";
     String match = String.join("::text ilike ? or ", cols) + "::text ilike ?";
-    Object[] args = new Object[cols.length];
-    java.util.Arrays.fill(args, "%" + id + "%");
+    // Email-only receipts (keyed invitations) never mention the user id.
+    match = match + " or " + match;
+    Object[] args = new Object[cols.length * 2];
+    for (int i = 0; i < cols.length; i++) {
+      args[i] = "%" + id + "%";
+      args[cols.length + i] = "%" + oldEmail + "%";
+    }
     // ponytail: closure is rare, so one pass over matching rows beats a bespoke index.
     var rows =
         jdbc.queryForList(

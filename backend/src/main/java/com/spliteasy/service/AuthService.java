@@ -31,6 +31,7 @@ public class AuthService {
     if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
       throw new BadRequestException("Password must be at most 72 UTF-8 bytes");
     }
+    AccountClosureService.requireNotReserved(request.email());
     String email = Emails.normalize(request.email());
     log.debug("Registering new user with email {}", email);
     if (userRepository.existsByEmail(email)) {

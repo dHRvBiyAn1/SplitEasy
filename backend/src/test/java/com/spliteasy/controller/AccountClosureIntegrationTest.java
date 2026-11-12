@@ -383,4 +383,61 @@ class AccountClosureIntegrationTest extends AbstractIntegrationTest {
       assertThat(response.getContentAsString()).contains("Locked trip");
     }
   }
+
+  @Test
+  void netZeroWithDirectObligationsStillBlocksClosureWhenSimplificationIsOff() throws Exception {
+    var alice = register(UUID.randomUUID() + "@example.test", "password123", "Alice");
+    var bob = register(UUID.randomUUID() + "@example.test", "password123", "Bob");
+    var carol = register(UUID.randomUUID() + "@example.test", "password123", "Carol");
+    String g = group(alice, "Direct debts", bob, carol);
+    send(
+        alice,
+        patch("/api/groups/" + g)
+            .contentType("application/json")
+            .content("{\"simplifyDebts\":false}"),
+        200);
+    expense(bob, g, bob.user().id(), alice.user().id(), null); // Alice owes Bob
+    expense(alice, g, alice.user().id(), carol.user().id(), null); // Carol owes Alice
+    var refused =
+        send(alice, jsonPost("/api/me/closure", Map.of("currentPassword", "password123")), 409);
+    assertThat(refused.path("message").asText()).contains("Direct debts");
+  }
+
+  @Test
+  void theTombstoneAddressSpaceCannotBeRegisteredOrClaimedByEmailChange() throws Exception {
+    mockMvc
+        .perform(
+            jsonPost(
+                "/api/auth/register",
+                Map.of(
+                    "email",
+                    "closed+" + UUID.randomUUID() + "@closed.invalid",
+                    "password",
+                    "password123",
+                    "displayName",
+                    "Squatter")))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void emailOnlyRetryReceiptsLoseTheClosedAccountsAddress() throws Exception {
+    String email = UUID.randomUUID() + "@example.test";
+    var alice = register(email, "password123", "Alice");
+    var bob = register(UUID.randomUUID() + "@example.test", "password123", "Bob");
+    jdbc.update(
+        "insert into create_operations(actor_id,kind,scope_id,operation_id,intent,response) values (?,?,?,?,?,?)",
+        bob.user().id(),
+        "invitation",
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "{\"email\":\"" + email + "\"}",
+        "\"" + UUID.randomUUID() + "\"");
+    close(alice, "password123", 204);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from create_operations where intent ilike ?",
+                Integer.class,
+                "%" + email + "%"))
+        .isZero();
+  }
 }
