@@ -30,6 +30,8 @@ import tools.jackson.databind.ObjectMapper;
 public class RecurrenceRunner {
   static final int CATCH_UP_DAYS = 30;
   static final int MAX_CREATED_PER_RUN = 31;
+  // A far-past anchor must not hold one run for years of skipped days; the next run resumes.
+  static final int MAX_SKIPPED_PER_RUN = 400;
 
   private enum Step {
     NONE,
@@ -76,7 +78,8 @@ public class RecurrenceRunner {
 
   private void runSchedule(UUID id) {
     int created = 0;
-    while (created < MAX_CREATED_PER_RUN) {
+    int skipped = 0;
+    while (created < MAX_CREATED_PER_RUN && skipped < MAX_SKIPPED_PER_RUN) {
       Step step;
       try {
         step = tx.execute(status -> step(id));
@@ -86,6 +89,7 @@ public class RecurrenceRunner {
       }
       if (step == Step.NONE) return;
       if (step == Step.CREATED) created++;
+      else skipped++;
     }
   }
 

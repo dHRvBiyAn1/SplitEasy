@@ -9,6 +9,12 @@ import { GroupDetailComponent } from './group-detail.component';
 const me = { id: 'me', displayName: 'Alex Rivera', email: 'alex@test.com' };
 const bob = { id: 'bob', displayName: 'Bob Chen', email: 'bob@test.com', accountId: 'bob-acct' };
 const ann = { id: 'ann', displayName: 'Ann Lee', email: 'ann@test.com' };
+const guest = {
+  id: 'guest',
+  displayName: 'Gus Guest',
+  email: null,
+  accountId: null as string | null,
+};
 
 describe('Remind action on an owed-to-me balance', () => {
   let http: HttpTestingController;
@@ -32,12 +38,13 @@ describe('Remind action on an owed-to-me balance', () => {
       name: 'Trip',
       type: 'TRIP',
       createdBy: me,
-      members: [me, bob, ann],
+      members: [me, bob, ann, guest],
       simplifyDebts: true,
     });
     http.expectOne('/api/groups/g/balances/mine').flush([
       { user: bob, netMinor: 1500, currency: 'USD' },
       { user: ann, netMinor: -500, currency: 'USD' },
+      { user: guest, netMinor: 700, currency: 'USD' },
     ]);
     http.expectOne('/api/groups/g/balances').flush({ balances: [] });
     http.expectOne('/api/groups/g/expenses').flush([]);
@@ -55,7 +62,7 @@ describe('Remind action on an owed-to-me balance', () => {
       b.textContent?.includes('Remind'),
     );
 
-  it('is offered only for people who owe me, and posts the debtor account and currency', () => {
+  it('is offered only for people with an account who owe me, and posts the debtor account and currency', () => {
     const fixture = render();
     const root: HTMLElement = fixture.nativeElement;
     expect(reminders(root)).toHaveLength(1);

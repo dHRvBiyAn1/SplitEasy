@@ -139,7 +139,7 @@
           >
             {{ display(b.netMinor < 0 ? -b.netMinor : b.netMinor, b.currency) }}
           </strong>
-          @if (b.netMinor > 0) {
+          @if (b.netMinor > 0 && b.user.accountId !== null) {
             <button type="button" class="dc-btn-outline" (click)="remind(b)">
               Remind {{ b.user.displayName.split(' ')[0] }}
             </button>

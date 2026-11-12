@@ -382,6 +382,23 @@ class RecurrenceIntegrationTest extends AbstractIntegrationTest {
         .isZero(); // validation never leaves an expense behind
   }
 
+  @Test
+  void skippedCatchUpIsBoundedPerRunAndResumesOnTheNext() throws Exception {
+    var alice = account("Alice");
+    String g = group(alice);
+    var s = create(alice, g, schedule(template(alice, 100, alice), "DAILY", "2024-01-01", "UTC"));
+    String id = s.path("id").asText();
+    long stale =
+        java.time.temporal.ChronoUnit.DAYS.between(
+            java.time.LocalDate.of(2024, 1, 1), java.time.LocalDate.of(2026, 1, 30));
+    runner.run();
+    assertThat(occurrences(id, "SKIPPED")).isEqualTo(RecurrenceRunner.MAX_SKIPPED_PER_RUN);
+    assertThat(spentOn(alice, g)).isEmpty(); // one run never walks the whole backlog
+    runner.run();
+    assertThat(occurrences(id, "SKIPPED")).isEqualTo(stale);
+    assertThat(spentOn(alice, g)).hasSize(31);
+  }
+
   long unread(AuthResponse who) throws Exception {
     return send(who, get("/api/notifications/unread-count"), 200).path("count").asLong();
   }
