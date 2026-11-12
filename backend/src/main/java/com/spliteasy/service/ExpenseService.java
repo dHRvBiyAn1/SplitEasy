@@ -3,6 +3,8 @@ package com.spliteasy.service;
 import com.spliteasy.config.LedgerContract;
 import com.spliteasy.dto.common.ParticipantSummary;
 import com.spliteasy.dto.common.UserSummary;
+import com.spliteasy.dto.expense.Contribution;
+import com.spliteasy.dto.expense.ContributionInput;
 import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.dto.expense.DeletedExpense;
 import com.spliteasy.dto.expense.ExpenseResponse;
@@ -19,6 +21,7 @@ import com.spliteasy.entity.SplitType;
 import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.NotFoundException;
+import com.spliteasy.repository.ExpenseContributionRepository;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.ParticipantRepository;
@@ -26,10 +29,12 @@ import com.spliteasy.repository.UserRepository;
 import com.spliteasy.service.split.Share;
 import com.spliteasy.service.split.SplitContext;
 import com.spliteasy.service.split.SplitStrategy;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +60,7 @@ public class ExpenseService {
   private final jakarta.persistence.EntityManager entityManager;
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
+  private final ExpenseContributionRepository contributionRepository;
   private final GroupWriteGuard groupWriteGuard;
   private final UserRepository userRepository;
   private final MembershipGuard membershipGuard;
@@ -71,6 +77,7 @@ public class ExpenseService {
       jakarta.persistence.EntityManager entityManager,
       ExpenseRepository expenseRepository,
       ExpenseParticipantRepository participantRepository,
+      ExpenseContributionRepository contributionRepository,
       GroupWriteGuard groupWriteGuard,
       UserRepository userRepository,
       MembershipGuard membershipGuard,
@@ -83,6 +90,7 @@ public class ExpenseService {
     this.entityManager = entityManager;
     this.expenseRepository = expenseRepository;
     this.participantRepository = participantRepository;
+    this.contributionRepository = contributionRepository;
     this.groupWriteGuard = groupWriteGuard;
     this.userRepository = userRepository;
     this.membershipGuard = membershipGuard;
@@ -119,7 +127,12 @@ public class ExpenseService {
             null,
             null,
             request.amountMinor(),
-            request.currency()),
+            request.currency(),
+            request.contributions() == null
+                ? null
+                : request.contributions().stream()
+                    .sorted(Comparator.comparing(ContributionInput::userId))
+                    .toList()),
         ExpenseResponse.class,
         response -> {},
         () -> createNewExpense(requesterId, groupId, group, request));
@@ -130,7 +143,7 @@ public class ExpenseService {
     financialParticipants.requireCompatible(groupId);
     log.debug("Creating expense in group {} by user {}", groupId, requesterId);
 
-    ComputedSplit split = computeSplit(groupId, request);
+    ComputedSplit split = computeSplit(groupId, request, null);
     Expense expense =
         new Expense(
             group,
@@ -173,17 +186,15 @@ public class ExpenseService {
           "Expense currency cannot change. Create a separate expense in the correct currency.");
     }
     versionPolicy.requireExpected(request.expectedVersion(), expense.getVersion());
+    if (request.contributions() == null && expense.getContributions().size() > 1) {
+      throw new ConflictException(
+          "This expense has several payers. Reload it in an updated app and edit who paid.");
+    }
     requireActiveExpenseParticipants(expense);
 
     ExpenseResponse before = toResponse(expense);
     // Validate before advancing; parent versions must also cover child-only split intent changes.
-    ComputedSplit split =
-        computeSplit(
-            groupId,
-            request,
-            expense.getParticipants().stream()
-                .map(p -> p.getUser().getId())
-                .collect(Collectors.toSet()));
+    ComputedSplit split = computeSplit(groupId, request, expense);
     // Immediate increment (unlike deferred OPTIMISTIC_FORCE_INCREMENT) keeps the response current.
     entityManager.lock(expense, jakarta.persistence.LockModeType.PESSIMISTIC_FORCE_INCREMENT);
     expense.setDescription(request.description().trim());
@@ -195,6 +206,7 @@ public class ExpenseService {
     // Flush the orphan-removal deletes before re-inserting, or the new rows collide with the
     // old ones on the (expense_id, user_id) unique constraint within one flush.
     expense.clearParticipants();
+    expense.getContributions().clear();
     expenseRepository.flush();
     addShares(expense, split);
     expenseRepository.saveAndFlush(expense);
@@ -243,7 +255,8 @@ public class ExpenseService {
 
   private void requireActiveExpenseParticipants(Expense expense) {
     Set<UUID> active = financialParticipants.active(expense.getGroup().getId());
-    if (!active.contains(expense.getPaidBy().getId())
+    if (expense.getContributions().stream()
+            .anyMatch(c -> !active.contains(c.getParticipant().getId()))
         || expense.getParticipants().stream()
             .anyMatch(p -> !active.contains(p.getUser().getId()))) {
       throw new ConflictException("Re-add former participants before changing this expense.");
@@ -256,23 +269,20 @@ public class ExpenseService {
       UUID payerId,
       List<Share> shares,
       Map<UUID, Participant> participantsById,
-      Map<UUID, Long> inputs) {}
+      Map<UUID, Long> inputs,
+      Map<UUID, Long> contributions) {}
 
   /**
    * Validates payer/participants (financial eligibility) and computes shares via the split
    * strategy.
    */
-  private ComputedSplit computeSplit(UUID groupId, CreateExpenseRequest request) {
-    return computeSplit(groupId, request, Set.of());
-  }
-
-  private ComputedSplit computeSplit(
-      UUID groupId, CreateExpenseRequest request, Set<UUID> historicalIds) {
+  private ComputedSplit computeSplit(UUID groupId, CreateExpenseRequest request, Expense existing) {
     Set<UUID> activeParticipantIds = financialParticipants.active(groupId);
     UUID payerId = request.paidByUserId();
     if (!activeParticipantIds.contains(payerId)) {
       throw new BadRequestException("The payer must be an active participant in this group");
     }
+    Map<UUID, Long> contributions = contributionsOf(request, activeParticipantIds);
     SplitType splitType = Objects.requireNonNullElse(request.splitType(), SplitType.EQUAL);
     // Service resolves financial eligibility; the strategy owns the split math + its validation.
     SplitContext ctx;
@@ -296,25 +306,67 @@ public class ExpenseService {
               requireSplits(request.splits(), activeParticipantIds));
     }
     List<Share> shares = strategies.get(splitType).split(ctx);
-    var originals = financialParticipants.originals(groupId);
-    var owners =
-        shares.stream()
-            .collect(
-                Collectors.groupingBy(
-                    share -> originals.get(share.userId()).canonicalParticipantId()));
-    for (var owned : owners.values())
-      if (owned.size() > 1
-          && !historicalIds.containsAll(owned.stream().map(Share::userId).toList()))
-        throw new ConflictException(
-            "These participants now belong to the same person. Reload and review the split without duplicate identities.");
+    requireDistinctOwners(
+        groupId,
+        shares.stream().map(Share::userId).toList(),
+        existing == null
+            ? Set.of()
+            : existing.getParticipants().stream()
+                .map(p -> p.getUser().getId())
+                .collect(Collectors.toSet()));
+    requireDistinctOwners(
+        groupId,
+        List.copyOf(contributions.keySet()),
+        existing == null
+            ? Set.of()
+            : existing.getContributions().stream()
+                .map(c -> c.getParticipant().getId())
+                .collect(Collectors.toSet()));
     Map<UUID, Participant> participantsById =
-        loadParticipants(shares.stream().map(Share::userId).toList(), payerId);
+        loadParticipants(shares.stream().map(Share::userId).toList(), contributions.keySet());
     Map<UUID, Long> inputs =
         splitType == SplitType.EQUAL
             ? shares.stream().collect(Collectors.toMap(Share::userId, share -> 1L))
             : ctx.splits().stream()
                 .collect(Collectors.toMap(SplitInput::userId, SplitInput::value));
-    return new ComputedSplit(splitType, payerId, shares, participantsById, inputs);
+    return new ComputedSplit(splitType, payerId, shares, participantsById, inputs, contributions);
+  }
+
+  /** Several aliases of one owner are rejected unless the expense already held them all. */
+  private void requireDistinctOwners(UUID groupId, List<UUID> ids, Set<UUID> historicalIds) {
+    var originals = financialParticipants.originals(groupId);
+    var owners =
+        ids.stream()
+            .collect(Collectors.groupingBy(id -> originals.get(id).canonicalParticipantId()));
+    for (var owned : owners.values())
+      if (owned.size() > 1 && !historicalIds.containsAll(owned))
+        throw new ConflictException(
+            "These participants now belong to the same person. Reload and review the split without duplicate identities.");
+  }
+
+  /** Who paid what; absent contributions mean the payer paid the whole amount. */
+  private Map<UUID, Long> contributionsOf(CreateExpenseRequest request, Set<UUID> active) {
+    long amount = request.resolvedAmountMinor();
+    if (request.contributions() == null) return Map.of(request.paidByUserId(), amount);
+    Map<UUID, Long> paid = new LinkedHashMap<>();
+    for (ContributionInput c : request.contributions()) {
+      if (!active.contains(c.userId())) {
+        throw new BadRequestException(
+            "Contributor " + c.userId() + " is not an active participant in this group");
+      }
+      if (paid.put(c.userId(), c.amountMinor()) != null) {
+        throw new BadRequestException("Duplicate contributor: " + c.userId());
+      }
+    }
+    if (!paid.containsKey(request.paidByUserId())) {
+      throw new BadRequestException("The payer must be one of the contributors");
+    }
+    BigInteger total =
+        paid.values().stream().map(BigInteger::valueOf).reduce(BigInteger.ZERO, BigInteger::add);
+    if (!total.equals(BigInteger.valueOf(amount))) {
+      throw new BadRequestException("Contributions must add up to the expense amount");
+    }
+    return paid;
   }
 
   private ExpenseCategory categoryOf(CreateExpenseRequest request) {
@@ -331,6 +383,9 @@ public class ExpenseService {
           .addParticipant(split.participantsById().get(share.userId()), share.shareCents())
           .setSplitValue(split.inputs().get(share.userId()));
     }
+    split
+        .contributions()
+        .forEach((id, amount) -> expense.addContribution(split.participantsById().get(id), amount));
   }
 
   /** A non-empty, duplicate-free split list where every financial participant is active. */
@@ -363,6 +418,12 @@ public class ExpenseService {
                 Collectors.toMap(
                     ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
                     ExpenseParticipantRepository.ExpenseShareView::getShareCents));
+    Map<UUID, Long> myPaid =
+        contributionRepository.findPaidByUserAndGroups(requesterId, List.of(groupId)).stream()
+            .collect(
+                Collectors.toMap(
+                    ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
+                    ExpenseParticipantRepository.ExpenseShareView::getShareCents));
     var rows = expenseRepository.findSummariesByGroupId(groupId);
     var payers =
         participantIdentities
@@ -383,27 +444,14 @@ public class ExpenseService {
                     v.getAmountCents(),
                     payers.get(v.getPayerId()),
                     v.getParticipantCount(),
+                    v.getPayerCount(),
                     v.getCategory(),
                     v.getSpentOn(),
-                    viewerDelta(
-                        requesterId,
-                        payers.get(v.getPayerId()).canonicalParticipantId(),
-                        v.getAmountCents(),
-                        myShare.getOrDefault(v.getId(), 0L)),
+                    myPaid.getOrDefault(v.getId(), 0L) - myShare.getOrDefault(v.getId(), 0L),
                     v.getCreatedAt(),
                     v.getVersion(),
                     v.getCurrency()))
         .toList();
-  }
-
-  /**
-   * The requesting member's net for one expense: positive = they lent (paid more than their share),
-   * negative = they borrowed (their share), 0 = not involved. Shared by the group expense list and
-   * the dashboard activity feed so both read the same everywhere.
-   */
-  static long viewerDelta(UUID viewerId, UUID payerId, long amountCents, long viewerShareCents) {
-    long paid = viewerId.equals(payerId) ? amountCents : 0L;
-    return paid - viewerShareCents;
   }
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -495,9 +543,10 @@ public class ExpenseService {
     return distinct;
   }
 
-  private Map<UUID, Participant> loadParticipants(List<UUID> participantIds, UUID payerId) {
+  private Map<UUID, Participant> loadParticipants(
+      List<UUID> participantIds, Set<UUID> contributorIds) {
     Set<UUID> ids = new LinkedHashSet<>(participantIds);
-    ids.add(payerId);
+    ids.addAll(contributorIds);
     return participantIdentities.findAllById(ids).stream()
         .collect(Collectors.toMap(Participant::getId, Function.identity()));
   }
@@ -545,6 +594,15 @@ public class ExpenseService {
         inputs,
         expense.getCreatedAt(),
         expense.getVersion(),
-        expense.getCurrency());
+        expense.getCurrency(),
+        expense.getContributions().stream()
+            .map(
+                c ->
+                    new Contribution(
+                        ParticipantSummary.from(c.getParticipant()),
+                        c.getAmountCents(),
+                        expense.getCurrency()))
+            .sorted(Comparator.comparing(c -> c.user().displayName()))
+            .toList());
   }
 }

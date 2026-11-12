@@ -9,12 +9,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParticipant, UUID> {
 
-  /** Raw expense debts, grouped by debtor and creditor across the whole group. */
+  /**
+   * Raw debts of single-payer expenses, grouped by debtor and creditor. Multi-payer expenses are
+   * attributed separately ({@code ContributionAttribution}).
+   */
   @Query(
       """
       select p.user.id as fromId, p.expense.currency as currency, p.expense.paidBy.id as toId, sum(p.shareCents) as totalCents
       from ExpenseParticipant p
       where p.expense.deletedAt is null and p.expense.group.id = :groupId and p.user.id <> p.expense.paidBy.id
+        and p.expense.id in (select c.expense.id from ExpenseContribution c
+                             group by c.expense.id having count(*) = 1)
       group by p.user.id, p.expense.paidBy.id, p.expense.currency
       """)
   List<PairAmount> sumOwedByPair(@Param("groupId") UUID groupId);
@@ -52,34 +57,4 @@ public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParti
 
     long getShareCents();
   }
-
-  /**
-   * Others' shares in expenses the given user paid, grouped by the other participant — i.e. how
-   * much each counterparty owes the user from the user's own expenses. Powers pairwise balances.
-   */
-  @Query(
-      """
-            select p.user.id as userId, p.expense.currency as currency, sum(p.shareCents) as totalCents
-            from ExpenseParticipant p
-            where p.expense.deletedAt is null and p.expense.group.id = :groupId
-              and p.expense.paidBy.id = :userId
-              and p.user.id <> :userId
-            group by p.user.id, p.expense.currency
-            """)
-  List<UserAmount> sumOwedToUser(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
-
-  /**
-   * The given user's shares in expenses others paid, grouped by the payer — i.e. how much the user
-   * owes each counterparty from their expenses. Powers pairwise balances.
-   */
-  @Query(
-      """
-            select p.expense.paidBy.id as userId, p.expense.currency as currency, sum(p.shareCents) as totalCents
-            from ExpenseParticipant p
-            where p.expense.deletedAt is null and p.expense.group.id = :groupId
-              and p.user.id = :userId
-              and p.expense.paidBy.id <> :userId
-            group by p.expense.paidBy.id, p.expense.currency
-            """)
-  List<UserAmount> sumOwedByUser(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
 }

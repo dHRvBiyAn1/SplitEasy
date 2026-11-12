@@ -28,7 +28,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                    payer.id as payerId,
                    case when payer.scopeGroupId is null then coalesce(payer.currentDisplayName,payer.displayName) else payer.displayName end as payerDisplayName,
                    payer.email as payerEmail,
-                   (select count(p.id) from ExpenseParticipant p where p.expense = e) as participantCount
+                   (select count(p.id) from ExpenseParticipant p where p.expense = e) as participantCount,
+                   (select count(c.id) from ExpenseContribution c where c.expense = e) as payerCount
             from Expense e
             join e.paidBy payer
             where e.deletedAt is null and e.group.id = :groupId
@@ -91,14 +92,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
   Optional<Expense> findByIdFetchAll(@Param("expenseId") UUID expenseId);
 
   /**
-   * Total amount paid per payer across all expenses in a group — one aggregate query, not a
-   * per-expense loop.
+   * Total paid per payer over the group's single-payer expenses — one aggregate query. Multi-payer
+   * expenses are summed from their contributions ({@code ExpenseContributionRepository}).
    */
   @Query(
       """
             select e.paidBy.id as userId, e.currency as currency, sum(e.amountCents) as totalCents
             from Expense e
             where e.deletedAt is null and e.group.id = :groupId
+              and e.id in (select c.expense.id from ExpenseContribution c
+                           group by c.expense.id having count(*) = 1)
             group by e.paidBy.id, e.currency
             """)
   List<UserAmount> sumPaidByGroup(@Param("groupId") UUID groupId);
@@ -139,6 +142,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     String getPayerEmail();
 
     long getParticipantCount();
+
+    long getPayerCount();
   }
 
   /** Projection backing {@link #findRecentByGroupIds(List, Pageable)}. */

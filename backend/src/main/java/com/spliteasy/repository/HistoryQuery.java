@@ -74,7 +74,9 @@ public class HistoryQuery {
 
   // Parties are only computed when a friend scope needs them.
   private static final String EXPENSE_PARTIES =
-      ",ARRAY(SELECT ep.user_id FROM expense_participants ep WHERE ep.expense_id=e.id) || e.paid_by AS parties";
+      ",ARRAY(SELECT ep.user_id FROM expense_participants ep WHERE ep.expense_id=e.id) || e.paid_by"
+          + " || ARRAY(SELECT c.participant_id FROM expense_contributions c WHERE c.expense_id=e.id)"
+          + " AS parties";
   private static final String PAYMENT_PARTIES = ",ARRAY[p.payer_id,p.payee_id]";
   private static final String REFUND_PARTIES =
       ",ARRAY(SELECT rp.participant_id FROM expense_refund_participants rp WHERE rp.refund_id=r.id) || r.received_by";
@@ -114,19 +116,22 @@ public class HistoryQuery {
       SELECT 'EXPENSE' AS type,e.id AS transaction_id,e.group_id,e.spent_on AS financial_date,
              e.description,e.currency,e.amount_cents AS amount_minor,
              ep.user_id AS participant_id,%6$s AS participant_name,
-             CASE WHEN ep.user_id=e.paid_by THEN e.amount_cents ELSE 0::bigint END AS paid_minor,
+             ep.paid_cents AS paid_minor,
              ep.share_cents AS owed_minor,0::bigint AS settlement_minor,
-             CASE WHEN ep.user_id=e.paid_by THEN e.amount_cents ELSE 0::bigint END
-               - ep.share_cents AS net_minor,
+             ep.paid_cents - ep.share_cents AS net_minor,
              (SELECT v.actor->>'displayName' FROM expense_revisions v
               WHERE v.expense_id=e.id ORDER BY v.version DESC LIMIT 1) AS last_changed_by,
              COALESCE((SELECT max(v.recorded_at) FROM expense_revisions v WHERE v.expense_id=e.id),e.created_at) AS updated_at
              %1$s
       FROM expenses e CROSS JOIN LATERAL (
-        SELECT user_id,share_cents FROM expense_participants WHERE expense_id=e.id
-        UNION ALL
-        SELECT e.paid_by,0 WHERE NOT EXISTS
-          (SELECT 1 FROM expense_participants WHERE expense_id=e.id AND user_id=e.paid_by)
+        -- one row per person: what they owe (shares) and what they paid (contributions, V23)
+        SELECT x.user_id,sum(x.share)::bigint AS share_cents,sum(x.paid)::bigint AS paid_cents
+        FROM (SELECT user_id,share_cents AS share,0::bigint AS paid
+              FROM expense_participants WHERE expense_id=e.id
+              UNION ALL
+              SELECT participant_id,0::bigint,amount_cents
+              FROM expense_contributions WHERE expense_id=e.id) x
+        GROUP BY x.user_id
       ) ep
       WHERE e.deleted_at IS NULL AND e.group_id IN (SELECT id FROM scope)
       UNION ALL

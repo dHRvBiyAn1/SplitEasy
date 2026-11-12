@@ -7,6 +7,7 @@ import com.spliteasy.dto.dashboard.ActivityItem;
 import com.spliteasy.dto.dashboard.DashboardGroup;
 import com.spliteasy.dto.dashboard.DashboardResponse;
 import com.spliteasy.dto.group.GroupSummary;
+import com.spliteasy.repository.ExpenseContributionRepository;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.ExpenseRepository.ActivityExpenseView;
@@ -50,6 +51,7 @@ public class DashboardService {
   private final PairwiseBalanceService pairwiseService;
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
+  private final ExpenseContributionRepository contributionRepository;
   private final PaymentRepository paymentRepository;
   private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
   private final com.spliteasy.repository.PersonalLedgerRepository personalLedgers;
@@ -239,6 +241,13 @@ public class DashboardService {
                 Collectors.toMap(
                     ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
                     ExpenseParticipantRepository.ExpenseShareView::getShareCents));
+    // What the viewer actually paid per expense (V23), so a multi-payer item shows the right delta.
+    Map<UUID, Long> myPaid =
+        contributionRepository.findPaidByUserAndGroups(userId, groupIds).stream()
+            .collect(
+                Collectors.toMap(
+                    ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
+                    ExpenseParticipantRepository.ExpenseShareView::getShareCents));
 
     List<ActivityItem> items = new ArrayList<>();
     var expenseRows = expenseRepository.findRecentByGroupIds(groupIds, limit);
@@ -261,11 +270,7 @@ public class DashboardService {
               payer,
               null,
               e.getAmountCents(),
-              ExpenseService.viewerDelta(
-                  userId,
-                  payer.canonicalParticipantId(),
-                  e.getAmountCents(),
-                  myShare.getOrDefault(e.getId(), 0L)),
+              myPaid.getOrDefault(e.getId(), 0L) - myShare.getOrDefault(e.getId(), 0L),
               e.getCategory(),
               e.getSpentOn(),
               e.getCurrency()));

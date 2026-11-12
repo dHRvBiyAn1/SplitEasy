@@ -77,6 +77,11 @@ public class Expense {
   @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<ExpenseParticipant> participants = new ArrayList<>();
 
+  /** Who actually paid (V23); sums to the amount. One row for a single-payer expense. */
+  @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
+  @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
+  private List<ExpenseContribution> contributions = new ArrayList<>();
+
   public Expense(
       Group group,
       String description,
@@ -107,6 +112,10 @@ public class Expense {
     ExpenseParticipant participant = new ExpenseParticipant(this, user, shareCents);
     participants.add(participant);
     return participant;
+  }
+
+  public void addContribution(Participant participant, long amountCents) {
+    contributions.add(new ExpenseContribution(this, participant, amountCents));
   }
 
   /**

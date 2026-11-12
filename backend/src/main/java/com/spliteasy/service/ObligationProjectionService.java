@@ -2,6 +2,7 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.DirectObligation;
 import com.spliteasy.exception.NotFoundException;
+import com.spliteasy.repository.ExpenseContributionRepository;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.GroupRepository;
 import com.spliteasy.repository.PairAmount;
@@ -25,6 +26,7 @@ public class ObligationProjectionService {
   private final BalanceService balanceService;
   private final ExpenseParticipantRepository participantRepository;
   private final PaymentRepository paymentRepository;
+  private final ExpenseContributionRepository contributionRepository;
   private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
   private final FinancialParticipantService financialParticipants;
   private final GroupRepository groupRepository;
@@ -65,6 +67,7 @@ public class ObligationProjectionService {
   private List<DirectObligation> rawSnapshot(UUID groupId) {
     Map<Pair, Long> amounts = new HashMap<>();
     addPairs(groupId, amounts, participantRepository.sumOwedByPair(groupId), 1);
+    addMultiPayerPairs(groupId, amounts);
     addPairs(groupId, amounts, paymentRepository.sumPaidByPair(groupId), -1);
     // A refund lowers each participant's debt to the payer who received the money back.
     addPairs(groupId, amounts, refundRepository.sumByPair(groupId), -1);
@@ -97,11 +100,50 @@ public class ObligationProjectionService {
     for (PairAmount row : rows) {
       UUID from = originals.get(row.getFromId()).canonicalParticipantId();
       UUID to = originals.get(row.getToId()).canonicalParticipantId();
-      if (from.equals(to)) continue;
-      long amount = row.getTotalCents() * sign;
-      amounts.merge(new Pair(from, to, row.getCurrency()), amount, Math::addExact);
-      amounts.merge(new Pair(to, from, row.getCurrency()), -amount, Math::addExact);
+      addPair(amounts, new Pair(from, to, row.getCurrency()), row.getTotalCents() * sign);
     }
+  }
+
+  /** Multi-payer expenses: per-expense attribution over canonical owners, then the same netting. */
+  private void addMultiPayerPairs(UUID groupId, Map<Pair, Long> amounts) {
+    var contributions = contributionRepository.findMultiPayerContributions(groupId);
+    if (contributions.isEmpty()) return;
+    var originals = financialParticipants.originals(groupId);
+    Map<UUID, Map<UUID, Long>> paid = new HashMap<>();
+    Map<UUID, Map<UUID, Long>> owed = new HashMap<>();
+    Map<UUID, ExpenseContributionRepository.AttributionRow> expenses = new HashMap<>();
+    for (var row : contributions) {
+      expenses.put(row.getExpenseId(), row);
+      paid.computeIfAbsent(row.getExpenseId(), id -> new HashMap<>())
+          .merge(
+              originals.get(row.getParticipantId()).canonicalParticipantId(),
+              row.getAmountCents(),
+              Math::addExact);
+    }
+    for (var row : contributionRepository.findMultiPayerShares(groupId))
+      owed.computeIfAbsent(row.getExpenseId(), id -> new HashMap<>())
+          .merge(
+              originals.get(row.getParticipantId()).canonicalParticipantId(),
+              row.getAmountCents(),
+              Math::addExact);
+    expenses.forEach(
+        (expenseId, row) ->
+            ContributionAttribution.attribute(
+                    paid.get(expenseId),
+                    owed.getOrDefault(expenseId, Map.of()),
+                    originals.get(row.getPrimaryId()).canonicalParticipantId())
+                .forEach(
+                    debt ->
+                        addPair(
+                            amounts,
+                            new Pair(debt.from(), debt.to(), row.getCurrency()),
+                            debt.amount())));
+  }
+
+  private void addPair(Map<Pair, Long> amounts, Pair pair, long amount) {
+    if (pair.from().equals(pair.to())) return;
+    amounts.merge(pair, amount, Math::addExact);
+    amounts.merge(new Pair(pair.to(), pair.from(), pair.currency()), -amount, Math::addExact);
   }
 
   private record Pair(UUID from, UUID to, com.spliteasy.entity.LedgerCurrency currency) {}
