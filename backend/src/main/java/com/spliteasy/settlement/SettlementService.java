@@ -1,6 +1,7 @@
 package com.spliteasy.settlement;
 
 import com.spliteasy.config.ParticipantContract;
+import com.spliteasy.dto.friend.FriendBalance;
 import com.spliteasy.dto.payment.RecordPaymentRequest;
 import com.spliteasy.entity.LedgerCurrency;
 import com.spliteasy.exception.BadRequestException;
@@ -9,8 +10,8 @@ import com.spliteasy.exception.ForbiddenException;
 import com.spliteasy.repository.FriendRepository;
 import com.spliteasy.repository.GroupMembershipRepository;
 import com.spliteasy.repository.PersonalLedgerRepository;
+import com.spliteasy.service.FriendService;
 import com.spliteasy.service.GroupWriteGuard;
-import com.spliteasy.service.PairwiseBalanceService;
 import com.spliteasy.service.PaymentService;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,7 +35,7 @@ public class SettlementService {
   private final FriendRepository friends;
   private final GroupMembershipRepository memberships;
   private final PersonalLedgerRepository personalLedgers;
-  private final PairwiseBalanceService pairwise;
+  private final FriendService friendService;
   private final GroupWriteGuard writes;
   private final PaymentService payments;
   private final JdbcClient jdbc;
@@ -140,43 +141,45 @@ public class SettlementService {
       throw new ForbiddenException("Save this person as a friend to settle with them.");
   }
 
-  private boolean shares(UUID group, UUID friend) {
-    return jdbc.sql("SELECT EXISTS(SELECT 1 FROM group_memberships WHERE group_id=? AND user_id=?)")
-        .params(group, friend)
-        .query(Boolean.class)
-        .single();
-  }
-
+  /** Same projection as the friend page, so a preview can never disagree with its totals. */
   private Computed compute(UUID owner, UUID friend, LedgerCurrency currency) {
+    var detail = friendService.detail(owner, friend);
     var personal = personalLedgers.find(owner, friend);
-    var groups =
-        memberships.findGroupSummariesForUser(owner).stream()
-            .filter(g -> shares(g.getId(), friend))
-            .sorted(Comparator.comparing(g -> g.getId()))
-            .toList();
+    var archived = new java.util.HashSet<UUID>();
+    for (var g : memberships.findGroupSummariesForUser(owner))
+      if (g.getArchivedAt() != null) archived.add(g.getId());
+    // scope id, display name (null = personal), net owed to the requester in this currency
+    record Row(UUID scope, String name, long owed) {}
+    var rows = new ArrayList<Row>();
+    for (var g : detail.sharedGroups())
+      rows.add(new Row(g.id(), g.name(), owed(g.balances(), currency)));
+    personal.ifPresent(
+        id -> rows.add(new Row(id, null, owed(detail.personalBalances(), currency))));
+    rows.sort(Comparator.comparing(Row::scope));
     var allocations = new ArrayList<Allocation>();
     var skipped = new ArrayList<SettlementPreview.Skipped>();
     long net = 0;
-    for (var g : groups) {
-      long owed =
-          pairwise.compute(owner, g.getId()).stream()
-              .filter(p -> p.user().id().equals(friend) && p.currency() == currency)
-              .mapToLong(p -> p.netCents())
-              .reduce(0, Math::addExact);
-      if (owed == 0) continue;
-      String name = personal.filter(g.getId()::equals).isPresent() ? null : g.getName();
-      if (g.getArchivedAt() != null) {
-        skipped.add(new SettlementPreview.Skipped(g.getId(), name, "Archived group"));
+    for (var r : rows) {
+      if (r.owed() == 0) continue;
+      if (archived.contains(r.scope())) {
+        skipped.add(new SettlementPreview.Skipped(r.scope(), r.name(), "Archived group"));
         continue;
       }
       allocations.add(
-          owed > 0
-              ? new Allocation(g.getId(), name, friend, owner, owed, null)
-              : new Allocation(g.getId(), name, owner, friend, -owed, null));
-      net = Math.addExact(net, owed);
+          r.owed() > 0
+              ? new Allocation(r.scope(), r.name(), friend, owner, r.owed(), null)
+              : new Allocation(r.scope(), r.name(), owner, friend, -r.owed(), null));
+      net = Math.addExact(net, r.owed());
     }
     return new Computed(
-        groups.stream().map(g -> g.getId()).toList(),
+        rows.stream().map(Row::scope).toList(),
         new SettlementPreview(currency, allocations, skipped, net));
+  }
+
+  private static long owed(List<FriendBalance> balances, LedgerCurrency currency) {
+    return balances.stream()
+        .filter(b -> b.currency() == currency)
+        .mapToLong(FriendBalance::netMinor)
+        .sum();
   }
 }

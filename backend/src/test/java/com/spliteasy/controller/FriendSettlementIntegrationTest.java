@@ -19,8 +19,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.JsonNode;
 
+@org.springframework.boot.test.context.SpringBootTest(
+    properties = {
+      "app.mail.enabled=true",
+      "app.mail.from=no-reply@example.test",
+      "app.mail.frontend-url=http://localhost:4200",
+      "app.mail.allow-insecure-local=true"
+    })
+@org.springframework.context.annotation.Import(
+    ParticipantInvitationIntegrationTest.MailConfiguration.class)
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class FriendSettlementIntegrationTest extends AbstractIntegrationTest {
+  @org.springframework.beans.factory.annotation.Autowired
+  ParticipantInvitationIntegrationTest.Mailbox mailbox;
 
   private AuthResponse account(String name) throws Exception {
     return register(UUID.randomUUID() + "@example.test", "password123", name);
@@ -59,6 +70,11 @@ class FriendSettlementIntegrationTest extends AbstractIntegrationTest {
   private void expense(
       String url, AuthResponse payer, AuthResponse other, long amount, String currency)
       throws Exception {
+    expense(url, payer, other.user().id().toString(), amount, currency);
+  }
+
+  private void expense(String url, AuthResponse payer, String other, long amount, String currency)
+      throws Exception {
     send(
         payer,
         jsonPost(
@@ -73,7 +89,7 @@ class FriendSettlementIntegrationTest extends AbstractIntegrationTest {
                 "paidByUserId",
                 payer.user().id(),
                 "participantUserIds",
-                List.of(payer.user().id(), other.user().id()))),
+                List.of(payer.user().id().toString(), other))),
         201);
   }
 
@@ -139,6 +155,57 @@ class FriendSettlementIntegrationTest extends AbstractIntegrationTest {
     var changed = commit(preview, op);
     changed.put("note", "Different");
     send(w.alice(), jsonPost(settle(w.bob()), changed), 409);
+  }
+
+  @Test
+  void aClaimedGuestAliasIsSettledAndPreviewMatchesTheFriendDetail() throws Exception {
+    var alice = account("Alice");
+    var bob = account("Bob");
+    String path =
+        "/api/groups/"
+            + send(alice, jsonPost("/api/groups", Map.of("name", "Guests")), 201)
+                .path("id")
+                .asText();
+    var guest =
+        send(alice, jsonPost(path + "/participants", Map.of("displayName", "Bob guest")), 201);
+    expense(path + "/expenses", alice, guest.path("id").asText(), 3000, "USD");
+    send(
+        alice,
+        jsonPost(
+            path + "/invitations/email",
+            Map.of("email", bob.user().email(), "participantId", guest.path("id").asText())),
+        201);
+    String invitation = mailbox.token(bob.user().email());
+    send(bob, jsonPost("/api/me/email-verification-requests", Map.of()), 202);
+    send(
+        bob,
+        jsonPost(
+            "/api/auth/email-verifications", Map.of("token", mailbox.token(bob.user().email()))),
+        204);
+    send(
+        bob,
+        jsonPost("/api/invitations/accept", Map.of("token", invitation, "confirmOwnership", true)),
+        200);
+    send(
+        alice,
+        jsonPost(
+            "/api/friends",
+            Map.of(
+                "groupId",
+                path.substring(path.lastIndexOf('/') + 1),
+                "participantId",
+                bob.user().id())),
+        200);
+
+    var detail = send(alice, get("/api/friends/" + bob.user().id()), 200);
+    long total = detail.path("balances").get(0).path("netMinor").asLong();
+    var preview = send(alice, get(preview(bob, "USD")), 200);
+    assertThat(preview.path("allocations")).hasSize(1);
+    assertThat(preview.path("netMinor").asLong()).isEqualTo(total).isEqualTo(1500);
+
+    send(alice, jsonPost(settle(bob), commit(preview, UUID.randomUUID())), 201);
+    var after = send(alice, get("/api/friends/" + bob.user().id()), 200);
+    assertThat(after.path("hasOpenObligations").asBoolean()).isFalse();
   }
 
   @Test

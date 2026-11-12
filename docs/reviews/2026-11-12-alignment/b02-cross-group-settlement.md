@@ -29,8 +29,11 @@ Branch `feat/alignment-b02-cross-group-settlement`, migration V26, design per
 ## Decisions / limits
 
 - Non-friend and third-user requests are 403 (the plan's test list), not the 404 `GET /friends/{id}` gives.
-- Shared scopes are found by group membership of the friend; a friend who only exists as a claimed
-  guest alias or former member in a group is not included.
+- Preview and commit-time recompute call `FriendService.detail` (the friend page projection, with
+  claimed-alias handling) and map its per-scope balances for the currency; archived state comes from
+  the requester's group summaries. Regression `aClaimedGuestAliasIsSettled...` (guest owes 30, claims,
+  preview = friend detail total, commit settles to zero) passed on the earlier membership-based code
+  too, because accepting an invitation also creates a membership; it now guards the projection.
 - The retained operation ID is in memory only (like the payment modal before E02 drafts); a reload
   between an uncertain error and retry starts a fresh review.
 
