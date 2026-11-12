@@ -1,5 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { EMPTY, Observable, defer, takeUntil, tap } from 'rxjs';
+import { PendingWritesService } from '../core/pending-writes.service';
+import { SessionService } from '../core/auth/session.service';
+import {
+  DeletedPayment,
+  LedgerRevision,
+  PaymentResponse,
+  RecordPaymentRequest,
+} from '../payments/payment.models';
 import { ApiService } from '../core/api/api.service';
 import {
   CreateExpenseRequest,
@@ -11,6 +19,8 @@ import { FriendDetail, FriendSummary } from './friend.models';
 @Injectable({ providedIn: 'root' })
 export class FriendService {
   private readonly api = inject(ApiService);
+  private readonly session = inject(SessionService);
+  private readonly pendingWrites = inject(PendingWritesService);
   remove(id: string) {
     return this.api.delete<void>(`/friends/${id}`);
   }
@@ -63,5 +73,63 @@ export class FriendService {
     return this.api.post<ExpenseResponse>(`/friends/${friendId}/expenses/${expenseId}/restore`, {
       expectedVersion,
     });
+  }
+
+  // Settlements between the pair, in the same hidden ledger (G02.3).
+  personalPayments(friendId: string): Observable<PaymentResponse[]> {
+    return this.api.get<PaymentResponse[]>(`/friends/${friendId}/payments`);
+  }
+
+  deletedPersonalPayments(friendId: string): Observable<DeletedPayment[]> {
+    return this.api.get<DeletedPayment[]>(`/friends/${friendId}/payments/deleted`);
+  }
+
+  personalPaymentHistory(
+    friendId: string,
+    paymentId: string,
+  ): Observable<LedgerRevision<PaymentResponse>[]> {
+    return this.api.get<LedgerRevision<PaymentResponse>[]>(
+      `/friends/${friendId}/payments/${paymentId}/history`,
+    );
+  }
+
+  deletePersonalPayment(
+    friendId: string,
+    paymentId: string,
+    expectedVersion: number,
+  ): Observable<void> {
+    return this.api.delete<void>(
+      `/friends/${friendId}/payments/${paymentId}?expectedVersion=${expectedVersion}`,
+    );
+  }
+
+  restorePersonalPayment(
+    friendId: string,
+    paymentId: string,
+    expectedVersion: number,
+  ): Observable<PaymentResponse> {
+    return this.api.post<PaymentResponse>(`/friends/${friendId}/payments/${paymentId}/restore`, {
+      expectedVersion,
+    });
+  }
+
+  /** Keyed like a group payment; the scope is `personal:<friendId>`, shared with the settle-up modal. */
+  recordPersonalPayment(
+    friendId: string,
+    request: Omit<RecordPaymentRequest, 'operationId'>,
+    draft?: unknown,
+  ): Observable<PaymentResponse> {
+    const version = this.session.version;
+    return defer(() => {
+      if (this.session.version !== version) return EMPTY;
+      const intent = { ...request, currency: request.currency ?? ('USD' as const) };
+      const pending = this.pendingWrites.prepare('payment', `personal:${friendId}`, intent, draft);
+      return this.api
+        .post<PaymentResponse>(`/friends/${friendId}/payments`, {
+          ...intent,
+          operationId: pending.operationId,
+        })
+        .pipe(tap(() => this.pendingWrites.complete('payment', pending)));
+    }).pipe(takeUntil(this.session.changes));
   }
 }

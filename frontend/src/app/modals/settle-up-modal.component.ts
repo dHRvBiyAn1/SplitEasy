@@ -19,6 +19,7 @@ import {
 } from '../core/pending-writes.service';
 import { RecordPaymentRequest } from '../payments/payment.models';
 import { PaymentService } from '../payments/payment.service';
+import { FriendService } from '../friends/friend.service';
 import { avatarTint } from '../core/avatar';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
@@ -35,6 +36,7 @@ export class SettleUpModalComponent {
   protected readonly draftBlocked = signal(false);
   protected readonly retryNotice = signal<string | null>(null);
   private readonly payments = inject(PaymentService);
+  private readonly friends = inject(FriendService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
@@ -196,25 +198,26 @@ export class SettleUpModalComponent {
   ): void {
     this.saving.set(true);
     this.modal.setMutationPending(true);
-    this.payments
-      .recordPayment(groupId, request, draft)
-      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.dashboard.refresh();
-          this.modal.close();
-        },
-        error: (err) => {
-          this.error.set(
-            err instanceof PendingWriteError
-              ? err.message
-              : (err?.error?.message ?? 'Could not record the payment.'),
-          );
-          this.retryNotice.set(UNCERTAIN_WRITE);
-          this.saving.set(false);
-          this.modal.setMutationPending(false);
-        },
-      });
+    // `personal:<friendId>` is the friend scope: the pair's hidden ledger instead of a group.
+    const record$ = groupId.startsWith('personal:')
+      ? this.friends.recordPersonalPayment(groupId.slice('personal:'.length), request, draft)
+      : this.payments.recordPayment(groupId, request, draft);
+    record$.pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.dashboard.refresh();
+        this.modal.close();
+      },
+      error: (err) => {
+        this.error.set(
+          err instanceof PendingWriteError
+            ? err.message
+            : (err?.error?.message ?? 'Could not record the payment.'),
+        );
+        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.saving.set(false);
+        this.modal.setMutationPending(false);
+      },
+    });
   }
 
   retryOriginal(): void {

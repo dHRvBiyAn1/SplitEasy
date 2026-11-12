@@ -48,6 +48,7 @@ describe('personal expenses with one saved friend', () => {
   });
   afterEach(() => {
     http.match('/api/dashboard'); // mutations refresh the shell overview; not under test here
+    http.match((r) => r.url.endsWith('/payments')); // G02.3 history is covered in its own spec
     http.verify({ ignoreCancelled: true });
     TestBed.resetTestingModule();
   });
@@ -177,7 +178,11 @@ describe('personal expenses with one saved friend', () => {
     button('Edit').click();
     const contributions = [
       { user: me, amountMinor: 600, currency: 'USD' },
-      { user: { id: 'pat', displayName: 'Pat', email: 'pat@test.com' }, amountMinor: 400, currency: 'USD' },
+      {
+        user: { id: 'pat', displayName: 'Pat', email: 'pat@test.com' },
+        amountMinor: 400,
+        currency: 'USD',
+      },
     ];
     http
       .expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'GET' })
