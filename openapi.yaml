@@ -2563,6 +2563,12 @@ paths:
 
   # --- e03 paths (insert below; parallel batch plan rule 3) ---
 
+  # --- e03-b paths (insert below; parallel batch plan rule 3) ---
+
+  # --- g02-3 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- h03 paths (insert below; parallel batch plan rule 3) ---
+
 components:
   schemas:
     SaveFriendRequest:
@@ -4748,6 +4754,12 @@ components:
           maximum: 1000000000000
       description: Optional per-payer input. A present list is nonempty, duplicate-free, includes
         paidByUserId, names only active financial participants, and sums exactly to amountMinor.
+
+    # --- e03-b schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- g02-3 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h03 schemas (insert below; parallel batch plan rule 3) ---
 
   parameters:
     ParticipantVersion:

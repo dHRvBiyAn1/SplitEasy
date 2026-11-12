@@ -38,7 +38,7 @@ TDD/verification workflow and migration policy still apply in full.
 | --- | --- | --- |
 | V20 | B01 | payment detail, corrections, refunds (PR #112) |
 | V21 | G02.2 | `groups.kind`, `personal_ledgers` |
-| V22 | H05 | cursor/filter indexes, if any are needed |
+| V22 | H05 | unused (cursor query runs over a UNION; no index needed) |
 | V23 | E03 | `expense_contributions` plus single-payer backfill |
 | V24 | G02.3 | only if friend payments need schema |
 | V25 | H03 | activity events, outbox, notification preferences |
@@ -51,7 +51,7 @@ TDD/verification workflow and migration policy still apply in full.
 
 An unused reservation leaves a gap, which Flyway accepts.
 
-## Wave 6 — now (after B01 merges)
+## Wave 6 — done (PRs #115, #116, #114 merged to dev 2026-11-11)
 
 | Package | Owns (exclusive this wave) | Must not touch |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ Interactions:
 - H05's CSV "paid" column reads `expenses.paid_by` until E03-A lands. Merge H05 before E03-A;
   E03-A switches the export to contributions as part of its own PR.
 
-## Wave 7
+## Wave 7 — now
 
 | Package | Owns | Must not touch |
 | --- | --- | --- |

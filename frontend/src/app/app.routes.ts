@@ -82,6 +82,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./history/history.component').then((m) => m.HistoryComponent),
   },
+  // --- e03-b routes (insert below; parallel batch plan rule 3) ---
+
+  // --- g02-3 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h03 routes (insert below; parallel batch plan rule 3) ---
 
   { path: '**', redirectTo: 'dashboard' },
 ];
