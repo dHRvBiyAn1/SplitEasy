@@ -34,6 +34,9 @@ class AccountClosureIntegrationTest extends AbstractIntegrationTest {
   @org.springframework.beans.factory.annotation.Autowired
   ParticipantInvitationIntegrationTest.Mailbox mailbox;
 
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+  com.spliteasy.service.MembershipGuard membershipGuard;
+
   private final List<String> bodies = new ArrayList<>();
 
   private JsonNode send(AuthResponse actor, MockHttpServletRequestBuilder request, int expected)
@@ -235,7 +238,10 @@ class AccountClosureIntegrationTest extends AbstractIntegrationTest {
     send(bob, get("/api/dashboard"), 200);
     var friends = send(bob, get("/api/friends"), 200);
     assertThat(friends.get(0).path("displayName").asText()).isEqualTo("Closed account");
-    send(carol, get("/api/friends"), 200);
+    // Carol's bookmark survives, still reads, and shows the closed account.
+    assertThat(send(carol, get("/api/friends"), 200).get(0).path("displayName").asText())
+        .isEqualTo("Closed account");
+    send(carol, get("/api/friends/" + alice.user().id()), 200);
     // Replayed keyed receipt carries no old email either.
     send(
         bob,
@@ -271,7 +277,7 @@ class AccountClosureIntegrationTest extends AbstractIntegrationTest {
                 Integer.class,
                 alice.user().id()))
         .isZero();
-    // A bookmark with no personal ledger cannot open one with a closed account.
+    // A bookmark never opens a ledger with, or writes to one of, a closed account.
     send(
         carol,
         jsonPost(
@@ -288,11 +294,93 @@ class AccountClosureIntegrationTest extends AbstractIntegrationTest {
                 "participantUserIds",
                 List.of(alice.user().id()))),
         403);
+    var pay =
+        Map.of(
+            "currency",
+            "USD",
+            "amountMinor",
+            100,
+            "payerUserId",
+            carol.user().id(),
+            "payeeUserId",
+            alice.user().id());
+    send(carol, jsonPost("/api/friends/" + alice.user().id() + "/payments", pay), 403);
+    var payBob =
+        Map.of(
+            "currency",
+            "USD",
+            "amountMinor",
+            100,
+            "payerUserId",
+            bob.user().id(),
+            "payeeUserId",
+            alice.user().id());
+    send(bob, jsonPost("/api/friends/" + alice.user().id() + "/payments", payBob), 403);
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from personal_ledgers where account_low=?::uuid or account_high=?::uuid",
+                Integer.class,
+                carol.user().id().toString(),
+                carol.user().id().toString()))
+        .isZero();
 
     // The address is free: registration is a new empty account.
     var again = register(email, "password123", "Alice again");
     assertThat(again.user().id()).isNotEqualTo(alice.user().id());
     assertThat(send(again, get("/api/groups"), 200)).isEmpty();
     assertThat(send(again, get("/api/friends"), 200)).isEmpty();
+  }
+
+  @Test
+  void anExpenseHoldingTheGroupLockMakesClosureWaitThenRefuseNamingTheGroup() throws Exception {
+    var alice = register(UUID.randomUUID() + "@example.test", "password123", "Alice");
+    var bob = register(UUID.randomUUID() + "@example.test", "password123", "Bob");
+    String g = group(alice, "Locked trip", bob);
+    var locked = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    var writer = new java.util.concurrent.atomic.AtomicReference<Thread>();
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    // The writer's second membership check runs after it has locked the group row.
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              call.callRealMethod();
+              if (Thread.currentThread() == writer.get() && calls.incrementAndGet() == 2) {
+                locked.countDown();
+                assertThat(release.await(20, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+              }
+              return null;
+            })
+        .when(membershipGuard)
+        .requireMember(
+            org.mockito.ArgumentMatchers.eq(java.util.UUID.fromString(g)),
+            org.mockito.ArgumentMatchers.eq(bob.user().id()));
+    try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var write =
+          pool.submit(
+              () -> {
+                writer.set(Thread.currentThread());
+                expense(bob, g, alice.user().id(), bob.user().id(), null);
+                return null;
+              });
+      assertThat(locked.await(20, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      var closing =
+          pool.submit(
+              () -> {
+                var result =
+                    mockMvc
+                        .perform(
+                            jsonPost("/api/me/closure", Map.of("currentPassword", "password123"))
+                                .header("Authorization", bearer(alice.accessToken())))
+                        .andReturn();
+                return result.getResponse();
+              });
+      Thread.sleep(1500);
+      assertThat(closing.isDone()).as("closure waits for the group lock").isFalse();
+      release.countDown();
+      write.get(20, java.util.concurrent.TimeUnit.SECONDS);
+      var response = closing.get(20, java.util.concurrent.TimeUnit.SECONDS);
+      assertThat(response.getStatus()).isEqualTo(409);
+      assertThat(response.getContentAsString()).contains("Locked trip");
+    }
   }
 }

@@ -34,6 +34,7 @@ public class AccountClosureService {
   private final UserRepository users;
   private final PasswordEncoder passwords;
   private final BalanceService balances;
+  private final GroupWriteGuard writeGuard;
   private final JdbcTemplate jdbc;
   private final ObjectMapper mapper;
 
@@ -48,12 +49,14 @@ public class AccountClosureService {
         || !passwords.matches(currentPassword, user.getPasswordHash()))
       throw new BadRequestException("Current password is incorrect");
 
-    // Group rows lock in id order, so a writer that already holds one commits before we read it.
+    // Lock every group in ascending id order (as B02 does) so an in-flight financial write commits
+    // before the balance check and later writers fail their post-lock membership check.
     List<UUID> groups =
         jdbc.queryForList(
-            "select g.id from groups g join group_memberships m on m.group_id=g.id where m.user_id=? and g.deleted_at is null order by g.id for update of g",
+            "select g.id from groups g join group_memberships m on m.group_id=g.id where m.user_id=? and g.deleted_at is null order by g.id",
             UUID.class,
             userId);
+    groups.forEach(g -> writeGuard.lockForMemberAllowingArchived(g, userId));
     requireSettled(userId, groups);
 
     String oldEmail = user.getEmail();
@@ -91,12 +94,8 @@ public class AccountClosureService {
         "update group_invitations set target_email=? where lower(target_email)=?",
         tombstone,
         oldEmail);
-    // Private bookmarks of the closed owner go; others keep one only where a pair ledger exists,
-    // so no new personal ledger can be opened with the closed account (403: not a saved friend).
+    // Others' bookmarks stay (their private data); writes with a closed account are refused.
     jdbc.update("delete from friends where owner_id=?", userId);
-    jdbc.update(
-        "delete from friends f where f.friend_account_id=? and not exists (select 1 from personal_ledgers pl where (pl.account_low=f.owner_id and pl.account_high=f.friend_account_id) or (pl.account_low=f.friend_account_id and pl.account_high=f.owner_id))",
-        userId);
     jdbc.update(
         "update friends set display_name_snapshot=? where friend_account_id=?",
         CLOSED_NAME,

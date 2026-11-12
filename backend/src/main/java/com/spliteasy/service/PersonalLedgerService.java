@@ -72,6 +72,7 @@ public class PersonalLedgerService {
   // One transaction: a rejected expense must not leave a newly created empty ledger behind.
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public ExpenseResponse create(UUID requester, UUID friend, CreateExpenseRequest request) {
+    requireOpenAccount(friend);
     UUID ledger = ledger(requester, friend).orElseGet(() -> open(requester, friend));
     return expenses.createExpense(requester, ledger, request);
   }
@@ -79,12 +80,14 @@ public class PersonalLedgerService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public ExpenseResponse update(
       UUID requester, UUID friend, UUID expense, CreateExpenseRequest request) {
+    requireOpenAccount(friend);
     return expenses.updateExpense(requester, existing(requester, friend), expense, request);
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void delete(
       UUID requester, UUID friend, UUID expense, Long expectedVersion, UUID operationId) {
+    requireOpenAccount(friend);
     expenses.deleteExpense(
         requester, existing(requester, friend), expense, expectedVersion, operationId);
   }
@@ -92,6 +95,7 @@ public class PersonalLedgerService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public ExpenseResponse restore(
       UUID requester, UUID friend, UUID expense, RestoreExpenseRequest request) {
+    requireOpenAccount(friend);
     return expenses.restoreExpense(requester, existing(requester, friend), expense, request);
   }
 
@@ -123,6 +127,7 @@ public class PersonalLedgerService {
   // One transaction, like create: a rejected payment must not leave a new empty ledger behind.
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PaymentResponse recordPayment(UUID requester, UUID friend, RecordPaymentRequest request) {
+    requireOpenAccount(friend);
     var ledger = ledger(requester, friend);
     requirePair(requester, friend, request.payerUserId(), request.payeeUserId());
     return payments.recordPayment(
@@ -132,6 +137,7 @@ public class PersonalLedgerService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PaymentResponse correctPayment(
       UUID requester, UUID friend, UUID payment, CorrectPaymentRequest request) {
+    requireOpenAccount(friend);
     UUID ledger = existingPayment(requester, friend);
     requirePair(requester, friend, request.payerUserId(), request.payeeUserId());
     return payments.correctPayment(requester, ledger, payment, request);
@@ -140,6 +146,7 @@ public class PersonalLedgerService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void deletePayment(
       UUID requester, UUID friend, UUID payment, Long expectedVersion, UUID operationId) {
+    requireOpenAccount(friend);
     payments.deletePayment(
         requester, existingPayment(requester, friend), payment, expectedVersion, operationId);
   }
@@ -147,7 +154,14 @@ public class PersonalLedgerService {
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public PaymentResponse restorePayment(
       UUID requester, UUID friend, UUID payment, RestorePaymentRequest request) {
+    requireOpenAccount(friend);
     return payments.restorePayment(requester, existingPayment(requester, friend), payment, request);
+  }
+
+  /** A closed account keeps its history readable but takes no new or changed entries. */
+  private void requireOpenAccount(UUID friend) {
+    if (users.findById(friend).map(u -> u.getClosedAt() != null).orElse(false))
+      throw new ForbiddenException("This account is closed");
   }
 
   private void requirePair(UUID requester, UUID friend, UUID payer, UUID payee) {

@@ -24,15 +24,17 @@ while any balance is non-zero, shown as "Closed account", email freed.
   login notice for `?reason=account-closed`.
 - OpenAPI: `/api/me/closure` + `CloseAccountRequest` below the a04 anchors.
 
-## Deviation to review (plan said bookmarks show "Closed account" and 403 new personal work)
+## Review follow-ups (integrator, PR #125)
 
-Enforcing the 403 needs a guard inside `PersonalLedgerService`, which A04 does not own. Instead
-closure deletes other people's bookmarks of the closed account **where no pair ledger exists**
-(so the existing "Save this person as a friend" 403 applies and no ledger can be opened with the
-closed account) and keeps bookmarks with an existing ledger, relabelled "Closed account". Existing
-ledgers refuse new expenses/payments because the closed participant is inactive (400). If the
-parent prefers keeping every bookmark, add a closed-account guard in `PersonalLedgerService.open`
-and drop the `delete from friends ... not exists` statement.
+- Bookmarks of a closed account are never deleted. `PersonalLedgerService` now refuses every
+  expense/payment write path (create, update, delete, restore, record, correct, undo, restore) with
+  403 "This account is closed"; reads still work and show "Closed account". Red first: with the
+  bookmark-delete SQL removed, a bookmark opened a ledger with the closed account (201).
+- Closure now locks each non-deleted group/personal ledger the user belongs to through
+  `GroupWriteGuard.lockForMemberAllowingArchived`, ascending UUID, before the balance check.
+  Real-PostgreSQL race test: an expense write holding the group lock makes closure wait; after it
+  commits closure returns 409 naming the group. (Not red-first: the earlier SQL `FOR UPDATE` in id
+  order already satisfied it; the test locks the behaviour in.)
 
 ## Red → green
 
@@ -67,4 +69,4 @@ Conventions / Data Model:
 
 - `users.closed_at` (V27) marks a closed account; its email is `closed+<id>@closed.invalid`, name
   "Closed account". `AccountClosureService` owns all closure SQL.
-- Closure deletes other users' friend bookmarks of the closed account that have no pair ledger.
+- `PersonalLedgerService` write paths refuse a closed friend account with 403; bookmarks stay.
