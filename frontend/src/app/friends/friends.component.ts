@@ -20,11 +20,18 @@ import { GroupService } from '../groups/group.service';
 import { financialRoster, GroupSummary, ownedIdentities } from '../groups/group.models';
 import { ParticipantSummary } from '../groups/participant.models';
 import { MoneyComponent } from '../shared/money.component';
+import { FriendSettleAllComponent } from './friend-settle-all.component';
 import { PersonalExpensesComponent } from './personal-expenses.component';
 import { PersonalPaymentsComponent } from './personal-payments.component';
 @Component({
   selector: 'app-friends',
-  imports: [RouterLink, MoneyComponent, PersonalExpensesComponent, PersonalPaymentsComponent],
+  imports: [
+    RouterLink,
+    MoneyComponent,
+    PersonalExpensesComponent,
+    PersonalPaymentsComponent,
+    FriendSettleAllComponent,
+  ],
   templateUrl: './friends.component.html',
   styleUrl: './friends.component.scss',
 })

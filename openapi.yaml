@@ -2864,6 +2864,76 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
 
   # --- b02 paths (insert below; parallel batch plan rule 3) ---
+  /api/friends/{friendId}/settlement-preview:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The saved friend's account ID
+        schema: {type: string, format: uuid}
+      - name: currency
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Currency'
+    get:
+      operationId: previewFriendSettlement
+      summary: Preview settling everything with one friend in one currency
+      description: One allocation per non-deleted, non-archived scope (shared group or the personal
+        ledger) with a non-zero canonical obligation in the currency. Archived scopes are listed in
+        `skipped`. Currencies are never combined. A target that is not a saved friend is 403.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: The allocations a commit must repeat exactly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/friends/{friendId}/settlements:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: commitFriendSettlement
+      summary: Settle every previewed scope atomically
+      description: Locks every shared scope in ascending UUID order, recomputes the allocations and
+        requires an exact match with the request; any difference is 409 with nothing written. Then
+        records one ordinary payment per allocation in the direction of that scope's obligation,
+        in the same transaction. `operationId` is required and unique per requester; an exact replay
+        returns the stored 201 body, a changed request with the same ID is 409.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitSettlementRequest'
+      responses:
+        '201':
+          description: The batch with the payment created in each scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   # --- a04 paths (insert below; parallel batch plan rule 3) ---
 
@@ -5235,6 +5305,57 @@ components:
         groupChanges: {type: boolean}
 
     # --- b02 schemas (insert below; parallel batch plan rule 3) ---
+    SettlementAllocation:
+      type: object
+      required: [scopeId, payerId, payeeId, amountMinor]
+      properties:
+        scopeId: {type: string, format: uuid, description: Group ID, or the personal ledger's ID}
+        groupName: {type: [string, 'null'], description: Null for the personal ledger}
+        payerId: {type: string, format: uuid}
+        payeeId: {type: string, format: uuid}
+        amountMinor: {type: integer, format: int64, minimum: 1}
+        paymentId: {type: [string, 'null'], format: uuid, description: Set on commit responses only}
+    SettlementPreview:
+      type: object
+      required: [currency, allocations, skipped, netMinor]
+      properties:
+        currency: {$ref: '#/components/schemas/Currency'}
+        allocations:
+          type: array
+          items: {$ref: '#/components/schemas/SettlementAllocation'}
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [scopeId, reason]
+            properties:
+              scopeId: {type: string, format: uuid}
+              groupName: {type: [string, 'null']}
+              reason: {type: string}
+        netMinor: {type: integer, format: int64, description: Positive when the friend owes the requester}
+    CommitSettlementRequest:
+      type: object
+      required: [currency, allocations, operationId]
+      properties:
+        currency: {$ref: '#/components/schemas/Currency'}
+        allocations:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/SettlementAllocation'}
+        operationId: {type: string, format: uuid}
+        paidOn: {type: [string, 'null'], format: date}
+        method: {$ref: '#/components/schemas/PaymentMethod'}
+        note: {type: [string, 'null'], maxLength: 280}
+    SettlementResponse:
+      type: object
+      required: [id, currency, allocations, netMinor]
+      properties:
+        id: {type: string, format: uuid}
+        currency: {$ref: '#/components/schemas/Currency'}
+        allocations:
+          type: array
+          items: {$ref: '#/components/schemas/SettlementAllocation'}
+        netMinor: {type: integer, format: int64}
 
     # --- a04 schemas (insert below; parallel batch plan rule 3) ---
 

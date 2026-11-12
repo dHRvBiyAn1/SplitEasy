@@ -15,12 +15,36 @@ import {
   ExpenseResponse,
   ExpenseSummary,
 } from '../expenses/expense.models';
-import { FriendDetail, FriendSummary } from './friend.models';
+import {
+  FriendDetail,
+  FriendSummary,
+  SettlementAllocation,
+  SettlementPreview,
+  SettlementResponse,
+} from './friend.models';
 @Injectable({ providedIn: 'root' })
 export class FriendService {
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
   private readonly pendingWrites = inject(PendingWritesService);
+  // Settle everything in one currency across every shared scope, atomically (B02).
+  settlementPreview(friendId: string, currency: string) {
+    return this.api.get<SettlementPreview>(
+      `/friends/${friendId}/settlement-preview?currency=${currency}`,
+    );
+  }
+  settleAll(
+    friendId: string,
+    currency: string,
+    allocations: SettlementAllocation[],
+    operationId: string,
+  ) {
+    return this.api.post<SettlementResponse>(`/friends/${friendId}/settlements`, {
+      currency,
+      allocations,
+      operationId,
+    });
+  }
   remove(id: string) {
     return this.api.delete<void>(`/friends/${id}`);
   }
