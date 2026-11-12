@@ -209,6 +209,21 @@ class FriendSettlementIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
+  void anAllocationAboveThePaymentCapIsRefusedWithNothingWritten() throws Exception {
+    var alice = account("Alice");
+    var bob = account("Bob");
+    String g = group(alice, bob, "Big");
+    befriend(alice, bob, g);
+    for (int i = 0; i < 3; i++)
+      expense("/api/groups/" + g + "/expenses", alice, bob, 1_000_000_000_000L, "USD");
+    var preview = send(alice, get(preview(bob, "USD")), 200);
+    assertThat(preview.path("allocations").get(0).path("amountMinor").asLong())
+        .isGreaterThan(1_000_000_000_000L);
+    send(alice, jsonPost(settle(bob), commit(preview, UUID.randomUUID())), 409);
+    assertThat(send(bob, get("/api/groups/" + g + "/payments"), 200)).isEmpty();
+  }
+
+  @Test
   void staleAllocationsAreRejectedWithNothingWritten() throws Exception {
     var w = world();
     var preview = send(w.alice(), get(preview(w.bob(), "USD")), 200);

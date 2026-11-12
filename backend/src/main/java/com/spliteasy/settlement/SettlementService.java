@@ -32,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class SettlementService {
+  private static final long MAX_PAYMENT_MINOR = 1_000_000_000_000L;
   private final FriendRepository friends;
   private final GroupMembershipRepository memberships;
   private final PersonalLedgerRepository personalLedgers;
@@ -74,6 +75,11 @@ public class SettlementService {
         || !locked.preview().allocations().stream().map(Allocation::key).toList().equals(requested))
       throw new ConflictException(
           "Balances changed since the preview. Review the settlement again.");
+
+    // The payment endpoint's @Valid cap does not apply to this internal call, so enforce it here.
+    if (locked.preview().allocations().stream().anyMatch(a -> a.amountMinor() > MAX_PAYMENT_MINOR))
+      throw new ConflictException(
+          "A scope's balance exceeds the single-payment limit. Settle it in smaller payments in that group.");
 
     var recorded = new ArrayList<Allocation>();
     for (var a : locked.preview().allocations()) {
