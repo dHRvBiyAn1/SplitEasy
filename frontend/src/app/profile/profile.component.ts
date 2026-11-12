@@ -1,3 +1,4 @@
+import { NotificationPreferencesComponent } from './notification-preferences.component';
 import { DeviceSessionsComponent } from './device-sessions.component';
 import { CURRENCIES } from '../shared/currency';
 import { AccountSecurityComponent } from './account-security.component';
@@ -16,6 +17,7 @@ import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../cor
     AppearancePanelComponent,
     AccountSecurityComponent,
     DeviceSessionsComponent,
+    NotificationPreferencesComponent,
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',

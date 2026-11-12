@@ -87,6 +87,17 @@ export const routes: Routes = [
   // --- g02-3 routes (insert below; parallel batch plan rule 3) ---
 
   // --- h03 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'activity',
+    canActivate: [authGuard],
+    loadComponent: () => import('./activity/activity.component').then((m) => m.ActivityComponent),
+  },
+  {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./notification/notifications.component').then((m) => m.NotificationsComponent),
+  },
 
   { path: '**', redirectTo: 'dashboard' },
 ];
