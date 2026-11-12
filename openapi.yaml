@@ -2566,6 +2566,200 @@ paths:
   # --- e03-b paths (insert below; parallel batch plan rule 3) ---
 
   # --- g02-3 paths (insert below; parallel batch plan rule 3) ---
+  /api/friends/{friendId}/payments:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listPersonalPayments
+      summary: List settlements between you and one saved friend
+      description: Personal payments live in the pair's hidden ledger, never a group. No ledger yet returns an empty list; a target that is neither a ledger partner nor a saved friend is 403.
+      tags: [Friends]
+      responses:
+        '200':
+          description: Payments, financial-date order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: recordPersonalPayment
+      summary: Record a settlement between you and one saved friend
+      description: Same body, keyed `operationId` replay, currency, date, method and note rules as a group payment. Payer and payee must be exactly you and the friend, in either direction, otherwise 400 before any write. May open the pair ledger like a personal expense create.
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecordPaymentRequest'}
+      responses:
+        '201':
+          description: The recorded payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/payments/deleted:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedPersonalPayments
+      summary: Recently undone personal payments
+      tags: [Friends]
+      responses:
+        '200':
+          description: Undone payments with the version to restore at
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/DeletedPayment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/friends/{friendId}/payments/{paymentId}:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    get:
+      operationId: getPersonalPayment
+      summary: Personal payment detail
+      tags: [Friends]
+      responses:
+        '200':
+          description: The active payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: correctPersonalPayment
+      summary: Correct a personal payment at its expected version
+      description: Same rules as a group correction; payer and payee must remain exactly the pair (400 otherwise). Stale version is 409 before mutation.
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CorrectPaymentRequest'}
+      responses:
+        '200':
+          description: The corrected payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: undoPersonalPayment
+      summary: Undo (recoverable delete) a personal payment
+      tags: [Friends]
+      parameters:
+      - name: expectedVersion
+        in: query
+        required: true
+        schema: {type: integer, format: int64}
+      - name: operationId
+        in: query
+        schema: {type: string, format: uuid}
+      responses:
+        '204': {description: Undone}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/payments/{paymentId}/restore:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    post:
+      operationId: restorePersonalPayment
+      summary: Restore an undone personal payment at its expected version
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RestorePaymentRequest'}
+      responses:
+        '200':
+          description: The restored payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/payments/{paymentId}/history:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    get:
+      operationId: personalPaymentHistory
+      summary: Attributable revisions of a personal payment
+      tags: [Friends]
+      responses:
+        '200':
+          description: Revisions oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PaymentRevision'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
 
   # --- h03 paths (insert below; parallel batch plan rule 3) ---
 
