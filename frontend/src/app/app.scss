@@ -90,6 +90,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.bell {
+  display: inline-flex;
+  gap: var(--sp-2);
+  align-items: center;
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+.bell-count {
+  background: var(--accent, var(--ink));
+  color: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--sp-2);
+  font-size: 12px;
+  font-weight: 700;
+}
 .shell__main {
   max-width: 1440px;
   margin: auto;

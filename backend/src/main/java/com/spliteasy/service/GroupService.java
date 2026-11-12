@@ -44,6 +44,7 @@ public class GroupService {
   private final PairwiseBalanceService pairwiseBalanceService;
   private final ObligationProjectionService projection;
   private final com.spliteasy.repository.PersonalLedgerRepository personalLedgers;
+  private final com.spliteasy.activity.ActivityRecorder activity;
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public GroupResponse createGroup(UUID requesterId, CreateGroupRequest request) {
@@ -87,6 +88,8 @@ public class GroupService {
     }
     membershipRepository.saveAndFlush(new GroupMembership(group, invitee));
     financialParticipants.activate(groupId, invitee.getId());
+    activity.group(
+        groupId, "MEMBER_ADDED", requesterId, group.getName(), UserSummary.from(invitee));
     log.info("User {} added member {} to group {}", requesterId, invitee.getId(), groupId);
     return toGroupResponse(group, requesterId);
   }
@@ -208,6 +211,12 @@ public class GroupService {
 
     membershipRepository.deleteByGroupIdAndUserId(groupId, targetUserId);
     financialParticipants.deactivate(groupId, targetUserId);
+    activity.group(
+        groupId,
+        isSelf ? "MEMBER_LEFT" : "MEMBER_REMOVED",
+        requesterId,
+        group.getName(),
+        userRepository.findById(targetUserId).map(UserSummary::from).orElse(null));
     log.info("User {} removed member {} from group {}", requesterId, targetUserId, groupId);
   }
 
@@ -223,6 +232,7 @@ public class GroupService {
       throw new ConflictException("This group is already archived");
     }
     group.archive();
+    activity.group(groupId, "GROUP_ARCHIVED", requesterId, group.getName(), null);
     log.info("Group {} archived by user {}", groupId, requesterId);
     return toGroupResponse(group, requesterId);
   }
@@ -236,6 +246,7 @@ public class GroupService {
       throw new ConflictException("This group is not archived");
     }
     group.unarchive();
+    activity.group(groupId, "GROUP_UNARCHIVED", requesterId, group.getName(), null);
     log.info("Group {} re-opened by user {}", groupId, requesterId);
     return toGroupResponse(group, requesterId);
   }
@@ -253,6 +264,7 @@ public class GroupService {
     requireCreator(group, requesterId, "delete");
     requireSettled(requesterId, groupId, group);
     group.markDeleted();
+    activity.group(groupId, "GROUP_DELETED", requesterId, group.getName(), null);
     log.info("Group {} deleted by creator {} (recoverable)", groupId, requesterId);
   }
 
@@ -290,6 +302,7 @@ public class GroupService {
     }
     group.restore();
     financialParticipants.requireCompatible(groupId);
+    activity.group(groupId, "GROUP_RESTORED", requesterId, group.getName(), null);
     log.info("Group {} restored by creator {}", groupId, requesterId);
     return toGroupResponse(group, requesterId);
   }

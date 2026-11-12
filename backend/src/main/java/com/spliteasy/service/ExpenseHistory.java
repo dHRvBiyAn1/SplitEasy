@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 class ExpenseHistory {
   private final JdbcClient jdbc;
   private final ObjectMapper mapper;
+  private final com.spliteasy.activity.ActivityRecorder activity;
 
   void record(
       String action,
@@ -33,6 +34,7 @@ class ExpenseHistory {
         .param(before == null ? null : mapper.writeValueAsString(before))
         .param(mapper.writeValueAsString(after))
         .update();
+    activity.expense(action, actor, after);
   }
 
   List<ExpenseRevision> list(UUID expenseId) {

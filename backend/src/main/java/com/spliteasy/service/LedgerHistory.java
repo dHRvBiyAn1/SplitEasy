@@ -30,6 +30,7 @@ class LedgerHistory {
 
   private final JdbcClient jdbc;
   private final ObjectMapper mapper;
+  private final com.spliteasy.activity.ActivityRecorder activity;
 
   <T> void record(
       Subject subject,
@@ -52,6 +53,10 @@ class LedgerHistory {
         .param(before == null ? null : mapper.writeValueAsString(before))
         .param(mapper.writeValueAsString(after))
         .update();
+    if (after instanceof com.spliteasy.dto.payment.PaymentResponse p)
+      activity.payment(action, actor, p);
+    else if (after instanceof com.spliteasy.dto.payment.RefundResponse r)
+      activity.refund(action, actor, r);
   }
 
   <T> List<LedgerRevision<T>> list(Subject subject, UUID subjectId, Class<T> snapshotType) {

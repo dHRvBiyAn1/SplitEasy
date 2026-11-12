@@ -20,8 +20,20 @@
         <a routerLink="/friends" [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
           >Friends</a
         >
+        <a routerLink="/activity" [attr.aria-current]="activeNav() === 'activity' ? 'page' : null"
+          >Activity</a
+        >
         <button type="button" (click)="modal.openSettle()">Settle up</button>
       </nav>
+      <a
+        routerLink="/notifications"
+        class="bell"
+        [attr.aria-label]="'Notifications, ' + unreadCount() + ' unread'"
+        >Notifications
+        @if (unreadCount() > 0) {
+          <span class="bell-count">{{ unreadCount() }}</span>
+        }
+      </a>
       <button
         type="button"
         class="appearance-button"

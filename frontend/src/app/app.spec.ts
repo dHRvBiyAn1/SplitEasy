@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { NotificationService } from './notification/notification.service';
 import { provideHttpClient } from '@angular/common/http';
 import { APP_BASE_HREF, BrowserPlatformLocation, PlatformLocation } from '@angular/common';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -22,6 +24,11 @@ describe('App', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        // The bell's own read is covered in notification specs; shell specs verify other requests.
+        {
+          provide: NotificationService,
+          useValue: { unread: signal(0), revalidate: () => undefined },
+        },
         { provide: PlatformLocation, useClass: BrowserPlatformLocation },
         { provide: APP_BASE_HREF, useValue: '/' },
         provideRouter([

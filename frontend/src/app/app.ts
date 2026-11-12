@@ -15,6 +15,7 @@ import { filter } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { SessionService } from './core/auth/session.service';
 import { DashboardService } from './dashboard/dashboard.service';
+import { NotificationService } from './notification/notification.service';
 import { ProfileService } from './core/profile.service';
 import { ThemeService } from './core/theme.service';
 import { RibbonService } from './core/ribbon.service';
@@ -44,6 +45,8 @@ export class App {
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
   private readonly profile = inject(ProfileService);
+  private readonly notifications = inject(NotificationService);
+  protected readonly unreadCount = this.notifications.unread;
   private readonly theme = inject(ThemeService);
   private readonly ribbon = inject(RibbonService);
   protected readonly modal = inject(ModalService);
@@ -75,6 +78,7 @@ export class App {
     )
       return 'groups';
     if (this.currentUrl().startsWith('/friends')) return 'friends';
+    if (/^\/(activity|notifications)/.test(this.currentUrl())) return 'activity';
     return this.currentUrl().startsWith('/profile') ? 'profile' : 'overview';
   });
   protected readonly avatarStyle = computed(() => ({
@@ -91,7 +95,10 @@ export class App {
       .subscribe((e) => {
         this.currentUrl.set(e.urlAfterRedirects);
         this.groupsOpen.set(false);
-        if (this.showShell()) this.dashboard.revalidate();
+        if (this.showShell()) {
+          this.dashboard.revalidate();
+          this.notifications.revalidate();
+        }
       });
     const session = inject(SessionService);
     session.changes.pipe(takeUntilDestroyed()).subscribe(() => this.groupsOpen.set(false));
@@ -109,6 +116,7 @@ export class App {
   revalidateVisible(): void {
     if (document.visibilityState === 'visible' && this.showShell()) {
       this.dashboard.revalidate();
+      this.notifications.revalidate();
     }
   }
 
