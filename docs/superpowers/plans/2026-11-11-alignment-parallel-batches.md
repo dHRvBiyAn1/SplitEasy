@@ -40,7 +40,7 @@ TDD/verification workflow and migration policy still apply in full.
 | V21 | G02.2 | `groups.kind`, `personal_ledgers` |
 | V22 | H05 | unused (cursor query runs over a UNION; no index needed) |
 | V23 | E03 | `expense_contributions` plus single-payer backfill |
-| V24 | G02.3 | only if friend payments need schema |
+| V24 | G02.3 | unused (personal payments reuse `payments`) |
 | V25 | H03 | activity events, outbox, notification preferences |
 | V26 | B02 | settlement batches and allocations |
 | V27 | A04 | account closure state |
@@ -66,7 +66,7 @@ Interactions:
 - H05's CSV "paid" column reads `expenses.paid_by` until E03-A lands. Merge H05 before E03-A;
   E03-A switches the export to contributions as part of its own PR.
 
-## Wave 7 — now
+## Wave 7 — done (PRs #118, #119, #120 merged to dev 2026-11-12)
 
 Design and final ownership: [Wave 7 package plans](2026-11-12-alignment-wave7.md) (H03 leaves the dashboard feed alone this wave).
 
