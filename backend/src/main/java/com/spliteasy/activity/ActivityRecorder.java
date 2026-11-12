@@ -73,8 +73,28 @@ public class ActivityRecorder {
     record(groupId, kind, groupId, actor, summary);
   }
 
+  /** Balance reminder: delivered to the debtor only, under their payments preference. */
+  public void reminder(
+      UUID groupId, UserSummary actor, UUID debtorId, String currency, long amountMinor) {
+    var summary = new LinkedHashMap<String, Object>();
+    summary.put("debtorId", debtorId);
+    summary.put("currency", currency);
+    summary.put("amountMinor", amountMinor);
+    record(groupId, "BALANCE_REMINDER", debtorId, actor, summary, debtorId);
+  }
+
   private void record(
       UUID groupId, String kind, UUID subjectId, UserSummary actor, Map<String, Object> summary) {
+    record(groupId, kind, subjectId, actor, summary, null);
+  }
+
+  private void record(
+      UUID groupId,
+      String kind,
+      UUID subjectId,
+      UserSummary actor,
+      Map<String, Object> summary,
+      UUID onlyRecipient) {
     UUID event = UUID.randomUUID();
     jdbc.sql(
             """
@@ -89,7 +109,9 @@ public class ActivityRecorder {
     String preference =
         kind.startsWith("EXPENSE_")
             ? "expenses"
-            : kind.startsWith("PAYMENT_") || kind.startsWith("REFUND_")
+            : kind.startsWith("PAYMENT_")
+                    || kind.startsWith("REFUND_")
+                    || kind.startsWith("BALANCE_")
                 ? "payments"
                 : "group_changes";
     jdbc.sql(
@@ -99,10 +121,11 @@ public class ActivityRecorder {
         FROM group_memberships m LEFT JOIN notification_preferences p ON p.user_id=m.user_id
         WHERE m.group_id=? AND m.user_id IS DISTINCT FROM CAST(? AS uuid)
           AND COALESCE(p.%s, TRUE)
+          AND (CAST(? AS uuid) IS NULL OR m.user_id = CAST(? AS uuid))
         ON CONFLICT DO NOTHING
         """
                 .formatted(preference))
-        .params(event, groupId, actor == null ? null : actor.id())
+        .params(event, groupId, actor == null ? null : actor.id(), onlyRecipient, onlyRecipient)
         .update();
   }
 }

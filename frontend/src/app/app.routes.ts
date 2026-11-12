@@ -104,6 +104,12 @@ export const routes: Routes = [
   // --- a04 routes (insert below; parallel batch plan rule 3) ---
 
   // --- h04 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'groups/:id/recurring',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./recurring/recurring.component').then((m) => m.RecurringComponent),
+  },
 
   { path: '**', redirectTo: 'dashboard' },
 ];

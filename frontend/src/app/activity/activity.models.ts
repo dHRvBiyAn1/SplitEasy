@@ -1,3 +1,5 @@
+import { Currency, minorToDisplay } from '../shared/currency';
+
 export interface ActivityItem {
   id: string;
   seq: number;
@@ -41,6 +43,10 @@ export function describeEvent(e: ActivityItem): string {
       return `${who} added ${member} to ${where}`;
     case 'MEMBER_REMOVED':
       return `${who} removed ${member} from ${where}`;
+    case 'BALANCE_REMINDER': {
+      const currency = (e.summary.currency ?? 'USD') as Currency;
+      return `${who} reminded you about ${currency} ${minorToDisplay(e.summary.amountMinor ?? 0, currency)} in ${where}`;
+    }
     case 'MEMBER_LEFT':
       return `${who} left ${where}`;
     default:

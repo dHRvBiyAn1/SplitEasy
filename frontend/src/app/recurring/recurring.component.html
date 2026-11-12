@@ -1,0 +1,83 @@
+<section class="recurring-page" aria-labelledby="recurring-heading">
+  <a [routerLink]="['/groups', groupId]">Back to this group</a>
+  <header>
+    <p class="eyebrow">Repeats</p>
+    <h1 id="recurring-heading">Recurring expenses</h1>
+  </header>
+
+  @if (error()) {
+    <p class="write-error" role="alert">{{ error() }}</p>
+  }
+  @if (loading()) {
+    <p role="status">Loading recurring expenses…</p>
+  } @else {
+    @if (!schedules().length && !error()) {
+      <p>Nothing repeats yet. Choose Repeat when adding an expense to create one.</p>
+    }
+    <ul class="schedules">
+      @for (s of schedules(); track s.id) {
+        <li class="schedule">
+          <div class="schedule-main">
+            <strong>{{ s.template.description }}</strong>
+            <span>{{ amountText(s) }} · {{ frequencyLabel[s.frequency] }}</span>
+          </div>
+          <p class="meta">
+            @if (s.status === 'ACTIVE') {
+              Next on <time [attr.datetime]="s.nextDate">{{ s.nextDate }}</time>
+            } @else if (s.status === 'CANCELLED') {
+              Cancelled — no more expenses will be added
+            } @else {
+              Paused — needs review
+            }
+          </p>
+          @if (s.status === 'NEEDS_REVIEW') {
+            <p class="review" role="alert">{{ s.reviewReason }}</p>
+          }
+          @if (editing()?.id === s.id) {
+            <form class="edit" (submit)="$event.preventDefault(); saveEdit()">
+              <label>
+                Description
+                <input
+                  name="description"
+                  [value]="description"
+                  (input)="description = $any($event.target).value"
+                />
+              </label>
+              @if (canEditAmount(s)) {
+                <label>
+                  Amount
+                  <input
+                    name="amount"
+                    inputmode="decimal"
+                    [value]="amount"
+                    (input)="amount = $any($event.target).value"
+                  />
+                </label>
+              }
+              <label>
+                Repeats
+                <select name="frequency" (change)="frequency = $any($event.target).value">
+                  @for (f of frequencies; track f) {
+                    <option [value]="f" [selected]="f === frequency">
+                      {{ frequencyLabel[f] }}
+                    </option>
+                  }
+                </select>
+              </label>
+              <p class="meta">Changes apply to future expenses only.</p>
+              <button class="dc-btn" type="submit">Save future changes</button>
+              <button class="dc-btn-outline" type="button" (click)="editing.set(null)">
+                Close
+              </button>
+            </form>
+          } @else if (s.status !== 'CANCELLED') {
+            <div class="actions">
+              <button class="dc-btn-outline" type="button" (click)="edit(s)">Edit future</button>
+              <button class="dc-btn-outline" type="button" (click)="cancel(s)">Cancel</button>
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

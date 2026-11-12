@@ -1,3 +1,5 @@
+import { Frequency } from '../recurring/recurring.models';
+import { RecurringService } from '../recurring/recurring.service';
 import { formatMoney } from '../shared/money.component';
 import { ProfileService } from '../core/profile.service';
 import {
@@ -84,6 +86,7 @@ export class NewExpenseModalComponent {
   protected readonly retryNotice = signal<string | null>(null);
   private restored: PendingWrite<CreateExpenseRequest> | null = null;
   private readonly expenses = inject(ExpenseService);
+  private readonly recurring = inject(RecurringService);
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
@@ -106,6 +109,8 @@ export class NewExpenseModalComponent {
   });
   protected readonly amount = new FormControl<string | number | null>(null);
   protected readonly date = new FormControl(this.today(), { nonNullable: true });
+  /** New group expenses only: anything but NEVER creates a schedule instead of one expense. */
+  protected readonly repeat = signal<Frequency | 'NEVER'>('NEVER');
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
   protected readonly paidBy = signal<string>('');
   protected readonly splitType = signal<SplitType>('EQUAL');
@@ -543,7 +548,53 @@ export class NewExpenseModalComponent {
     } else {
       req = { ...paid, splitType: this.splitType(), splits: this.serializedSplits()! };
     }
+    const frequency = this.repeat();
+    if (!this.editId && frequency !== 'NEVER') {
+      this.saveSchedule(gid, req, frequency);
+      return;
+    }
     this.dispatch(gid, this.editId ? { ...req, expectedVersion: this.expectedVersion } : req);
+  }
+
+  private saveSchedule(gid: string, template: CreateExpenseRequest, frequency: Frequency): void {
+    const intent = {
+      template,
+      frequency,
+      anchorDate: this.date.value,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+    // One operationId per identical uncertain draft, so a retry cannot add a second schedule.
+    let pending: PendingWrite<typeof intent>;
+    try {
+      try {
+        pending = this.pendingWrites.prepare('recurring', gid, intent);
+      } catch (error) {
+        if ((error as Error).message !== UNCERTAIN_WRITE) throw error;
+        this.pendingWrites.abandon('recurring'); // the draft changed: a new schedule, a new key
+        pending = this.pendingWrites.prepare('recurring', gid, intent);
+      }
+    } catch (error) {
+      this.error.set((error as Error).message);
+      return;
+    }
+    this.saving.set(true);
+    this.modal.setMutationPending(true);
+    this.error.set(null);
+    this.recurring
+      .create(gid, { ...intent, operationId: pending.operationId })
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.pendingWrites.complete('recurring', pending);
+          this.dashboard.refresh();
+          this.modal.close();
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? 'Could not save the recurring expense.');
+          this.saving.set(false);
+          this.modal.setMutationPending(false);
+        },
+      });
   }
 
   private dispatch(gid: string, req: CreateExpenseRequest): void {

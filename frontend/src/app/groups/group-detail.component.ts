@@ -1,3 +1,4 @@
+import { RecurringService } from '../recurring/recurring.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
@@ -65,6 +66,7 @@ export class GroupDetailComponent implements OnInit {
   }
   private readonly groups = inject(GroupService);
   private readonly balances = inject(BalanceService);
+  private readonly recurring = inject(RecurringService);
   private readonly expensesApi = inject(ExpenseService);
   private readonly auth = inject(AuthService);
   private readonly dashboard = inject(DashboardService);
@@ -689,6 +691,28 @@ export class GroupDetailComponent implements OnInit {
 
   tint(id: string): { background: string; color: string } {
     return avatarTint(id);
+  }
+
+  protected readonly reminderNotice = signal<string | null>(null);
+  protected readonly reminderError = signal<string | null>(null);
+
+  /** Nudges someone who owes me; the server allows one per person and currency per day. */
+  remind(b: PersonBalance): void {
+    this.reminderNotice.set(null);
+    this.reminderError.set(null);
+    const name = b.user.displayName.split(/\s+/)[0];
+    this.recurring
+      .remind(this.groupId, b.user.accountId ?? b.user.id, b.currency ?? 'USD')
+      .pipe(
+        takeUntil(this.scopeChanges),
+        takeUntil(this.session.changes),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => this.reminderNotice.set(`Reminder sent to ${name}`),
+        error: (err) =>
+          this.reminderError.set(err?.error?.message ?? 'Could not send the reminder.'),
+      });
   }
 
   pillLabel(b: PersonBalance): string {

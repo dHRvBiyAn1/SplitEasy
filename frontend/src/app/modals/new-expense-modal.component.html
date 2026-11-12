@@ -90,6 +90,18 @@
         </div>
       </div>
 
+      @if (!editId) {
+        <div class="mform__field">
+          <label class="dc-field-label" for="ne-repeat">Repeat</label>
+          <select id="ne-repeat" class="dc-field" (change)="repeat.set($any($event.target).value)">
+            <option value="NEVER" [selected]="repeat() === 'NEVER'">Never</option>
+            <option value="DAILY" [selected]="repeat() === 'DAILY'">Daily</option>
+            <option value="WEEKLY" [selected]="repeat() === 'WEEKLY'">Weekly</option>
+            <option value="MONTHLY" [selected]="repeat() === 'MONTHLY'">Monthly</option>
+          </select>
+        </div>
+      }
+
       <div class="mform__field">
         <span class="dc-field-label">Category</span>
         <div class="chips">
