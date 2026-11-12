@@ -111,5 +111,11 @@ export const routes: Routes = [
       import('./recurring/recurring.component').then((m) => m.RecurringComponent),
   },
 
+  // --- c02 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h02 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- p07-p01 routes (insert below; parallel batch plan rule 3) ---
+
   { path: '**', redirectTo: 'dashboard' },
 ];

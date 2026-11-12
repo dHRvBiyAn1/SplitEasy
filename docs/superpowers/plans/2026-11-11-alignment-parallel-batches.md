@@ -47,7 +47,8 @@ TDD/verification workflow and migration policy still apply in full.
 | V28 | H04 | schedules and occurrences |
 | V29 | C02 | server-owned locale |
 | V30 | H02 | comments and attachment metadata |
-| V31+ | M4/M5 | assigned when their wave is planned |
+| V31 | P07-A/P01-A | search indexes, only if needed |
+| V32+ | M4/M5 | assigned when their wave is planned |
 
 An unused reservation leaves a gap, which Flyway accepts.
 
@@ -89,7 +90,9 @@ Design, owner decisions and final ownership: [Wave 8 package plans](2026-11-12-a
 | **A04** account closure | `AuthService`, `AuthSessionService`, `AccountLifecycleService`, `SecurityConfig`, `User` entity, `ProfileService`, frontend `profile/*`, `auth/*` | Settlement, recurrence |
 | **H04** recurrence + reminders | New `recurrence/*` (scheduler, occurrence identity, calls `ExpenseService`), reminder sender via H03 outbox, frontend new `recurring/*` plus a repeat control in `modals/new-expense-modal.*` | Profile, settlement |
 
-## Wave 9 — locale wave
+## Wave 9 — locale wave (now)
+
+Design, owner decisions (Hindi + Spanish + French, extensible; attachments in PostgreSQL) and final ownership: [Wave 9 package plans](2026-11-12-alignment-wave9.md).
 
 C02 rewrites strings in almost every template, so this wave's other slots are backend-only.
 

@@ -3081,6 +3081,12 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
 
+  # --- c02 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- h02 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- p07-p01 paths (insert below; parallel batch plan rule 3) ---
+
 components:
   schemas:
     SaveFriendRequest:
@@ -5430,6 +5436,12 @@ components:
         debtorId: {type: string, format: uuid}
         currency: {type: string, enum: [USD, EUR, GBP, INR, JPY, KWD]}
         amountMinor: {type: integer, format: int64}
+
+    # --- c02 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h02 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- p07-p01 schemas (insert below; parallel batch plan rule 3) ---
 
   parameters:
     ParticipantVersion:
