@@ -9,7 +9,6 @@ import { ModalService } from '../modals/modal.service';
 import {
   DeletedPayment,
   LedgerRevision,
-  PAYMENT_METHOD_LABEL,
   PaymentMethod,
   PaymentResponse,
 } from '../payments/payment.models';
@@ -68,7 +67,9 @@ export class PersonalPaymentsComponent {
   }
 
   protected methodText(method: PaymentMethod): string {
-    return PAYMENT_METHOD_LABEL[method];
+    // CASH → Cash, BANK_TRANSFER → Bank transfer (same labels as the payments screen).
+    const text = method.toLowerCase().replace('_', ' ');
+    return text[0].toUpperCase() + text.slice(1);
   }
 
   protected load(): void {

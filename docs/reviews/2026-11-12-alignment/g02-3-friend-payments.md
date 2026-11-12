@@ -22,4 +22,6 @@ No migration (V24 unused): a settlement between two friends is a normal `Payment
 
 ## Not verified
 
+Frontend gate: 405 tests in 58 files, Prettier clean, production build 557.22 kB. Backend: 409 tests (spotless:check verify). Note: importing `PAYMENT_METHOD_LABEL` from the friend component broke the existing payments spec in the full bundle (undefined at runtime), so the method label is formatted locally.
+
 No real-browser run and no populated-DB rehearsal. Personal payment correction (PUT) has HTTP coverage but no UI.
