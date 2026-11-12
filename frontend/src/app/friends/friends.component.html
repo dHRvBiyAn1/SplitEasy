@@ -231,6 +231,11 @@
     </div>
   }
   @if (detail(); as friend) {
+    <app-friend-settle-all
+      [friendId]="friend.id"
+      [friendName]="friend.displayName"
+      [balances]="friend.balances"
+    />
     <app-personal-payments
       [friendId]="friend.id"
       [friendName]="friend.displayName"
