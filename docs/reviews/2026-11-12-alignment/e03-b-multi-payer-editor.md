@@ -13,7 +13,7 @@ Contract: `docs/api/multi-payer-contributions.md`. Design: Wave 7 plan, E03-B.
 
 ## Verification
 - Frontend (Node 22.17.1): 410 tests / 59 files pass (399/57 before); Prettier check on `src` clean; production build OK (initial 557.98 kB).
-- Backend: unchanged; see PR for the `spotless:check verify` result.
+- Backend (unchanged): `./mvnw -B spotless:check verify` BUILD SUCCESS, 405 tests.
 - Not verified: real browser, real backend round trip.
 
 ## Agents.md delta
