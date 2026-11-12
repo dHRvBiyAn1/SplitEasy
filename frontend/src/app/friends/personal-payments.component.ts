@@ -85,17 +85,13 @@ export class PersonalPaymentsComponent {
   }
 
   protected settle(balance: FriendBalance): void {
-    // Prefill mirrors a dashboard Settlement; the `personal:` scope routes it to the pair ledger.
-    this.modal.openSettle(
-      {
-        groupId: `personal:${this.friendId()}`,
-        groupName: 'Personal',
-        counterparty: { id: this.friendId(), displayName: this.friendName(), email: null },
-        netMinor: balance.netMinor,
-        currency: balance.currency,
-      },
-      `personal:${this.friendId()}`,
-    );
+    this.modal.openSettle({
+      friendId: this.friendId(),
+      groupName: 'Personal',
+      counterparty: { id: this.friendId(), displayName: this.friendName(), email: null },
+      netMinor: balance.netMinor,
+      currency: balance.currency,
+    });
   }
 
   protected undo(p: PaymentResponse): void {

@@ -87,7 +87,8 @@ describe('personal payments with one saved friend', () => {
     const modal = TestBed.inject(ModalService);
     button('Settle up USD').click();
     const prefill = modal.settlePrefill()!;
-    expect(prefill.groupId).toBe('personal:pat');
+    expect(prefill.friendId).toBe('pat');
+    expect(prefill.groupId).toBeUndefined();
     expect(prefill.netMinor).toBe(500);
     expect(prefill.currency).toBe('USD');
     expect(prefill.counterparty.id).toBe('pat');

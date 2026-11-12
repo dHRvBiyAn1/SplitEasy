@@ -165,13 +165,13 @@ describe('SettleUpModalComponent', () => {
 
   it('records a personal settlement through the friend ledger, not a group', async () => {
     const prefill = {
-      groupId: 'personal:pat',
+      friendId: 'pat',
       groupName: 'Personal',
       counterparty: { id: 'pat', displayName: 'Pat', email: null },
       netMinor: -500,
       currency: 'USD' as const,
     };
-    modal.openSettle(prefill, 'personal:pat');
+    modal.openSettle(prefill);
     await render();
     fixture.nativeElement.querySelector('.dc-btn-accent').click();
 

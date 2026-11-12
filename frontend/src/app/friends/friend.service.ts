@@ -113,7 +113,7 @@ export class FriendService {
     });
   }
 
-  /** Keyed like a group payment; the scope is `personal:<friendId>`, shared with the settle-up modal. */
+  /** Keyed like a group payment; the pending-write scope is `friend:<friendId>`. */
   recordPersonalPayment(
     friendId: string,
     request: Omit<RecordPaymentRequest, 'operationId'>,
@@ -123,7 +123,7 @@ export class FriendService {
     return defer(() => {
       if (this.session.version !== version) return EMPTY;
       const intent = { ...request, currency: request.currency ?? ('USD' as const) };
-      const pending = this.pendingWrites.prepare('payment', `personal:${friendId}`, intent, draft);
+      const pending = this.pendingWrites.prepare('payment', `friend:${friendId}`, intent, draft);
       return this.api
         .post<PaymentResponse>(`/friends/${friendId}/payments`, {
           ...intent,

@@ -18,7 +18,12 @@ import {
   PendingWritesService,
   UNCERTAIN_WRITE,
 } from '../core/pending-writes.service';
-import { CreateExpenseRequest, DeletedExpense, ExpenseSummary } from '../expenses/expense.models';
+import {
+  ContributionInput,
+  CreateExpenseRequest,
+  DeletedExpense,
+  ExpenseSummary,
+} from '../expenses/expense.models';
 import { FriendService } from './friend.service';
 
 /**
@@ -65,7 +70,7 @@ export class PersonalExpensesComponent {
   protected editing: string | null = null;
   private expectedVersion: number | undefined;
   // Multi-payer entries (API-created) keep their stored contributions; this form can't edit them.
-  private contributions: { userId: string; amountMinor: number }[] | null = null;
+  private contributions: ContributionInput[] | null = null;
   protected restored: PendingWrite<CreateExpenseRequest> | null = null;
 
   protected readonly description = signal('');
@@ -226,8 +231,7 @@ export class PersonalExpensesComponent {
           this.date.set(e.spentOn);
           this.paidByMe.set(e.paidBy.id === this.me());
           this.expectedVersion = e.version;
-          const stored = (e as { contributions?: { user: { id: string }; amountMinor: number }[] })
-            .contributions;
+          const stored = e.contributions;
           this.contributions =
             stored && stored.length > 1
               ? stored.map((c) => ({ userId: c.user.id, amountMinor: c.amountMinor }))
