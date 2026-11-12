@@ -64,6 +64,8 @@ export class PersonalExpensesComponent {
   private deletedRequest?: Subscription;
   protected editing: string | null = null;
   private expectedVersion: number | undefined;
+  // Multi-payer entries (API-created) keep their stored contributions; this form can't edit them.
+  private contributions: { userId: string; amountMinor: number }[] | null = null;
   protected restored: PendingWrite<CreateExpenseRequest> | null = null;
 
   protected readonly description = signal('');
@@ -159,6 +161,7 @@ export class PersonalExpensesComponent {
     this.convertedFrom.set(null);
     this.editing = null;
     this.expectedVersion = undefined;
+    this.contributions = null;
     this.description.set('');
     this.amount.set('');
     this.date.set(this.today());
@@ -223,6 +226,12 @@ export class PersonalExpensesComponent {
           this.date.set(e.spentOn);
           this.paidByMe.set(e.paidBy.id === this.me());
           this.expectedVersion = e.version;
+          const stored = (e as { contributions?: { user: { id: string }; amountMinor: number }[] })
+            .contributions;
+          this.contributions =
+            stored && stored.length > 1
+              ? stored.map((c) => ({ userId: c.user.id, amountMinor: c.amountMinor }))
+              : null;
           // Only equal and exact are editable here; every other type opens as its stored exact
           // shares so saving never silently resets what was agreed.
           this.split.set(e.splitType === 'EQUAL' ? 'EQUAL' : 'UNEQUAL');
@@ -300,7 +309,15 @@ export class PersonalExpensesComponent {
               { userId: this.friendId(), value: this.shares()[1] },
             ],
           };
-    this.dispatch(this.editing ? { ...request, expectedVersion: this.expectedVersion } : request);
+    this.dispatch(
+      this.editing
+        ? {
+            ...request,
+            expectedVersion: this.expectedVersion,
+            ...(this.contributions && { contributions: this.contributions }),
+          }
+        : request,
+    );
   }
 
   /** Never auto-retry: an uncertain entry keeps its keyed identity until the reader reviews it. */
