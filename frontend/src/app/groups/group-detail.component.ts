@@ -702,7 +702,9 @@ export class GroupDetailComponent implements OnInit {
 
   paidSub(e: ExpenseSummary): string {
     const who = this.isOwned(e.paidBy.id) ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
-    return `${who} paid ${this.display(e.amountMinor, e.currency)}`;
+    const others = (e.payerCount ?? 1) - 1;
+    const names = others > 0 ? `${who} and ${others} other${others > 1 ? 's' : ''}` : who;
+    return `${names} paid ${this.display(e.amountMinor, e.currency)}`;
   }
 
   deltaLabel(e: ExpenseSummary): string {

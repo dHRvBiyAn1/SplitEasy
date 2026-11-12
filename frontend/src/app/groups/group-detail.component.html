@@ -208,10 +208,21 @@
                         Retry expense
                       </button>
                     } @else if (detail(); as d) {
-                      <div class="xdetail__line xdetail__line--paid">
-                        <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>
-                        <span class="xdetail__amt">{{ display(d.amountMinor, d.currency) }}</span>
-                      </div>
+                      @if ((d.contributions?.length ?? 0) > 1) {
+                        @for (c of d.contributions; track c.user.id) {
+                          <div class="xdetail__line xdetail__line--paid">
+                            <span class="xdetail__who">{{ firstName(c.user) }} paid</span>
+                            <span class="xdetail__amt">{{
+                              display(c.amountMinor, d.currency)
+                            }}</span>
+                          </div>
+                        }
+                      } @else {
+                        <div class="xdetail__line xdetail__line--paid">
+                          <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>
+                          <span class="xdetail__amt">{{ display(d.amountMinor, d.currency) }}</span>
+                        </div>
+                      }
                       @for (p of d.participants; track p.user.id) {
                         <div class="xdetail__line">
                           <span

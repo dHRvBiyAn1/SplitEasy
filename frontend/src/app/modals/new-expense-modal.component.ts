@@ -27,7 +27,12 @@ import {
   UNCERTAIN_WRITE,
 } from '../core/pending-writes.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { CreateExpenseRequest, SplitInput, SplitType } from '../expenses/expense.models';
+import {
+  ContributionInput,
+  CreateExpenseRequest,
+  SplitInput,
+  SplitType,
+} from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
@@ -104,6 +109,24 @@ export class NewExpenseModalComponent {
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
   protected readonly paidBy = signal<string>('');
   protected readonly splitType = signal<SplitType>('EQUAL');
+
+  /** Multi-payer mode: raw per-member amounts; blank excludes. paidBy stays the primary payer. */
+  protected readonly multiPayer = signal(false);
+  protected readonly payerValues = signal<Record<string, string>>({});
+  /** The loaded expense had several payers, so its PUT must always carry contributions. */
+  private hadMultiPayer = false;
+  private readonly serializedContributions = computed<ContributionInput[] | null>(() => {
+    const values = this.payerValues();
+    const rows: ContributionInput[] = [];
+    for (const member of this.members()) {
+      const raw = values[member.id]?.trim() ?? '';
+      if (raw === '') continue;
+      const amountMinor = amountToMinor(raw, this.currency(), false);
+      if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
+      rows.push({ userId: member.id, amountMinor });
+    }
+    return rows;
+  });
 
   /** EQUAL: member ids included. Custom modes: raw per-member input strings; blank excludes. */
   protected readonly included = signal<Set<string>>(new Set());
@@ -213,6 +236,8 @@ export class NewExpenseModalComponent {
     this.paidBy.set('');
     this.included.set(new Set());
     this.values.set({});
+    this.multiPayer.set(false);
+    this.payerValues.set({});
     if (!id) {
       return;
     }
@@ -260,7 +285,11 @@ export class NewExpenseModalComponent {
           }
           // Keep original alias rows and payer IDs; canonical defaults must not erase history.
           this.members.update((roster) => {
-            const originals = [e.paidBy, ...e.participants.map((p) => p.user)];
+            const originals = [
+              e.paidBy,
+              ...e.participants.map((p) => p.user),
+              ...(e.contributions ?? []).map((c) => c.user),
+            ];
             return [
               ...roster,
               ...originals.filter(
@@ -278,6 +307,18 @@ export class NewExpenseModalComponent {
           if (!this.date.dirty) this.date.setValue(e.spentOn);
           this.category.set(e.category);
           this.paidBy.set(e.paidBy.id);
+          if ((e.contributions?.length ?? 0) > 1) {
+            this.hadMultiPayer = true;
+            this.multiPayer.set(true);
+            this.payerValues.set(
+              Object.fromEntries(
+                e.contributions!.map((c) => [
+                  c.user.id,
+                  minorToDisplay(c.amountMinor, this.currency()),
+                ]),
+              ),
+            );
+          }
           this.included.set(new Set(e.participantUserIds ?? e.participants.map((p) => p.user.id)));
           if (e.splitType === 'EQUAL') {
             this.splitType.set('EQUAL');
@@ -353,6 +394,41 @@ export class NewExpenseModalComponent {
   setValue(id: string, v: string): void {
     this.values.update((m) => ({ ...m, [id]: v }));
     this.tick.update((n) => n + 1);
+  }
+
+  setPayerValue(id: string, v: string): void {
+    this.payerValues.update((m) => ({ ...m, [id]: v }));
+  }
+
+  /** Live remainder between the expense amount and what the payers have been given. */
+  payerRemainder(): string {
+    this.tick();
+    const rows = this.serializedContributions();
+    if (!rows) return 'Enter valid positive amounts';
+    const diff = this.amountMinor() - rows.reduce((sum, r) => sum + r.amountMinor, 0);
+    if (!Number.isSafeInteger(diff)) return 'Enter the expense amount first';
+    if (diff === 0) return 'Payer amounts match the total';
+    return diff > 0 ? `${this.display(diff)} left to assign` : `${this.display(-diff)} over`;
+  }
+
+  /** Nonempty, positive and unique by construction; must include the primary payer and sum to the amount. */
+  payersValid(): boolean {
+    this.tick();
+    if (!this.multiPayer()) return true;
+    const rows = this.serializedContributions();
+    return (
+      !!rows?.length &&
+      rows.some((r) => r.userId === this.paidBy()) &&
+      rows.reduce((sum, r) => sum + r.amountMinor, 0) === this.amountMinor()
+    );
+  }
+
+  /** Undefined keeps the single-payer wire shape; a former multi-payer edit never omits it. */
+  private contributionsForRequest(): ContributionInput[] | undefined {
+    if (this.multiPayer()) return this.serializedContributions()!;
+    return this.hadMultiPayer
+      ? [{ userId: this.paidBy(), amountMinor: this.amountMinor() }]
+      : undefined;
   }
 
   private amountMinor(): number {
@@ -435,6 +511,7 @@ export class NewExpenseModalComponent {
       this.amountMinor() <= 1_000_000_000_000 &&
       !!this.paidBy() &&
       this.splitValid() &&
+      this.payersValid() &&
       !this.saving()
     );
   }
@@ -458,11 +535,13 @@ export class NewExpenseModalComponent {
       category: this.category(),
       spentOn: this.date.value,
     };
+    const contributions = this.contributionsForRequest();
+    const paid = contributions ? { ...base, contributions } : base;
     let req: CreateExpenseRequest;
     if (this.splitType() === 'EQUAL') {
-      req = { ...base, participantUserIds: [...this.included()] };
+      req = { ...paid, participantUserIds: [...this.included()] };
     } else {
-      req = { ...base, splitType: this.splitType(), splits: this.serializedSplits()! };
+      req = { ...paid, splitType: this.splitType(), splits: this.serializedSplits()! };
     }
     this.dispatch(gid, this.editId ? { ...req, expectedVersion: this.expectedVersion } : req);
   }
@@ -535,6 +614,7 @@ export class NewExpenseModalComponent {
   private restoreDraft(request: CreateExpenseRequest): void {
     const originalIds = [
       request.paidByUserId,
+      ...(request.contributions ?? []).map((c) => c.userId),
       ...(request.participantUserIds ?? []),
       ...(request.splits ?? []).map((s) => s.userId),
     ];
@@ -549,6 +629,17 @@ export class NewExpenseModalComponent {
     this.date.setValue(request.spentOn ?? this.today());
     this.category.set(request.category ?? 'OTHER');
     this.paidBy.set(request.paidByUserId);
+    if (request.contributions) {
+      this.multiPayer.set(true);
+      this.payerValues.set(
+        Object.fromEntries(
+          request.contributions.map((c) => [
+            c.userId,
+            minorToDisplay(c.amountMinor, this.currency()),
+          ]),
+        ),
+      );
+    }
     this.splitType.set(request.splitType ?? 'EQUAL');
     this.included.set(new Set(request.participantUserIds ?? []));
     this.values.set(
