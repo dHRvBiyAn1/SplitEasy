@@ -108,7 +108,7 @@
       </div>
 
       <div class="mform__field">
-        <span class="dc-field-label">Paid by</span>
+        <span class="dc-field-label">{{ multiPayer() ? 'Primary payer' : 'Paid by' }}</span>
         <div class="chips">
           @for (m of members(); track m.id) {
             <button
@@ -126,6 +126,52 @@
             </button>
           }
         </div>
+      </div>
+
+      <div class="mform__field">
+        <button
+          type="button"
+          class="chip"
+          [class.chip--on]="multiPayer()"
+          [attr.aria-pressed]="multiPayer()"
+          (click)="multiPayer.set(!multiPayer())"
+        >
+          Multiple people paid
+        </button>
+        @if (multiPayer()) {
+          <p class="mform__hint">
+            Enter what each person paid. The person selected above covers any rounding.
+          </p>
+          <div class="prows">
+            @for (m of members(); track m.id) {
+              <div class="prow">
+                <span class="dc-avatar prow__av" aria-hidden="true" [style]="tint(m.id)">{{
+                  initials(m.displayName)
+                }}</span>
+                <span class="prow__name">{{ firstName(m) }}</span>
+                <input
+                  class="prow__val"
+                  type="text"
+                  inputmode="decimal"
+                  maxlength="32"
+                  [attr.data-payer]="m.id"
+                  [attr.aria-label]="memberLabel(m) + ' paid in ' + currency()"
+                  [value]="payerValues()[m.id] || ''"
+                  (input)="setPayerValue(m.id, $any($event.target).value)"
+                  [placeholder]="currency()"
+                />
+              </div>
+            }
+          </div>
+          <p
+            class="running payers__remainder"
+            aria-live="polite"
+            aria-atomic="true"
+            [class.running--ok]="payersValid()"
+          >
+            {{ payerRemainder() }}
+          </p>
+        }
       </div>
 
       <div class="mform__field">
