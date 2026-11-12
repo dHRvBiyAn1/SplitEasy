@@ -79,7 +79,7 @@ Design and final ownership: [Wave 7 package plans](2026-11-12-alignment-wave7.md
 H03 hooks into the revision writers that every financial write already calls, so it never edits
 the expense or payment services.
 
-## Wave 8 — now
+## Wave 8 — done (PRs #123, #125, #124 merged to dev 2026-11-12)
 
 Design, owner decisions and final ownership: [Wave 8 package plans](2026-11-12-alignment-wave8.md).
 
