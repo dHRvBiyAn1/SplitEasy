@@ -15,10 +15,13 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  private readonly reason = inject(ActivatedRoute).snapshot.queryParamMap.get('reason');
   protected readonly securityNotice =
-    inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === 'password-changed'
+    this.reason === 'password-changed'
       ? 'Password changed. Log in with your new password.'
-      : '';
+      : this.reason === 'account-closed'
+        ? 'Your account has been closed.'
+        : '';
   protected readonly logoutWarning = this.auth.logoutWarning;
   protected readonly passwordVisible = signal(false);
   protected readonly submitting = signal(false);

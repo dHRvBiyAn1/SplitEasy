@@ -2936,6 +2936,28 @@ paths:
           $ref: '#/components/responses/Conflict'
 
   # --- a04 paths (insert below; parallel batch plan rule 3) ---
+  /api/me/closure:
+    post:
+      summary: Permanently close the current account
+      description: >-
+        Requires the current password. Refused with 409 (naming the groups and friends) while any
+        balance is non-zero. Ends all sessions, frees the email, removes memberships and shows the
+        account as "Closed account" in retained history. Irreversible.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseAccountRequest'
+      responses:
+        '204':
+          description: Account closed
+        '400':
+          description: Wrong password
+        '409':
+          description: Unsettled balances; nothing changed
+        '429':
+          description: Sensitive-command rate limit
 
   # --- h04 paths (insert below; parallel batch plan rule 3) ---
   /api/groups/{groupId}/recurring:
@@ -5358,6 +5380,12 @@ components:
         netMinor: {type: integer, format: int64}
 
     # --- a04 schemas (insert below; parallel batch plan rule 3) ---
+    CloseAccountRequest:
+      type: object
+      required: [currentPassword]
+      properties:
+        currentPassword:
+          type: string
 
     # --- h04 schemas (insert below; parallel batch plan rule 3) ---
     RecurringScheduleRequest:

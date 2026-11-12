@@ -52,6 +52,9 @@ public class User {
   @Column(name = "credential_version", nullable = false)
   private long credentialVersion;
 
+  @Column(name = "closed_at")
+  private Instant closedAt;
+
   public User(String email, String passwordHash, String displayName) {
     this.email = email;
     this.passwordHash = passwordHash;
