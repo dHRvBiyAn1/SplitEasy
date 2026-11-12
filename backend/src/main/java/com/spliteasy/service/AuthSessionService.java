@@ -64,7 +64,7 @@ public class AuthSessionService {
             hash);
     if (owner.isEmpty()) return null;
     User user = users.findLockedById(owner.getFirst()).orElse(null);
-    if (user == null) return null;
+    if (user == null || user.getClosedAt() != null) return null;
     var credentials =
         jdbc.query(
             "select s.id,s.credential_version,s.expires_at,s.idle_expires_at,s.revoked_at,s.rotations,c.consumed_at from refresh_credentials c join auth_sessions s on s.id=c.session_id where c.token_hash=? and s.user_id=?",
