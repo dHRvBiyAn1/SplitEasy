@@ -1,0 +1,40 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.recurring-page {
+  max-width: 800px;
+  margin: auto;
+  padding: var(--sp-7) var(--sp-6) var(--sp-8);
+  display: grid;
+  gap: var(--sp-5);
+  overflow-wrap: anywhere;
+}
+.schedules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-4);
+}
+.schedule-main,
+.actions,
+.edit {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.edit label {
+  display: grid;
+  gap: var(--sp-1);
+}
+.meta {
+  color: var(--ink-soft);
+  margin: 0;
+}
+.review {
+  margin: 0;
+  color: var(--neg-strong);
+}

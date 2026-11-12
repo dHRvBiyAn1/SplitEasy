@@ -2868,6 +2868,126 @@ paths:
   # --- a04 paths (insert below; parallel batch plan rule 3) ---
 
   # --- h04 paths (insert below; parallel batch plan rule 3) ---
+  /api/groups/{groupId}/recurring:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listRecurringExpenses
+      summary: List the group's recurring expense schedules
+      tags: [Recurring]
+      responses:
+        '200':
+          description: Schedules, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/RecurringSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createRecurringExpense
+      summary: Create a recurring expense schedule
+      description: Occurrence dates are local dates in `timeZone`; monthly keeps the anchor day clamped to the month's last day. A runner creates each due expense as the schedule creator; occurrences missed for more than 30 days are recorded SKIPPED. Refused 409 on an archived group.
+      tags: [Recurring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecurringScheduleRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/recurring/{scheduleId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - {name: scheduleId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: getRecurringExpense
+      summary: Get one schedule
+      tags: [Recurring]
+      responses:
+        '200':
+          description: The schedule.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: updateRecurringExpense
+      summary: Change future occurrences
+      description: Requires `expectedVersion`; a stale version or a cancelled schedule is 409. Already generated expenses are untouched. Resets NEEDS_REVIEW to ACTIVE.
+      tags: [Recurring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecurringScheduleRequest'}
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/recurring/{scheduleId}/cancel:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - {name: scheduleId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: cancelRecurringExpense
+      summary: Cancel a schedule
+      description: Prevents future occurrences and deletes nothing. Repeating it is a no-op returning the cancelled schedule. Allowed on an archived group.
+      tags: [Recurring]
+      responses:
+        '200':
+          description: Cancelled.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/groups/{groupId}/reminders:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: sendBalanceReminder
+      summary: Remind a debtor in this group
+      description: Caller must be owed money by `debtorId` in `currency` under the canonical projection (else 409). At most one reminder per group, creditor, debtor and currency per 24 hours (409). Delivered in-app to the debtor only, subject to their payments notification preference (event kind BALANCE_REMINDER). No email.
+      tags: [Recurring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReminderRequest'}
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReminderResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
 
 components:
   schemas:
@@ -5119,6 +5239,47 @@ components:
     # --- a04 schemas (insert below; parallel batch plan rule 3) ---
 
     # --- h04 schemas (insert below; parallel batch plan rule 3) ---
+    RecurringScheduleRequest:
+      type: object
+      required: [template, frequency, anchorDate, timeZone]
+      properties:
+        template:
+          description: The expense each occurrence creates; its date and operationId are ignored.
+          $ref: '#/components/schemas/CreateExpenseRequest'
+        frequency: {type: string, enum: [DAILY, WEEKLY, MONTHLY]}
+        anchorDate: {type: string, format: date, description: First occurrence, a local date in timeZone.}
+        timeZone: {type: string, description: IANA zone, for example Australia/Sydney.}
+        expectedVersion: {type: integer, format: int64, minimum: 0, description: Required on PUT.}
+    RecurringSchedule:
+      type: object
+      required: [id, groupId, createdBy, template, frequency, anchorDate, timeZone, nextDate, version, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        createdBy: {type: string, format: uuid}
+        template: {$ref: '#/components/schemas/CreateExpenseRequest'}
+        frequency: {type: string, enum: [DAILY, WEEKLY, MONTHLY]}
+        anchorDate: {type: string, format: date}
+        timeZone: {type: string}
+        nextDate: {type: string, format: date}
+        version: {type: integer, format: int64}
+        status: {type: string, enum: [ACTIVE, NEEDS_REVIEW, CANCELLED]}
+        reviewReason: {type: [string, 'null']}
+        createdAt: {type: string, format: date-time}
+        cancelledAt: {type: [string, 'null'], format: date-time}
+    ReminderRequest:
+      type: object
+      required: [debtorId, currency]
+      properties:
+        debtorId: {type: string, format: uuid, description: The debtor's account ID.}
+        currency: {type: string, enum: [USD, EUR, GBP, INR, JPY, KWD]}
+    ReminderResponse:
+      type: object
+      required: [debtorId, currency, amountMinor]
+      properties:
+        debtorId: {type: string, format: uuid}
+        currency: {type: string, enum: [USD, EUR, GBP, INR, JPY, KWD]}
+        amountMinor: {type: integer, format: int64}
 
   parameters:
     ParticipantVersion:

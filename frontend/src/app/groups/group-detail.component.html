@@ -139,9 +139,21 @@
           >
             {{ display(b.netMinor < 0 ? -b.netMinor : b.netMinor, b.currency) }}
           </strong>
+          @if (b.netMinor > 0) {
+            <button type="button" class="dc-btn-outline" (click)="remind(b)">
+              Remind {{ b.user.displayName.split(' ')[0] }}
+            </button>
+          }
         </span>
       }
     </div>
+    <p><a [routerLink]="['/groups', groupId, 'recurring']">Recurring expenses</a></p>
+    @if (reminderNotice()) {
+      <p role="status">{{ reminderNotice() }}</p>
+    }
+    @if (reminderError()) {
+      <p class="write-error" role="alert">{{ reminderError() }}</p>
+    }
 
     @if (expenses().length === 0) {
       <p class="gd__empty">No expenses yet. Add the first one.</p>
