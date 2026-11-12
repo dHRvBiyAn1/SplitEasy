@@ -152,6 +152,13 @@ export class AuthService {
     return this.api.post<void>('/auth/email-change-confirmations', { token });
   }
 
+  /** Irreversible: on success the local session ends without a server logout call. */
+  closeAccount(currentPassword: string): Observable<void> {
+    return this.api
+      .post<void>('/me/closure', { currentPassword })
+      .pipe(tap(() => this.clearSession()));
+  }
+
   logout(): void {
     this.signOut('/auth/logout', 'copied credentials');
   }

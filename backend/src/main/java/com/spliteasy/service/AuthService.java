@@ -63,7 +63,8 @@ public class AuthService {
                     .findFirst()
                     .orElseThrow(() -> new BadCredentialsException("Invalid email or password")))
             .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
-    if (!user.getEmail().equals(email)
+    if (user.getClosedAt() != null
+        || !user.getEmail().equals(email)
         || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
       throw new BadCredentialsException("Invalid email or password");
     }
