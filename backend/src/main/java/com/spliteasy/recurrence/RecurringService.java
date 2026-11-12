@@ -4,6 +4,7 @@ import com.spliteasy.dto.expense.CreateExpenseRequest;
 import com.spliteasy.exception.BadRequestException;
 import com.spliteasy.exception.ConflictException;
 import com.spliteasy.exception.NotFoundException;
+import com.spliteasy.service.ExpenseService;
 import com.spliteasy.service.GroupWriteGuard;
 import com.spliteasy.service.MembershipGuard;
 import java.sql.ResultSet;
@@ -16,8 +17,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /** Schedule CRUD. Occurrence generation lives in {@link RecurrenceRunner}. */
@@ -33,6 +36,8 @@ public class RecurringService {
   private final MembershipGuard membership;
   private final GroupWriteGuard writeGuard;
   private final Clock clock;
+  private final ExpenseService expenses;
+  private final PlatformTransactionManager transactions;
 
   @Transactional(readOnly = true)
   public List<ScheduleResponse> list(UUID userId, UUID groupId) {
@@ -52,30 +57,114 @@ public class RecurringService {
     return find(groupId, id, false);
   }
 
-  @Transactional(isolation = Isolation.READ_COMMITTED)
   public ScheduleResponse create(UUID userId, UUID groupId, ScheduleRequest request) {
-    writeGuard.lockForMember(groupId, userId);
+    membership.requireMember(groupId, userId);
     ZoneId zone = zone(request);
-    UUID id = UUID.randomUUID();
-    jdbc.sql(
-            """
-        INSERT INTO recurring_schedules(id,group_id,created_by,template,frequency,anchor_date,time_zone,next_date)
-        VALUES (?,?,?,CAST(? AS jsonb),?,?,?,?)
-        """)
-        .params(id, groupId, userId, templateJson(request), request.frequency().name())
-        .param(request.anchorDate())
-        .param(zone.getId())
-        .param(request.anchorDate())
-        .update();
-    return find(groupId, id, false);
+    if (request.operationId() != null) {
+      var original = findByOperation(userId, groupId, request.operationId());
+      if (original != null) return replay(original, request, zone);
+    }
+    validate(userId, groupId, request);
+    return write(
+        status -> {
+          writeGuard.lockForMember(groupId, userId);
+          UUID id = UUID.randomUUID();
+          int inserted =
+              jdbc.sql(
+                      """
+              INSERT INTO recurring_schedules(id,group_id,created_by,template,frequency,anchor_date,time_zone,next_date,operation_id)
+              VALUES (?,?,?,CAST(? AS jsonb),?,?,?,?,?)
+              ON CONFLICT (created_by, group_id, operation_id) WHERE operation_id IS NOT NULL DO NOTHING
+              """)
+                  .params(id, groupId, userId, templateJson(request), request.frequency().name())
+                  .param(request.anchorDate())
+                  .param(zone.getId())
+                  .param(request.anchorDate())
+                  .param(request.operationId())
+                  .update();
+          if (inserted == 0) {
+            return replay(findByOperation(userId, groupId, request.operationId()), request, zone);
+          }
+          return find(groupId, id, false);
+        });
+  }
+
+  private ScheduleResponse replay(ScheduleResponse original, ScheduleRequest request, ZoneId zone) {
+    boolean same =
+        // Compare parsed text on both sides: valueToTree yields Long nodes that never equal Int
+        // nodes.
+        mapper
+                .readTree(templateJson(request))
+                .equals(mapper.readTree(mapper.writeValueAsString(original.template())))
+            && original.frequency() == request.frequency()
+            && original.anchorDate().equals(request.anchorDate())
+            && original.timeZone().equals(zone.getId());
+    if (!same) throw new ConflictException("Operation ID already used for a different schedule");
+    return original;
+  }
+
+  private ScheduleResponse findByOperation(UUID userId, UUID groupId, UUID operationId) {
+    return jdbc.sql(
+            "SELECT "
+                + COLUMNS
+                + " FROM recurring_schedules WHERE created_by=? AND group_id=? AND operation_id=?")
+        .params(userId, groupId, operationId)
+        .query(this::map)
+        .optional()
+        .orElse(null);
+  }
+
+  /**
+   * Dry-runs the template through ExpenseService (payer, contributors, split participants and split
+   * math) and rolls back, so a bad template fails now instead of at its first occurrence. Runs in
+   * its own transaction, before the write takes the group lock it would otherwise wait on.
+   */
+  private void validate(UUID userId, UUID groupId, ScheduleRequest request) {
+    CreateExpenseRequest t = request.template();
+    new TransactionTemplate(transactions)
+        .executeWithoutResult(
+            status -> {
+              expenses.createExpense(
+                  userId,
+                  groupId,
+                  new CreateExpenseRequest(
+                      t.description(),
+                      t.amountCents(),
+                      t.paidByUserId(),
+                      t.participantUserIds(),
+                      t.splitType(),
+                      t.splits(),
+                      t.category(),
+                      request.anchorDate(),
+                      null,
+                      null,
+                      t.amountMinor(),
+                      t.currency(),
+                      t.contributions()));
+              status.setRollbackOnly();
+            });
+  }
+
+  private <T> T write(
+      java.util.function.Function<org.springframework.transaction.TransactionStatus, T> body) {
+    var template = new TransactionTemplate(transactions);
+    template.setIsolationLevel(
+        org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+    return template.execute(body::apply);
   }
 
   /** Changes future occurrences only: past expenses are never touched; resets a halted review. */
-  @Transactional(isolation = Isolation.READ_COMMITTED)
   public ScheduleResponse update(UUID userId, UUID groupId, UUID id, ScheduleRequest request) {
-    writeGuard.lockForMember(groupId, userId);
+    membership.requireMember(groupId, userId);
     if (request.expectedVersion() == null)
       throw new BadRequestException("expectedVersion is required");
+    zone(request);
+    validate(userId, groupId, request);
+    return write(status -> doUpdate(userId, groupId, id, request));
+  }
+
+  private ScheduleResponse doUpdate(UUID userId, UUID groupId, UUID id, ScheduleRequest request) {
+    writeGuard.lockForMember(groupId, userId);
     ScheduleResponse current = find(groupId, id, true);
     if (current.version() != request.expectedVersion())
       throw new ConflictException("This schedule changed — reload it before editing");

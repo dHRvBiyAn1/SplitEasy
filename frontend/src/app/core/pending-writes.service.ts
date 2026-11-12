@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
 
-export type WriteKind = 'group' | 'expense' | 'payment' | 'refund';
+export type WriteKind = 'group' | 'expense' | 'payment' | 'refund' | 'recurring';
 export interface PendingWrite<T> {
   owner: string;
   scope: string;
@@ -55,7 +55,8 @@ export class PendingWritesService {
         'The saved retry draft is unreadable. Check history before starting a separate entry.',
       );
     }
-    if (kind !== 'group') {
+    // Schedules nest their expense template, so the flat expense/payment checks do not apply.
+    if (kind !== 'group' && kind !== 'recurring') {
       if (stored.identityVersion !== undefined && stored.identityVersion !== 1)
         throw new PendingWriteError(
           'Upgrade the app to read this saved identity version. Check history before starting a separate entry.',
@@ -149,7 +150,7 @@ export class PendingWritesService {
         ? previous.identityVersion
           ? { identityVersion: previous.identityVersion }
           : {}
-        : kind !== 'group'
+        : kind !== 'group' && kind !== 'recurring'
           ? { identityVersion: 1 as const }
           : {}),
       draft,

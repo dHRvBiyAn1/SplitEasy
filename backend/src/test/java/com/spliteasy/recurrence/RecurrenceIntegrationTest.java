@@ -320,6 +320,68 @@ class RecurrenceIntegrationTest extends AbstractIntegrationTest {
         409);
   }
 
+  @Test
+  void aReplayedCreateReturnsTheOriginalScheduleAndAChangedOneIsRefused() throws Exception {
+    var alice = account("Alice");
+    String g = group(alice);
+    var body = schedule(template(alice, 1000, alice), "DAILY", "2026-03-01", "UTC");
+    body.put("operationId", UUID.randomUUID().toString());
+    var first = create(alice, g, body);
+    var replay = create(alice, g, body);
+    assertThat(replay).isEqualTo(first);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM recurring_schedules WHERE group_id=?::uuid", Long.class, g))
+        .isEqualTo(1);
+
+    var changed = new HashMap<>(body);
+    changed.put("template", template(alice, 2000, alice));
+    send(alice, jsonPost("/api/groups/" + g + "/recurring", changed), 409);
+    // an unkeyed create is always a new schedule
+    body.remove("operationId");
+    create(alice, g, body);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM recurring_schedules WHERE group_id=?::uuid", Long.class, g))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void theTemplateMustBeValidForTheGroupAtCreateAndEdit() throws Exception {
+    var alice = account("Alice");
+    var eve = account("Eve"); // not in the group
+    String g = group(alice);
+    String url = "/api/groups/" + g + "/recurring";
+    send(
+        alice,
+        jsonPost(url, schedule(template(eve, 1000, alice), "DAILY", "2026-03-01", "UTC")),
+        400);
+    send(
+        alice,
+        jsonPost(url, schedule(template(alice, 1000, alice, eve), "DAILY", "2026-03-01", "UTC")),
+        400);
+    var unequal = template(alice, 1000, alice);
+    unequal.put("splitType", "UNEQUAL");
+    unequal.put("splits", List.of(Map.of("userId", alice.user().id(), "value", 400)));
+    send(alice, jsonPost(url, schedule(unequal, "DAILY", "2026-03-01", "UTC")), 400);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM recurring_schedules WHERE group_id=?::uuid", Long.class, g))
+        .isZero();
+
+    var ok = create(alice, g, schedule(template(alice, 1000, alice), "DAILY", "2026-03-01", "UTC"));
+    var bad = schedule(template(eve, 1000, alice), "DAILY", "2026-03-01", "UTC");
+    bad.put("expectedVersion", ok.path("version").asLong());
+    send(
+        alice,
+        put(url + "/" + ok.path("id").asText()).contentType("application/json").content(json(bad)),
+        400);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM expenses WHERE group_id=?::uuid", Long.class, g))
+        .isZero(); // validation never leaves an expense behind
+  }
+
   long unread(AuthResponse who) throws Exception {
     return send(who, get("/api/notifications/unread-count"), 200).path("count").asLong();
   }

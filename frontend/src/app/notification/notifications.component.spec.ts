@@ -133,4 +133,18 @@ describe('notifications', () => {
     expect(boxes[1].checked).toBe(true);
     expect(el.textContent).toContain('It was not changed');
   });
+
+  it('shows a balance reminder in the bell list', async () => {
+    const reminder = note('n9', null);
+    reminder.event.kind = 'BALANCE_REMINDER';
+    reminder.event.summary = { amountMinor: 1500, currency: 'EUR' } as never;
+    const fixture = TestBed.createComponent(NotificationsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/notifications').flush({ items: [reminder], nextCursor: null });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Alice reminded you about EUR 15.00 in Trip',
+    );
+  });
 });

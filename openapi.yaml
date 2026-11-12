@@ -2889,7 +2889,7 @@ paths:
     post:
       operationId: createRecurringExpense
       summary: Create a recurring expense schedule
-      description: Occurrence dates are local dates in `timeZone`; monthly keeps the anchor day clamped to the month's last day. A runner creates each due expense as the schedule creator; occurrences missed for more than 30 days are recorded SKIPPED. Refused 409 on an archived group.
+      description: Occurrence dates are local dates in `timeZone`; monthly keeps the anchor day clamped to the month's last day. A runner creates each due expense as the schedule creator; occurrences missed for more than 30 days are recorded SKIPPED. Refused 409 on an archived group. The template is validated like a new expense (payer, contributors and split participants must be active participants, split must be valid) and rejected 400 otherwise; the same check runs on PUT.
       tags: [Recurring]
       requestBody:
         required: true
@@ -5250,6 +5250,7 @@ components:
         anchorDate: {type: string, format: date, description: First occurrence, a local date in timeZone.}
         timeZone: {type: string, description: IANA zone, for example Australia/Sydney.}
         expectedVersion: {type: integer, format: int64, minimum: 0, description: Required on PUT.}
+        operationId: {type: string, format: uuid, description: Optional create retry key unique per requester and group. The same key with identical intent returns the original schedule; a changed intent is 409.}
     RecurringSchedule:
       type: object
       required: [id, groupId, createdBy, template, frequency, anchorDate, timeZone, nextDate, version, status, createdAt]

@@ -27,4 +27,6 @@ export interface ScheduleRequest {
   timeZone: string;
   /** Required when changing future occurrences. */
   expectedVersion?: number;
+  /** Create retry key: a replay with the same intent returns the original schedule. */
+  operationId?: string;
 }

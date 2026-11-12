@@ -15,10 +15,14 @@ CREATE TABLE recurring_schedules (
         CHECK (status IN ('ACTIVE','NEEDS_REVIEW','CANCELLED')),
     review_reason VARCHAR(400),
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    cancelled_at TIMESTAMPTZ
+    cancelled_at TIMESTAMPTZ,
+    operation_id UUID
 );
 CREATE INDEX idx_recurring_schedules_group_created ON recurring_schedules(group_id, created_at DESC);
 CREATE INDEX idx_recurring_schedules_created_by ON recurring_schedules(created_by);
+-- A lost create response retries with the same operation ID and must not add a second schedule.
+CREATE UNIQUE INDEX uq_recurring_schedules_operation
+    ON recurring_schedules(created_by, group_id, operation_id) WHERE operation_id IS NOT NULL;
 CREATE INDEX idx_recurring_schedules_due ON recurring_schedules(next_date) WHERE status = 'ACTIVE';
 
 CREATE TABLE recurring_occurrences (

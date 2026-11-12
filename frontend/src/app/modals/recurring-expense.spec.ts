@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AuthService } from '../core/auth/auth.service';
 import { GroupResponse } from '../groups/group.models';
+import { PendingWritesService } from '../core/pending-writes.service';
 import { ModalService } from './modal.service';
 import { NewExpenseModalComponent } from './new-expense-modal.component';
 
@@ -90,5 +91,44 @@ describe('repeat control on a new group expense', () => {
     expect(typeof req.request.body.timeZone).toBe('string');
     req.error(new ProgressEvent('error'));
     http.expectNone('/api/groups/g/expenses');
+  });
+
+  function fillRepeating(description = 'Rent') {
+    type('#ne-desc', description);
+    type('#ne-amt', '10');
+    type('#ne-date', '2026-03-01');
+    const repeat = root.querySelector<HTMLSelectElement>('#ne-repeat')!;
+    repeat.value = 'MONTHLY';
+    repeat.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+  }
+
+  it('keeps one operationId through an uncertain error and reuses it on retry', () => {
+    fillRepeating();
+    submit();
+    const first = http.expectOne({ method: 'POST', url: '/api/groups/g/recurring' });
+    expect(first.request.body.operationId).toMatch(/^[0-9a-f-]{36}$/);
+    first.error(new ProgressEvent('error'));
+    fixture.detectChanges();
+    submit();
+    const retry = http.expectOne({ method: 'POST', url: '/api/groups/g/recurring' });
+    expect(retry.request.body.operationId).toBe(first.request.body.operationId);
+    retry.error(new ProgressEvent('error'));
+  });
+
+  it('mints a new operationId when the draft changed, and clears it after success', () => {
+    fillRepeating();
+    submit();
+    const first = http.expectOne({ method: 'POST', url: '/api/groups/g/recurring' });
+    first.error(new ProgressEvent('error'));
+    fixture.detectChanges();
+    type('#ne-amt', '12');
+    submit();
+    const changed = http.expectOne({ method: 'POST', url: '/api/groups/g/recurring' });
+    expect(changed.request.body.operationId).not.toBe(first.request.body.operationId);
+    changed.flush({ id: 's' });
+    http.match('/api/dashboard').forEach((r) => r.flush({}));
+    const pending = TestBed.inject(PendingWritesService);
+    expect(pending.read('recurring')).toBeNull();
   });
 });

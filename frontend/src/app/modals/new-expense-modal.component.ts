@@ -557,19 +557,35 @@ export class NewExpenseModalComponent {
   }
 
   private saveSchedule(gid: string, template: CreateExpenseRequest, frequency: Frequency): void {
+    const intent = {
+      template,
+      frequency,
+      anchorDate: this.date.value,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+    // One operationId per identical uncertain draft, so a retry cannot add a second schedule.
+    let pending: PendingWrite<typeof intent>;
+    try {
+      try {
+        pending = this.pendingWrites.prepare('recurring', gid, intent);
+      } catch (error) {
+        if ((error as Error).message !== UNCERTAIN_WRITE) throw error;
+        this.pendingWrites.abandon('recurring'); // the draft changed: a new schedule, a new key
+        pending = this.pendingWrites.prepare('recurring', gid, intent);
+      }
+    } catch (error) {
+      this.error.set((error as Error).message);
+      return;
+    }
     this.saving.set(true);
     this.modal.setMutationPending(true);
     this.error.set(null);
     this.recurring
-      .create(gid, {
-        template,
-        frequency,
-        anchorDate: this.date.value,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      })
+      .create(gid, { ...intent, operationId: pending.operationId })
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.pendingWrites.complete('recurring', pending);
           this.dashboard.refresh();
           this.modal.close();
         },

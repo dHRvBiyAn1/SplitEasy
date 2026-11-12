@@ -79,4 +79,22 @@ describe('ActivityComponent', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('No activity yet.');
   });
+
+  it('describes a balance reminder with the amount and group', async () => {
+    const fixture = render();
+    feed('').flush({
+      items: [
+        event('r', {
+          kind: 'BALANCE_REMINDER',
+          summary: { amountMinor: 1200, currency: 'USD' },
+        }),
+      ],
+      nextCursor: null,
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Alice reminded you about USD 12.00 in Trip',
+    );
+  });
 });
