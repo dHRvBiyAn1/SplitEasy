@@ -55,7 +55,13 @@ export class NotificationService {
   }
 
   markAllRead(): Observable<void> {
-    return this.api.post<void>('/notifications/read-all', {}).pipe(tap(() => this.unread.set(0)));
+    return this.api.post<void>('/notifications/read-all', {}).pipe(
+      tap(() => {
+        // An older count read may still be in flight and would restore a stale badge.
+        this.pending?.unsubscribe();
+        this.unread.set(0);
+      }),
+    );
   }
 
   preferences(): Observable<NotificationPreferences> {

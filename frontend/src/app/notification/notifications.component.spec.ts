@@ -65,6 +65,30 @@ describe('notifications', () => {
     expect(el.querySelectorAll('li.unread').length).toBe(0);
   });
 
+  it('ignores an unread count that was requested before mark-all succeeded', () => {
+    const service = TestBed.inject(NotificationService);
+    service.unread.set(2);
+    service.revalidate();
+    const late = http.expectOne('/api/notifications/unread-count');
+    service.markAllRead().subscribe();
+    http.expectOne('/api/notifications/read-all').flush(null);
+    expect(service.unread()).toBe(0);
+    // The older read is cancelled, so its late answer can never reach the badge.
+    expect(late.cancelled).toBe(true);
+    expect(service.unread()).toBe(0);
+  });
+
+  it('ignores an unread count that was requested before mark-read succeeded', () => {
+    const service = TestBed.inject(NotificationService);
+    service.revalidate();
+    const stale = http.expectOne('/api/notifications/unread-count');
+    service.markRead('n1').subscribe();
+    http.expectOne('/api/notifications/n1/read').flush(null);
+    expect(stale.cancelled).toBe(true);
+    http.expectOne('/api/notifications/unread-count').flush({ count: 1 });
+    expect(service.unread()).toBe(1);
+  });
+
   it('shows a failed mark-read without changing the row', async () => {
     const fixture = TestBed.createComponent(NotificationsComponent);
     fixture.detectChanges();
