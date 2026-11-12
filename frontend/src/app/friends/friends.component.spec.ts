@@ -66,6 +66,7 @@ describe('saved friends through rendered routes and HTTP', () => {
     harness = await RouterTestingHarness.create();
   });
   afterEach(() => {
+    http.match((r) => r.url.endsWith('/payments')); // G02.3 history is covered in its own spec
     http.verify({ ignoreCancelled: true });
     TestBed.resetTestingModule();
   });

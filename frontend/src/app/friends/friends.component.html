@@ -230,6 +230,14 @@
       }
     </div>
   }
+  @if (detail(); as friend) {
+    <app-personal-payments
+      [friendId]="friend.id"
+      [friendName]="friend.displayName"
+      [balances]="friend.personalBalances"
+      [groups]="friend.sharedGroups"
+    />
+  }
   @if (personal(); as friend) {
     <app-personal-expenses [friendId]="friend.id" [friendName]="friend.name" />
   }

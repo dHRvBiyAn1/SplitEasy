@@ -48,6 +48,7 @@ describe('personal expenses with one saved friend', () => {
   });
   afterEach(() => {
     http.match('/api/dashboard'); // mutations refresh the shell overview; not under test here
+    http.match((r) => r.url.endsWith('/payments')); // G02.3 history is covered in its own spec
     http.verify({ ignoreCancelled: true });
     TestBed.resetTestingModule();
   });
@@ -170,6 +171,34 @@ describe('personal expenses with one saved friend', () => {
     http.expectOne('/api/friends/pat').flush(friend);
     harness.detectChanges();
     http.expectOne('/api/friends/pat/expenses').flush([]);
+  });
+
+  it('sends stored contributions back unchanged when a multi-payer entry is edited', async () => {
+    await openFriend();
+    button('Edit').click();
+    const contributions = [
+      { user: me, amountMinor: 600, currency: 'USD' },
+      {
+        user: { id: 'pat', displayName: 'Pat', email: 'pat@test.com' },
+        amountMinor: 400,
+        currency: 'USD',
+      },
+    ];
+    http
+      .expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'GET' })
+      .flush({ ...entry, splitType: 'EQUAL', participants: [], contributions });
+    harness.detectChanges();
+    type('Description', 'Cinema and snacks');
+    button('Save changes').click();
+    const update = http.expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'PUT' });
+    expect(update.request.body.contributions).toEqual([
+      { userId: 'me', amountMinor: 600 },
+      { userId: 'pat', amountMinor: 400 },
+    ]);
+    update.flush({ ...entry, version: 2 });
+    http.expectOne('/api/friends/pat').flush(friend);
+    harness.detectChanges();
+    http.expectOne('/api/friends/pat/expenses').flush([entry]);
   });
 
   it('keeps an uncertain save for review instead of retrying it', async () => {

@@ -19,8 +19,9 @@ import {
 } from '../core/pending-writes.service';
 import { RecordPaymentRequest } from '../payments/payment.models';
 import { PaymentService } from '../payments/payment.service';
+import { FriendService } from '../friends/friend.service';
 import { avatarTint } from '../core/avatar';
-import { ModalService } from './modal.service';
+import { ModalService, SettlePrefill } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
 
 @Component({
@@ -35,6 +36,7 @@ export class SettleUpModalComponent {
   protected readonly draftBlocked = signal(false);
   protected readonly retryNotice = signal<string | null>(null);
   private readonly payments = inject(PaymentService);
+  private readonly friends = inject(FriendService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   private readonly session = inject(SessionService);
@@ -65,7 +67,7 @@ export class SettleUpModalComponent {
     return groups.length > 0 && groups.every((g) => g.simplifyDebts);
   });
 
-  protected readonly selected = signal<Settlement | null>(this.modal.settlePrefill());
+  protected readonly selected = signal<SettlePrefill | null>(this.modal.settlePrefill());
   /** Editable amount for the selected row, in the obligation currency — settle in full or partially. */
   protected readonly amount = signal('');
   protected readonly saving = signal(false);
@@ -78,7 +80,7 @@ export class SettleUpModalComponent {
     try {
       const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
       if (pending?.draft) {
-        this.selected.set(pending.draft as Settlement);
+        this.selected.set(pending.draft as SettlePrefill);
         this.amount.set(
           minorToDisplay(pending.request.amountMinor, pending.request.currency ?? 'USD'),
         );
@@ -113,13 +115,13 @@ export class SettleUpModalComponent {
   }
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
-  label(s: Settlement): string {
+  label(s: SettlePrefill): string {
     const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
     return s.netMinor > 0 ? `${name} owes you` : `You owe ${name}`;
   }
 
   /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
-  payingLabel(s: Settlement): string {
+  payingLabel(s: SettlePrefill): string {
     const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
     return s.netMinor > 0 ? `${name} is paying you` : `You are paying ${name}`;
   }
@@ -142,6 +144,8 @@ export class SettleUpModalComponent {
 
   cancel(): void {
     if (this.saving()) return;
+    // A friend settlement has no list to go back to.
+    if (this.selected()?.friendId) return this.modal.requestClose();
     this.selected.set(null);
     this.error.set(null);
   }
@@ -178,7 +182,7 @@ export class SettleUpModalComponent {
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
     const [payer, payee] = s.netMinor > 0 ? [s.counterparty.id, me] : [me, s.counterparty.id];
     this.dispatch(
-      s.groupId,
+      s,
       {
         payerUserId: payer,
         payeeUserId: payee,
@@ -190,31 +194,31 @@ export class SettleUpModalComponent {
   }
 
   private dispatch(
-    groupId: string,
+    scope: SettlePrefill,
     request: Omit<RecordPaymentRequest, 'operationId'>,
     draft: unknown,
   ): void {
     this.saving.set(true);
     this.modal.setMutationPending(true);
-    this.payments
-      .recordPayment(groupId, request, draft)
-      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.dashboard.refresh();
-          this.modal.close();
-        },
-        error: (err) => {
-          this.error.set(
-            err instanceof PendingWriteError
-              ? err.message
-              : (err?.error?.message ?? 'Could not record the payment.'),
-          );
-          this.retryNotice.set(UNCERTAIN_WRITE);
-          this.saving.set(false);
-          this.modal.setMutationPending(false);
-        },
-      });
+    const record$ = scope.friendId
+      ? this.friends.recordPersonalPayment(scope.friendId, request, draft)
+      : this.payments.recordPayment(scope.groupId!, request, draft);
+    record$.pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.dashboard.refresh();
+        this.modal.close();
+      },
+      error: (err) => {
+        this.error.set(
+          err instanceof PendingWriteError
+            ? err.message
+            : (err?.error?.message ?? 'Could not record the payment.'),
+        );
+        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.saving.set(false);
+        this.modal.setMutationPending(false);
+      },
+    });
   }
 
   retryOriginal(): void {
@@ -223,7 +227,7 @@ export class SettleUpModalComponent {
       const pending = this.pendingWrites.read<Omit<RecordPaymentRequest, 'operationId'>>('payment');
       if (!pending) return;
       // Original IDs and amount are immutable, even if aliases were subsequently claimed.
-      this.dispatch(pending.scope, pending.request, pending.draft);
+      this.dispatch(pending.draft as SettlePrefill, pending.request, pending.draft);
     } catch {
       this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
     }
