@@ -34,7 +34,10 @@ export class ProfileComponent {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
   protected readonly locale = this.i18n.locale;
-  protected readonly locales = SUPPORTED_LOCALES;
+  /** A getter, not a field: read lazily so module evaluation order cannot leave it undefined. */
+  protected get locales() {
+    return SUPPORTED_LOCALES;
+  }
 
   protected readonly user = this.auth.user;
   protected readonly loading = this.profile.loading;

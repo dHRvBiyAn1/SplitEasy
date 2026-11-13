@@ -30,8 +30,7 @@
 ## Gates (merged tree incl. dev 1a36974)
 - Backend `./mvnw -B clean spotless:check verify`: 460 tests, 0 failures. (Needed `clean`: a stale `target/` held my
   pre-rename V29 file next to H02-A's V29.)
-- Frontend Node 22 `ng test --watch=false`: 455/455 in 70 files (one unreproduced failure of
-  `profile-language.spec.ts` in a single full run; it passed alone and on two further full runs).
+- Frontend Node 22 `ng test --watch=false`: 455/455 in 70 files, stable (see flake fix below).
 - `prettier --check src`: clean. `ng build`: succeeds, initial total 621.30 kB (was ~553 kB + 890-key bundled English).
 
 ## Deviations and known gaps
@@ -53,3 +52,11 @@
 - Frontend Conventions: UI text goes through `'key' | t` (templates) or `translate('key')` (TS); never hardcode English. Adding a language = `public/i18n/xx.json` + `SUPPORTED_LOCALES` + backend allow-list in `UpdateProfileRequest`; the completeness spec enforces keys and placeholders. Plurals use `key_one/key_other`.
 - Data Model: `users.locale` (V30) varchar(8) default 'en'.
 - API: `/me` carries `locale`.
+
+## Flake fix (`profile-language.spec.ts`)
+- Red: reproduced in full runs (about half of them): `expected [] to deeply equal ['en','hi','es','fr']`. Debug output showed
+  the component's `locales` property was `undefined` while `SUPPORTED_LOCALES.length` was 4, i.e. the class field was
+  initialised before the imported constant was available (module evaluation order differs between full and isolated runs).
+  Not shared signal/localStorage state and not an unflushed request.
+- Fix: `ProfileComponent.locales` is now a getter (read lazily, like the existing `currencies`), so evaluation order cannot matter.
+- Green: spec looped 20 times alone, 20/20 pass; 8 consecutive full runs, 455/455 each time.
