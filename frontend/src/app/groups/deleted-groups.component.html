@@ -36,11 +36,11 @@
           <button
             type="button"
             class="dc-btn-outline"
-            [attr.aria-label]="'Restore ' + row.name"
+            [attr.aria-label]="'deletedGroups.restoreName' | t: { name: row.name }"
             [disabled]="restoring() === row.id"
             (click)="restore(row)"
           >
-            {{ restoring() === row.id ? 'Restoring…' : 'Restore' }}
+            {{ restoring() === row.id ? ('deletedGroups.restoring' | t) : ('common.restore' | t) }}
           </button>
         </li>
       }

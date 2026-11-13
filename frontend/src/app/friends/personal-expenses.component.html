@@ -58,7 +58,13 @@
 
   @if (formOpen()) {
     <form class="personal-form" (submit)="$event.preventDefault(); save()">
-      <h3>{{ editing ? 'Edit personal expense' : 'Add personal expense' }}</h3>
+      <h3>
+        {{
+          editing
+            ? ('personalExpenses.editPersonalExpense' | t)
+            : ('personalExpenses.addPersonalExpense' | t)
+        }}
+      </h3>
       <label>
         <span class="dc-field-label">{{ 'common.description' | t }}</span>
         <input
@@ -194,7 +200,7 @@
       </p>
       <div class="actions">
         <button class="dc-btn-accent" type="submit" [disabled]="!canSave()">
-          {{ editing ? 'Save changes' : 'Add expense' }}
+          {{ editing ? ('personalExpenses.saveChanges' | t) : ('common.addExpense' | t) }}
         </button>
         <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="cancelForm()">
           {{ 'common.cancel' | t }}
@@ -220,7 +226,11 @@
             <strong>{{ row.description }}</strong>
             <p>
               {{ row.spentOn }} ·
-              {{ row.paidBy.id === paidByMeId() ? 'You paid' : row.paidBy.displayName + ' paid' }}
+              {{
+                row.paidBy.id === paidByMeId()
+                  ? ('personalExpenses.youPaid' | t)
+                  : ('personalExpenses.namePaid' | t: { name: row.paidBy.displayName })
+              }}
             </p>
           </div>
           <app-money [minor]="row.amountMinor" [currency]="row.currency ?? 'USD'" />

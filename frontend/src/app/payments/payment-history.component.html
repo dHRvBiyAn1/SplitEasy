@@ -196,8 +196,10 @@
                 @for (revision of revisions(); track revision.version) {
                   <li>
                     {{ actionLabel[revision.action] }} by
-                    {{ revision.actor?.displayName ?? 'an unknown earlier recorder' }} ·
-                    <time [attr.datetime]="revision.recordedAt">{{ revision.recordedAt }}</time> ·
+                    {{
+                      revision.actor?.displayName ?? ('paymentHistory.anUnknownEarlierRecorder' | t)
+                    }}
+                    · <time [attr.datetime]="revision.recordedAt">{{ revision.recordedAt }}</time> ·
                     <app-money
                       [minor]="revision.after.amountMinor"
                       [currency]="revision.after.currency ?? 'USD'"

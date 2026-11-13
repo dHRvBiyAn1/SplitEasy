@@ -39,7 +39,11 @@ import { translate } from '../core/i18n/i18n.service';
             <p role="status">{{ message() }}</p>
           }
           <button class="dc-btn-accent auth__submit" type="submit" [disabled]="pending()">
-            {{ pending() ? 'Requesting…' : 'Request reset link' }}
+            {{
+              pending()
+                ? ('forgotPassword.requesting' | t)
+                : ('forgotPassword.requestResetLink' | t)
+            }}
           </button>
         </form>
         <p class="auth__switch">

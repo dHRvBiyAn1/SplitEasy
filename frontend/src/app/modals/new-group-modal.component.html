@@ -40,7 +40,7 @@
                   type="button"
                   class="chip__x"
                   (click)="removeEmail(e)"
-                  [attr.aria-label]="'Remove ' + e"
+                  [attr.aria-label]="'groupSettings.removeName' | t: { name: e }"
                 >
                   ✕
                 </button>
@@ -71,14 +71,14 @@
           <p>
             {{
               failedEmails().length
-                ? 'Some members could not be added.'
-                : 'All requested members were added.'
+                ? ('newGroupModal.someMembersCouldNot' | t)
+                : ('newGroupModal.allRequestedMembersWere' | t)
             }}
           </p>
         }
         <ul>
           @for (result of results(); track result.email) {
-            <li>{{ result.email }} — {{ result.reason ?? 'Added' }}</li>
+            <li>{{ result.email }} — {{ result.reason ?? ('newGroupModal.added' | t) }}</li>
           }
         </ul>
       </div>

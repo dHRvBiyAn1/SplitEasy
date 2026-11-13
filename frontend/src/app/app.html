@@ -35,7 +35,7 @@
       <a
         routerLink="/notifications"
         class="bell"
-        [attr.aria-label]="'Notifications, ' + unreadCount() + ' unread'"
+        [attr.aria-label]="'shell.notificationsUnread' | t: { count: unreadCount() }"
         >{{ 'common.notifications' | t }}
         @if (unreadCount() > 0) {
           <span class="bell-count">{{ unreadCount() }}</span>
@@ -53,7 +53,7 @@
       <a
         routerLink="/profile"
         class="account"
-        [attr.aria-label]="'Profile for ' + user()?.displayName"
+        [attr.aria-label]="'shell.profileFor' | t: { name: user()?.displayName }"
         ><span class="dc-avatar" [style]="avatarStyle()" aria-hidden="true">{{
           initials(user()?.displayName)
         }}</span

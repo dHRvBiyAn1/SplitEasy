@@ -135,7 +135,9 @@
       </div>
 
       <div class="mform__field">
-        <span class="dc-field-label">{{ multiPayer() ? 'Primary payer' : 'Paid by' }}</span>
+        <span class="dc-field-label">{{
+          multiPayer() ? ('newExpenseModal.primaryPayer' | t) : ('newExpenseModal.paidBy' | t)
+        }}</span>
         <div class="chips">
           @for (m of members(); track m.id) {
             <button
@@ -182,7 +184,10 @@
                   inputmode="decimal"
                   maxlength="32"
                   [attr.data-payer]="m.id"
-                  [attr.aria-label]="memberLabel(m) + ' paid in ' + currency()"
+                  [attr.aria-label]="
+                    'newExpenseModal.payerPaidIn'
+                      | t: { name: memberLabel(m), currency: currency() }
+                  "
                   [value]="payerValues()[m.id] || ''"
                   (input)="setPayerValue(m.id, $any($event.target).value)"
                   [placeholder]="currency()"
@@ -260,21 +265,21 @@
                     class="prow__check"
                     [checked]="included().has(m.id)"
                     (change)="toggle(m.id)"
-                    [attr.aria-label]="'Include ' + memberLabel(m)"
+                    [attr.aria-label]="'newExpenseModal.includeName' | t: { name: memberLabel(m) }"
                 /></label>
               } @else {
                 <input
                   class="prow__val"
                   aria-describedby="ne-split-precision"
                   [attr.aria-label]="
-                    memberLabel(m) +
                     (splitType() === 'ADJUSTMENTS'
-                      ? ' adjustment in signed ' + currency()
+                      ? 'newExpenseModal.adjustmentInSigned'
                       : splitType() === 'WEIGHTS'
-                        ? ' weight in whole units'
+                        ? 'newExpenseModal.weightInWholeUnits'
                         : splitType() === 'PERCENTAGE'
-                          ? ' share in percent'
-                          : ' exact amount in ' + currency())
+                          ? 'newExpenseModal.shareInPercent'
+                          : 'newExpenseModal.exactAmountIn'
+                    ) | t: { name: memberLabel(m), currency: currency() }
                   "
                   [type]="splitType() === 'WEIGHTS' ? 'number' : 'text'"
                   maxlength="32"
@@ -302,17 +307,14 @@
         @if (splitType() !== 'EQUAL') {
           <p class="mform__hint" id="ne-split-precision">
             {{
-              splitType() === 'ADJUSTMENTS'
-                ? 'Add signed ' +
-                  currency() +
-                  ' adjustments to equal shares over the entered participants. Adjustments must total zero; final shares cannot be negative. Blank excludes; enter 0 to include without adjustment. Each adjustment rounds to ' +
-                  precision() +
-                  ' decimal places.'
+              (splitType() === 'ADJUSTMENTS'
+                ? 'newExpenseModal.adjustmentsHint'
                 : splitType() === 'WEIGHTS'
-                  ? 'Use positive whole units, such as 1 and 2. Blank excludes a participant.'
-                  : 'Each share rounds to ' +
-                    (splitType() === 'PERCENTAGE' ? 2 : precision()) +
-                    ' decimal places. Blank excludes; 0 keeps a participant.'
+                  ? 'newExpenseModal.usePositiveWholeUnits'
+                  : 'newExpenseModal.shareHint'
+              )
+                | t
+                  : { currency: currency(), places: splitType() === 'PERCENTAGE' ? 2 : precision() }
             }}
           </p>
         }

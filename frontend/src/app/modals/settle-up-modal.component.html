@@ -32,7 +32,9 @@
             [attr.step]="step()"
             aria-describedby="settle-precision"
             inputmode="decimal"
-            [attr.aria-label]="'Amount to settle (' + (s.currency ?? 'USD') + ')'"
+            [attr.aria-label]="
+              'settleUpModal.amountToSettle' | t: { currency: s.currency ?? 'USD' }
+            "
             [value]="amount()"
             (input)="onAmountInput($any($event.target).value)"
           />
@@ -66,7 +68,11 @@
     <div class="simplify-bar" [class.simplify-bar--on]="allSimplified()">
       <span class="simplify-bar__text">
         <span class="simplify-bar__title">
-          {{ allSimplified() ? 'Simplified obligations' : 'Current obligations' }}
+          {{
+            allSimplified()
+              ? ('friends.simplifiedObligations' | t)
+              : ('settleUpModal.currentObligations' | t)
+          }}
         </span>
         <span class="simplify-bar__sub">
           @if (allSimplified()) {

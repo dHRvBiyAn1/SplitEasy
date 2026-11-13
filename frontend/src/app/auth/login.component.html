@@ -53,10 +53,12 @@
               "
             /><button
               type="button"
-              [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'"
+              [attr.aria-label]="
+                passwordVisible() ? ('login.hidePassword' | t) : ('login.showPassword' | t)
+              "
               (click)="passwordVisible.set(!passwordVisible())"
             >
-              {{ passwordVisible() ? 'Hide' : 'Show' }}
+              {{ passwordVisible() ? ('login.hide' | t) : ('login.show' | t) }}
             </button></span
           >
         </div>

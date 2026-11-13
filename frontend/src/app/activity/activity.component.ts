@@ -61,7 +61,7 @@ import { translate } from '../core/i18n/i18n.service';
             [disabled]="loadingMore()"
             (click)="loadMore()"
           >
-            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+            {{ loadingMore() ? ('history.loading' | t) : ('history.loadMore' | t) }}
           </button>
         } @else if (!nextCursor() && items().length && !error()) {
           <p class="meta">

@@ -19,10 +19,10 @@ import { translate } from '../core/i18n/i18n.service';
       <h1 class="dc-display auth__title">
         {{
           action() === 'password-reset'
-            ? 'Reset your password'
+            ? ('forgotPassword.resetYourPassword' | t)
             : action() === 'email-change'
-              ? 'Confirm email change'
-              : 'Verify email'
+              ? ('accountAction.confirmEmailChange' | t)
+              : ('accountAction.verifyEmail' | t)
         }}
       </h1>
       @if (message()) {
@@ -49,12 +49,12 @@ import { translate } from '../core/i18n/i18n.service';
           <button type="submit" class="dc-btn-accent" [disabled]="pending()">
             {{
               pending()
-                ? 'Saving…'
+                ? ('profile.saving' | t)
                 : action() === 'password-reset'
-                  ? 'Reset password'
+                  ? ('accountAction.resetPassword' | t)
                   : action() === 'email-change'
-                    ? 'Confirm email change'
-                    : 'Verify email'
+                    ? ('accountAction.confirmEmailChange' | t)
+                    : ('accountAction.verifyEmail' | t)
             }}
           </button>
         </form>

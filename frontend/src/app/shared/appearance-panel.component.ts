@@ -50,7 +50,11 @@ import { translate } from '../core/i18n/i18n.service';
         <svg viewBox="0 0 220 70" aria-hidden="true">
           <path d="M25 46c24-47 37 31 68-8s39 16 63-11" />
           <circle cx="163" cy="26" r="9" /></svg
-        ><span>{{ motion.reduced() ? 'Motion is reduced' : 'Tap or trace here' }}</span
+        ><span>{{
+          motion.reduced()
+            ? ('appearancePanel.motionIsReduced' | t)
+            : ('appearancePanel.tapOrTraceHere' | t)
+        }}</span
         ><button
           type="button"
           class="dc-btn-outline"
@@ -67,7 +71,9 @@ import { translate } from '../core/i18n/i18n.service';
         (click)="motion.setReduced(!motion.deviceReduced())"
       >
         {{ 'appearancePanel.reduceMotion' | t }}
-        <span aria-hidden="true">{{ motion.deviceReduced() ? 'On' : 'Off' }}</span>
+        <span aria-hidden="true">{{
+          motion.deviceReduced() ? 'On' : ('appearancePanel.off' | t)
+        }}</span>
       </button>
     </fieldset>
     <p class="appearance-note">

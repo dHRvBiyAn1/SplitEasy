@@ -6,7 +6,7 @@
       <h1 id="history-heading">{{ 'common.history' | t }}</h1>
     </div>
     <button class="dc-btn-outline" type="button" [disabled]="exportBusy()" (click)="download()">
-      {{ exportBusy() ? 'Preparing CSV…' : 'Download CSV' }}
+      {{ exportBusy() ? ('history.preparingCsv' | t) : ('history.downloadCsv' | t) }}
     </button>
   </header>
 
@@ -61,7 +61,7 @@
     </ul>
     @if (nextCursor() && !error()) {
       <button class="dc-btn-outline" type="button" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        {{ loadingMore() ? ('history.loading' | t) : ('history.loadMore' | t) }}
       </button>
     }
   }

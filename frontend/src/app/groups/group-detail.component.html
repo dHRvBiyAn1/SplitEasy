@@ -36,7 +36,7 @@
           class="dc-btn-outline"
           (click)="settleUp()"
           [disabled]="loading() || !!error() || writePending() || archived()"
-          [attr.title]="archived() ? 'This group is archived — re-open it to settle up' : null"
+          [attr.title]="archived() ? ('groupDetail.thisGroupIsArchived' | t) : null"
         >
           <svg
             viewBox="0 0 24 24"
@@ -58,7 +58,7 @@
           class="dc-btn-accent"
           (click)="addExpense()"
           [disabled]="writePending() || archived()"
-          [attr.title]="archived() ? 'This group is archived — re-open it to add expenses' : null"
+          [attr.title]="archived() ? ('groupDetail.thisGroupIsArchived2' | t) : null"
         >
           <svg
             viewBox="0 0 24 24"
@@ -116,12 +116,12 @@
           {{ total.currency }}
           {{
             total.netMinor > 0
-              ? 'You are owed'
+              ? ('groupDetail.youAreOwed' | t)
               : total.netMinor < 0
-                ? 'You owe'
+                ? ('dashboard.youOwe' | t)
                 : total.hasOpenBalances
-                  ? 'Even overall · open balances'
-                  : 'All square'
+                  ? ('groupDetail.evenOverallOpenBalances' | t)
+                  : ('dashboard.allSquare' | t)
           }}
           @if (total.netMinor !== 0) {
             <strong
@@ -516,7 +516,7 @@
               <li>
                 <p>
                   <strong>{{ revisionLabel(revision.action) }}</strong> ·
-                  {{ revision.actor?.displayName ?? 'Recorder unknown' }} ·
+                  {{ revision.actor?.displayName ?? ('groupDetail.recorderUnknown' | t) }} ·
                   <time [attr.datetime]="revision.recordedAt">{{
                     recordedDate(revision.recordedAt)
                   }}</time>
@@ -528,7 +528,11 @@
                   @if (snapshot) {
                     <div class="gd__snapshot">
                       <p>
-                        <strong>{{ $index === 0 ? 'Before' : 'After' }}:</strong>
+                        <strong
+                          >{{
+                            $index === 0 ? ('groupDetail.before' | t) : ('groupDetail.after' | t)
+                          }}:</strong
+                        >
                         {{ snapshot.description }} ·
                         <span class="dc-amount">{{
                           display(snapshot.amountMinor, snapshot.currency)

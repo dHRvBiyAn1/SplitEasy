@@ -48,7 +48,7 @@
               <a
                 class="group-object dc-glass"
                 [routerLink]="['/groups', g.id]"
-                [attr.aria-label]="'Open ' + g.name"
+                [attr.aria-label]="'dashboard.openGroup' | t: { name: g.name }"
                 ><app-group-art [type]="g.type" /><span class="group-object__copy"
                   ><strong>{{ g.name }}</strong
                   ><small>{{
@@ -59,12 +59,12 @@
                     @for (total of groupTotals(g); track total.currency) {
                       <span>{{
                         total.netMinor > 0
-                          ? 'You’re owed'
+                          ? ('dashboard.youReOwed' | t)
                           : total.netMinor < 0
-                            ? 'You owe'
+                            ? ('dashboard.youOwe' | t)
                             : total.youAreOwedMinor || total.youOweMinor
-                              ? 'Even overall'
-                              : 'All square'
+                              ? ('dashboard.evenOverall' | t)
+                              : ('dashboard.allSquare' | t)
                       }}</span>
                       <app-money
                         [minor]="total.netMinor"
@@ -98,12 +98,12 @@
             <p>
               {{
                 total.totalNetMinor > 0
-                  ? 'You’re owed overall'
+                  ? ('dashboard.youReOwedOverall' | t)
                   : total.totalNetMinor < 0
-                    ? 'You owe overall'
+                    ? ('dashboard.youOweOverall' | t)
                     : total.owedMinor || total.oweMinor
-                      ? 'Even overall · open balances below'
-                      : 'All square. A clear head.'
+                      ? ('dashboard.evenOverallOpenBalances' | t)
+                      : ('dashboard.allSquareAClear' | t)
               }}
             </p>
           }
@@ -164,7 +164,15 @@
               initials(p.user.displayName)
             }}</span>
             <h3>{{ p.user.displayName }}</h3>
-            <p>{{ p.netMinor > 0 ? 'Owes you' : p.netMinor < 0 ? 'You owe' : 'All square' }}</p>
+            <p>
+              {{
+                p.netMinor > 0
+                  ? ('dashboard.owesYou' | t)
+                  : p.netMinor < 0
+                    ? ('dashboard.youOwe' | t)
+                    : ('dashboard.allSquare' | t)
+              }}
+            </p>
             <app-money [minor]="p.netMinor" [currency]="p.currency ?? 'USD'" [net]="true" /><button
               type="button"
               class="dc-btn-link"

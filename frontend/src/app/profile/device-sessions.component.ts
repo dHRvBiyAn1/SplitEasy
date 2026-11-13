@@ -17,7 +17,9 @@ import { translate } from '../core/i18n/i18n.service';
       <h2 id="device-sessions-title">{{ 'deviceSessions.devicesAndSessions' | t }}</h2>
       <p>{{ 'deviceSessions.tabsInTheSame' | t }}</p>
       <button type="button" class="dc-btn-outline" [disabled]="busy()" (click)="load()">
-        {{ opened() ? 'Refresh sessions' : 'Manage sessions' }}
+        {{
+          opened() ? ('deviceSessions.refreshSessions' | t) : ('deviceSessions.manageSessions' | t)
+        }}
       </button>
       @if (busy()) {
         <p role="status">{{ 'deviceSessions.updatingSessions' | t }}</p>
@@ -54,12 +56,18 @@ import { translate } from '../core/i18n/i18n.service';
                 class="dc-btn-outline"
                 [disabled]="busy()"
                 [attr.aria-label]="
-                  device.current ? 'Sign out this device' : 'Sign out ' + device.deviceLabel
+                  device.current
+                    ? ('deviceSessions.signOutThisDevice' | t)
+                    : ('deviceSessions.signOutName' | t: { name: device.deviceLabel })
                 "
                 [attr.aria-describedby]="'session-details-' + device.id"
                 (click)="revoke(device)"
               >
-                {{ device.current ? 'Sign out this device' : 'Sign out device' }}
+                {{
+                  device.current
+                    ? ('deviceSessions.signOutThisDevice' | t)
+                    : ('deviceSessions.signOutDevice' | t)
+                }}
               </button>
             </li>
           }

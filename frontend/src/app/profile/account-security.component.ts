@@ -24,7 +24,9 @@ import { translate } from '../core/i18n/i18n.service';
     <h2 id="account-security-title">{{ 'accountSecurity.accountSecurity' | t }}</h2>
     <p>
       <span class="security__badge">{{
-        profile.data()?.emailVerified ? 'Email verified' : 'Email not verified'
+        profile.data()?.emailVerified
+          ? ('accountSecurity.emailVerified' | t)
+          : ('accountSecurity.emailNotVerified' | t)
       }}</span>
     </p>
     @if (!profile.data()?.emailVerified) {
@@ -125,7 +127,7 @@ import { translate } from '../core/i18n/i18n.service';
           {{ 'accountSecurity.enterYourCurrentPassword2' | t }}
         </p>
         <button class="dc-btn-accent" type="submit" [disabled]="pending()">
-          {{ pending() ? 'Saving…' : 'Save password' }}
+          {{ pending() ? ('profile.saving' | t) : ('accountSecurity.savePassword' | t) }}
         </button>
         <button class="dc-btn-outline" type="button" [disabled]="pending()" (click)="cancel()">
           {{ 'common.cancel' | t }}
@@ -193,7 +195,11 @@ import { translate } from '../core/i18n/i18n.service';
           {{ 'accountSecurity.enterYourCurrentPassword3' | t }}
         </p>
         <button class="dc-btn-accent" type="submit" [disabled]="pending()">
-          {{ pending() ? 'Requesting…' : 'Request email change' }}
+          {{
+            pending()
+              ? ('forgotPassword.requesting' | t)
+              : ('accountSecurity.requestEmailChange' | t)
+          }}
         </button>
         <button class="dc-btn-outline" type="button" [disabled]="pending()" (click)="cancel()">
           {{ 'common.cancel' | t }}

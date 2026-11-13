@@ -69,7 +69,7 @@ import { translate } from '../core/i18n/i18n.service';
             [disabled]="loadingMore()"
             (click)="loadMore()"
           >
-            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+            {{ loadingMore() ? ('history.loading' | t) : ('history.loadMore' | t) }}
           </button>
         }
       }

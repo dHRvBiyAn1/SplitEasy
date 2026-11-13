@@ -24,7 +24,7 @@
         <ul class="personal-list">
           @for (a of preview.allocations; track a.scopeId) {
             <li>
-              <strong>{{ a.groupName ?? 'Personal' }}</strong>
+              <strong>{{ a.groupName ?? ('personalPayments.personal' | t) }}</strong>
               <span>{{ pays(a.payerId) }}</span>
               <app-money [minor]="a.amountMinor" [currency]="preview.currency" />
             </li>
@@ -38,7 +38,7 @@
         <p>{{ 'friendSettleAll.nothingToSettleIn' | t: { currency: preview.currency } }}</p>
       }
       @for (s of preview.skipped; track s.scopeId) {
-        <p>{{ s.groupName ?? 'Personal' }} was skipped: {{ s.reason }}.</p>
+        <p>{{ s.groupName ?? ('personalPayments.personal' | t) }} was skipped: {{ s.reason }}.</p>
       }
       @if (preview.allocations.length) {
         <button class="dc-btn" type="button" [disabled]="busy()" (click)="confirm(preview)">

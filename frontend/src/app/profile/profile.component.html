@@ -144,7 +144,7 @@
                 [style.background]="col"
                 [disabled]="saving()"
                 (click)="avatarColor.set(col)"
-                [attr.aria-label]="'Avatar color ' + col"
+                [attr.aria-label]="'profile.avatarColor' | t: { color: col }"
               ></button>
             }
           </div>
@@ -159,7 +159,7 @@
             class="dc-btn-accent"
             [disabled]="saving() || name.invalid || !name.value.trim()"
           >
-            {{ saving() ? 'Saving…' : 'Save changes' }}
+            {{ saving() ? ('profile.saving' | t) : ('personalExpenses.saveChanges' | t) }}
           </button>
         </div>
       </form>

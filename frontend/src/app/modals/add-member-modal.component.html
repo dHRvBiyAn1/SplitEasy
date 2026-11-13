@@ -1,6 +1,6 @@
 <app-modal-shell heading="Add member" [maxWidth]="460" (closed)="close()">
   <div class="mform">
-    <p class="mform__lead">to {{ groupName() || 'this group' }}</p>
+    <p class="mform__lead">to {{ groupName() || ('addMemberModal.thisGroup' | t) }}</p>
 
     <div class="mform__field">
       <label class="dc-field-label" for="am-email">{{
@@ -131,7 +131,11 @@
         (click)="readInvitations()"
         [disabled]="saving() || invitationsLoading()"
       >
-        {{ invitationsOpen() ? 'Read invitation status' : 'Manage invitations' }}
+        {{
+          invitationsOpen()
+            ? ('addMemberModal.readInvitationStatus' | t)
+            : ('addMemberModal.manageInvitations' | t)
+        }}
       </button>
       @if (invitationsOpen()) {
         @if (invitationsLoading()) {
@@ -248,7 +252,8 @@
         <ul>
           @for (i of invitationRows(); track i.id) {
             <li>
-              {{ invitationKind(i.kind) }} · {{ i.participantName || 'Join only' }} ·
+              {{ invitationKind(i.kind) }} ·
+              {{ i.participantName || ('addMemberModal.joinOnly' | t) }} ·
               {{ invitationStatus(i.status) }} · expires
               <time [attr.datetime]="i.expiresAt">{{ localDate(i.expiresAt) }}</time>
               {{ 'addMemberModal.localTime' | t }}

@@ -6,7 +6,10 @@
     <div>
       <p class="eyebrow">{{ 'friends.yourPrivateDirectory' | t }}</p>
       <h1 id="friends-heading">
-        {{ detail()?.displayName ?? (id ? 'Friend details' : 'Your friends') }}
+        {{
+          detail()?.displayName ??
+            (id ? ('friends.friendDetails' | t) : ('friends.yourFriends' | t))
+        }}
       </h1>
     </div>
     @if (!id && !adding()) {
@@ -66,7 +69,11 @@
               <option value="">{{ 'friends.chooseAPerson' | t }}</option>
               @for (person of people(); track person.id) {
                 <option [value]="person.id" [disabled]="!person.accountId">
-                  {{ person.displayName }}{{ !person.accountId ? ' — claim first' : '' }}
+                  {{
+                    !person.accountId
+                      ? ('friends.personClaimFirst' | t: { name: person.displayName })
+                      : person.displayName
+                  }}
                 </option>
               }
             </select></label
@@ -222,7 +229,13 @@
       @for (group of friend.sharedGroups; track group.id) {
         <article class="friend-panel">
           <h3>{{ group.name }}</h3>
-          <p>{{ group.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}</p>
+          <p>
+            {{
+              group.simplifyDebts
+                ? ('friends.simplifiedObligations' | t)
+                : ('friends.directObligations' | t)
+            }}
+          </p>
           <div class="balances">
             @for (balance of group.balances; track balance.currency) {
               <div>

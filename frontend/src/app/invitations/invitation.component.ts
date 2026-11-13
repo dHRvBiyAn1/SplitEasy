@@ -163,7 +163,9 @@ import { translate } from '../core/i18n/i18n.service';
             (click)="accept()"
             [disabled]="pending() || uncertain() || (needsOwnership() && !ownershipConfirmed())"
           >
-            {{ needsOwnership() ? 'Claim guest and join' : 'Join group' }}
+            {{
+              needsOwnership() ? ('invitation.claimGuestAndJoin' | t) : ('invitation.joinGroup' | t)
+            }}
           </button>
         }
         @if (uncertain()) {

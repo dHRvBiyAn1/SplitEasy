@@ -125,7 +125,7 @@
         type="button"
         class="mrow mrow--add"
         [disabled]="archived()"
-        [attr.title]="archived() ? 'Re-open the group to add members' : null"
+        [attr.title]="archived() ? ('groupSettings.reOpenTheGroup' | t) : null"
         (click)="addMember()"
       >
         <span class="mrow__plus" aria-hidden="true">
@@ -186,8 +186,10 @@
             class="mrow__x"
             (click)="removeMember(m.id)"
             [disabled]="!!blockedReason(m.id) || busy()"
-            [title]="blockedReason(m.id) ?? 'Remove ' + m.displayName"
-            [attr.aria-label]="'Remove ' + m.displayName"
+            [title]="
+              blockedReason(m.id) ?? ('groupSettings.removeName' | t: { name: m.displayName })
+            "
+            [attr.aria-label]="'groupSettings.removeName' | t: { name: m.displayName }"
           >
             <svg
               viewBox="0 0 24 24"
@@ -208,7 +210,7 @@
         }
         @for (debt of obligationsOf(m.id); track debt.user.id + (debt.currency ?? 'USD')) {
           <p class="mrow__why">
-            {{ debt.netMinor > 0 ? 'Is owed' : 'Owes' }}
+            {{ debt.netMinor > 0 ? ('groupSettings.isOwed' | t) : ('groupSettings.owes' | t) }}
             {{ display(debt.netMinor < 0 ? -debt.netMinor : debt.netMinor, debt.currency) }}
             {{ debt.netMinor > 0 ? 'by' : 'to' }} {{ debt.user.displayName }} ({{
               debt.user.email || 'guest'
@@ -222,7 +224,11 @@
     <section class="gcard">
       <h2 class="gcard__title">{{ 'groupSettings.advancedSettings' | t }}</h2>
       <p class="grow__sub">
-        {{ g.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}
+        {{
+          g.simplifyDebts
+            ? ('friends.simplifiedObligations' | t)
+            : ('friends.directObligations' | t)
+        }}
         govern balances, settlement and who can leave. Raw expenses and payments stay unchanged.
       </p>
       <div class="grow grow--stack">
@@ -238,7 +244,7 @@
               type="button"
               class="gtype"
               [class.gtype--on]="g.type === option.value"
-              [attr.aria-label]="'Group type ' + option.label"
+              [attr.aria-label]="'groupSettings.groupTypeOption' | t: { type: option.label }"
               [attr.aria-pressed]="g.type === option.value"
               [disabled]="savingType()"
               (click)="setType(option.value)"
@@ -251,7 +257,9 @@
 
       <div class="grow">
         <span class="grow__text">
-          <span class="grow__label">{{ archived() ? 'Re-open group' : 'Archive group' }}</span>
+          <span class="grow__label">{{
+            archived() ? ('groupSettings.reOpenGroup' | t) : ('groupSettings.archiveGroup' | t)
+          }}</span>
           <span class="grow__sub">
             {{ 'groupSettings.archivingKeepsEveryExpense' | t }}
           </span>
@@ -262,7 +270,7 @@
           [disabled]="savingArchive()"
           (click)="toggleArchive()"
         >
-          {{ archived() ? 'Re-open group' : 'Archive group' }}
+          {{ archived() ? ('groupSettings.reOpenGroup' | t) : ('groupSettings.archiveGroup' | t) }}
         </button>
       </div>
 
