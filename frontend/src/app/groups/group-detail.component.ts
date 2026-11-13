@@ -27,7 +27,7 @@ import { PaymentService } from '../payments/payment.service';
 import { RefundResponse } from '../payments/payment.models';
 import { financialRoster, ownedIdentities, viewerIdentity, GroupResponse } from './group.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { translate } from '../core/i18n/i18n.service';
+import { intlLocale, translate } from '../core/i18n/i18n.service';
 
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
   FOOD_DRINK: '☕',
@@ -622,7 +622,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   recordedDate(iso: string): string {
-    return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    return new Date(iso).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   inputName(snapshot: ExpenseResponse, userId: string): string {
@@ -745,12 +745,12 @@ export class GroupDetailComponent implements OnInit {
 
   private monthLabel(iso: string): string {
     return new Date(iso + 'T00:00:00')
-      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      .toLocaleDateString(intlLocale(), { month: 'long', year: 'numeric' })
       .toUpperCase();
   }
 
   fullDate(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    return new Date(iso + 'T00:00:00').toLocaleDateString(intlLocale(), {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -763,7 +763,7 @@ export class GroupDetailComponent implements OnInit {
 
   dayMon(iso: string): string {
     return new Date(iso + 'T00:00:00')
-      .toLocaleDateString('en-US', { month: 'short' })
+      .toLocaleDateString(intlLocale(), { month: 'short' })
       .toUpperCase();
   }
 }

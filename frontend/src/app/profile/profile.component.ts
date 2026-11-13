@@ -11,6 +11,7 @@ import { SessionService } from '../core/auth/session.service';
 import { AuthService } from '../core/auth/auth.service';
 import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../core/profile.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { I18nService, SUPPORTED_LOCALES, intlLocale } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-profile',
@@ -31,6 +32,9 @@ export class ProfileComponent {
   private readonly auth = inject(AuthService);
   private readonly profile = inject(ProfileService);
   private readonly router = inject(Router);
+  private readonly i18n = inject(I18nService);
+  protected readonly locale = this.i18n.locale;
+  protected readonly locales = SUPPORTED_LOCALES;
 
   protected readonly user = this.auth.user;
   protected readonly loading = this.profile.loading;
@@ -82,10 +86,21 @@ export class ProfileComponent {
 
   memberSince(): string {
     if (!this.prefs().joinedAt) return '—';
-    return new Date(this.prefs().joinedAt).toLocaleDateString('en-US', {
+    return new Date(this.prefs().joinedAt).toLocaleDateString(intlLocale(this.locale()), {
       month: 'long',
       year: 'numeric',
     });
+  }
+
+  /** Each language is named in itself, so it stays findable whatever the UI language is. */
+  languageName(code: string): string {
+    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+  }
+
+  /** Switch the UI at once, then persist; the PATCH response re-applies the server value. */
+  setLanguage(code: string): void {
+    this.i18n.setLocale(code);
+    this.profile.update({ locale: this.i18n.locale() });
   }
 
   currencyLabel(c: Currency): string {

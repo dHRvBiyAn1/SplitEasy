@@ -12,6 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
 import { ApiService } from './api/api.service';
+import { I18nService, Locale } from './i18n/i18n.service';
 
 import { Currency } from '../shared/currency';
 import { translate } from './i18n/i18n.service';
@@ -33,10 +34,11 @@ export interface CurrentProfile {
   phone: string;
   avatarColor: string;
   preferredCurrency: Currency;
+  locale: Locale;
   createdAt: string;
 }
 export type ProfilePatch = Partial<
-  Pick<CurrentProfile, 'displayName' | 'phone' | 'avatarColor' | 'preferredCurrency'>
+  Pick<CurrentProfile, 'displayName' | 'phone' | 'avatarColor' | 'preferredCurrency' | 'locale'>
 >;
 interface LegacyPrefs {
   phone: string;
@@ -58,6 +60,7 @@ export class ProfileService {
   private readonly auth = inject(AuthService);
   private readonly session = inject(SessionService);
   private readonly api = inject(ApiService);
+  private readonly i18n = inject(I18nService);
   private readonly owner = computed(
     () => `${this.session.currentVersion()}:${this.auth.user()?.id ?? ''}`,
   );
@@ -145,6 +148,7 @@ export class ProfileService {
         if (!current() || data.id !== id) return;
         this.state.set({ data, loading: false, saving: false, error: '' });
         this.auth.applyProfileName(id, version, data.displayName);
+        this.i18n.setLocale(data.locale); // the server preference wins after sign-in
         onSaved?.();
       },
       error: () => {

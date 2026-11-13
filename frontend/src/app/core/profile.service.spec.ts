@@ -40,6 +40,7 @@ describe('account-owned profile preferences', () => {
       emailVerified: false,
       phone: '',
       preferredCurrency: 'USD',
+      locale: 'en',
       avatarColor: AVATAR_COLORS[0],
       createdAt: response.user.id === 'alice-id' ? '2020-01-01T00:00:00Z' : '2021-01-01T00:00:00Z',
     };

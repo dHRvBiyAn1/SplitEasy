@@ -10,7 +10,7 @@ import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory, dashboardTotals, groupTotals } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { translate } from '../core/i18n/i18n.service';
+import { intlLocale, translate } from '../core/i18n/i18n.service';
 
 /** Category / payment → a glyph for the activity + expense rows. */
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
@@ -124,7 +124,7 @@ export class DashboardComponent {
   /** "JUL 2" style short date from an ISO date string. */
   shortDate(iso: string): string {
     return new Date(iso + 'T00:00:00')
-      .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      .toLocaleDateString(intlLocale(), { month: 'short', day: 'numeric' })
       .toUpperCase();
   }
 }
