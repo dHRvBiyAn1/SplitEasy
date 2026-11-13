@@ -3,24 +3,25 @@
     <p class="mform__lead">to {{ groupName() || 'this group' }}</p>
 
     <div class="mform__field">
-      <label class="dc-field-label" for="am-email">Add someone by email</label>
+      <label class="dc-field-label" for="am-email">{{
+        'addMemberModal.addSomeoneByEmail' | t
+      }}</label>
       <div class="mform__row">
         <input
           id="am-email"
           class="dc-field"
           [formControl]="email"
           type="email"
-          placeholder="friend@example.com"
+          [placeholder]="'common.friendExampleCom' | t"
           autocomplete="off"
           (keydown.enter)="$event.preventDefault(); add()"
         />
         <button type="button" class="dc-btn-accent" (click)="add()" [disabled]="!canAdd()">
-          Add
+          {{ 'common.add' | t }}
         </button>
       </div>
       <p class="mform__hint">
-        They need an existing SplitEasy account. This grants account access immediately and never
-        claims a guest’s entries.
+        {{ 'addMemberModal.theyNeedAnExisting' | t }}
       </p>
     </div>
 
@@ -29,15 +30,15 @@
     }
 
     @if (membersLoading()) {
-      <p role="status">Loading group members…</p>
+      <p role="status">{{ 'addMemberModal.loadingGroupMembers' | t }}</p>
     }
     @if (membersFailed()) {
       <button type="button" class="dc-btn-outline retry-members" (click)="retryMembers()">
-        Retry members
+        {{ 'addMemberModal.retryMembers' | t }}
       </button>
     }
     <div class="mform__field">
-      <span class="dc-field-label">Already in this group</span>
+      <span class="dc-field-label">{{ 'addMemberModal.alreadyInThisGroup' | t }}</span>
       <div class="chips">
         @for (m of members(); track m.id) {
           <span class="chip chip--tag">
@@ -50,13 +51,12 @@
       </div>
     </div>
 
-    <section class="mform__field" aria-label="Guests">
-      <h2 class="dc-field-label">Guests without an account</h2>
+    <section class="mform__field" [attr.aria-label]="'addMemberModal.guests' | t">
+      <h2 class="dc-field-label">{{ 'addMemberModal.guestsWithoutAnAccount' | t }}</h2>
       <p class="mform__hint">
-        Add someone by name to include them in expenses. This does not send an invitation or grant
-        access.
+        {{ 'addMemberModal.addSomeoneByName' | t }}
       </p>
-      <label class="dc-field-label" for="guest-name">Guest name</label>
+      <label class="dc-field-label" for="guest-name">{{ 'addMemberModal.guestName' | t }}</label>
       <input
         id="guest-name"
         class="dc-field"
@@ -70,7 +70,7 @@
         (click)="createGuest()"
         [disabled]="saving() || membersLoading() || !guestName.value.trim() || guestUncertain()"
       >
-        Create guest
+        {{ 'addMemberModal.createGuest' | t }}
       </button>
       @if (guestNotice()) {
         <p role="status">{{ guestNotice() }}</p>
@@ -82,21 +82,21 @@
           (click)="createGuest(true)"
           [disabled]="saving()"
         >
-          Retry guest creation
+          {{ 'addMemberModal.retryGuestCreation' | t }}
         </button>
       }
       <ul>
         @for (p of participants(); track p.id) {
           @if (p.accountId === null) {
             <li>
-              {{ p.displayName }} · guest, no account access
+              {{ 'addMemberModal.displaynameGuestNoAccount' | t: { displayName: p.displayName } }}
               <button
                 type="button"
                 class="dc-btn-ghost"
                 (click)="removeGuest(p)"
                 [disabled]="saving()"
               >
-                Remove guest {{ p.displayName }}
+                {{ 'addMemberModal.removeGuestDisplayname' | t: { displayName: p.displayName } }}
               </button>
             </li>
           }
@@ -105,11 +105,10 @@
     </section>
 
     @if (inactiveGuests().length) {
-      <section class="mform__field" aria-label="Removed guests">
-        <h2 class="dc-field-label">Removed guests</h2>
+      <section class="mform__field" [attr.aria-label]="'addMemberModal.removedGuests' | t">
+        <h2 class="dc-field-label">{{ 'addMemberModal.removedGuests' | t }}</h2>
         <p class="mform__hint">
-          Re-add the original identity to repair or restore historical entries. Earlier invitations
-          remain revoked.
+          {{ 'addMemberModal.reAddTheOriginal' | t }}
         </p>
         @for (p of inactiveGuests(); track p.id) {
           <button
@@ -118,14 +117,14 @@
             (click)="reactivateGuest(p)"
             [disabled]="saving()"
           >
-            Re-add guest {{ p.displayName }}
+            {{ 'addMemberModal.reAddGuestDisplayname' | t: { displayName: p.displayName } }}
           </button>
         }
       </section>
     }
 
-    <section class="mform__field" aria-label="Invitations">
-      <h2 class="dc-field-label">Invitations</h2>
+    <section class="mform__field" [attr.aria-label]="'addMemberModal.invitations' | t">
+      <h2 class="dc-field-label">{{ 'addMemberModal.invitations' | t }}</h2>
       <button
         type="button"
         class="dc-btn-outline"
@@ -136,12 +135,14 @@
       </button>
       @if (invitationsOpen()) {
         @if (invitationsLoading()) {
-          <p role="status">Loading invitation status…</p>
+          <p role="status">{{ 'addMemberModal.loadingInvitationStatus' | t }}</p>
         }
         @if (invitationReadError()) {
           <p class="mform__error" role="alert">{{ invitationReadError() }}</p>
         }
-        <label class="dc-field-label" for="invite-email">Invitation email</label>
+        <label class="dc-field-label" for="invite-email">{{
+          'addMemberModal.invitationEmail' | t
+        }}</label>
         <input
           id="invite-email"
           class="dc-field"
@@ -150,16 +151,16 @@
           [formControl]="inviteEmail"
           autocomplete="off"
         />
-        <label class="dc-field-label" for="invite-participant"
-          >Guest to claim after verified acceptance</label
-        >
+        <label class="dc-field-label" for="invite-participant">{{
+          'addMemberModal.guestToClaimAfter' | t
+        }}</label>
         <select
           id="invite-participant"
           class="dc-field"
           [value]="inviteParticipant()"
           (change)="inviteParticipant.set($any($event.target).value)"
         >
-          <option value="">Join only · no guest claim</option>
+          <option value="">{{ 'addMemberModal.joinOnlyNoGuest' | t }}</option>
           @for (p of participants(); track p.id) {
             @if (p.accountId === null) {
               <option [value]="p.id">{{ p.displayName }}</option>
@@ -167,8 +168,7 @@
           }
         </select>
         <p class="mform__hint">
-          A guest claim requires the recipient's verified matching email and their explicit
-          ownership confirmation. Guests and group links work independently of email delivery.
+          {{ 'addMemberModal.aGuestClaimRequires' | t }}
         </p>
         <button
           type="button"
@@ -178,7 +178,7 @@
             saving() || invitationsLoading() || !inviteEmail.value.trim() || emailUncertain()
           "
         >
-          Send email invitation
+          {{ 'addMemberModal.sendEmailInvitation' | t }}
         </button>
         <button
           type="button"
@@ -188,7 +188,7 @@
             saving() || invitationsLoading() || !inviteEmail.value.trim() || emailUncertain()
           "
         >
-          Resend and invalidate earlier email link
+          {{ 'addMemberModal.resendAndInvalidateEarlier' | t }}
         </button>
         @if (emailUncertain()) {
           <button
@@ -197,7 +197,7 @@
             (click)="sendInvitation(true)"
             [disabled]="saving()"
           >
-            Retry original email invitation
+            {{ 'addMemberModal.retryOriginalEmailInvitation' | t }}
           </button>
           <button
             type="button"
@@ -205,16 +205,15 @@
             (click)="reviewSeparateEmail()"
             [disabled]="saving() || !linkStatusReviewed()"
           >
-            Review a separate email invitation
+            {{ 'addMemberModal.reviewASeparateEmail' | t }}
           </button>
         }
         @if (invitationNotice()) {
           <p role="status">{{ invitationNotice() }}</p>
         }
-        <h3 class="dc-field-label">Single-use group join link</h3>
+        <h3 class="dc-field-label">{{ 'addMemberModal.singleUseGroupJoin' | t }}</h3>
         <p class="mform__hint">
-          Anyone holding the link can join once before expiry. Forwarding transfers that
-          opportunity. This never claims a guest's financial entries.
+          {{ 'addMemberModal.anyoneHoldingTheLink' | t }}
         </p>
         <button
           type="button"
@@ -222,11 +221,11 @@
           (click)="generateLink()"
           [disabled]="saving() || invitationsLoading() || linkUncertain()"
         >
-          Generate join link
+          {{ 'addMemberModal.generateJoinLink' | t }}
         </button>
         @if (linkUncertain()) {
           <p role="status">
-            Read status and revoke unknown pending links before creating a replacement.
+            {{ 'addMemberModal.readStatusAndRevoke' | t }}
           </p>
           <button
             type="button"
@@ -234,20 +233,25 @@
             (click)="replaceLostLink()"
             [disabled]="saving() || !canReplaceLink()"
           >
-            Create replacement link
+            {{ 'addMemberModal.createReplacementLink' | t }}
           </button>
         }
         @if (joinLink()) {
-          <label class="dc-field-label" for="join-link">Copy this link before closing</label>
+          <label class="dc-field-label" for="join-link">{{
+            'addMemberModal.copyThisLinkBefore' | t
+          }}</label>
           <input id="join-link" class="dc-field" type="text" readonly [value]="joinLink()" />
-          <button type="button" class="dc-btn-outline" (click)="copyLink()">Copy join link</button>
+          <button type="button" class="dc-btn-outline" (click)="copyLink()">
+            {{ 'addMemberModal.copyJoinLink' | t }}
+          </button>
         }
         <ul>
           @for (i of invitationRows(); track i.id) {
             <li>
               {{ invitationKind(i.kind) }} · {{ i.participantName || 'Join only' }} ·
               {{ invitationStatus(i.status) }} · expires
-              <time [attr.datetime]="i.expiresAt">{{ localDate(i.expiresAt) }}</time> (local time)
+              <time [attr.datetime]="i.expiresAt">{{ localDate(i.expiresAt) }}</time>
+              {{ 'addMemberModal.localTime' | t }}
               @if (i.status === 'PENDING') {
                 <button
                   type="button"
@@ -255,7 +259,7 @@
                   (click)="revokeInvitation(i)"
                   [disabled]="saving()"
                 >
-                  Revoke invitation
+                  {{ 'addMemberModal.revokeInvitation' | t }}
                 </button>
               }
             </li>
@@ -265,7 +269,9 @@
     </section>
 
     <div class="mform__actions">
-      <button type="button" class="dc-btn-outline" (click)="close()">Done</button>
+      <button type="button" class="dc-btn-outline" (click)="close()">
+        {{ 'addMemberModal.done' | t }}
+      </button>
     </div>
   </div>
 </app-modal-shell>

@@ -14,6 +14,7 @@ import {
 } from '../payments/payment.models';
 import { FriendBalance } from './friend.models';
 import { FriendService } from './friend.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /**
  * Settlements with one saved friend outside any group (G02.3): the personal balance with its
@@ -21,7 +22,7 @@ import { FriendService } from './friend.service';
  */
 @Component({
   selector: 'app-personal-payments',
-  imports: [MoneyComponent, RouterLink],
+  imports: [TranslatePipe, MoneyComponent, RouterLink],
   templateUrl: './personal-payments.component.html',
   styleUrl: './personal-expenses.component.scss',
 })

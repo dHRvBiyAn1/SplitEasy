@@ -1,17 +1,25 @@
 <div class="gd">
-  <a class="gd__back" routerLink="/dashboard"><span aria-hidden="true">‹</span> Dashboard</a>
+  <a class="gd__back" routerLink="/dashboard"
+    ><span aria-hidden="true">‹</span> {{ 'groupDetail.dashboard' | t }}</a
+  >
 
   @if (loading() && !group()) {
-    <div class="dc-loading" role="status" aria-label="Loading group"></div>
+    <div class="dc-loading" role="status" [attr.aria-label]="'groupDetail.loadingGroup' | t"></div>
   } @else if (error() && !group()) {
     <p class="gd__error" role="alert">{{ error() }}</p>
-    <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
+    <button type="button" class="dc-btn-outline" (click)="retry()">
+      {{ 'common.tryAgain' | t }}
+    </button>
   } @else if (group(); as g) {
     @if (error()) {
-      <p class="gd__error" role="alert">{{ error() }} Showing the last loaded group.</p>
-      <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
+      <p class="gd__error" role="alert">
+        {{ 'groupDetail.errorShowingTheLast' | t: { error: error() } }}
+      </p>
+      <button type="button" class="dc-btn-outline" (click)="retry()">
+        {{ 'common.tryAgain' | t }}
+      </button>
     } @else if (loading()) {
-      <p role="status">Refreshing group…</p>
+      <p role="status">{{ 'groupDetail.refreshingGroup' | t }}</p>
     }
     <header class="gd__head">
       <app-group-art [type]="g.type" />
@@ -19,7 +27,7 @@
         <h1 class="gd__name">{{ g.name }}</h1>
         <p class="gd__sub">{{ typeLabel(g) }} · {{ memberNames(g) }}</p>
         @if (archived()) {
-          <p class="gd__sub" role="status">Archived — read-only until it is re-opened.</p>
+          <p class="gd__sub" role="status">{{ 'groupDetail.archivedReadOnlyUntil' | t }}</p>
         }
       </div>
       <div class="gd__actions">
@@ -43,7 +51,7 @@
           >
             <path d="M4 8h13l-3-3M20 16H7l3 3" />
           </svg>
-          Settle up
+          {{ 'common.settleUp' | t }}
         </button>
         <button
           type="button"
@@ -64,17 +72,19 @@
           >
             <path d="M12 5.5v13M5.5 12h13" />
           </svg>
-          Add expense
+          {{ 'common.addExpense' | t }}
         </button>
         <a class="dc-btn-outline" [routerLink]="['/groups', groupId, 'payments']">
-          Payment history
+          {{ 'common.paymentHistory' | t }}
         </a>
-        <a class="dc-btn-outline" [routerLink]="['/groups', groupId, 'history']"> History </a>
+        <a class="dc-btn-outline" [routerLink]="['/groups', groupId, 'history']">
+          {{ 'common.history' | t }}
+        </a>
         <a
           class="gd__gear"
           [routerLink]="['/groups', groupId, 'settings']"
-          title="Group settings"
-          aria-label="Group settings"
+          [attr.title]="'groupDetail.groupSettings' | t"
+          [attr.aria-label]="'groupDetail.groupSettings' | t"
         >
           <svg
             viewBox="0 0 24 24"
@@ -122,7 +132,7 @@
                 display(total.netMinor < 0 ? -total.netMinor : total.netMinor, total.currency)
               }}</strong
             >
-            overall
+            {{ 'groupDetail.overall' | t }}
           }
         </span>
       }
@@ -141,13 +151,15 @@
           </strong>
           @if (b.netMinor > 0 && b.user.accountId !== null) {
             <button type="button" class="dc-btn-outline" (click)="remind(b)">
-              Remind {{ b.user.displayName.split(' ')[0] }}
+              {{ 'groupDetail.remindV1' | t: { v1: b.user.displayName.split(' ')[0] } }}
             </button>
           }
         </span>
       }
     </div>
-    <p><a [routerLink]="['/groups', groupId, 'recurring']">Recurring expenses</a></p>
+    <p>
+      <a [routerLink]="['/groups', groupId, 'recurring']">{{ 'common.recurringExpenses' | t }}</a>
+    </p>
     @if (reminderNotice()) {
       <p role="status">{{ reminderNotice() }}</p>
     }
@@ -156,7 +168,7 @@
     }
 
     @if (expenses().length === 0) {
-      <p class="gd__empty">No expenses yet. Add the first one.</p>
+      <p class="gd__empty">{{ 'groupDetail.noExpensesYetAdd' | t }}</p>
     } @else {
       @for (m of months(); track m.label) {
         <section class="gd__month">
@@ -206,24 +218,33 @@
                 @if (deleteError(); as failure) {
                   @if (failure.expenseId === e.id) {
                     <p role="alert">
-                      Could not delete "{{ e.description }}". {{ failure.message }}
+                      {{
+                        'groupDetail.couldNotDeleteDescription'
+                          | t: { description: e.description, message: failure.message }
+                      }}
                     </p>
                   }
                 }
                 @if (expandedId() === e.id) {
                   <div class="xdetail">
                     @if (detailLoading()) {
-                      <div class="dc-loading" role="status" aria-label="Loading details"></div>
+                      <div
+                        class="dc-loading"
+                        role="status"
+                        [attr.aria-label]="'groupDetail.loadingDetails' | t"
+                      ></div>
                     } @else if (detailError()) {
                       <p role="alert">{{ detailError() }}</p>
                       <button type="button" class="dc-btn-outline" (click)="retryDetail()">
-                        Retry expense
+                        {{ 'groupDetail.retryExpense' | t }}
                       </button>
                     } @else if (detail(); as d) {
                       @if ((d.contributions?.length ?? 0) > 1) {
                         @for (c of d.contributions; track c.user.id) {
                           <div class="xdetail__line xdetail__line--paid">
-                            <span class="xdetail__who">{{ firstName(c.user) }} paid</span>
+                            <span class="xdetail__who">{{
+                              'groupDetail.userPaid' | t: { user: firstName(c.user) }
+                            }}</span>
                             <span class="xdetail__amt">{{
                               display(c.amountMinor, d.currency)
                             }}</span>
@@ -231,7 +252,9 @@
                         }
                       } @else {
                         <div class="xdetail__line xdetail__line--paid">
-                          <span class="xdetail__who">{{ firstName(d.paidBy) }} paid</span>
+                          <span class="xdetail__who">{{
+                            'groupDetail.paidbyPaid' | t: { paidBy: firstName(d.paidBy) }
+                          }}</span>
                           <span class="xdetail__amt">{{ display(d.amountMinor, d.currency) }}</span>
                         </div>
                       }
@@ -246,10 +269,10 @@
                           <span class="xdetail__who"
                             >{{ partLabel(p) }}
                             @if (sameSnapshotOwner(d, p.user)) {
-                              <small
-                                >{{ p.user.displayName }} · same account, original identity
-                                retained</small
-                              >
+                              <small>{{
+                                'groupDetail.displaynameSameAccountOriginal'
+                                  | t: { displayName: p.user.displayName }
+                              }}</small>
                             }
                           </span>
                           <span class="xdetail__amt">{{ display(p.shareMinor, d.currency) }}</span>
@@ -257,7 +280,7 @@
                       }
                       <div class="xdetail__actions">
                         <button type="button" class="dc-btn-outline" (click)="viewHistory(e.id)">
-                          Expense history
+                          {{ 'groupDetail.expenseHistory' | t }}
                         </button>
                         <button
                           type="button"
@@ -265,7 +288,7 @@
                           (click)="startRefund(d)"
                           [disabled]="writePending()"
                         >
-                          Record refund
+                          {{ 'groupDetail.recordRefund' | t }}
                         </button>
                         <button
                           type="button"
@@ -273,7 +296,7 @@
                           (click)="editExpense(e)"
                           [disabled]="writePending()"
                         >
-                          Edit
+                          {{ 'common.edit' | t }}
                         </button>
                         <button
                           type="button"
@@ -281,15 +304,22 @@
                           (click)="deleteExpense(e)"
                           [disabled]="writePending()"
                         >
-                          <span aria-hidden="true">🗑</span> Delete expense
+                          <span aria-hidden="true">🗑</span> {{ 'groupDetail.deleteExpense' | t }}
                         </button>
                       </div>
                       @if (refunds().length) {
                         <ul class="xrefunds">
                           @for (refund of refunds(); track refund.id) {
                             <li>
-                              Refunded {{ display(refund.amountMinor, refund.currency) }} to
-                              {{ firstName(refund.receivedBy) }} on {{ refund.refundedOn }}
+                              {{
+                                'groupDetail.refundedV1ToReceivedby'
+                                  | t
+                                    : {
+                                        v1: display(refund.amountMinor, refund.currency),
+                                        receivedBy: firstName(refund.receivedBy),
+                                        refundedOn: refund.refundedOn,
+                                      }
+                              }}
                               @if (refund.note) {
                                 · {{ refund.note }}
                               }
@@ -304,11 +334,12 @@
                           (submit)="$event.preventDefault(); saveRefund(d)"
                         >
                           <p>
-                            Money the seller returned out of this expense. It reverses this
-                            expense's own split, so each person owes less by their share.
+                            {{ 'groupDetail.moneyTheSellerReturned' | t }}
                           </p>
                           <label
-                            ><span class="dc-field-label">Refund amount in {{ d.currency }}</span>
+                            ><span class="dc-field-label">{{
+                              'groupDetail.refundAmountInCurrency' | t: { currency: d.currency }
+                            }}</span>
                             <input
                               type="text"
                               inputmode="decimal"
@@ -318,7 +349,9 @@
                             />
                           </label>
                           <label
-                            ><span class="dc-field-label">Date of the refund</span>
+                            ><span class="dc-field-label">{{
+                              'groupDetail.dateOfTheRefund' | t
+                            }}</span>
                             <input
                               type="date"
                               data-test="refund-date"
@@ -327,7 +360,7 @@
                             />
                           </label>
                           <label
-                            ><span class="dc-field-label">Note (optional)</span>
+                            ><span class="dc-field-label">{{ 'common.noteOptional' | t }}</span>
                             <input
                               type="text"
                               maxlength="280"
@@ -340,7 +373,7 @@
                           }
                           <div class="xdetail__actions">
                             <button type="submit" class="dc-btn-accent" [disabled]="refundSaving()">
-                              Save refund
+                              {{ 'groupDetail.saveRefund' | t }}
                             </button>
                             <button
                               type="button"
@@ -348,7 +381,7 @@
                               [disabled]="refundSaving()"
                               (click)="cancelRefund()"
                             >
-                              Cancel
+                              {{ 'common.cancel' | t }}
                             </button>
                           </div>
                         </form>
@@ -373,14 +406,17 @@
       [attr.aria-expanded]="recoveryOpen()"
       [disabled]="writePending()"
     >
-      Deleted expenses
+      {{ 'groupDetail.deletedExpenses' | t }}
     </button>
     @if (recoveryOpen()) {
-      <section class="gd__recovery" role="region" aria-label="Deleted expenses">
-        <h2>Deleted expenses</h2>
+      <section
+        class="gd__recovery"
+        role="region"
+        [attr.aria-label]="'groupDetail.deletedExpenses' | t"
+      >
+        <h2>{{ 'groupDetail.deletedExpenses' | t }}</h2>
         <p>
-          Review the retained payer, shares and currency. Restoring an expense changes balances.
-          Re-add any former participants first.
+          {{ 'groupDetail.reviewTheRetainedPayer' | t }}
         </p>
         <button
           type="button"
@@ -388,10 +424,10 @@
           (click)="reviewDeleted()"
           [disabled]="recoveryLoading() || writePending()"
         >
-          Reload deleted expenses
+          {{ 'groupDetail.reloadDeletedExpenses' | t }}
         </button>
         @if (recoveryLoading()) {
-          <p role="status">Loading deleted expenses…</p>
+          <p role="status">{{ 'groupDetail.loadingDeletedExpenses' | t }}</p>
         }
         @if (recoveryError()) {
           <p role="alert">{{ recoveryError() }}</p>
@@ -400,18 +436,25 @@
           <p role="alert">{{ failure.message }}</p>
         }
         @if (!recoveryLoading() && !recoveryError() && deletedExpenses().length === 0) {
-          <p>No deleted expenses.</p>
+          <p>{{ 'groupDetail.noDeletedExpenses' | t }}</p>
         }
         @for (entry of deletedExpenses(); track entry.expense.id) {
           <article class="gd__snapshot">
             <h3>{{ entry.expense.description }}</h3>
             <p>
-              Paid by {{ entry.expense.paidBy.displayName }} ·
-              {{ display(entry.expense.amountMinor, entry.expense.currency) }} ·
-              {{ fullDate(entry.expense.spentOn) }} · {{ splitLabel(entry.expense.splitType) }}
+              {{
+                'groupDetail.paidByDisplaynameV1'
+                  | t
+                    : {
+                        displayName: entry.expense.paidBy.displayName,
+                        v1: display(entry.expense.amountMinor, entry.expense.currency),
+                        spentOn: fullDate(entry.expense.spentOn),
+                        splitType: splitLabel(entry.expense.splitType),
+                      }
+              }}
             </p>
             <p>
-              Deleted
+              {{ 'groupDetail.deleted' | t }}
               <time [attr.datetime]="entry.deletedAt">{{ recordedDate(entry.deletedAt) }}</time>
             </p>
             <ul>
@@ -424,7 +467,7 @@
             </ul>
             <div class="xdetail__actions">
               <button type="button" class="dc-btn-outline" (click)="viewHistory(entry.expense.id)">
-                Expense history
+                {{ 'groupDetail.expenseHistory' | t }}
               </button>
               <button
                 type="button"
@@ -439,10 +482,10 @@
                   recoveryNeedsReview()
                 "
               >
-                Restore expense
+                {{ 'groupDetail.restoreExpense' | t }}
               </button>
               @if (restoringId() === entry.expense.id) {
-                <span role="status">Restoring expense…</span>
+                <span role="status">{{ 'groupDetail.restoringExpense' | t }}</span>
               }
             </div>
           </article>
@@ -451,15 +494,21 @@
     }
 
     @if (historyId(); as expenseId) {
-      <section class="gd__history" role="region" aria-label="Expense history">
-        <h2>Expense history</h2>
-        <button type="button" class="dc-btn-outline" (click)="clearHistory()">Close history</button>
+      <section
+        class="gd__history"
+        role="region"
+        [attr.aria-label]="'groupDetail.expenseHistory' | t"
+      >
+        <h2>{{ 'groupDetail.expenseHistory' | t }}</h2>
+        <button type="button" class="dc-btn-outline" (click)="clearHistory()">
+          {{ 'groupDetail.closeHistory' | t }}
+        </button>
         @if (historyLoading()) {
-          <p role="status">Loading expense history…</p>
+          <p role="status">{{ 'groupDetail.loadingExpenseHistory' | t }}</p>
         } @else if (historyError()) {
           <p role="alert">{{ historyError() }}</p>
           <button type="button" class="dc-btn-outline" (click)="viewHistory(expenseId)">
-            Retry history
+            {{ 'groupDetail.retryHistory' | t }}
           </button>
         } @else {
           <ol>
@@ -473,7 +522,7 @@
                   }}</time>
                 </p>
                 @if (revision.action === 'IMPORTED') {
-                  <p>Imported from existing records. Earlier recorder and edits are unknown.</p>
+                  <p>{{ 'groupDetail.importedFromExistingRecords' | t }}</p>
                 }
                 @for (snapshot of [revision.before, revision.after]; track $index) {
                   @if (snapshot) {
@@ -486,15 +535,22 @@
                         }}</span>
                       </p>
                       <p>
-                        Paid by {{ snapshot.paidBy.displayName }} ·
-                        {{ fullDate(snapshot.spentOn) }} · {{ splitLabel(snapshot.splitType) }}
+                        {{
+                          'groupDetail.paidByDisplaynameSpenton'
+                            | t
+                              : {
+                                  displayName: snapshot.paidBy.displayName,
+                                  spentOn: fullDate(snapshot.spentOn),
+                                  splitType: splitLabel(snapshot.splitType),
+                                }
+                        }}
                       </p>
                       <ul>
                         @for (participant of snapshot.participants; track participant.user.id) {
                           <li>
                             {{ participant.user.displayName }}
                             @if (sameSnapshotOwner(snapshot, participant.user)) {
-                              <small>same account today · original identity retained</small>
+                              <small>{{ 'groupDetail.sameAccountTodayOriginal' | t }}</small>
                             }
                             :
                             {{ display(participant.shareMinor, snapshot.currency) }}
@@ -502,8 +558,13 @@
                         }
                       </ul>
                       @if (snapshot.splits?.length) {
-                        <p>Original inputs ({{ splitLabel(snapshot.splitType) }}):</p>
-                        <ul aria-label="Original split inputs">
+                        <p>
+                          {{
+                            'groupDetail.originalInputsSplittype'
+                              | t: { splitType: splitLabel(snapshot.splitType) }
+                          }}
+                        </p>
+                        <ul [attr.aria-label]="'groupDetail.originalSplitInputs' | t">
                           @for (input of snapshot.splits; track input.userId) {
                             <li>
                               {{ inputName(snapshot, input.userId) }}:

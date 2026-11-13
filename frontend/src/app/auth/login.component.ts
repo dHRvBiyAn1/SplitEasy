@@ -3,10 +3,11 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink, AuthHeroComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink, AuthHeroComponent],
   templateUrl: './login.component.html',
   styleUrl: './auth.scss',
 })

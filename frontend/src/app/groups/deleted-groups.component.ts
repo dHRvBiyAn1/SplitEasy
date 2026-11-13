@@ -7,6 +7,7 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { GroupArtComponent } from '../shared/group-art.component';
 import { GroupService } from './group.service';
 import { GroupSummary } from './group.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /**
  * The creator's recovery list for groups they deleted. Deletion keeps every expense, payment and
@@ -15,7 +16,7 @@ import { GroupSummary } from './group.models';
  */
 @Component({
   selector: 'app-deleted-groups',
-  imports: [RouterLink, GroupArtComponent],
+  imports: [TranslatePipe, RouterLink, GroupArtComponent],
   templateUrl: './deleted-groups.component.html',
   styleUrl: './deleted-groups.component.scss',
 })

@@ -66,7 +66,9 @@ describe('I18nService', () => {
   };
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     http = TestBed.inject(HttpTestingController);
     i18n = TestBed.inject(I18nService);
     i18n.setLocale('en');
@@ -80,7 +82,11 @@ describe('I18nService', () => {
   afterEach(() => activeLocale.set('en'));
 
   it('translates with interpolation and plurals and falls back to English per key', () => {
-    patch('es', { 'spec.hello': 'Hola {name}', 'spec.count_one': '{count} elemento', 'spec.count_other': '{count} elementos' });
+    patch('es', {
+      'spec.hello': 'Hola {name}',
+      'spec.count_one': '{count} elemento',
+      'spec.count_other': '{count} elementos',
+    });
     const f = TestBed.createComponent(Host);
     f.detectChanges();
     const text = (id: string) => f.nativeElement.querySelector(id).textContent;

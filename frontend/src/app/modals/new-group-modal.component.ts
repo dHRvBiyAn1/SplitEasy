@@ -11,6 +11,7 @@ import { GroupType } from '../dashboard/dashboard.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const TYPES: { value: GroupType; label: string }[] = [
   { value: 'HOME', label: 'Home' },
@@ -22,7 +23,7 @@ const TYPES: { value: GroupType; label: string }[] = [
 
 @Component({
   selector: 'app-new-group-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './new-group-modal.component.html',
   styleUrl: './modals.scss',
 })

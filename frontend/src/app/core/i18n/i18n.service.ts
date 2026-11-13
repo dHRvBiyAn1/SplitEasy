@@ -7,7 +7,7 @@ import en from '../../../../public/i18n/en.json';
 export const SUPPORTED_LOCALES = ['en', 'hi', 'es', 'fr'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 export type Catalogue = Record<string, string>;
-export type Params = Record<string, string | number>;
+export type Params = Record<string, string | number | null | undefined>;
 
 export const isLocale = (value: unknown): value is Locale =>
   SUPPORTED_LOCALES.includes(value as Locale);

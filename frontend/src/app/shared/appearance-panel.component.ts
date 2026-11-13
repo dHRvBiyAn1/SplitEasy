@@ -2,12 +2,14 @@ import { Component, inject } from '@angular/core';
 import { PALETTES, ThemeService, ThemeChoice } from '../core/theme.service';
 import { MotionPreferenceService } from '../core/motion-preference.service';
 import { RibbonService } from '../core/ribbon.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 @Component({
   selector: 'app-appearance-panel',
+  imports: [TranslatePipe],
   template: ` <div class="appearance">
     <fieldset>
-      <legend>Color theme</legend>
-      <p>Pick your colors. Keep your preferred light or dark mode.</p>
+      <legend>{{ 'appearancePanel.colorTheme' | t }}</legend>
+      <p>{{ 'appearancePanel.pickYourColorsKeep' | t }}</p>
       <div class="themes">
         @for (p of palettes; track p.value) {
           <button
@@ -27,8 +29,8 @@ import { RibbonService } from '../core/ribbon.service';
       </div>
     </fieldset>
     <fieldset>
-      <legend>Display mode</legend>
-      <div class="dc-segment" role="group" aria-label="Display mode">
+      <legend>{{ 'appearancePanel.displayMode' | t }}</legend>
+      <div class="dc-segment" role="group" [attr.aria-label]="'appearancePanel.displayMode' | t">
         @for (m of modes; track m.value) {
           <button
             type="button"
@@ -41,8 +43,8 @@ import { RibbonService } from '../core/ribbon.service';
       </div>
     </fieldset>
     <fieldset>
-      <legend>Silk Ribbon</legend>
-      <p>A fine ribbon for your mouse. A soft bloom and short trace for your touch.</p>
+      <legend>{{ 'appearancePanel.silkRibbon' | t }}</legend>
+      <p>{{ 'appearancePanel.aFineRibbonFor' | t }}</p>
       <div class="touch-pad" #pad>
         <svg viewBox="0 0 220 70" aria-hidden="true">
           <path d="M25 46c24-47 37 31 68-8s39 16 63-11" />
@@ -54,7 +56,7 @@ import { RibbonService } from '../core/ribbon.service';
           [disabled]="motion.reduced()"
           (click)="ribbon.previewTouch(pad)"
         >
-          Preview touch
+          {{ 'appearancePanel.previewTouch' | t }}
         </button>
       </div>
       <button
@@ -63,11 +65,12 @@ import { RibbonService } from '../core/ribbon.service';
         [attr.aria-pressed]="motion.deviceReduced()"
         (click)="motion.setReduced(!motion.deviceReduced())"
       >
-        Reduce motion <span aria-hidden="true">{{ motion.deviceReduced() ? 'On' : 'Off' }}</span>
+        {{ 'appearancePanel.reduceMotion' | t }}
+        <span aria-hidden="true">{{ motion.deviceReduced() ? 'On' : 'Off' }}</span>
       </button>
     </fieldset>
     <p class="appearance-note">
-      Appearance is saved on this device. System accessibility settings take priority.
+      {{ 'appearancePanel.appearanceIsSavedOn' | t }}
     </p>
   </div>`,
   styleUrl: './appearance-panel.component.scss',

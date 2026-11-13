@@ -1,18 +1,18 @@
 <section class="recurring-page" aria-labelledby="recurring-heading">
-  <a [routerLink]="['/groups', groupId]">Back to this group</a>
+  <a [routerLink]="['/groups', groupId]">{{ 'common.backToThisGroup' | t }}</a>
   <header>
-    <p class="eyebrow">Repeats</p>
-    <h1 id="recurring-heading">Recurring expenses</h1>
+    <p class="eyebrow">{{ 'recurring.repeats' | t }}</p>
+    <h1 id="recurring-heading">{{ 'common.recurringExpenses' | t }}</h1>
   </header>
 
   @if (error()) {
     <p class="write-error" role="alert">{{ error() }}</p>
   }
   @if (loading()) {
-    <p role="status">Loading recurring expenses…</p>
+    <p role="status">{{ 'recurring.loadingRecurringExpenses' | t }}</p>
   } @else {
     @if (!schedules().length && !error()) {
-      <p>Nothing repeats yet. Choose Repeat when adding an expense to create one.</p>
+      <p>{{ 'recurring.nothingRepeatsYetChoose' | t }}</p>
     }
     <ul class="schedules">
       @for (s of schedules(); track s.id) {
@@ -23,11 +23,12 @@
           </div>
           <p class="meta">
             @if (s.status === 'ACTIVE') {
-              Next on <time [attr.datetime]="s.nextDate">{{ s.nextDate }}</time>
+              {{ 'recurring.nextOn' | t }}
+              <time [attr.datetime]="s.nextDate">{{ s.nextDate }}</time>
             } @else if (s.status === 'CANCELLED') {
-              Cancelled — no more expenses will be added
+              {{ 'recurring.cancelledNoMoreExpenses' | t }}
             } @else {
-              Paused — needs review
+              {{ 'recurring.pausedNeedsReview' | t }}
             }
           </p>
           @if (s.status === 'NEEDS_REVIEW') {
@@ -36,7 +37,7 @@
           @if (editing()?.id === s.id) {
             <form class="edit" (submit)="$event.preventDefault(); saveEdit()">
               <label>
-                Description
+                {{ 'common.description' | t }}
                 <input
                   name="description"
                   [value]="description"
@@ -45,7 +46,7 @@
               </label>
               @if (canEditAmount(s)) {
                 <label>
-                  Amount
+                  {{ 'common.amount' | t }}
                   <input
                     name="amount"
                     inputmode="decimal"
@@ -55,7 +56,7 @@
                 </label>
               }
               <label>
-                Repeats
+                {{ 'recurring.repeats' | t }}
                 <select name="frequency" (change)="frequency = $any($event.target).value">
                   @for (f of frequencies; track f) {
                     <option [value]="f" [selected]="f === frequency">
@@ -64,16 +65,20 @@
                   }
                 </select>
               </label>
-              <p class="meta">Changes apply to future expenses only.</p>
-              <button class="dc-btn" type="submit">Save future changes</button>
+              <p class="meta">{{ 'recurring.changesApplyToFuture' | t }}</p>
+              <button class="dc-btn" type="submit">{{ 'recurring.saveFutureChanges' | t }}</button>
               <button class="dc-btn-outline" type="button" (click)="editing.set(null)">
-                Close
+                {{ 'common.close' | t }}
               </button>
             </form>
           } @else if (s.status !== 'CANCELLED') {
             <div class="actions">
-              <button class="dc-btn-outline" type="button" (click)="edit(s)">Edit future</button>
-              <button class="dc-btn-outline" type="button" (click)="cancel(s)">Cancel</button>
+              <button class="dc-btn-outline" type="button" (click)="edit(s)">
+                {{ 'recurring.editFuture' | t }}
+              </button>
+              <button class="dc-btn-outline" type="button" (click)="cancel(s)">
+                {{ 'common.cancel' | t }}
+              </button>
             </div>
           }
         </li>

@@ -10,10 +10,12 @@ import { Router } from '@angular/router';
 import { SessionService } from '../core/auth/session.service';
 import { AuthService } from '../core/auth/auth.service';
 import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../core/profile.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-profile',
   imports: [
+    TranslatePipe,
     ReactiveFormsModule,
     AppearancePanelComponent,
     AccountSecurityComponent,

@@ -1,6 +1,5 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Subscription, takeUntil } from 'rxjs';
 import { AuthService } from '../core/auth/auth.service';
@@ -8,45 +7,45 @@ import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { ActivityItem, describeEvent } from './activity.models';
 import { ActivityService } from './activity.service';
+import { LocaleDatePipe } from '../core/i18n/locale-date.pipe';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /** Account activity, newest first, a page at a time, with an optional group filter. */
 @Component({
   selector: 'app-activity',
-  imports: [DatePipe, RouterLink],
+  imports: [TranslatePipe, LocaleDatePipe, RouterLink],
   template: `
     <section class="activity" aria-labelledby="activity-heading">
-      <h1 id="activity-heading">Activity</h1>
+      <h1 id="activity-heading">{{ 'common.activity' | t }}</h1>
       <label class="filter"
-        >Group
+        >{{ 'common.group' | t }}
         <select name="group" [value]="groupId()" (change)="filter($any($event.target).value)">
-          <option value="">All groups</option>
+          <option value="">{{ 'activity.allGroups' | t }}</option>
           @for (g of groups(); track g.id) {
             <option [value]="g.id">{{ g.name }}</option>
           }
         </select>
       </label>
       @if (loading()) {
-        <p role="status">Loading activity…</p>
+        <p role="status">{{ 'activity.loadingActivity' | t }}</p>
       } @else {
         @if (error()) {
           <div role="alert">
             <p>{{ error() }}</p>
             <button class="dc-btn" type="button" (click)="nextCursor() ? loadMore() : load()">
-              Try again
+              {{ 'common.tryAgain' | t }}
             </button>
           </div>
         }
         @if (!items().length && !error()) {
-          <p>No activity yet.</p>
+          <p>{{ 'activity.noActivityYet' | t }}</p>
         }
         <ul class="events">
           @for (item of items(); track item.id) {
             <li>
               <p>{{ describe(item) }}</p>
               <p class="meta">
-                <time [attr.datetime]="item.occurredAt">{{
-                  item.occurredAt | date: 'medium'
-                }}</time>
+                <time [attr.datetime]="item.occurredAt">{{ item.occurredAt | ldate }}</time>
                 @if (item.groupName) {
                   · <a [routerLink]="['/groups', item.groupId]">{{ item.groupName }}</a>
                 }
@@ -65,7 +64,7 @@ import { ActivityService } from './activity.service';
           </button>
         } @else if (!nextCursor() && items().length && !error()) {
           <p class="meta">
-            That is everything recorded so far — activity starts from when it was introduced.
+            {{ 'activity.thatIsEverythingRecorded' | t }}
           </p>
         }
       }

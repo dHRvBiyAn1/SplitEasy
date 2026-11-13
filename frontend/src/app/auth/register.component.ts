@@ -3,10 +3,11 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@
 import { Router, RouterLink } from '@angular/router';
 import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink, AuthHeroComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink, AuthHeroComponent],
   templateUrl: './register.component.html',
   styleUrl: './auth.scss',
 })

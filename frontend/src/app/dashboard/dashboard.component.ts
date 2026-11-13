@@ -9,6 +9,7 @@ import { avatarTint } from '../core/avatar';
 import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory, dashboardTotals, groupTotals } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /** Category / payment → a glyph for the activity + expense rows. */
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
@@ -24,7 +25,7 @@ const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, GroupArtComponent, MoneyComponent, IconComponent],
+  imports: [TranslatePipe, RouterLink, GroupArtComponent, MoneyComponent, IconComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })

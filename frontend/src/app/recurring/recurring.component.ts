@@ -6,6 +6,7 @@ import { SessionService } from '../core/auth/session.service';
 import { Currency, amountToMinor, minorToDisplay } from '../shared/currency';
 import { Frequency, RecurringSchedule } from './recurring.models';
 import { RecurringService } from './recurring.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const FREQUENCY_LABEL: Record<Frequency, string> = {
   DAILY: 'Every day',
@@ -16,7 +17,7 @@ const FREQUENCY_LABEL: Record<Frequency, string> = {
 /** A group's recurring expenses: change future occurrences, cancel, and see why one halted. */
 @Component({
   selector: 'app-recurring',
-  imports: [RouterLink],
+  imports: [TranslatePipe, RouterLink],
   templateUrl: './recurring.component.html',
   styleUrl: './recurring.component.scss',
 })

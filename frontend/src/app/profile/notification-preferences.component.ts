@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { NotificationPreferences, NotificationService } from '../notification/notification.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
   { key: 'expenses', label: 'Expenses added, edited, deleted or restored' },
@@ -13,12 +14,15 @@ const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
 /** Server-owned in-app notification switches; email and push are not offered yet. */
 @Component({
   selector: 'app-notification-preferences',
+  imports: [TranslatePipe],
   template: `
     <details class="pcard" (toggle)="open($any($event.target).open)">
-      <summary>Notification settings</summary>
+      <summary>{{ 'notificationPreferences.notificationSettings' | t }}</summary>
       @if (loadError()) {
         <p role="alert">{{ loadError() }}</p>
-        <button class="dc-btn-outline" type="button" (click)="load()">Try again</button>
+        <button class="dc-btn-outline" type="button" (click)="load()">
+          {{ 'common.tryAgain' | t }}
+        </button>
       } @else if (prefs(); as p) {
         @for (s of switches; track s.key) {
           <label class="switch">
@@ -35,7 +39,7 @@ const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
           <p role="alert">{{ saveError() }}</p>
         }
       } @else {
-        <p role="status">Loading notification settings…</p>
+        <p role="status">{{ 'notificationPreferences.loadingNotificationSettings' | t }}</p>
       }
     </details>
   `,

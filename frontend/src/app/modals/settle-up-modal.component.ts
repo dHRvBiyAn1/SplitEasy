@@ -23,10 +23,11 @@ import { FriendService } from '../friends/friend.service';
 import { avatarTint } from '../core/avatar';
 import { ModalService, SettlePrefill } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-settle-up-modal',
-  imports: [ModalShellComponent, MoneyComponent],
+  imports: [TranslatePipe, ModalShellComponent, MoneyComponent],
   templateUrl: './settle-up-modal.component.html',
   styleUrl: './modals.scss',
 })

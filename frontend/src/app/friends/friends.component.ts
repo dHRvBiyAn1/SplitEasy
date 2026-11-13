@@ -23,9 +23,11 @@ import { MoneyComponent } from '../shared/money.component';
 import { FriendSettleAllComponent } from './friend-settle-all.component';
 import { PersonalExpensesComponent } from './personal-expenses.component';
 import { PersonalPaymentsComponent } from './personal-payments.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 @Component({
   selector: 'app-friends',
   imports: [
+    TranslatePipe,
     RouterLink,
     MoneyComponent,
     PersonalExpensesComponent,

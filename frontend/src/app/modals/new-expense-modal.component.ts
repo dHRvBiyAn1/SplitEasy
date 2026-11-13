@@ -38,6 +38,7 @@ import {
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
   { value: 'FOOD_DRINK', label: 'Food & drink', ico: '☕' },
@@ -52,7 +53,7 @@ const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
 
 @Component({
   selector: 'app-new-expense-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './new-expense-modal.component.html',
   styleUrl: './modals.scss',
 })

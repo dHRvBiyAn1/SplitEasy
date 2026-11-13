@@ -26,6 +26,7 @@ import { GroupService } from './group.service';
 import { PaymentService } from '../payments/payment.service';
 import { RefundResponse } from '../payments/payment.models';
 import { financialRoster, ownedIdentities, viewerIdentity, GroupResponse } from './group.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
   FOOD_DRINK: '☕',
@@ -45,7 +46,7 @@ interface MonthGroup {
 
 @Component({
   selector: 'app-group-detail',
-  imports: [RouterLink, GroupArtComponent],
+  imports: [TranslatePipe, RouterLink, GroupArtComponent],
   templateUrl: './group-detail.component.html',
   styleUrl: './group-detail.component.scss',
 })

@@ -7,6 +7,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { HistoryFilter, HistoryItem, HistoryType } from './history.models';
 import { HistoryService } from './history.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const TYPE_LABEL: Record<HistoryType, string> = {
   EXPENSE: 'Expense',
@@ -17,7 +18,7 @@ const TYPE_LABEL: Record<HistoryType, string> = {
 /** A group's financial history, newest first, a page at a time, with date filters and CSV export. */
 @Component({
   selector: 'app-history',
-  imports: [RouterLink, MoneyComponent],
+  imports: [TranslatePipe, RouterLink, MoneyComponent],
   templateUrl: './history.component.html',
   styleUrl: './history.component.scss',
 })

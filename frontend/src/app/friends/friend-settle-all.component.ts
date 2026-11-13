@@ -7,6 +7,7 @@ import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { FriendBalance, SettlementPreview } from './friend.models';
 import { FriendService } from './friend.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /**
  * "Settle all in USD": previews every shared scope for one currency, then commits them in one
@@ -15,7 +16,7 @@ import { FriendService } from './friend.service';
  */
 @Component({
   selector: 'app-friend-settle-all',
-  imports: [MoneyComponent],
+  imports: [TranslatePipe, MoneyComponent],
   templateUrl: './friend-settle-all.component.html',
   styleUrl: './personal-expenses.component.scss',
 })

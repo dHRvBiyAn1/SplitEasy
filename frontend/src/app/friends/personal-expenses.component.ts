@@ -25,6 +25,7 @@ import {
   ExpenseSummary,
 } from '../expenses/expense.models';
 import { FriendService } from './friend.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /**
  * Non-group expenses with one saved friend (G02.2). Every entry belongs to the pair, never to a
@@ -32,7 +33,7 @@ import { FriendService } from './friend.service';
  */
 @Component({
   selector: 'app-personal-expenses',
-  imports: [MoneyComponent],
+  imports: [TranslatePipe, MoneyComponent],
   templateUrl: './personal-expenses.component.html',
   styleUrl: './personal-expenses.component.scss',
 })

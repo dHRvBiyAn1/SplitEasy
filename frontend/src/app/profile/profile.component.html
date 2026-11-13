@@ -1,8 +1,8 @@
 <div class="profile">
-  <h1 class="profile__title">Profile</h1>
+  <h1 class="profile__title">{{ 'common.profile' | t }}</h1>
 
   @if (loading()) {
-    <p role="status">Loading profile…</p>
+    <p role="status">{{ 'profile.loadingProfile' | t }}</p>
   }
   @if (error()) {
     <p role="alert">{{ error() }}</p>
@@ -14,14 +14,13 @@
       [disabled]="loading() || saving()"
       (click)="refresh()"
     >
-      Refresh profile
+      {{ 'profile.refreshProfile' | t }}
     </button>
   }
   @if (legacyPrefs() && !importDismissed()) {
     <section class="pcard">
       <p>
-        Preferences saved for this account on this device are available. Importing replaces your
-        saved phone, avatar and currency preferences.
+        {{ 'profile.preferencesSavedForThis' | t }}
       </p>
       <button
         type="button"
@@ -29,7 +28,7 @@
         [disabled]="!loaded() || loading() || saving() || editing()"
         (click)="importLegacy()"
       >
-        Import device preferences
+        {{ 'profile.importDevicePreferences' | t }}
       </button>
       <button
         type="button"
@@ -37,7 +36,7 @@
         [disabled]="saving()"
         (click)="importDismissed.set(true)"
       >
-        Keep server preferences
+        {{ 'profile.keepServerPreferences' | t }}
       </button>
     </section>
   }
@@ -49,7 +48,9 @@
         }}</span>
         <div class="pcard__id">
           <h2 class="pcard__name">{{ user()?.displayName }}</h2>
-          <p class="pcard__since">Member since {{ memberSince() }}</p>
+          <p class="pcard__since">
+            {{ 'profile.memberSinceMembersince' | t: { memberSince: memberSince() } }}
+          </p>
         </div>
         <button
           type="button"
@@ -57,21 +58,21 @@
           [disabled]="!loaded() || loading() || saving()"
           (click)="startEdit()"
         >
-          <span aria-hidden="true">✎</span> Edit profile
+          <span aria-hidden="true">✎</span> {{ 'profile.editProfile' | t }}
         </button>
       </div>
 
       <dl class="pcard__rows">
         <div class="prow2">
-          <dt class="dc-field-label">Email</dt>
+          <dt class="dc-field-label">{{ 'common.email' | t }}</dt>
           <dd>{{ loaded()?.email ?? user()?.email }}</dd>
         </div>
         <div class="prow2">
-          <dt class="dc-field-label">Phone</dt>
+          <dt class="dc-field-label">{{ 'profile.phone' | t }}</dt>
           <dd>{{ prefs().phone || '—' }}</dd>
         </div>
         <div class="prow2">
-          <dt class="dc-field-label">Preferred currency</dt>
+          <dt class="dc-field-label">{{ 'profile.preferredCurrency' | t }}</dt>
           <dd>{{ currencyLabel(prefs().currency) }}</dd>
         </div>
       </dl>
@@ -83,13 +84,15 @@
           }}</span>
           <div class="pcard__id">
             <h2 class="pcard__name">{{ user()?.displayName }}</h2>
-            <p class="pcard__since">Member since {{ memberSince() }}</p>
+            <p class="pcard__since">
+              {{ 'profile.memberSinceMembersince' | t: { memberSince: memberSince() } }}
+            </p>
           </div>
         </div>
 
-        <p>{{ loaded()?.email ?? user()?.email }} (email is read-only)</p>
+        <p>{{ 'profile.v1EmailIsRead' | t: { v1: loaded()?.email ?? user()?.email } }}</p>
         <label class="pfield"
-          ><span class="dc-field-label">Name</span
+          ><span class="dc-field-label">{{ 'profile.name' | t }}</span
           ><input
             class="dc-field"
             [formControl]="name"
@@ -100,7 +103,7 @@
         /></label>
 
         <label class="pfield">
-          <span class="dc-field-label">Phone</span>
+          <span class="dc-field-label">{{ 'profile.phone' | t }}</span>
           <input
             class="dc-field"
             [formControl]="phone"
@@ -112,7 +115,7 @@
         </label>
 
         <div class="pfield">
-          <span class="dc-field-label">Default currency for new expenses</span>
+          <span class="dc-field-label">{{ 'profile.defaultCurrencyForNew' | t }}</span>
           <div class="chips">
             @for (c of currencies; track c) {
               <button
@@ -130,7 +133,7 @@
         </div>
 
         <div class="pfield">
-          <span class="dc-field-label">Avatar color</span>
+          <span class="dc-field-label">{{ 'profile.avatarColor' | t }}</span>
           <div class="swatches">
             @for (col of avatarColors; track col) {
               <button
@@ -149,7 +152,7 @@
 
         <div class="pform__actions">
           <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="cancel()">
-            Cancel
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="submit"
@@ -172,16 +175,14 @@
   <app-close-account />
 
   <section class="pcard pappearance" id="appearance">
-    <h2>Make it yours.</h2>
+    <h2>{{ 'profile.makeItYours' | t }}</h2>
     <app-appearance-panel />
   </section>
   <p class="profile__note">
-    Name, phone, avatar and currency preferences are saved to your account. Phone is unverified
-    contact information. Currency preferences do not change or convert recorded amounts. They
-    prefill new expense drafts.
+    {{ 'profile.namePhoneAvatarAnd' | t }}
   </p>
 
   <button type="button" class="dc-btn-outline profile__signout" (click)="signOut()">
-    <span aria-hidden="true">⇥</span> Sign out
+    <span aria-hidden="true">⇥</span> {{ 'profile.signOut' | t }}
   </button>
 </div>

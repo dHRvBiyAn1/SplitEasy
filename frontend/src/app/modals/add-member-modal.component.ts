@@ -17,11 +17,12 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /** Account access and financial guests remain separate, explicit actions. */
 @Component({
   selector: 'app-add-member-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './add-member-modal.component.html',
   styleUrl: './modals.scss',
 })

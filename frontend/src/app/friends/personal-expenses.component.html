@@ -1,10 +1,9 @@
 <section class="personal" aria-labelledby="personal-heading">
   <div class="personal-head">
     <div>
-      <h2 id="personal-heading">Personal expenses</h2>
+      <h2 id="personal-heading">{{ 'personalExpenses.personalExpenses' | t }}</h2>
       <p>
-        Money between you and {{ friendName() }} only, kept outside every group. Either of you can
-        add, edit or delete an entry.
+        {{ 'personalExpenses.moneyBetweenYouAnd' | t: { friendName: friendName() } }}
       </p>
     </div>
     @if (!formOpen()) {
@@ -14,7 +13,7 @@
         [disabled]="saving() || deleting() !== null || needsReview() || loading() || !!error()"
         (click)="startAdd()"
       >
-        Add personal expense
+        {{ 'personalExpenses.addPersonalExpense' | t }}
       </button>
     }
   </div>
@@ -25,7 +24,7 @@
   @if (error()) {
     <p role="alert">{{ error() }}</p>
     <button class="dc-btn-outline" type="button" [disabled]="loading()" (click)="load()">
-      Try again
+      {{ 'common.tryAgain' | t }}
     </button>
   }
   @if (retryNotice()) {
@@ -38,10 +37,10 @@
           [disabled]="saving() || draftBlocked()"
           (click)="retryOriginal()"
         >
-          Retry the original draft
+          {{ 'personalExpenses.retryTheOriginalDraft' | t }}
         </button>
         <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="reviewEntries()">
-          Check entries
+          {{ 'personalExpenses.checkEntries' | t }}
         </button>
         @if (needsReview()) {
           <button
@@ -50,7 +49,7 @@
             [disabled]="saving()"
             (click)="startSeparate()"
           >
-            Start a separate entry
+            {{ 'personalExpenses.startASeparateEntry' | t }}
           </button>
         }
       </div>
@@ -61,10 +60,10 @@
     <form class="personal-form" (submit)="$event.preventDefault(); save()">
       <h3>{{ editing ? 'Edit personal expense' : 'Add personal expense' }}</h3>
       <label>
-        <span class="dc-field-label">Description</span>
+        <span class="dc-field-label">{{ 'common.description' | t }}</span>
         <input
           class="dc-field"
-          aria-label="Description"
+          [attr.aria-label]="'common.description' | t"
           [value]="description()"
           [disabled]="saving()"
           (input)="description.set($any($event.target).value)"
@@ -72,10 +71,10 @@
       </label>
       <div class="row">
         <label>
-          <span class="dc-field-label">Amount</span>
+          <span class="dc-field-label">{{ 'common.amount' | t }}</span>
           <input
             class="dc-field"
-            aria-label="Amount"
+            [attr.aria-label]="'common.amount' | t"
             inputmode="decimal"
             [value]="amount()"
             [disabled]="saving()"
@@ -83,10 +82,10 @@
           />
         </label>
         <label>
-          <span class="dc-field-label">Currency</span>
+          <span class="dc-field-label">{{ 'common.currency' | t }}</span>
           <select
             class="dc-field"
-            aria-label="Currency"
+            [attr.aria-label]="'common.currency' | t"
             [value]="currency()"
             [disabled]="saving() || !!editing"
             (change)="currency.set($any($event.target).value)"
@@ -97,11 +96,11 @@
           </select>
         </label>
         <label>
-          <span class="dc-field-label">Date</span>
+          <span class="dc-field-label">{{ 'common.date' | t }}</span>
           <input
             class="dc-field"
             type="date"
-            aria-label="Date"
+            [attr.aria-label]="'common.date' | t"
             [value]="date()"
             [disabled]="saving()"
             (input)="date.set($any($event.target).value)"
@@ -109,7 +108,7 @@
         </label>
       </div>
       <fieldset>
-        <legend class="dc-field-label">Who paid?</legend>
+        <legend class="dc-field-label">{{ 'personalExpenses.whoPaid' | t }}</legend>
         <button
           class="dc-btn-outline"
           type="button"
@@ -117,7 +116,7 @@
           [disabled]="saving()"
           (click)="paidByMe.set(true)"
         >
-          You paid
+          {{ 'personalExpenses.youPaid' | t }}
         </button>
         <button
           class="dc-btn-outline"
@@ -126,11 +125,11 @@
           [disabled]="saving()"
           (click)="paidByMe.set(false)"
         >
-          {{ friendName() }} paid
+          {{ 'personalExpenses.friendnamePaid' | t: { friendName: friendName() } }}
         </button>
       </fieldset>
       <fieldset>
-        <legend class="dc-field-label">How to split</legend>
+        <legend class="dc-field-label">{{ 'personalExpenses.howToSplit' | t }}</legend>
         <button
           class="dc-btn-outline"
           type="button"
@@ -138,7 +137,7 @@
           [disabled]="saving()"
           (click)="split.set('EQUAL')"
         >
-          Split equally
+          {{ 'personalExpenses.splitEqually' | t }}
         </button>
         <button
           class="dc-btn-outline"
@@ -147,22 +146,21 @@
           [disabled]="saving()"
           (click)="split.set('UNEQUAL')"
         >
-          Exact amounts
+          {{ 'personalExpenses.exactAmounts' | t }}
         </button>
       </fieldset>
       @if (convertedFrom()) {
         <p role="status">
-          This expense was split by {{ convertedFrom() }}. It is shown as the exact amounts each of
-          you owes; saving keeps those amounts.
+          {{ 'personalExpenses.thisExpenseWasSplit' | t: { convertedFrom: convertedFrom() } }}
         </p>
       }
       @if (split() === 'UNEQUAL') {
         <div class="row">
           <label>
-            <span class="dc-field-label">Your share</span>
+            <span class="dc-field-label">{{ 'personalExpenses.yourShare' | t }}</span>
             <input
               class="dc-field"
-              aria-label="Your share"
+              [attr.aria-label]="'personalExpenses.yourShare' | t"
               inputmode="decimal"
               [value]="mine()"
               [disabled]="saving()"
@@ -170,10 +168,12 @@
             />
           </label>
           <label>
-            <span class="dc-field-label">{{ friendName() }}'s share</span>
+            <span class="dc-field-label">{{
+              'personalExpenses.friendnameSShare' | t: { friendName: friendName() }
+            }}</span>
             <input
               class="dc-field"
-              aria-label="Their share"
+              [attr.aria-label]="'personalExpenses.theirShare' | t"
               inputmode="decimal"
               [value]="theirs()"
               [disabled]="saving()"
@@ -184,11 +184,12 @@
       }
       <p role="status" aria-live="polite">
         @if (split() === 'EQUAL') {
-          Split equally between the two of you.
+          {{ 'personalExpenses.splitEquallyBetweenThe' | t }}
         } @else {
-          Shares total
+          {{ 'personalExpenses.sharesTotal' | t }}
           <app-money [minor]="shareTotal()" [currency]="currency()" />
-          of <app-money [minor]="amountMinor()" [currency]="currency()" />
+          {{ 'personalExpenses.of' | t }}
+          <app-money [minor]="amountMinor()" [currency]="currency()" />
         }
       </p>
       <div class="actions">
@@ -196,19 +197,21 @@
           {{ editing ? 'Save changes' : 'Add expense' }}
         </button>
         <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="cancelForm()">
-          Cancel
+          {{ 'common.cancel' | t }}
         </button>
       </div>
       @if (saving()) {
-        <p role="status">Saving personal expense…</p>
+        <p role="status">{{ 'personalExpenses.savingPersonalExpense' | t }}</p>
       }
     </form>
   }
 
   @if (loading()) {
-    <p role="status">Loading personal expenses…</p>
+    <p role="status">{{ 'personalExpenses.loadingPersonalExpenses' | t }}</p>
   } @else if (!error() && !expenses().length) {
-    <p class="empty">No personal expenses with {{ friendName() }} yet.</p>
+    <p class="empty">
+      {{ 'personalExpenses.noPersonalExpensesWith' | t: { friendName: friendName() } }}
+    </p>
   } @else if (expenses().length) {
     <ul class="personal-list">
       @for (row of expenses(); track row.id) {
@@ -233,7 +236,7 @@
               [disabled]="saving() || deleting() !== null || needsReview()"
               (click)="edit(row.id)"
             >
-              Edit
+              {{ 'common.edit' | t }}
             </button>
             <button
               class="dc-btn-ghost"
@@ -241,11 +244,11 @@
               [disabled]="saving() || deleting() !== null || needsReview()"
               (click)="remove(row)"
             >
-              Delete
+              {{ 'personalExpenses.delete' | t }}
             </button>
           </div>
           @if (deleting() === row.id) {
-            <p role="status">Deleting…</p>
+            <p role="status">{{ 'personalExpenses.deleting' | t }}</p>
           }
         </li>
       }
@@ -258,12 +261,12 @@
     [attr.aria-expanded]="deletedOpen()"
     (click)="toggleDeleted()"
   >
-    Recently deleted
+    {{ 'common.recentlyDeleted' | t }}
   </button>
   @if (deletedOpen()) {
-    <section aria-label="Recently deleted personal expenses">
+    <section [attr.aria-label]="'personalExpenses.recentlyDeletedPersonalExpenses' | t">
       @if (deletedLoading()) {
-        <p role="status">Loading deleted personal expenses…</p>
+        <p role="status">{{ 'personalExpenses.loadingDeletedPersonalExpenses' | t }}</p>
       }
       @if (deletedError()) {
         <p role="alert">{{ deletedError() }}</p>
@@ -273,10 +276,10 @@
           [disabled]="deletedLoading()"
           (click)="loadDeleted()"
         >
-          Reload deleted
+          {{ 'personalExpenses.reloadDeleted' | t }}
         </button>
       } @else if (!deletedLoading() && !deletedEntries().length) {
-        <p class="empty">No deleted personal expenses.</p>
+        <p class="empty">{{ 'personalExpenses.noDeletedPersonalExpenses' | t }}</p>
       }
       <ul class="personal-list">
         @for (entry of deletedEntries(); track entry.expense.id) {
@@ -295,7 +298,7 @@
               [disabled]="!!restoring() || deletedLoading()"
               (click)="restore(entry)"
             >
-              Restore
+              {{ 'common.restore' | t }}
             </button>
           </li>
         }

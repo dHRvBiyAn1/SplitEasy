@@ -7,10 +7,11 @@ import { newPasswordValidators } from './password-validation';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { ProfileService } from '../core/profile.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-account-action',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink],
   styleUrl: './auth.scss',
   template: `<div class="auth__panel">
     <main class="auth__form-wrap">
@@ -33,7 +34,7 @@ import { ProfileService } from '../core/profile.service';
         <form class="auth__form" (submit)="$event.preventDefault(); submit()" novalidate>
           @if (action() === 'password-reset') {
             <label class="auth__field"
-              ><span class="dc-field-label">New password</span
+              ><span class="dc-field-label">{{ 'common.newPassword' | t }}</span
               ><input
                 class="dc-field"
                 type="password"
@@ -42,7 +43,7 @@ import { ProfileService } from '../core/profile.service';
                 [attr.aria-invalid]="password.touched && password.invalid"
                 aria-describedby="reset-password-hint"
             /></label>
-            <p id="reset-password-hint">Use at least 8 characters and at most 72 UTF-8 bytes.</p>
+            <p id="reset-password-hint">{{ 'common.useAtLeast8' | t }}</p>
           }
           <button type="submit" class="dc-btn-accent" [disabled]="pending()">
             {{
@@ -58,9 +59,9 @@ import { ProfileService } from '../core/profile.service';
         </form>
       }
       <p class="auth__switch">
-        <a routerLink="/login">Log in</a> ·
-        <a routerLink="/forgot-password">Request a new reset link</a> ·
-        <a routerLink="/profile">Account security and verification</a>
+        <a routerLink="/login">{{ 'common.logIn' | t }}</a> ·
+        <a routerLink="/forgot-password">{{ 'accountAction.requestANewReset' | t }}</a> ·
+        <a routerLink="/profile">{{ 'common.accountSecurityAndVerification' | t }}</a>
       </p>
     </main>
   </div>`,

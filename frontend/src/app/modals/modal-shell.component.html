@@ -14,7 +14,7 @@
       <button
         class="mdl-close"
         type="button"
-        aria-label="Close"
+        [attr.aria-label]="'common.close' | t"
         [disabled]="modal.mutationPending()"
         (click)="requestClose()"
       >
@@ -22,7 +22,7 @@
       </button>
     </div>
     @if (modal.mutationPending()) {
-      <p role="status" aria-live="polite">Saving. Please wait.</p>
+      <p role="status" aria-live="polite">{{ 'modalShell.savingPleaseWait' | t }}</p>
     }
     <div class="mdl-body">
       <ng-content />

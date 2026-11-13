@@ -16,6 +16,7 @@ import { ModalService } from '../modals/modal.service';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
 import { GroupType } from '../dashboard/dashboard.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 /** Which destructive action is showing its inline "Yes, …/Cancel" confirm. */
 type Confirming = 'leave' | 'delete' | null;
@@ -27,7 +28,7 @@ type Confirming = 'leave' | 'delete' | null;
  */
 @Component({
   selector: 'app-group-settings',
-  imports: [RouterLink, ReactiveFormsModule, GroupArtComponent],
+  imports: [TranslatePipe, RouterLink, ReactiveFormsModule, GroupArtComponent],
   templateUrl: './group-settings.component.html',
   styleUrl: './group-settings.component.scss',
 })

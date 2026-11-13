@@ -3,11 +3,11 @@
 
   <div class="auth__panel">
     <div class="auth__form-wrap">
-      <h2 class="dc-display auth__title">Welcome back</h2>
+      <h2 class="dc-display auth__title">{{ 'login.welcomeBack' | t }}</h2>
 
-      <nav class="auth__tabs" aria-label="Authentication">
-        <a routerLink="/login" class="auth__tab" aria-current="page">Log in</a>
-        <a routerLink="/register" class="auth__tab">Sign up</a>
+      <nav class="auth__tabs" [attr.aria-label]="'common.authentication' | t">
+        <a routerLink="/login" class="auth__tab" aria-current="page">{{ 'common.logIn' | t }}</a>
+        <a routerLink="/register" class="auth__tab">{{ 'common.signUp' | t }}</a>
       </nav>
 
       @if (securityNotice) {
@@ -17,12 +17,12 @@
         <p class="auth__error" role="alert">{{ logoutWarning() }}</p>
       }
       @if (submitting()) {
-        <div class="dc-loading" role="status" aria-label="Signing in"></div>
+        <div class="dc-loading" role="status" [attr.aria-label]="'login.signingIn' | t"></div>
       }
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="auth__form" novalidate>
         <label class="auth__field"
-          ><span class="dc-field-label">Email</span
+          ><span class="dc-field-label">{{ 'common.email' | t }}</span
           ><input
             class="dc-field"
             type="email"
@@ -34,10 +34,10 @@
             "
         /></label>
         @if (form.controls.email.touched && form.controls.email.invalid) {
-          <p class="auth__field-error" id="email-hint">Enter a valid email address.</p>
+          <p class="auth__field-error" id="email-hint">{{ 'common.enterAValidEmail' | t }}</p>
         }
         <div class="auth__field">
-          <label class="dc-field-label" for="auth-password">Password</label
+          <label class="dc-field-label" for="auth-password">{{ 'common.password' | t }}</label
           ><span class="auth__password"
             ><input
               id="auth-password"
@@ -61,7 +61,7 @@
           >
         </div>
         @if (form.controls.password.touched && form.controls.password.invalid) {
-          <p class="auth__field-error" id="password-hint">Enter your password.</p>
+          <p class="auth__field-error" id="password-hint">{{ 'login.enterYourPassword' | t }}</p>
         }
 
         @if (error()) {
@@ -69,12 +69,17 @@
         }
 
         <button class="dc-btn-accent auth__submit" type="submit" [disabled]="submitting()">
-          Log in
+          {{ 'common.logIn' | t }}
         </button>
       </form>
 
-      <p class="auth__switch"><a routerLink="/forgot-password">Forgot password?</a></p>
-      <p class="auth__switch">New to SplitEasy? <a routerLink="/register">Create an account</a></p>
+      <p class="auth__switch">
+        <a routerLink="/forgot-password">{{ 'login.forgotPassword' | t }}</a>
+      </p>
+      <p class="auth__switch">
+        {{ 'login.newToSpliteasy' | t }}
+        <a routerLink="/register">{{ 'login.createAnAccount' | t }}</a>
+      </p>
     </div>
   </div>
 </div>

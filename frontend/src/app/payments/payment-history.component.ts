@@ -18,6 +18,7 @@ import {
   PaymentResponse,
 } from './payment.models';
 import { PaymentService } from './payment.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 const ACTION_LABEL: Record<LedgerRevision<PaymentResponse>['action'], string> = {
   IMPORTED: 'Imported',
@@ -33,7 +34,7 @@ const ACTION_LABEL: Record<LedgerRevision<PaymentResponse>['action'], string> = 
  */
 @Component({
   selector: 'app-payment-history',
-  imports: [RouterLink, MoneyComponent],
+  imports: [TranslatePipe, RouterLink, MoneyComponent],
   templateUrl: './payment-history.component.html',
   styleUrl: './payment-history.component.scss',
 })
