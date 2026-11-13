@@ -27,6 +27,7 @@ public class ProfileService {
     if (patch.phone() != null) user.setPhone(patch.phone().trim());
     if (patch.avatarColor() != null) user.setAvatarColor(patch.avatarColor());
     if (patch.preferredCurrency() != null) user.setPreferredCurrency(patch.preferredCurrency());
+    if (patch.locale() != null) user.setLocale(patch.locale());
     return ProfileResponse.from(user);
   }
 

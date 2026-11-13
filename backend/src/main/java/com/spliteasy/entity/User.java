@@ -46,6 +46,9 @@ public class User {
   @Column(name = "preferred_currency", nullable = false, length = 3)
   private String preferredCurrency = "USD";
 
+  @Column(nullable = false, length = 8)
+  private String locale = "en";
+
   @Column(name = "email_verified", nullable = false)
   private boolean emailVerified;
 

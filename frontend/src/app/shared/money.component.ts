@@ -1,5 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 
+import { activeLocale, intlLocale } from '../core/i18n/i18n.service';
 import { Currency, CURRENCY_EXPONENT, minorToDisplay } from './currency';
 
 /** Format integer units exactly, including zero/three-decimal currencies and large totals. */
@@ -8,7 +9,8 @@ export function formatMoney(minor: number, net = false, currency: Currency = 'US
   const sign = minor < 0 ? '−' : net && minor > 0 ? '+' : '';
   const [whole, fraction] = minorToDisplay(Math.abs(minor), currency).split('.');
   const exponent = CURRENCY_EXPONENT[currency];
-  const text = new Intl.NumberFormat('en-US', {
+  const locale = intlLocale(activeLocale());
+  const text = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
     currencyDisplay: currency === 'USD' ? 'symbol' : 'code',
@@ -18,7 +20,7 @@ export function formatMoney(minor: number, net = false, currency: Currency = 'US
     .formatToParts(0)
     .map((part) =>
       part.type === 'integer'
-        ? Number(whole).toLocaleString('en-US')
+        ? Number(whole).toLocaleString(locale)
         : part.type === 'fraction'
           ? fraction
           : part.value,

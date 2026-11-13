@@ -140,4 +140,40 @@ class ProfileIntegrationTest extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.displayName").value("Alice"));
   }
+
+  @Test
+  void localeDefaultsToEnglishPersistsAndRejectsUnsupportedLanguages() throws Exception {
+    var alice = register("profile-locale@example.com", "password123", "Alice");
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(alice.accessToken())))
+        .andExpect(jsonPath("$.locale").value("en"));
+    for (String locale : new String[] {"hi", "es", "fr"}) {
+      mockMvc
+          .perform(
+              patch("/api/me")
+                  .header("Authorization", bearer(alice.accessToken()))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(json(Map.of("locale", locale))))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.locale").value(locale));
+    }
+    var fresh = login("profile-locale@example.com", "password123");
+    mockMvc
+        .perform(get("/api/me").header("Authorization", bearer(fresh.accessToken())))
+        .andExpect(jsonPath("$.locale").value("fr"));
+    mockMvc
+        .perform(
+            patch("/api/me")
+                .header("Authorization", bearer(alice.accessToken()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(Map.of("locale", "de"))))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            patch("/api/me")
+                .header("Authorization", bearer(alice.accessToken()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"locale\":null,\"phone\":\"1\"}"))
+        .andExpect(jsonPath("$.locale").value("fr"));
+  }
 }
