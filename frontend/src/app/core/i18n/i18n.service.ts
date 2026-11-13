@@ -28,6 +28,16 @@ export const activeLocale = signal<Locale>(browserLocale());
 export const intlLocale = (locale: Locale = activeLocale()): string =>
   locale === 'en' ? 'en-US' : locale === 'hi' ? 'hi-IN' : locale;
 
+const fill = (raw: string, params?: Params) =>
+  raw.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? ''));
+
+let current: I18nService | undefined;
+
+/** For code outside the injection context (pure helpers, static maps); English before the service exists. */
+export function translate(key: string, params?: Params): string {
+  return current ? current.t(key, params) : fill((en as Catalogue)[key] ?? key, params);
+}
+
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly http = inject(HttpClient);
@@ -35,6 +45,7 @@ export class I18nService {
   private readonly catalogues = signal<Partial<Record<Locale, Catalogue>>>({ en });
 
   constructor() {
+    current = this;
     inject(SessionService).changes.subscribe(() => this.setLocale(browserLocale()));
     this.setLocale(activeLocale());
   }
@@ -70,6 +81,6 @@ export class I18nService {
   t(key: string, params?: Params): string {
     const count = params?.['count'];
     const raw = this.lookup(this.locale(), key, count) ?? this.lookup('en', key, count);
-    return (raw ?? key).replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? ''));
+    return fill(raw ?? key, params);
   }
 }
