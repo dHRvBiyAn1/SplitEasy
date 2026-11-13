@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 import { ActivityComponent } from './activity.component';
 import { ActivityItem } from './activity.models';
 import { AuthService } from '../core/auth/auth.service';
+import { I18nService } from '../core/i18n/i18n.service';
 import { storeTestSession } from '../core/auth/auth-test-fixture';
 
 function event(id: string, overrides: Partial<ActivityItem> = {}): ActivityItem {
@@ -96,5 +97,29 @@ describe('ActivityComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Alice reminded you about USD 12.00 in Trip',
     );
+  });
+
+  it('describes a comment event in English and in the active language', async () => {
+    const fixture = render();
+    feed('').flush({
+      items: [
+        event('c', { kind: 'COMMENT_CREATED', summary: { description: 'Dinner' } }),
+        event('d', { kind: 'COMMENT_CREATED', summary: {} }),
+      ],
+      nextCursor: null,
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Alice commented on “Dinner” in Trip');
+    expect(el.textContent).toContain('Alice commented in Trip');
+    TestBed.inject(I18nService).extend('es', {
+      'activity.event.COMMENT_CREATED': '{who} comentó en “{description}” en {where}',
+    });
+    TestBed.inject(I18nService).setLocale('es');
+    http.match('/i18n/es.json');
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Alice comentó en “Dinner” en Trip');
+    TestBed.inject(I18nService).setLocale('en');
   });
 });

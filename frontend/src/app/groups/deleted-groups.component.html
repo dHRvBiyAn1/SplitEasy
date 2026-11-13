@@ -27,7 +27,7 @@
           <span class="dgroups__text">
             <span class="dc-body">{{ row.name }}</span>
             <span class="dc-caption">
-              {{ row.memberCount }} {{ row.memberCount === 1 ? 'member' : 'members' }}
+              {{ 'deletedGroups.memberCount' | t: { count: row.memberCount } }}
               @if (row.archivedAt) {
                 {{ 'deletedGroups.wasArchived' | t }}
               }

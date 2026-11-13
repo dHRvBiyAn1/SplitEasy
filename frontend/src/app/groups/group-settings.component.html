@@ -210,11 +210,18 @@
         }
         @for (debt of obligationsOf(m.id); track debt.user.id + (debt.currency ?? 'USD')) {
           <p class="mrow__why">
-            {{ debt.netMinor > 0 ? ('groupSettings.isOwed' | t) : ('groupSettings.owes' | t) }}
-            {{ display(debt.netMinor < 0 ? -debt.netMinor : debt.netMinor, debt.currency) }}
-            {{ debt.netMinor > 0 ? 'by' : 'to' }} {{ debt.user.displayName }} ({{
-              debt.user.email || 'guest'
-            }})
+            {{
+              (debt.netMinor > 0 ? 'groupSettings.debtOwedBy' : 'groupSettings.debtOwesTo')
+                | t
+                  : {
+                      amount: display(
+                        debt.netMinor < 0 ? -debt.netMinor : debt.netMinor,
+                        debt.currency
+                      ),
+                      name: debt.user.displayName,
+                      contact: debt.user.email || ('groupSettings.guest' | t),
+                    }
+            }}
           </p>
         }
       }

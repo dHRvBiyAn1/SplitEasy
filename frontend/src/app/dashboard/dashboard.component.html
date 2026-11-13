@@ -52,8 +52,8 @@
                 ><app-group-art [type]="g.type" /><span class="group-object__copy"
                   ><strong>{{ g.name }}</strong
                   ><small>{{
-                    'dashboard.membercountMembersTolowercase'
-                      | t: { memberCount: g.memberCount, toLowerCase: g.type.toLowerCase() }
+                    'dashboard.memberCountType'
+                      | t: { count: g.memberCount, type: typeLabel(g.type) }
                   }}</small
                   ><span class="group-object__balance">
                     @for (total of groupTotals(g); track total.currency) {
@@ -116,32 +116,19 @@
             <div class="balance-pocket balance-pocket--owed">
               <span>{{ 'dashboard.youReOwed' | t }}</span
               ><app-money [minor]="total.owedMinor" [currency]="total.currency" /><small>{{
-                'dashboard.fromOwedpeoplecountV1'
-                  | t
-                    : {
-                        owedPeopleCount: total.owedPeopleCount,
-                        v1: total.owedPeopleCount === 1 ? 'person' : 'people',
-                      }
+                'dashboard.fromPeople' | t: { count: total.owedPeopleCount }
               }}</small>
             </div>
             <div class="balance-pocket balance-pocket--owes">
               <span>{{ 'dashboard.youOwe' | t }}</span
               ><app-money [minor]="total.oweMinor" [currency]="total.currency" /><small>{{
-                'dashboard.toOwepeoplecountV1'
-                  | t
-                    : {
-                        owePeopleCount: total.owePeopleCount,
-                        v1: total.owePeopleCount === 1 ? 'person' : 'people',
-                      }
+                'dashboard.toPeople' | t: { count: total.owePeopleCount }
               }}</small>
             </div>
           }
         </div>
         <p class="collection-note">
-          {{
-            'dashboard.acrossGroupcountV1Amounts'
-              | t: { groupCount: d.groupCount, v1: d.groupCount === 1 ? 'group' : 'groups' }
-          }}
+          {{ 'dashboard.acrossGroups' | t: { count: d.groupCount } }}
         </p>
       </section>
       <aside class="friends" aria-labelledby="people-heading">

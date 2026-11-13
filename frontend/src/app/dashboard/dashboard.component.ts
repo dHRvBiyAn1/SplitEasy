@@ -94,6 +94,10 @@ export class DashboardComponent {
   }
 
   /** Sub-line for an activity row: who paid what, in which group. */
+  typeLabel(type: string): string {
+    return translate(`groupType.${type}`);
+  }
+
   activitySub(a: ActivityItem): string {
     if (a.kind === 'PAYMENT') {
       return translate('dashboard.groupnameSettlement', { groupName: a.groupName });

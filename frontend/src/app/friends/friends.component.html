@@ -172,14 +172,7 @@
           }
         </div>
         <p class="group-count">
-          {{
-            'friends.sharedgroupcountCurrentSharedV1'
-              | t
-                : {
-                    sharedGroupCount: friend.sharedGroupCount,
-                    v1: friend.sharedGroupCount === 1 ? 'group' : 'groups',
-                  }
-          }}
+          {{ 'friends.sharedGroupCount' | t: { count: friend.sharedGroupCount } }}
         </p>
         <button
           class="dc-btn-ghost"

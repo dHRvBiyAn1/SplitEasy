@@ -27,7 +27,9 @@ export function describeEvent(e: ActivityItem): string {
   const where = e.groupName ?? translate('activity.aPersonalLedger');
   const member = e.summary.member?.displayName ?? translate('activity.aMember');
   const currency = (e.summary.currency ?? 'USD') as Currency;
-  const key = `activity.event.${e.kind}`;
+  // A comment on an expense that carries no description falls back to the shorter sentence.
+  const noText = e.kind === 'COMMENT_CREATED' && !e.summary.description ? '_NO_DESCRIPTION' : '';
+  const key = `activity.event.${e.kind}${noText}`;
   const text = translate(key, {
     who,
     where,

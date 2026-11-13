@@ -242,9 +242,7 @@ export class PersonalExpensesComponent {
           this.convertedFrom.set(
             e.splitType === 'EQUAL' || e.splitType === 'UNEQUAL'
               ? null
-              : { PERCENTAGE: 'percentages', WEIGHTS: 'weights', ADJUSTMENTS: 'adjustments' }[
-                  e.splitType
-                ],
+              : translate(`personalExpenses.splitBy.${e.splitType}`),
           );
           this.applyShares(e.splitType === 'UNEQUAL' ? e.splits : null, e.participants);
         },
