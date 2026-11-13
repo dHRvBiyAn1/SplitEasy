@@ -122,10 +122,10 @@ describe('I18nService', () => {
     const f = TestBed.createComponent(Host);
     f.detectChanges();
     const money = () => f.nativeElement.querySelector('app-money').textContent.trim();
-    expect(money()).toBe('INR 123,456.78');
+    expect(money()).toMatch(/^INR\s123,456\.78$/);
     patch('hi', {});
     f.detectChanges();
-    expect(money()).toBe('INR 1,23,456.78');
+    expect(money()).toMatch(/^INR\s1,23,456\.78$/);
   });
 
   it('returns to the browser default when the session resets', () => {
