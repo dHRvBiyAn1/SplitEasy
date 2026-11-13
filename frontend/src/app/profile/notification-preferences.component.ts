@@ -7,9 +7,24 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { translate } from '../core/i18n/i18n.service';
 
 const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
-  { key: 'expenses', label: translate('notificationPreferences.expensesAddedEditedDeleted') },
-  { key: 'payments', label: translate('notificationPreferences.settlementsAndRefunds') },
-  { key: 'groupChanges', label: translate('notificationPreferences.groupChangesAndMember') },
+  {
+    key: 'expenses',
+    get label() {
+      return translate('notificationPreferences.expensesAddedEditedDeleted');
+    },
+  },
+  {
+    key: 'payments',
+    get label() {
+      return translate('notificationPreferences.settlementsAndRefunds');
+    },
+  },
+  {
+    key: 'groupChanges',
+    get label() {
+      return translate('notificationPreferences.groupChangesAndMember');
+    },
+  },
 ];
 
 /** Server-owned in-app notification switches; email and push are not offered yet. */

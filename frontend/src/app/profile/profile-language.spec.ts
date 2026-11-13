@@ -55,9 +55,13 @@ describe('profile language', () => {
     const save = http.expectOne('/api/me');
     expect(save.request.method).toBe('PATCH');
     expect(save.request.body).toEqual({ locale: 'fr' });
-    http.expectOne('/i18n/fr.json').flush({ 'profile.editProfile': 'Modifier le profil' });
+    http.expectOne('/i18n/fr.json').flush({
+      'profile.editProfile': 'Modifier le profil',
+      'appearancePanel.light': 'Clair',
+    });
     fixture.detectChanges();
     expect(text()).toContain('Modifier le profil'); // switched before the PATCH answered
+    expect(text()).toContain('Clair'); // option labels built in class fields follow the switch too
     save.flush(me('fr'));
 
     TestBed.inject(SessionService).reset();

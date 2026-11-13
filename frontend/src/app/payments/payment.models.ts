@@ -7,11 +7,21 @@ import { translate } from '../core/i18n/i18n.service';
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ONLINE' | 'OTHER';
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
-  CASH: translate('payment.cash'),
-  BANK_TRANSFER: translate('payment.bankTransfer'),
-  CARD: translate('payment.card'),
-  ONLINE: translate('payment.online'),
-  OTHER: translate('groupSettings.other'),
+  get CASH() {
+    return translate('payment.cash');
+  },
+  get BANK_TRANSFER() {
+    return translate('payment.bankTransfer');
+  },
+  get CARD() {
+    return translate('payment.card');
+  },
+  get ONLINE() {
+    return translate('payment.online');
+  },
+  get OTHER() {
+    return translate('groupSettings.other');
+  },
 };
 
 export interface PaymentResponse {

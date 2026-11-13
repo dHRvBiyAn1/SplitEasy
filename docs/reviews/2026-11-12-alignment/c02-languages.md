@@ -59,4 +59,16 @@
   initialised before the imported constant was available (module evaluation order differs between full and isolated runs).
   Not shared signal/localStorage state and not an unflushed request.
 - Fix: `ProfileComponent.locales` is now a getter (read lazily, like the existing `currencies`), so evaluation order cannot matter.
-- Green: spec looped 20 times alone, 20/20 pass; 8 consecutive full runs, 455/455 each time.
+- Green: spec looped 20 times alone, 20/20 pass; consecutive full runs 455/455 every time (8 after the getter, then 5 more after the review fix below).
+- Lesson recorded: the unit-test bundle can evaluate a shared module's exports late. A temporary spec that used a dynamic
+  `import()` of `payment.models` made its exports `undefined` for other components in full runs (reproduced 6/6), so specs
+  must not dynamically import app modules; component fields should not cache imported constants where avoidable.
+
+## Review fix (Codex P2, PR #130): label maps evaluated once at load
+- Red: a spec showed `PAYMENT_METHOD_LABEL.CASH` stayed `Cash` after switching to Spanish (module-level `translate()` ran at import).
+- Fix: every module-level or class-field label map/array that called `translate()` now uses getters
+  (`payment.models`, `payment-history`, `history`, `recurring`, `new-expense-modal` categories, `new-group-modal` types,
+  `notification-preferences`, `appearance-panel` themes, `group-settings` types), so labels resolve at render time.
+- Covered by `profile-language.spec.ts` (Appearance option label follows the switch). Final: 20/20 spec loops, 5/5 full runs 455/455,
+  prettier clean, build OK.
+

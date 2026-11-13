@@ -88,8 +88,23 @@ export class AppearancePanelComponent {
   protected readonly ribbon = inject(RibbonService);
   protected readonly palettes = PALETTES;
   protected readonly modes: { value: ThemeChoice; label: string }[] = [
-    { value: 'system', label: translate('appearancePanel.system') },
-    { value: 'light', label: translate('appearancePanel.light') },
-    { value: 'dark', label: translate('appearancePanel.dark') },
+    {
+      value: 'system',
+      get label() {
+        return translate('appearancePanel.system');
+      },
+    },
+    {
+      value: 'light',
+      get label() {
+        return translate('appearancePanel.light');
+      },
+    },
+    {
+      value: 'dark',
+      get label() {
+        return translate('appearancePanel.dark');
+      },
+    },
   ];
 }

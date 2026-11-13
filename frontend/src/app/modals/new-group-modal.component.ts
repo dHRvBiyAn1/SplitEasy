@@ -15,11 +15,36 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { translate } from '../core/i18n/i18n.service';
 
 const TYPES: { value: GroupType; label: string }[] = [
-  { value: 'HOME', label: translate('groupSettings.home') },
-  { value: 'TRIP', label: translate('groupSettings.trip') },
-  { value: 'DINING', label: translate('groupSettings.dining') },
-  { value: 'EVENT', label: translate('groupSettings.event') },
-  { value: 'OTHER', label: translate('groupSettings.other') },
+  {
+    value: 'HOME',
+    get label() {
+      return translate('groupSettings.home');
+    },
+  },
+  {
+    value: 'TRIP',
+    get label() {
+      return translate('groupSettings.trip');
+    },
+  },
+  {
+    value: 'DINING',
+    get label() {
+      return translate('groupSettings.dining');
+    },
+  },
+  {
+    value: 'EVENT',
+    get label() {
+      return translate('groupSettings.event');
+    },
+  },
+  {
+    value: 'OTHER',
+    get label() {
+      return translate('groupSettings.other');
+    },
+  },
 ];
 
 @Component({

@@ -22,11 +22,21 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { translate } from '../core/i18n/i18n.service';
 
 const ACTION_LABEL: Record<LedgerRevision<PaymentResponse>['action'], string> = {
-  IMPORTED: translate('paymentHistory.imported'),
-  CREATED: translate('paymentHistory.recorded'),
-  CORRECTED: translate('paymentHistory.corrected'),
-  DELETED: translate('paymentHistory.undone'),
-  RESTORED: translate('groupDetail.restored'),
+  get IMPORTED() {
+    return translate('paymentHistory.imported');
+  },
+  get CREATED() {
+    return translate('paymentHistory.recorded');
+  },
+  get CORRECTED() {
+    return translate('paymentHistory.corrected');
+  },
+  get DELETED() {
+    return translate('paymentHistory.undone');
+  },
+  get RESTORED() {
+    return translate('groupDetail.restored');
+  },
 };
 
 /**

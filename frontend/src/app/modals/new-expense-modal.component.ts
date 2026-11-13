@@ -42,14 +42,62 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { translate } from '../core/i18n/i18n.service';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
-  { value: 'FOOD_DRINK', label: translate('newExpenseModal.foodDrink'), ico: '☕' },
-  { value: 'GROCERIES', label: translate('newExpenseModal.groceries'), ico: '🧺' },
-  { value: 'RENT_HOME', label: translate('newExpenseModal.rentHome'), ico: '⌂' },
-  { value: 'UTILITIES', label: translate('newExpenseModal.utilities'), ico: '⚡' },
-  { value: 'TRAVEL', label: translate('newExpenseModal.travel'), ico: '✈' },
-  { value: 'TRANSPORT', label: translate('newExpenseModal.transport'), ico: '🚕' },
-  { value: 'FUN', label: translate('newExpenseModal.fun'), ico: '✦' },
-  { value: 'OTHER', label: translate('groupSettings.other'), ico: '◆' },
+  {
+    value: 'FOOD_DRINK',
+    get label() {
+      return translate('newExpenseModal.foodDrink');
+    },
+    ico: '☕',
+  },
+  {
+    value: 'GROCERIES',
+    get label() {
+      return translate('newExpenseModal.groceries');
+    },
+    ico: '🧺',
+  },
+  {
+    value: 'RENT_HOME',
+    get label() {
+      return translate('newExpenseModal.rentHome');
+    },
+    ico: '⌂',
+  },
+  {
+    value: 'UTILITIES',
+    get label() {
+      return translate('newExpenseModal.utilities');
+    },
+    ico: '⚡',
+  },
+  {
+    value: 'TRAVEL',
+    get label() {
+      return translate('newExpenseModal.travel');
+    },
+    ico: '✈',
+  },
+  {
+    value: 'TRANSPORT',
+    get label() {
+      return translate('newExpenseModal.transport');
+    },
+    ico: '🚕',
+  },
+  {
+    value: 'FUN',
+    get label() {
+      return translate('newExpenseModal.fun');
+    },
+    ico: '✦',
+  },
+  {
+    value: 'OTHER',
+    get label() {
+      return translate('groupSettings.other');
+    },
+    ico: '◆',
+  },
 ];
 
 @Component({

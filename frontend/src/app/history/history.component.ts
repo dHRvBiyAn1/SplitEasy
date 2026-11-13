@@ -11,9 +11,15 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { translate } from '../core/i18n/i18n.service';
 
 const TYPE_LABEL: Record<HistoryType, string> = {
-  EXPENSE: translate('shell.expense'),
-  PAYMENT: translate('history.settlement'),
-  REFUND: translate('history.refund'),
+  get EXPENSE() {
+    return translate('shell.expense');
+  },
+  get PAYMENT() {
+    return translate('history.settlement');
+  },
+  get REFUND() {
+    return translate('history.refund');
+  },
 };
 
 /** A group's financial history, newest first, a page at a time, with date filters and CSV export. */

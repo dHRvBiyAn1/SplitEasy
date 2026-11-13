@@ -10,9 +10,15 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { translate } from '../core/i18n/i18n.service';
 
 const FREQUENCY_LABEL: Record<Frequency, string> = {
-  DAILY: translate('recurring.everyDay'),
-  WEEKLY: translate('recurring.everyWeek'),
-  MONTHLY: translate('recurring.everyMonth'),
+  get DAILY() {
+    return translate('recurring.everyDay');
+  },
+  get WEEKLY() {
+    return translate('recurring.everyWeek');
+  },
+  get MONTHLY() {
+    return translate('recurring.everyMonth');
+  },
 };
 
 /** A group's recurring expenses: change future occurrences, cancel, and see why one halted. */
