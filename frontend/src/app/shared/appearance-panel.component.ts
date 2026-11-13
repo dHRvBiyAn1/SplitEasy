@@ -3,6 +3,7 @@ import { PALETTES, ThemeService, ThemeChoice } from '../core/theme.service';
 import { MotionPreferenceService } from '../core/motion-preference.service';
 import { RibbonService } from '../core/ribbon.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 @Component({
   selector: 'app-appearance-panel',
   imports: [TranslatePipe],
@@ -81,8 +82,8 @@ export class AppearancePanelComponent {
   protected readonly ribbon = inject(RibbonService);
   protected readonly palettes = PALETTES;
   protected readonly modes: { value: ThemeChoice; label: string }[] = [
-    { value: 'system', label: 'System' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
+    { value: 'system', label: translate('appearancePanel.system') },
+    { value: 'light', label: translate('appearancePanel.light') },
+    { value: 'dark', label: translate('appearancePanel.dark') },
   ];
 }

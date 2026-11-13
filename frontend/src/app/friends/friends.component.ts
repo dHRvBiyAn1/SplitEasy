@@ -24,6 +24,7 @@ import { FriendSettleAllComponent } from './friend-settle-all.component';
 import { PersonalExpensesComponent } from './personal-expenses.component';
 import { PersonalPaymentsComponent } from './personal-payments.component';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 @Component({
   selector: 'app-friends',
   imports: [
@@ -75,7 +76,7 @@ export class FriendsComponent {
       this.needsReview.set(false);
       this.notice.set(null);
       this.loading.set(false);
-      this.error.set('Session changed. Try again to load saved friends for the current account.');
+      this.error.set(translate('friends.sessionChangedTryAgain'));
     });
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       this.scopeChanges.next();
@@ -143,8 +144,8 @@ export class FriendsComponent {
           this.personal.set(null);
           this.error.set(
             this.id && (err.status === 404 || err.status === 403)
-              ? 'Saved friend unavailable. Return to your directory and review current access.'
-              : 'Could not load saved friends. Try again to review current balances.',
+              ? translate('friends.savedFriendUnavailableReturn')
+              : translate('friends.couldNotLoadSaved'),
           );
         },
       });
@@ -178,9 +179,7 @@ export class FriendsComponent {
         },
         error: () => {
           this.sourceLoading.set(false);
-          this.sourceError.set(
-            'Could not load your groups. Cancel and reopen Add friend to try again.',
-          );
+          this.sourceError.set(translate('friends.couldNotLoadYour'));
         },
       });
   }
@@ -216,9 +215,7 @@ export class FriendsComponent {
         },
         error: () => {
           this.sourceLoading.set(false);
-          this.sourceError.set(
-            'Could not load this group. Select the group again to review its current people.',
-          );
+          this.sourceError.set(translate('friends.couldNotLoadThis'));
         },
       });
   }
@@ -255,20 +252,15 @@ export class FriendsComponent {
         next: () => {
           this.saving.set(false);
           this.cancelAdd();
-          this.notice.set('Friend saved.');
+          this.notice.set(translate('friends.friendSaved'));
           this.load(false, true);
         },
         error: (err) => {
           this.saving.set(false);
           if (!err.status || err.status >= 500) {
             this.needsReview.set(true);
-            this.writeError.set(
-              'Could not confirm saving. Saved status may have changed. Check saved status before trying again.',
-            );
-          } else
-            this.sourceError.set(
-              'Could not save this friend. Select the current group again and review eligible people.',
-            );
+            this.writeError.set(translate('friends.couldNotConfirmSaving'));
+          } else this.sourceError.set(translate('friends.couldNotSaveThis'));
         },
       });
   }
@@ -301,7 +293,7 @@ export class FriendsComponent {
         next: () => {
           this.deleting.set(false);
           this.removing.set(null);
-          this.notice.set('Saved friend removed.');
+          this.notice.set(translate('friends.savedFriendRemoved'));
           if (this.id) void this.router.navigateByUrl('/friends');
           else this.load(false, true);
         },
@@ -309,9 +301,7 @@ export class FriendsComponent {
           this.deleting.set(false);
           this.removing.set(null);
           this.needsReview.set(true);
-          this.writeError.set(
-            'Could not confirm removal. Saved status may have changed. Check saved status before trying again.',
-          );
+          this.writeError.set(translate('friends.couldNotConfirmRemoval'));
         },
       });
   }
@@ -345,15 +335,16 @@ export class FriendsComponent {
         },
         error: () => {
           this.loading.set(false);
-          this.error.set('Could not load saved friends. Try checking saved status again.');
+          this.error.set(translate('friends.couldNotLoadSaved2'));
         },
       });
   }
   protected status(friend: FriendSummary): string {
-    if (!friend.sharedGroupCount || !friend.balances.length) return 'No current shared group data';
-    if (!friend.hasOpenObligations) return 'All square in current shared groups';
+    if (!friend.sharedGroupCount || !friend.balances.length)
+      return translate('friends.noCurrentSharedGroup');
+    if (!friend.hasOpenObligations) return translate('friends.allSquareInCurrent');
     return friend.balances.every((b) => b.netMinor === 0)
-      ? 'Even overall · open group obligations'
-      : 'Open balances in current shared groups';
+      ? translate('friends.evenOverallOpenGroup')
+      : translate('friends.openBalancesInCurrent');
   }
 }

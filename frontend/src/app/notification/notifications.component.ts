@@ -8,6 +8,7 @@ import { SessionService } from '../core/auth/session.service';
 import { NotificationItem, NotificationService } from './notification.service';
 import { LocaleDatePipe } from '../core/i18n/locale-date.pipe';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-notifications',
@@ -139,7 +140,7 @@ export class NotificationsComponent {
       this.nextCursor.set(null);
       this.loading.set(false);
       this.loadingMore.set(false);
-      this.error.set('Session changed. Try again to load notifications.');
+      this.error.set(translate('notifications.sessionChangedTryAgain'));
     });
     this.load();
   }
@@ -163,7 +164,7 @@ export class NotificationsComponent {
       },
       error: () => {
         this.loading.set(false);
-        this.error.set('Could not load notifications. Try again.');
+        this.error.set(translate('notifications.couldNotLoadNotifications'));
       },
     });
   }
@@ -181,7 +182,7 @@ export class NotificationsComponent {
       },
       error: () => {
         this.loadingMore.set(false);
-        this.error.set('Could not load more notifications. Try again.');
+        this.error.set(translate('notifications.couldNotLoadMore'));
       },
     });
   }
@@ -193,7 +194,7 @@ export class NotificationsComponent {
         this.items.update((rows) =>
           rows.map((r) => (r.id === n.id ? { ...r, readAt: new Date().toISOString() } : r)),
         ),
-      error: () => this.actionError.set('Could not mark that notification as read. Try again.'),
+      error: () => this.actionError.set(translate('notifications.couldNotMarkThat')),
     });
   }
 
@@ -204,7 +205,7 @@ export class NotificationsComponent {
         const now = new Date().toISOString();
         this.items.update((rows) => rows.map((r) => ({ ...r, readAt: r.readAt ?? now })));
       },
-      error: () => this.actionError.set('Could not mark notifications as read. Try again.'),
+      error: () => this.actionError.set(translate('notifications.couldNotMarkNotifications')),
     });
   }
 }

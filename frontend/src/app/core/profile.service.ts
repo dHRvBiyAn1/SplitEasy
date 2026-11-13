@@ -14,6 +14,7 @@ import { SessionService } from './auth/session.service';
 import { ApiService } from './api/api.service';
 
 import { Currency } from '../shared/currency';
+import { translate } from './i18n/i18n.service';
 export type { Currency } from '../shared/currency';
 export const CURRENCY_SYMBOL: Record<Currency, string> = {
   USD: '$',
@@ -154,8 +155,8 @@ export class ProfileService {
           saving: false,
           error:
             method === 'get'
-              ? 'Profile unavailable. Try again.'
-              : 'Profile could not be saved. Your changes are still here. Try again.',
+              ? translate('profile.profileUnavailableTryAgain')
+              : translate('profile.profileCouldNotBe'),
         }));
       },
     });

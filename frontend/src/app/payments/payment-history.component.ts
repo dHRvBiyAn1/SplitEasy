@@ -19,13 +19,14 @@ import {
 } from './payment.models';
 import { PaymentService } from './payment.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const ACTION_LABEL: Record<LedgerRevision<PaymentResponse>['action'], string> = {
-  IMPORTED: 'Imported',
-  CREATED: 'Recorded',
-  CORRECTED: 'Corrected',
-  DELETED: 'Undone',
-  RESTORED: 'Restored',
+  IMPORTED: translate('paymentHistory.imported'),
+  CREATED: translate('paymentHistory.recorded'),
+  CORRECTED: translate('paymentHistory.corrected'),
+  DELETED: translate('paymentHistory.undone'),
+  RESTORED: translate('groupDetail.restored'),
 };
 
 /**
@@ -64,7 +65,7 @@ export class PaymentHistoryComponent {
     this.dashboard.refreshes.pipe(takeUntilDestroyed()).subscribe(() => this.foreground());
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
       this.reset();
-      this.error.set('Session changed. Try again to load this group’s settlements.');
+      this.error.set(translate('paymentHistory.sessionChangedTryAgain'));
     });
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       this.scopeChanges.next();
@@ -122,7 +123,7 @@ export class PaymentHistoryComponent {
           this.loading.set(false);
           this.payments.set([]);
           this.undone.set([]);
-          this.error.set('Could not load settlements. Try again to review this group’s ledger.');
+          this.error.set(translate('paymentHistory.couldNotLoadSettlements'));
         },
       });
   }
@@ -160,10 +161,7 @@ export class PaymentHistoryComponent {
       )
       .subscribe({
         next: (group) => this.people.set(financialRoster(group)),
-        error: () =>
-          this.writeError.set(
-            'Could not load this group’s people. Close and reopen the correction to try again.',
-          ),
+        error: () => this.writeError.set(translate('paymentHistory.couldNotLoadThis')),
       });
   }
 
@@ -179,11 +177,11 @@ export class PaymentHistoryComponent {
     const currency = payment.currency ?? 'USD';
     const minor = this.toMinor(this.amount, currency);
     if (minor === null || minor <= 0) {
-      this.writeError.set('Enter an amount greater than zero.');
+      this.writeError.set(translate('paymentHistory.enterAnAmountGreater'));
       return;
     }
     if (this.payerId === this.payeeId) {
-      this.writeError.set('A settlement is between two different people.');
+      this.writeError.set(translate('paymentHistory.aSettlementIsBetween'));
       return;
     }
     this.saving.set(true);
@@ -203,7 +201,7 @@ export class PaymentHistoryComponent {
         next: () => {
           this.saving.set(false);
           this.editing.set(null);
-          this.notice.set('Settlement corrected. The original is kept in its history.');
+          this.notice.set(translate('paymentHistory.settlementCorrectedTheOriginal'));
           this.dashboard.refresh();
         },
         error: (err) => {
@@ -211,8 +209,8 @@ export class PaymentHistoryComponent {
           // The form stays open with the user's values; a stale edit is never retried for them.
           this.writeError.set(
             err.status === 409
-              ? 'This settlement changed. Reload and review the latest version before saving again.'
-              : 'Could not save this correction. Review the values and try again.',
+              ? translate('paymentHistory.thisSettlementChangedReload')
+              : translate('paymentHistory.couldNotSaveThis'),
           );
         },
       });
@@ -241,7 +239,7 @@ export class PaymentHistoryComponent {
         next: () => {
           this.saving.set(false);
           this.confirming.set(null);
-          this.notice.set('Settlement undone. You can restore it below.');
+          this.notice.set(translate('paymentHistory.settlementUndoneYouCan'));
           this.dashboard.refresh();
         },
         error: (err) => {
@@ -249,8 +247,8 @@ export class PaymentHistoryComponent {
           this.confirming.set(null);
           this.writeError.set(
             err.status === 409
-              ? 'This settlement changed. Reload and review the latest version before undoing it again.'
-              : 'Could not undo this settlement. Reload and review the ledger.',
+              ? translate('paymentHistory.thisSettlementChangedReload2')
+              : translate('paymentHistory.couldNotUndoThis'),
           );
         },
       });
@@ -266,15 +264,15 @@ export class PaymentHistoryComponent {
       .subscribe({
         next: () => {
           this.saving.set(false);
-          this.notice.set('Settlement restored.');
+          this.notice.set(translate('paymentHistory.settlementRestored'));
           this.dashboard.refresh();
         },
         error: (err) => {
           this.saving.set(false);
           this.writeError.set(
             err.status === 409
-              ? 'This settlement changed. Reload and review the latest version before restoring it again.'
-              : 'Could not restore this settlement. Reload and review the ledger.',
+              ? translate('paymentHistory.thisSettlementChangedReload3')
+              : translate('paymentHistory.couldNotRestoreThis'),
           );
         },
       });
@@ -303,8 +301,7 @@ export class PaymentHistoryComponent {
       )
       .subscribe({
         next: (revisions) => this.revisions.set(revisions),
-        error: () =>
-          this.revisionsError.set('Could not load this settlement’s history. Try again.'),
+        error: () => this.revisionsError.set(translate('paymentHistory.couldNotLoadThis2')),
       });
   }
 

@@ -7,6 +7,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { LocaleDatePipe } from '../core/i18n/locale-date.pipe';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-device-sessions',
@@ -141,7 +142,7 @@ export class DeviceSessionsComponent {
         },
         error: () => {
           this.busy.set(false);
-          this.error.set('Unable to load sessions. Refresh sessions to try again.');
+          this.error.set(translate('deviceSessions.unableToLoadSessions'));
         },
       });
   }
@@ -171,11 +172,11 @@ export class DeviceSessionsComponent {
             devices.filter((candidate) => candidate.id !== device.id),
           );
           this.busy.set(false);
-          this.message.set('Device signed out.');
+          this.message.set(translate('deviceSessions.deviceSignedOut'));
         },
         error: () => {
           this.busy.set(false);
-          this.error.set('Device sign-out could not be confirmed. Try again or refresh sessions.');
+          this.error.set(translate('deviceSessions.deviceSignOutCould'));
         },
       });
   }

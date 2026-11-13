@@ -4,11 +4,12 @@ import { takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { NotificationPreferences, NotificationService } from '../notification/notification.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
-  { key: 'expenses', label: 'Expenses added, edited, deleted or restored' },
-  { key: 'payments', label: 'Settlements and refunds' },
-  { key: 'groupChanges', label: 'Group changes and member updates' },
+  { key: 'expenses', label: translate('notificationPreferences.expensesAddedEditedDeleted') },
+  { key: 'payments', label: translate('notificationPreferences.settlementsAndRefunds') },
+  { key: 'groupChanges', label: translate('notificationPreferences.groupChangesAndMember') },
 ];
 
 /** Server-owned in-app notification switches; email and push are not offered yet. */
@@ -87,7 +88,7 @@ export class NotificationPreferencesComponent {
         next: (p) => this.prefs.set(p),
         error: () => {
           this.requested = false;
-          this.loadError.set('Could not load notification settings.');
+          this.loadError.set(translate('notificationPreferences.couldNotLoadNotification'));
         },
       });
   }
@@ -109,7 +110,7 @@ export class NotificationPreferencesComponent {
         error: () => {
           input.checked = !value; // the server kept the old value
           this.saving.set(false);
-          this.saveError.set('Could not save that setting. It was not changed.');
+          this.saveError.set(translate('notificationPreferences.couldNotSaveThat'));
         },
       });
   }

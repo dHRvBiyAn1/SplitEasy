@@ -10,6 +10,7 @@ import { ModalService } from '../modals/modal.service';
 import { ActivityItem, ExpenseCategory, dashboardTotals, groupTotals } from './dashboard.models';
 import { DashboardService } from './dashboard.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /** Category / payment → a glyph for the activity + expense rows. */
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
@@ -56,9 +57,9 @@ export class DashboardComponent {
 
   greeting(): string {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return translate('dashboard.goodMorning');
+    if (h < 18) return translate('dashboard.goodAfternoon');
+    return translate('dashboard.goodEvening');
   }
 
   firstName(name: string): string {
@@ -95,19 +96,27 @@ export class DashboardComponent {
   /** Sub-line for an activity row: who paid what, in which group. */
   activitySub(a: ActivityItem): string {
     if (a.kind === 'PAYMENT') {
-      return `${a.groupName} · settlement`;
+      return translate('dashboard.groupnameSettlement', { groupName: a.groupName });
     }
-    const who = this.isMe(a.actor) ? 'You' : this.firstName(a.actor.displayName);
-    return `${who} paid ${formatMoney(a.amountMinor, false, a.currency ?? 'USD')} · ${a.groupName}`;
+    const who = this.isMe(a.actor)
+      ? translate('dashboard.you')
+      : this.firstName(a.actor.displayName);
+    return translate('dashboard.whoPaidAmountGroup', {
+      who,
+      amount: formatMoney(a.amountMinor, false, a.currency ?? 'USD'),
+      groupName: a.groupName,
+    });
   }
 
   activityTitle(a: ActivityItem): string {
     if (a.kind === 'PAYMENT') {
-      const payer = this.isMe(a.actor) ? 'You' : this.firstName(a.actor.displayName);
+      const payer = this.isMe(a.actor)
+        ? translate('dashboard.you')
+        : this.firstName(a.actor.displayName);
       const payee = this.isMe(a.counterparty)
         ? 'you'
         : this.firstName(a.counterparty?.displayName ?? '');
-      return `${payer} paid ${payee}`;
+      return translate('dashboard.payerPaidPayee', { payer, payee });
     }
     return a.description;
   }

@@ -8,6 +8,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { ProfileService } from '../core/profile.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-account-action',
@@ -97,8 +98,7 @@ export class AccountActionComponent {
       this.password.reset();
       this.valid.set(false);
       this.pending.set(false);
-      if (!this.message())
-        this.error.set('Your session changed. Reopen the link from your email to continue.');
+      if (!this.message()) this.error.set(translate('accountAction.yourSessionChangedReopen'));
     });
     this.destroyRef.onDestroy(() => {
       window.removeEventListener('hashchange', reopen);
@@ -110,9 +110,7 @@ export class AccountActionComponent {
     const fragment = new URLSearchParams(location.hash.slice(1));
     history.replaceState(history.state, '', location.pathname + location.search);
     if (this.pending()) {
-      this.error.set(
-        'An account action is already pending. Wait for it to finish, then reopen your email link.',
-      );
+      this.error.set(translate('accountAction.anAccountActionIs'));
       return;
     }
     this.token = '';
@@ -133,7 +131,7 @@ export class AccountActionComponent {
       this.token = token;
       this.action.set(fragment.get('action')!);
       this.valid.set(true);
-    } else this.error.set('Reopen the link from your email, or request a new link.');
+    } else this.error.set(translate('accountAction.reopenTheLinkFrom'));
   }
   submit(): void {
     if (!this.valid() || this.pending()) return;
@@ -162,10 +160,10 @@ export class AccountActionComponent {
           this.profile.refresh();
         this.message.set(
           reset
-            ? 'Password reset. Log in with your new password.'
+            ? translate('accountAction.passwordResetLogIn')
             : this.action() === 'email-change'
-              ? 'Email changed. Log in with your new email.'
-              : 'Email verified.',
+              ? translate('accountAction.emailChangedLogIn')
+              : translate('accountAction.emailVerified'),
         );
       },
       error: (err) => {
@@ -173,17 +171,15 @@ export class AccountActionComponent {
         if (this.action() === 'email-change' && err.status === 409) {
           this.token = '';
           this.valid.set(false);
-          this.error.set(
-            'This email address is already registered. Request a new email change with a different address in Account security and verification.',
-          );
+          this.error.set(translate('accountAction.thisEmailAddressIs'));
           return;
         }
         this.error.set(
           err.status === 429
-            ? 'Too many attempts. Please wait before trying again.'
+            ? translate('accountAction.tooManyAttemptsPlease')
             : err.status === 400
-              ? 'This link is invalid or expired. Request a new link.'
-              : 'Temporarily unavailable. Please try again later.',
+              ? translate('accountAction.thisLinkIsInvalid')
+              : translate('accountAction.temporarilyUnavailablePleaseTry'),
         );
       },
     });

@@ -1,16 +1,17 @@
 import { Currency } from '../shared/currency';
 import { ParticipantSummary } from '../groups/participant.models';
 import { UserSummary } from '../core/auth/auth.models';
+import { translate } from '../core/i18n/i18n.service';
 
 /** How the people involved moved the money themselves. SplitEasy records it; it moves nothing. */
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ONLINE' | 'OTHER';
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
-  CASH: 'Cash',
-  BANK_TRANSFER: 'Bank transfer',
-  CARD: 'Card',
-  ONLINE: 'Online',
-  OTHER: 'Other',
+  CASH: translate('payment.cash'),
+  BANK_TRANSFER: translate('payment.bankTransfer'),
+  CARD: translate('payment.card'),
+  ONLINE: translate('payment.online'),
+  OTHER: translate('groupSettings.other'),
 };
 
 export interface PaymentResponse {

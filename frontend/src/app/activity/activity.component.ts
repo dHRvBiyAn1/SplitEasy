@@ -9,6 +9,7 @@ import { ActivityItem, describeEvent } from './activity.models';
 import { ActivityService } from './activity.service';
 import { LocaleDatePipe } from '../core/i18n/locale-date.pipe';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /** Account activity, newest first, a page at a time, with an optional group filter. */
 @Component({
@@ -132,7 +133,7 @@ export class ActivityComponent {
       this.nextCursor.set(null);
       this.loading.set(false);
       this.loadingMore.set(false);
-      this.error.set('Session changed. Try again to load activity.');
+      this.error.set(translate('activity.sessionChangedTryAgain'));
     });
     this.dashboard.ensureLoaded();
     this.load();
@@ -162,7 +163,7 @@ export class ActivityComponent {
         },
         error: () => {
           this.loading.set(false);
-          this.error.set('Could not load activity. Try again.');
+          this.error.set(translate('activity.couldNotLoadActivity'));
         },
       });
   }
@@ -184,7 +185,7 @@ export class ActivityComponent {
         error: () => {
           // Loaded rows and the cursor stay so the same page can be retried.
           this.loadingMore.set(false);
-          this.error.set('Could not load more activity. Try again.');
+          this.error.set(translate('activity.couldNotLoadMore'));
         },
       });
   }

@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-close-account',
@@ -79,7 +80,7 @@ export class CloseAccountComponent {
 
   close(): void {
     if (this.busy() || this.password.invalid || this.confirmed.invalid) {
-      this.error.set('Enter your current password and confirm to close your account.');
+      this.error.set(translate('closeAccount.enterYourCurrentPassword'));
       return;
     }
     this.busy.set(true);
@@ -89,7 +90,7 @@ export class CloseAccountComponent {
         void this.router.navigate(['/login'], { queryParams: { reason: 'account-closed' } }),
       error: (err) => {
         this.busy.set(false);
-        this.error.set(err?.error?.message ?? 'Your account could not be closed. Try again.');
+        this.error.set(err?.error?.message ?? translate('closeAccount.yourAccountCouldNot'));
       },
     });
   }

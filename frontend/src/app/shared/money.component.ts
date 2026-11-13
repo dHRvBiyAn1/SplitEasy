@@ -2,10 +2,11 @@ import { Component, computed, input } from '@angular/core';
 
 import { activeLocale, intlLocale } from '../core/i18n/i18n.service';
 import { Currency, CURRENCY_EXPONENT, minorToDisplay } from './currency';
+import { translate } from '../core/i18n/i18n.service';
 
 /** Format integer units exactly, including zero/three-decimal currencies and large totals. */
 export function formatMoney(minor: number, net = false, currency: Currency = 'USD'): string {
-  if (!Number.isSafeInteger(minor)) return 'Unavailable';
+  if (!Number.isSafeInteger(minor)) return translate('invitation.unavailable');
   const sign = minor < 0 ? '−' : net && minor > 0 ? '+' : '';
   const [whole, fraction] = minorToDisplay(Math.abs(minor), currency).split('.');
   const exponent = CURRENCY_EXPONENT[currency];

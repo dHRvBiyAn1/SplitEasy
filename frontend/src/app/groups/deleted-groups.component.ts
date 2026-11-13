@@ -8,6 +8,7 @@ import { GroupArtComponent } from '../shared/group-art.component';
 import { GroupService } from './group.service';
 import { GroupSummary } from './group.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /**
  * The creator's recovery list for groups they deleted. Deletion keeps every expense, payment and
@@ -64,7 +65,7 @@ export class DeletedGroupsComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Could not load your deleted groups.');
+        this.error.set(translate('deletedGroups.couldNotLoadYour'));
         this.loading.set(false);
       },
     });
@@ -82,7 +83,7 @@ export class DeletedGroupsComponent implements OnInit {
         this.dashboard.refresh();
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not restore that group.');
+        this.error.set(err?.error?.message ?? translate('deletedGroups.couldNotRestoreThat'));
         this.restoring.set(null);
       },
     });

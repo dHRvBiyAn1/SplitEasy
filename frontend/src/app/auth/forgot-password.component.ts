@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { AuthHeroComponent } from './auth-hero.component';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-forgot-password',
@@ -75,18 +76,16 @@ export class ForgotPasswordComponent {
       .subscribe({
         next: () => {
           this.pending.set(false);
-          this.message.set(
-            'If an account exists, a link may arrive; retry or contact support if it does not.',
-          );
+          this.message.set(translate('forgotPassword.ifAnAccountExists'));
         },
         error: (err) => {
           this.pending.set(false);
           this.error.set(
             err.status === 429
-              ? 'Too many attempts. Please wait before trying again.'
+              ? translate('accountAction.tooManyAttemptsPlease')
               : err.status === 503
-                ? 'Email is temporarily unavailable. Please try again later.'
-                : 'Unable to request a link. Please try again.',
+                ? translate('forgotPassword.emailIsTemporarilyUnavailable')
+                : translate('forgotPassword.unableToRequestA'),
           );
         },
       });

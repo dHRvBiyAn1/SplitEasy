@@ -15,6 +15,7 @@ import { takeUntil } from 'rxjs';
 import { ProfileService } from '../core/profile.service';
 import { SessionService } from '../core/auth/session.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-account-security',
@@ -304,11 +305,7 @@ export class AccountSecurityComponent {
           this.auth.clearSession();
           this.router.navigate(['/login'], { queryParams: { reason: 'password-changed' } });
         },
-        error: (err) =>
-          this.failure(
-            err,
-            'Password could not be changed. Check your current password and try again.',
-          ),
+        error: (err) => this.failure(err, translate('accountSecurity.passwordCouldNotBe')),
       });
   }
   changeEmail(): void {
@@ -338,15 +335,15 @@ export class AccountSecurityComponent {
           this.pending.set(false);
           this.cancel();
           this.message.set(
-            `A confirmation link may arrive at ${email.trim()}; your current email remains your login until confirmation. Retry or contact support if it does not arrive.`,
+            translate('accountSecurity.aConfirmationLinkMay', { trim: email.trim() }),
           );
         },
         error: (err) =>
           this.failure(
             err,
             err.status === 409
-              ? 'This email is already in use. Choose another email.'
-              : 'Email change could not be requested. Check your current password and try again.',
+              ? translate('accountSecurity.thisEmailIsAlready')
+              : translate('accountSecurity.emailChangeCouldNot'),
           ),
       });
   }
@@ -355,9 +352,9 @@ export class AccountSecurityComponent {
     this.pending.set(false);
     this.error.set(
       err.status === 429
-        ? 'Too many attempts. Please wait before trying again.'
+        ? translate('accountAction.tooManyAttemptsPlease')
         : err.status === 503
-          ? 'Email is temporarily unavailable. Please try again later.'
+          ? translate('forgotPassword.emailIsTemporarilyUnavailable')
           : fallback,
     );
   }
@@ -372,11 +369,9 @@ export class AccountSecurityComponent {
       .subscribe({
         next: () => {
           this.pending.set(false);
-          this.message.set(
-            'A verification link may arrive; retry or contact support if it does not.',
-          );
+          this.message.set(translate('accountSecurity.aVerificationLinkMay'));
         },
-        error: (err) => this.failure(err, 'Unable to request a verification link. Try again.'),
+        error: (err) => this.failure(err, translate('accountSecurity.unableToRequestA')),
       });
   }
 }

@@ -10,6 +10,7 @@ import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-invitation',
@@ -227,7 +228,7 @@ export class InvitationComponent {
       this.ownershipConfirmed.set(false);
       this.message.set('');
       this.acceptedGroup.set('');
-      this.error.set('Your session changed. Reopen the original invitation to continue.');
+      this.error.set(translate('invitation.yourSessionChangedReopen'));
     });
     this.destroyRef.onDestroy(() => {
       window.removeEventListener('hashchange', reopen);
@@ -240,9 +241,7 @@ export class InvitationComponent {
     const fragment = new URLSearchParams(location.hash.slice(1));
     history.replaceState(history.state, '', location.pathname + location.search);
     if (this.pending() || this.uncertain()) {
-      this.error.set(
-        'An invitation action is pending. Wait for its result before reopening a link.',
-      );
+      this.error.set(translate('invitation.anInvitationActionIs'));
       return;
     }
     this.token = '';
@@ -261,7 +260,7 @@ export class InvitationComponent {
     ) {
       this.token = token;
       this.valid.set(true);
-    } else this.error.set('Reopen the original invitation, or ask a group member for a new link.');
+    } else this.error.set(translate('invitation.reopenTheOriginalInvitation'));
   }
   readPreview(): void {
     const owner = this.user()?.id;
@@ -284,8 +283,8 @@ export class InvitationComponent {
           this.pending.set(false);
           this.error.set(
             err.status === 429
-              ? 'Too many attempts. Wait before previewing again.'
-              : 'Invitation unavailable. Use the verified matching account for an email invitation, then reopen the original link. It may also be expired, revoked or already used.',
+              ? translate('invitation.tooManyAttemptsWait')
+              : translate('invitation.invitationUnavailableUseThe'),
           );
         },
       });
@@ -323,17 +322,15 @@ export class InvitationComponent {
           this.acceptedGroup.set(result.groupId);
           this.message.set(
             result.claimed
-              ? 'Ownership accepted. Your account now owns the original guest entries.'
-              : 'You joined the group. No guest entries were claimed.',
+              ? translate('invitation.ownershipAcceptedYourAccount')
+              : translate('invitation.youJoinedTheGroup'),
           );
           this.dashboard.refresh();
         },
         error: () => {
           this.pending.set(false);
           this.uncertain.set(true);
-          this.error.set(
-            'Acceptance could not be confirmed. Read current group status; do not send another acceptance.',
-          );
+          this.error.set(translate('invitation.acceptanceCouldNotBe'));
         },
       });
   }
@@ -364,9 +361,7 @@ export class InvitationComponent {
           if (this.user()?.id !== owner || this.session.version !== version) return;
           this.pending.set(false);
           if (preview.participant && !group.ownedParticipantIds?.includes(preview.participant.id)) {
-            this.error.set(
-              'Your membership exists, but guest ownership is not confirmed. Acceptance remains blocked. Ask a group member to review invitation status, or reopen the original invitation after reviewing the outcome.',
-            );
+            this.error.set(translate('invitation.yourMembershipExistsBut'));
             return;
           }
           this.token = '';
@@ -377,16 +372,14 @@ export class InvitationComponent {
           this.acceptedGroup.set(group.id);
           this.message.set(
             preview.participant
-              ? 'Ownership confirmed by your current owned financial identities.'
-              : 'Current group access confirmed. No guest entries were claimed; invitation consumption was not confirmed by this read.',
+              ? translate('invitation.ownershipConfirmedByYour')
+              : translate('invitation.currentGroupAccessConfirmed'),
           );
           this.dashboard.refresh();
         },
         error: () => {
           this.pending.set(false);
-          this.error.set(
-            'Current membership and guest ownership could not be confirmed. No further acceptance will be sent here. Ask a group member to review invitation status before reopening the original invitation.',
-          );
+          this.error.set(translate('invitation.currentMembershipAndGuest'));
         },
       });
   }
