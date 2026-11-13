@@ -83,6 +83,15 @@ public class ActivityRecorder {
     record(groupId, "BALANCE_REMINDER", debtorId, actor, summary, debtorId);
   }
 
+  /** A comment on an expense, delivered under the members' expenses preference. */
+  public void comment(
+      UUID groupId, UserSummary actor, UUID commentId, UUID expenseId, String description) {
+    var summary = new LinkedHashMap<String, Object>();
+    summary.put("expenseId", expenseId);
+    summary.put("description", description);
+    record(groupId, "COMMENT_CREATED", commentId, actor, summary);
+  }
+
   private void record(
       UUID groupId, String kind, UUID subjectId, UserSummary actor, Map<String, Object> summary) {
     record(groupId, kind, subjectId, actor, summary, null);
@@ -107,7 +116,7 @@ public class ActivityRecorder {
         .update();
     // Column comes from a closed set below, never from input.
     String preference =
-        kind.startsWith("EXPENSE_")
+        kind.startsWith("EXPENSE_") || kind.startsWith("COMMENT_")
             ? "expenses"
             : kind.startsWith("PAYMENT_")
                     || kind.startsWith("REFUND_")
