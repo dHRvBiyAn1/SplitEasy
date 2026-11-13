@@ -1,10 +1,10 @@
 # H02-A — expense comments and attachments (backend)
 
-Branch `feat/alignment-h02-a-comments-attachments`, migration V30. Backend only.
+Branch `feat/alignment-h02-a-comments-attachments`, migration V29. Backend only.
 
 ## What shipped
 
-- V30 `expense_comments` and `attachments` (bytea), soft delete, cascade with the expense, FK columns indexed.
+- V29 `expense_comments` and `attachments` (bytea), soft delete, cascade with the expense, FK columns indexed.
 - `comment/*` and `attachment/*` packages: list / create / delete-own for both, attachment download.
   Group routes bind `{groupId}` (so `PersonalLedgerRouteGuard` returns 404 for a personal ledger's id);
   `/api/friends/{friendId}/expenses/{expenseId}/…` mirrors them by authorizing through
@@ -27,7 +27,7 @@ Branch `feat/alignment-h02-a-comments-attachments`, migration V30. Backend only.
 
 ## Red → green
 
-`CommentAttachmentIntegrationTest` (8 cases) written first against V30 only: 8/8 failed (no routes).
+`CommentAttachmentIntegrationTest` (8 cases) written first against V29 only: 8/8 failed (no routes).
 After the implementation: 8/8 pass. Cases: comment auth/author/soft-delete/validation, event once and
 preference-gated, archived group, detected type + download headers + sanitized name, all four types,
 spoofed/empty/truncated/missing-part uploads, 5 MB cap + 10-attachment limit, personal-ledger mirror
@@ -45,11 +45,11 @@ and hidden ledger group.
 
 - **API table:** add `GET/POST /groups/{g}/expenses/{e}/comments`, `DELETE …/comments/{c}`,
   `GET/POST …/attachments`, `GET/DELETE …/attachments/{a}`, and the `/friends/{id}/expenses/{e}/…` mirrors.
-- **Backend convention:** Attachments live in PostgreSQL (V30, bytea, 5 MB, ≤10 live per expense), type
+- **Backend convention:** Attachments live in PostgreSQL (V29, bytea, 5 MB, ≤10 live per expense), type
   verified by magic bytes and stored as detected, name display-only, downloads `attachment` + `nosniff` +
   `private, no-store`. Comments/attachments are member-only, write through `GroupWriteGuard.lockForMember`
   (archived 409), author/uploader-only soft delete. Personal routes authorize via `PersonalLedgerService.get`.
   `AttachmentConfig` overrides Boot's 1 MB multipart default.
 - **Activity:** `COMMENT_CREATED` (via `ActivityRecorder.comment`) follows the `expenses` preference.
-- **Data model:** `expense_comments`, `attachments` (V30). Drain old backends before V30; forward-fix only.
-- **Progress log:** Alignment H02-A comments + attachments backend — V30, 8 integration cases; backend 451 (443 before).
+- **Data model:** `expense_comments`, `attachments` (V29). Drain old backends before V29; forward-fix only.
+- **Progress log:** Alignment H02-A comments + attachments backend — V29, 8 integration cases; backend 451 (443 before).
