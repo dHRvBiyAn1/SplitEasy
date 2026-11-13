@@ -3084,6 +3084,272 @@ paths:
   # --- c02 paths (insert below; parallel batch plan rule 3) ---
 
   # --- h02 paths (insert below; parallel batch plan rule 3) ---
+  /api/groups/{groupId}/expenses/{expenseId}/comments:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listGroupComments
+      summary: List live comments (metadata only, oldest first)
+      tags: [Comments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Comment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addGroupComment
+      summary: Comment on an expense
+      description: Any member. 409 on an archived group. Raises one COMMENT_CREATED event for the other members, subject to their expenses notification preference.
+      tags: [Comments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/expenses/{expenseId}/comments/{itemId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      operationId: deleteGroupComment
+      summary: Remove your own comment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Comments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/expenses/{expenseId}/attachments:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listGroupAttachments
+      summary: List live attachments (metadata only, oldest first)
+      tags: [Attachments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Attachment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addGroupAttachment
+      summary: Attach a file to an expense
+      description: multipart/form-data with one `file` part, at most 5 MB, at most 10 live attachments per expense (409). The type is taken from the file's magic bytes (JPEG, PNG, WebP, PDF); the client Content-Type is ignored and anything else is 400. 413 over 5 MB. The file name is sanitized for display only. 409 on an archived group.
+      tags: [Attachments]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Created (metadata only).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Attachment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {description: File larger than 5 MB}
+  /api/groups/{groupId}/expenses/{expenseId}/attachments/{itemId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: downloadGroupAttachment
+      summary: Download the stored bytes
+      description: 'Streams the stored content type with Content-Disposition attachment, X-Content-Type-Options nosniff and Cache-Control private, no-store.'
+      tags: [Attachments]
+      responses:
+        '200':
+          description: The file.
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+            application/pdf: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: deleteGroupAttachment
+      summary: Remove your own attachment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Attachments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/expenses/{expenseId}/comments:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listPersonalComments
+      summary: List live comments (metadata only, oldest first)
+      tags: [Comments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Comment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addPersonalComment
+      summary: Comment on an expense
+      description: Any member. 409 on an archived group. Raises one COMMENT_CREATED event for the other members, subject to their expenses notification preference.
+      tags: [Comments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/expenses/{expenseId}/comments/{itemId}:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      operationId: deletePersonalComment
+      summary: Remove your own comment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Comments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/expenses/{expenseId}/attachments:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listPersonalAttachments
+      summary: List live attachments (metadata only, oldest first)
+      tags: [Attachments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Attachment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addPersonalAttachment
+      summary: Attach a file to an expense
+      description: multipart/form-data with one `file` part, at most 5 MB, at most 10 live attachments per expense (409). The type is taken from the file's magic bytes (JPEG, PNG, WebP, PDF); the client Content-Type is ignored and anything else is 400. 413 over 5 MB. The file name is sanitized for display only. 409 on an archived group.
+      tags: [Attachments]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Created (metadata only).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Attachment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {description: File larger than 5 MB}
+  /api/friends/{friendId}/expenses/{expenseId}/attachments/{itemId}:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: downloadPersonalAttachment
+      summary: Download the stored bytes
+      description: 'Streams the stored content type with Content-Disposition attachment, X-Content-Type-Options nosniff and Cache-Control private, no-store.'
+      tags: [Attachments]
+      responses:
+        '200':
+          description: The file.
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+            application/pdf: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: deletePersonalAttachment
+      summary: Remove your own attachment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Attachments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
 
   # --- p07-p01 paths (insert below; parallel batch plan rule 3) ---
 
@@ -5440,6 +5706,33 @@ components:
     # --- c02 schemas (insert below; parallel batch plan rule 3) ---
 
     # --- h02 schemas (insert below; parallel batch plan rule 3) ---
+    CommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body: {type: string, minLength: 1, maxLength: 2000}
+    Comment:
+      type: object
+      required: [id, expenseId, author, body, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        expenseId: {type: string, format: uuid}
+        author: {$ref: '#/components/schemas/UserSummary'}
+        body: {type: string}
+        createdAt: {type: string, format: date-time}
+    Attachment:
+      type: object
+      description: Metadata only; bytes come from the download route.
+      required: [id, expenseId, uploadedBy, fileName, contentType, sizeBytes, sha256, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        expenseId: {type: string, format: uuid}
+        uploadedBy: {$ref: '#/components/schemas/UserSummary'}
+        fileName: {type: string, maxLength: 255}
+        contentType: {type: string, enum: [image/jpeg, image/png, image/webp, application/pdf]}
+        sizeBytes: {type: integer, format: int64, minimum: 1, maximum: 5242880}
+        sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        createdAt: {type: string, format: date-time}
 
     # --- p07-p01 schemas (insert below; parallel batch plan rule 3) ---
 
