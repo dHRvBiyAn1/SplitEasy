@@ -1,12 +1,15 @@
 <section class="friends-page" aria-labelledby="friends-heading">
   @if (id) {
-    <a routerLink="/friends">All saved friends</a>
+    <a routerLink="/friends">{{ 'friends.allSavedFriends' | t }}</a>
   }
   <header class="page-heading">
     <div>
-      <p class="eyebrow">Your private directory</p>
+      <p class="eyebrow">{{ 'friends.yourPrivateDirectory' | t }}</p>
       <h1 id="friends-heading">
-        {{ detail()?.displayName ?? (id ? 'Friend details' : 'Your friends') }}
+        {{
+          detail()?.displayName ??
+            (id ? ('friends.friendDetails' | t) : ('friends.yourFriends' | t))
+        }}
       </h1>
     </div>
     @if (!id && !adding()) {
@@ -16,40 +19,38 @@
         [disabled]="saving() || deleting() || needsReview() || !!removing()"
         (click)="startAdd()"
       >
-        Add friend
+        {{ 'friends.addFriend' | t }}
       </button>
     }
   </header>
   <div class="scope-note">
     <p>
-      Balances cover current shared groups you can access. Saving a friend never grants group
-      access.
+      {{ 'friends.balancesCoverCurrentShared' | t }}
     </p>
-    <p>Saved friends stay here after settlement or when shared groups are no longer accessible.</p>
-    <p>Positive amounts mean your friend owes you; negative amounts mean you owe your friend.</p>
+    <p>{{ 'friends.savedFriendsStayHere' | t }}</p>
+    <p>{{ 'friends.positiveAmountsMeanYour' | t }}</p>
   </div>
   @if (notice()) {
     <p class="notice" role="status">{{ notice() }}</p>
   }
   @if (adding()) {
     <section class="friend-panel" aria-labelledby="add-heading">
-      <h2 id="add-heading">Save someone from a shared group</h2>
+      <h2 id="add-heading">{{ 'friends.saveSomeoneFromA' | t }}</h2>
       <p>
-        Choose a registered person from a group you currently belong to. Guests must complete a
-        verified participant claim before you can save them.
+        {{ 'friends.chooseARegisteredPerson' | t }}
       </p>
       <div class="source-fields">
         <label
-          ><span class="dc-field-label">Source group</span
+          ><span class="dc-field-label">{{ 'friends.sourceGroup' | t }}</span
           ><select
             #sourceField
             class="dc-field"
-            aria-label="Source group"
+            [attr.aria-label]="'friends.sourceGroup' | t"
             [value]="groupId"
             [disabled]="saving() || needsReview()"
             (change)="chooseGroup($any($event.target).value)"
           >
-            <option value="">Choose a group</option>
+            <option value="">{{ 'friends.chooseAGroup' | t }}</option>
             @for (group of groups(); track group.id) {
               <option [value]="group.id">{{ group.name }}</option>
             }
@@ -57,18 +58,22 @@
         >
         @if (groupId) {
           <label
-            ><span class="dc-field-label">Person</span
+            ><span class="dc-field-label">{{ 'friends.person' | t }}</span
             ><select
               class="dc-field"
-              aria-label="Person"
+              [attr.aria-label]="'friends.person' | t"
               [value]="participantId"
               [disabled]="sourceLoading() || saving() || needsReview()"
               (change)="participantId = $any($event.target).value"
             >
-              <option value="">Choose a person</option>
+              <option value="">{{ 'friends.chooseAPerson' | t }}</option>
               @for (person of people(); track person.id) {
                 <option [value]="person.id" [disabled]="!person.accountId">
-                  {{ person.displayName }}{{ !person.accountId ? ' — claim first' : '' }}
+                  {{
+                    !person.accountId
+                      ? ('friends.personClaimFirst' | t: { name: person.displayName })
+                      : person.displayName
+                  }}
                 </option>
               }
             </select></label
@@ -76,14 +81,14 @@
         }
       </div>
       @if (sourceLoading()) {
-        <p role="status">Loading source people…</p>
+        <p role="status">{{ 'friends.loadingSourcePeople' | t }}</p>
       } @else if (!sourceError() && !groups().length) {
         <p>
-          No current groups to choose from.
-          <a routerLink="/dashboard">Open your overview to create a group.</a>
+          {{ 'friends.noCurrentGroupsTo' | t }}
+          <a routerLink="/dashboard">{{ 'friends.openYourOverviewTo' | t }}</a>
         </p>
       } @else if (!sourceError() && groupId && !people().length) {
-        <p>No other active people are available in this group. Choose another group.</p>
+        <p>{{ 'friends.noOtherActivePeople' | t }}</p>
       }
       @if (sourceError()) {
         <p role="alert">{{ sourceError() }}</p>
@@ -95,14 +100,14 @@
           [disabled]="!participantId || sourceLoading() || saving() || needsReview()"
           (click)="save()"
         >
-          Save friend
+          {{ 'friends.saveFriend' | t }}
         </button>
         <button class="dc-btn-ghost" type="button" [disabled]="saving()" (click)="cancelAdd()">
-          Cancel adding
+          {{ 'friends.cancelAdding' | t }}
         </button>
       </div>
       @if (saving()) {
-        <p role="status">Saving friend…</p>
+        <p role="status">{{ 'friends.savingFriend' | t }}</p>
       }
     </section>
   }
@@ -111,42 +116,44 @@
   }
   @if (needsReview()) {
     <button class="dc-btn-outline" type="button" [disabled]="loading()" (click)="review()">
-      Check saved status
+      {{ 'friends.checkSavedStatus' | t }}
     </button>
   }
   @if (removing(); as friend) {
     <section class="friend-panel" aria-labelledby="remove-heading">
-      <h2 #confirmation id="remove-heading" tabindex="-1">Remove {{ friend.displayName }}?</h2>
+      <h2 #confirmation id="remove-heading" tabindex="-1">
+        {{ 'friends.removeDisplayname' | t: { displayName: friend.displayName } }}
+      </h2>
       <p>
-        This only removes your saved friend. Balances, group membership and financial history stay
-        unchanged. Personal expenses you share stay with both of you, and either of you can still
-        open and change them.
+        {{ 'friends.thisOnlyRemovesYour' | t }}
       </p>
       <div class="actions">
         <button class="dc-btn-outline" type="button" [disabled]="deleting()" (click)="remove()">
-          Remove saved friend
+          {{ 'friends.removeSavedFriend' | t }}
         </button>
         <button class="dc-btn-ghost" type="button" [disabled]="deleting()" (click)="cancelRemove()">
-          Keep friend
+          {{ 'friends.keepFriend' | t }}
         </button>
       </div>
       @if (deleting()) {
-        <p role="status">Removing saved friend…</p>
+        <p role="status">{{ 'friends.removingSavedFriend' | t }}</p>
       }
     </section>
   }
   @if (loading()) {
-    <p role="status">Loading saved friends…</p>
+    <p role="status">{{ 'friends.loadingSavedFriends' | t }}</p>
   }
   @if (error()) {
     <p class="notice" role="alert">{{ error() }}</p>
     @if (!needsReview()) {
-      <button class="dc-btn-outline" type="button" (click)="load()">Try again</button>
+      <button class="dc-btn-outline" type="button" (click)="load()">
+        {{ 'common.tryAgain' | t }}
+      </button>
     }
   } @else if (!loading() && !id && friends().length === 0) {
     <div class="friend-panel empty">
-      <h2>No saved friends yet</h2>
-      <p>Keep someone in your directory by choosing them from a current shared group.</p>
+      <h2>{{ 'friends.noSavedFriendsYet' | t }}</h2>
+      <p>{{ 'friends.keepSomeoneInYour' | t }}</p>
     </div>
   }
   <div class="friend-grid">
@@ -165,8 +172,7 @@
           }
         </div>
         <p class="group-count">
-          {{ friend.sharedGroupCount }} current shared
-          {{ friend.sharedGroupCount === 1 ? 'group' : 'groups' }}
+          {{ 'friends.sharedGroupCount' | t: { count: friend.sharedGroupCount } }}
         </p>
         <button
           class="dc-btn-ghost"
@@ -174,14 +180,14 @@
           [disabled]="adding() || saving() || deleting() || needsReview()"
           (click)="requestRemove(friend, $event)"
         >
-          Remove friend
+          {{ 'friends.removeFriend' | t }}
         </button>
       </article>
     }
   </div>
   @if (detail(); as friend) {
     <div class="friend-panel totals">
-      <h2>Current totals by currency</h2>
+      <h2>{{ 'friends.currentTotalsByCurrency' | t }}</h2>
       <p>{{ status(friend) }}</p>
       <div class="balances">
         @for (balance of friend.balances; track balance.currency) {
@@ -192,7 +198,7 @@
         }
       </div>
       @if (friend.personalBalances.length) {
-        <h3>Personal expenses only</h3>
+        <h3>{{ 'friends.personalExpensesOnly' | t }}</h3>
         <div class="balances">
           @for (balance of friend.personalBalances; track balance.currency) {
             <div>
@@ -208,15 +214,21 @@
         [disabled]="deleting() || needsReview()"
         (click)="requestRemove(friend, $event)"
       >
-        Remove friend
+        {{ 'friends.removeFriend' | t }}
       </button>
     </div>
-    <h2>Current shared groups</h2>
+    <h2>{{ 'friends.currentSharedGroups' | t }}</h2>
     <div class="friend-grid">
       @for (group of friend.sharedGroups; track group.id) {
         <article class="friend-panel">
           <h3>{{ group.name }}</h3>
-          <p>{{ group.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}</p>
+          <p>
+            {{
+              group.simplifyDebts
+                ? ('friends.simplifiedObligations' | t)
+                : ('friends.directObligations' | t)
+            }}
+          </p>
           <div class="balances">
             @for (balance of group.balances; track balance.currency) {
               <div>
@@ -225,7 +237,7 @@
               </div>
             }
           </div>
-          <a [routerLink]="['/groups', group.id]">Open group history and settlement</a>
+          <a [routerLink]="['/groups', group.id]">{{ 'friends.openGroupHistoryAnd' | t }}</a>
         </article>
       }
     </div>

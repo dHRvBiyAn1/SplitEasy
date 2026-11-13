@@ -17,11 +17,13 @@ import { DashboardService } from '../dashboard/dashboard.service';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /** Account access and financial guests remain separate, explicit actions. */
 @Component({
   selector: 'app-add-member-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './add-member-modal.component.html',
   styleUrl: './modals.scss',
 })
@@ -37,21 +39,21 @@ export class AddMemberModalComponent {
   protected readonly localDate = invitationDate;
   invitationKind(kind: string): string {
     return kind === 'EMAIL'
-      ? 'Email invitation'
+      ? translate('addMemberModal.emailInvitation')
       : kind === 'LINK'
-        ? 'Group join link'
-        : 'Invitation';
+        ? translate('addMemberModal.groupJoinLink')
+        : translate('addMemberModal.invitation');
   }
   invitationStatus(status: string): string {
     return (
       (
         {
-          PENDING: 'Pending',
-          ACCEPTED: 'Accepted',
-          REVOKED: 'Revoked',
-          EXPIRED: 'Expired',
+          PENDING: translate('addMemberModal.pending'),
+          ACCEPTED: translate('addMemberModal.accepted'),
+          REVOKED: translate('addMemberModal.revoked'),
+          EXPIRED: translate('addMemberModal.expired'),
         } as Record<string, string>
-      )[status] ?? 'Unavailable'
+      )[status] ?? translate('invitation.unavailable')
     );
   }
   protected readonly groupId = this.modal.addMemberGroupId();
@@ -102,7 +104,7 @@ export class AddMemberModalComponent {
       this.members.set([]);
       this.inviteEmail.reset();
       this.guestName.reset();
-      this.invitationNotice.set('Your session changed. Reopen this group.');
+      this.invitationNotice.set(translate('addMemberModal.yourSessionChangedReopen'));
     });
     this.dashboard.refreshes.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((force) => {
       if (!force && this.invitationsOpen() && !this.saving()) {
@@ -139,7 +141,7 @@ export class AddMemberModalComponent {
         error: () => {
           this.membersLoading.set(false);
           this.membersFailed.set(true);
-          this.error.set('Could not load group members.');
+          this.error.set(translate('addMemberModal.couldNotLoadGroup'));
         },
       });
   }
@@ -168,9 +170,7 @@ export class AddMemberModalComponent {
           this.guestName.reset();
           this.guestRetry = null;
           this.guestUncertain.set(false);
-          this.guestNotice.set(
-            'Guest created. They have financial entries only, without account access.',
-          );
+          this.guestNotice.set(translate('addMemberModal.guestCreatedTheyHave'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
           this.dashboard.refresh();
@@ -178,8 +178,9 @@ export class AddMemberModalComponent {
         error: (err) => {
           this.guestUncertain.set(true);
           this.guestNotice.set(
-            (err?.error?.message ?? 'Could not create the guest.') +
-              ' The guest may already exist. Retry guest creation with its original identity or review the roster.',
+            (err?.error?.message ?? translate('addMemberModal.couldNotCreateThe')) +
+              ' ' +
+              translate('addMemberModal.theGuestMayAlready'),
           );
           this.saving.set(false);
           this.modal.setMutationPending(false);
@@ -215,17 +216,16 @@ export class AddMemberModalComponent {
             ),
           );
           if (this.inviteParticipant() === participant.id) this.inviteParticipant.set('');
-          this.guestNotice.set(
-            'Guest removed from new entries. Existing financial history is retained.',
-          );
+          this.guestNotice.set(translate('addMemberModal.guestRemovedFromNew'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
           this.dashboard.refresh();
         },
         error: (err) => {
           this.guestNotice.set(
-            (err?.error?.message ?? 'Could not confirm guest removal.') +
-              ' Review the roster and balances before trying again.',
+            (err?.error?.message ?? translate('addMemberModal.couldNotConfirmGuest')) +
+              ' ' +
+              translate('addMemberModal.reviewTheRosterAnd'),
           );
           this.saving.set(false);
           this.modal.setMutationPending(false);
@@ -250,17 +250,16 @@ export class AddMemberModalComponent {
         next: (active) => {
           this.inactiveGuests.update((rows) => rows.filter((p) => p.id !== active.id));
           this.participants.update((rows) => [...rows.filter((p) => p.id !== active.id), active]);
-          this.guestNotice.set(
-            'Guest re-added with the original identity. Historical entries can be reviewed or restored; earlier invitations stay revoked.',
-          );
+          this.guestNotice.set(translate('addMemberModal.guestReAddedWith'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
           this.dashboard.refresh();
         },
         error: (err) => {
           this.guestNotice.set(
-            (err?.error?.message ?? 'Guest re-add could not be confirmed.') +
-              ' Refresh the roster before trying again.',
+            (err?.error?.message ?? translate('addMemberModal.guestReAddCould')) +
+              ' ' +
+              translate('addMemberModal.refreshTheRosterBefore'),
           );
           this.saving.set(false);
           this.modal.setMutationPending(false);
@@ -289,9 +288,7 @@ export class AddMemberModalComponent {
           this.invitationsLoading.set(false);
         },
         error: () => {
-          this.invitationReadError.set(
-            'Invitation status unavailable. Read status again before making another decision.',
-          );
+          this.invitationReadError.set(translate('addMemberModal.invitationStatusUnavailableRead'));
           this.invitationsLoading.set(false);
         },
       });
@@ -325,9 +322,7 @@ export class AddMemberModalComponent {
           this.invitationRows.update((rows) => [row, ...rows.filter((i) => i.id !== row.id)]);
           this.emailUncertain.set(false);
           this.emailRetry = null;
-          this.invitationNotice.set(
-            'Invitation sent; acceptance is pending. This does not add an account or claim guest entries.',
-          );
+          this.invitationNotice.set(translate('addMemberModal.invitationSentAcceptanceIs'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
@@ -335,9 +330,10 @@ export class AddMemberModalComponent {
           this.emailUncertain.set(true);
           this.invitationNotice.set(
             err?.status === 503
-              ? 'Email delivery unavailable. No delivery or membership is confirmed. Retry the original invitation or review status.'
-              : (err?.error?.message ?? 'Invitation outcome uncertain.') +
-                  ' Review status or retry the original invitation.',
+              ? translate('addMemberModal.emailDeliveryUnavailableNo')
+              : (err?.error?.message ?? translate('addMemberModal.invitationOutcomeUncertain')) +
+                  ' ' +
+                  translate('addMemberModal.reviewStatusOrRetry'),
           );
           this.saving.set(false);
           this.modal.setMutationPending(false);
@@ -348,17 +344,10 @@ export class AddMemberModalComponent {
   reviewSeparateEmail(): void {
     if (this.session.version !== this.sessionVersion || this.saving() || !this.linkStatusReviewed())
       return;
-    if (
-      !window.confirm(
-        'Review invitation status first. The previous email may have been sent. Start a separate invitation with a new operation identity?',
-      )
-    )
-      return;
+    if (!window.confirm(translate('addMemberModal.reviewInvitationStatusFirst'))) return;
     this.emailRetry = null;
     this.emailUncertain.set(false);
-    this.invitationNotice.set(
-      'Review the recipient and guest before sending. Resend deliberately invalidates the earlier email link.',
-    );
+    this.invitationNotice.set(translate('addMemberModal.reviewTheRecipientAnd'));
   }
 
   generateLink(): void {
@@ -395,15 +384,11 @@ export class AddMemberModalComponent {
           ) {
             this.joinLink.set(url.href);
             this.joinLinkId = result.invitation.id;
-            this.invitationNotice.set(
-              'Join link created. Copy it now; it cannot be recovered later. It grants one join opportunity and never claims guest entries. Forwarding transfers that opportunity.',
-            );
+            this.invitationNotice.set(translate('addMemberModal.joinLinkCreatedCopy'));
           } else {
             this.linkUncertain.set(true);
             this.linkStatusReviewed.set(false);
-            this.invitationNotice.set(
-              'The link could not be displayed safely. Read status and revoke it before creating a replacement.',
-            );
+            this.invitationNotice.set(translate('addMemberModal.theLinkCouldNot'));
           }
           this.saving.set(false);
           this.modal.setMutationPending(false);
@@ -411,9 +396,7 @@ export class AddMemberModalComponent {
         error: () => {
           this.linkUncertain.set(true);
           this.linkStatusReviewed.set(false);
-          this.invitationNotice.set(
-            'The join link may already exist, but its secret cannot be recovered. Read invitation status, revoke any unknown pending link, then deliberately create a replacement.',
-          );
+          this.invitationNotice.set(translate('addMemberModal.theJoinLinkMay'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
@@ -437,14 +420,10 @@ export class AddMemberModalComponent {
     try {
       await navigator.clipboard.writeText(link);
       if (!this.destroyRef.destroyed && this.session.version === version)
-        this.invitationNotice.set(
-          'Join link copied. Share it deliberately; forwarding transfers its one join opportunity.',
-        );
+        this.invitationNotice.set(translate('addMemberModal.joinLinkCopiedShare'));
     } catch {
       if (!this.destroyRef.destroyed && this.session.version === version)
-        this.invitationNotice.set(
-          'Copy was unavailable. Select and copy the displayed link before closing this panel.',
-        );
+        this.invitationNotice.set(translate('addMemberModal.copyWasUnavailableSelect'));
     }
   }
 
@@ -470,16 +449,15 @@ export class AddMemberModalComponent {
             this.joinLink.set('');
             this.joinLinkId = '';
           }
-          this.invitationNotice.set(
-            'Invitation revoked. Accepted ownership is never undone by revocation.',
-          );
+          this.invitationNotice.set(translate('addMemberModal.invitationRevokedAcceptedOwnership'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
         error: (err) => {
           this.invitationNotice.set(
-            (err?.error?.message ?? 'Revocation could not be confirmed.') +
-              ' Read invitation status before another action.',
+            (err?.error?.message ?? translate('addMemberModal.revocationCouldNotBe')) +
+              ' ' +
+              translate('addMemberModal.readInvitationStatusBefore'),
           );
           this.saving.set(false);
           this.modal.setMutationPending(false);
@@ -530,7 +508,7 @@ export class AddMemberModalComponent {
           this.dashboard.refresh();
         },
         error: (err) => {
-          this.error.set(err?.error?.message ?? 'Could not add that member.');
+          this.error.set(err?.error?.message ?? translate('addMemberModal.couldNotAddThat'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },

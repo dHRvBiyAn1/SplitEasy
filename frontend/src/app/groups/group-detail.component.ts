@@ -26,6 +26,8 @@ import { GroupService } from './group.service';
 import { PaymentService } from '../payments/payment.service';
 import { RefundResponse } from '../payments/payment.models';
 import { financialRoster, ownedIdentities, viewerIdentity, GroupResponse } from './group.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { intlLocale, translate } from '../core/i18n/i18n.service';
 
 const CATEGORY_GLYPH: Record<ExpenseCategory, string> = {
   FOOD_DRINK: '☕',
@@ -45,7 +47,7 @@ interface MonthGroup {
 
 @Component({
   selector: 'app-group-detail',
-  imports: [RouterLink, GroupArtComponent],
+  imports: [TranslatePipe, RouterLink, GroupArtComponent],
   templateUrl: './group-detail.component.html',
   styleUrl: './group-detail.component.scss',
 })
@@ -266,8 +268,8 @@ export class GroupDetailComponent implements OnInit {
         }
         this.error.set(
           err?.status === 403
-            ? 'You are not a member of this group.'
-            : 'Could not load this group’s balances and expense history.',
+            ? translate('groupDetail.youAreNotA')
+            : translate('groupDetail.couldNotLoadThis'),
         );
         this.loading.set(false);
       },
@@ -318,7 +320,7 @@ export class GroupDetailComponent implements OnInit {
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (refunds) => this.refunds.set(refunds),
-        error: () => this.refundError.set('Could not load this expense\u2019s refunds. Try again.'),
+        error: () => this.refundError.set(translate('groupDetail.couldNotLoadThis2')),
       });
   }
 
@@ -336,17 +338,19 @@ export class GroupDetailComponent implements OnInit {
     const remaining =
       expense.amountMinor - this.refunds().reduce((sum, r) => sum + r.amountMinor, 0);
     if (minor === null || minor <= 0) {
-      this.refundError.set('Enter a refund amount greater than zero.');
+      this.refundError.set(translate('groupDetail.enterARefundAmount'));
       return;
     }
     if (minor > remaining) {
       this.refundError.set(
-        `Only ${this.display(remaining, currency)} is left to refund on this expense.`,
+        translate('groupDetail.onlyCurrencyIsLeft', {
+          currency: this.display(remaining, currency),
+        }),
       );
       return;
     }
     if (!this.refundedOn) {
-      this.refundError.set('Choose the date of the refund.');
+      this.refundError.set(translate('groupDetail.chooseTheDateOf'));
       return;
     }
     this.refundSaving.set(true);
@@ -370,8 +374,8 @@ export class GroupDetailComponent implements OnInit {
           this.refundSaving.set(false);
           this.refundError.set(
             err.status === 400
-              ? 'This refund is larger than what is left to refund, or in the wrong currency. Reload and review the expense.'
-              : 'Could not record this refund. Review the amount and try again.',
+              ? translate('groupDetail.thisRefundIsLarger')
+              : translate('groupDetail.couldNotRecordThis'),
           );
         },
       });
@@ -414,7 +418,7 @@ export class GroupDetailComponent implements OnInit {
       },
       error: () => {
         this.detailLoading.set(false);
-        this.detailError.set('Could not load this expense.');
+        this.detailError.set(translate('groupDetail.couldNotLoadThis3'));
       },
     });
   }
@@ -438,14 +442,12 @@ export class GroupDetailComponent implements OnInit {
     if (!Number.isSafeInteger(e.version) || e.version! < 0) {
       this.deleteError.set({
         expenseId: e.id,
-        message: 'Reload or upgrade the app before deleting this expense safely.',
+        message: translate('groupDetail.reloadOrUpgradeThe'),
       });
       return;
     }
     if (
-      !confirm(
-        `Delete "${e.description}"? You can restore it from Deleted expenses while this group exists.`,
-      )
+      !confirm(translate('groupDetail.deleteDescriptionYouCan', { description: e.description }))
     ) {
       return;
     }
@@ -462,7 +464,7 @@ export class GroupDetailComponent implements OnInit {
         this.deletingId.set(null);
         this.deleteError.set({
           expenseId: e.id,
-          message: err?.error?.message ?? 'Could not delete this expense. Please try again.',
+          message: err?.error?.message ?? translate('groupDetail.couldNotDeleteThis'),
         });
       },
     });
@@ -516,9 +518,7 @@ export class GroupDetailComponent implements OnInit {
           this.deletedExpenses.set([]);
           this.clearHistory();
         }
-        this.recoveryError.set(
-          err?.error?.message ?? 'Could not load deleted expenses. Reload before restoring.',
-        );
+        this.recoveryError.set(err?.error?.message ?? translate('groupDetail.couldNotLoadDeleted'));
       },
     });
   }
@@ -536,7 +536,7 @@ export class GroupDetailComponent implements OnInit {
     if (!Number.isSafeInteger(expense.version) || expense.version! < 0) {
       this.restoreError.set({
         expenseId: expense.id,
-        message: 'Reload or upgrade the app before restoring this expense safely.',
+        message: translate('groupDetail.reloadOrUpgradeThe2'),
       });
       this.recoveryNeedsReview.set(true);
       return;
@@ -552,7 +552,7 @@ export class GroupDetailComponent implements OnInit {
         this.deletedExpenses.update((expenses) =>
           expenses.filter((entry) => entry.expense.id !== expense.id),
         );
-        this.recoveryNotice.set('Expense restored. Balances have been recalculated.');
+        this.recoveryNotice.set(translate('groupDetail.expenseRestoredBalancesHave'));
         this.dashboard.refresh();
       },
       error: (err) => {
@@ -562,9 +562,8 @@ export class GroupDetailComponent implements OnInit {
           expenseId: expense.id,
           message:
             !err?.status || err.status >= 500
-              ? 'Could not confirm restoration. Reload deleted expenses and review current balances before trying again.'
-              : (err?.error?.message ??
-                'Could not restore this expense. Reload and review the latest changes.'),
+              ? translate('groupDetail.couldNotConfirmRestoration')
+              : (err?.error?.message ?? translate('groupDetail.couldNotRestoreThis')),
         });
       },
     });
@@ -572,11 +571,11 @@ export class GroupDetailComponent implements OnInit {
 
   splitLabel(type: ExpenseResponse['splitType']): string {
     return {
-      EQUAL: 'Equal',
-      UNEQUAL: 'Exact amounts',
-      PERCENTAGE: 'Percentages',
-      WEIGHTS: 'Weights',
-      ADJUSTMENTS: 'Adjustments',
+      EQUAL: translate('groupDetail.equal'),
+      UNEQUAL: translate('personalExpenses.exactAmounts'),
+      PERCENTAGE: translate('groupDetail.percentages'),
+      WEIGHTS: translate('newExpenseModal.weights'),
+      ADJUSTMENTS: translate('newExpenseModal.adjustments'),
     }[type];
   }
 
@@ -607,37 +606,37 @@ export class GroupDetailComponent implements OnInit {
       },
       error: (err) => {
         this.historyLoading.set(false);
-        this.historyError.set(
-          err?.error?.message ?? 'Could not load expense history. Please try again.',
-        );
+        this.historyError.set(err?.error?.message ?? translate('groupDetail.couldNotLoadExpense'));
       },
     });
   }
 
   revisionLabel(action: ExpenseRevision['action']): string {
     return {
-      IMPORTED: 'Imported baseline',
-      CREATED: 'Created',
-      REPLACED: 'Replaced',
-      DELETED: 'Deleted',
-      RESTORED: 'Restored',
+      IMPORTED: translate('groupDetail.importedBaseline'),
+      CREATED: translate('groupDetail.created'),
+      REPLACED: translate('groupDetail.replaced'),
+      DELETED: translate('groupDetail.deleted'),
+      RESTORED: translate('groupDetail.restored'),
     }[action];
   }
 
   recordedDate(iso: string): string {
-    return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    return new Date(iso).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   inputName(snapshot: ExpenseResponse, userId: string): string {
     return (
       snapshot.participants.find((participant) => participant.user.id === userId)?.user
-        .displayName ?? 'Participant'
+        .displayName ?? translate('groupDetail.participant')
     );
   }
 
   /** Detail-row label: "You owe" / "Priya owes" for each participant's share. */
   partLabel(p: SplitShare): string {
-    return this.isOwned(p.user.id) ? 'You owe' : `${p.user.displayName.split(/\s+/)[0]} owes`;
+    return this.isOwned(p.user.id)
+      ? translate('dashboard.youOwe')
+      : translate('groupDetail.v1Owes', { v1: p.user.displayName.split(/\s+/)[0] });
   }
 
   meId(): string {
@@ -662,7 +661,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   firstName(u: ParticipantSummary): string {
-    return this.isOwned(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
+    return this.isOwned(u.id) ? translate('dashboard.you') : u.displayName.split(/\s+/)[0];
   }
 
   memberNames(g: GroupResponse): string {
@@ -709,15 +708,17 @@ export class GroupDetailComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: () => this.reminderNotice.set(`Reminder sent to ${name}`),
+        next: () => this.reminderNotice.set(translate('groupDetail.reminderSentToName', { name })),
         error: (err) =>
-          this.reminderError.set(err?.error?.message ?? 'Could not send the reminder.'),
+          this.reminderError.set(err?.error?.message ?? translate('groupDetail.couldNotSendThe')),
       });
   }
 
   pillLabel(b: PersonBalance): string {
     const name = b.user.displayName.split(/\s+/)[0];
-    return b.netMinor > 0 ? `${name} owes you` : `you owe ${name}`;
+    return b.netMinor > 0
+      ? translate('groupDetail.nameOwesYou', { name })
+      : translate('groupDetail.youOweName', { name });
   }
 
   categoryGlyph(c: ExpenseCategory): string {
@@ -725,26 +726,31 @@ export class GroupDetailComponent implements OnInit {
   }
 
   paidSub(e: ExpenseSummary): string {
-    const who = this.isOwned(e.paidBy.id) ? 'You' : e.paidBy.displayName.split(/\s+/)[0];
+    const who = this.isOwned(e.paidBy.id)
+      ? translate('dashboard.you')
+      : e.paidBy.displayName.split(/\s+/)[0];
     const others = (e.payerCount ?? 1) - 1;
-    const names = others > 0 ? `${who} and ${others} other${others > 1 ? 's' : ''}` : who;
-    return `${names} paid ${this.display(e.amountMinor, e.currency)}`;
+    const names = others > 0 ? translate('groupDetail.whoAndOthers', { who, count: others }) : who;
+    return translate('groupDetail.namesPaidCurrency', {
+      names,
+      currency: this.display(e.amountMinor, e.currency),
+    });
   }
 
   deltaLabel(e: ExpenseSummary): string {
-    if (e.viewerDeltaMinor > 0) return 'you lent';
-    if (e.viewerDeltaMinor < 0) return 'you borrowed';
-    return 'not involved';
+    if (e.viewerDeltaMinor > 0) return translate('groupDetail.youLent');
+    if (e.viewerDeltaMinor < 0) return translate('groupDetail.youBorrowed');
+    return translate('groupDetail.notInvolved');
   }
 
   private monthLabel(iso: string): string {
     return new Date(iso + 'T00:00:00')
-      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      .toLocaleDateString(intlLocale(), { month: 'long', year: 'numeric' })
       .toUpperCase();
   }
 
   fullDate(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    return new Date(iso + 'T00:00:00').toLocaleDateString(intlLocale(), {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -757,7 +763,7 @@ export class GroupDetailComponent implements OnInit {
 
   dayMon(iso: string): string {
     return new Date(iso + 'T00:00:00')
-      .toLocaleDateString('en-US', { month: 'short' })
+      .toLocaleDateString(intlLocale(), { month: 'short' })
       .toUpperCase();
   }
 }

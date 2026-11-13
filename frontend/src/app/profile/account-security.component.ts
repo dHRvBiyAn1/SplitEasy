@@ -14,15 +14,19 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { takeUntil } from 'rxjs';
 import { ProfileService } from '../core/profile.service';
 import { SessionService } from '../core/auth/session.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-account-security',
-  imports: [ReactiveFormsModule],
+  imports: [TranslatePipe, ReactiveFormsModule],
   template: `<section class="dc-card security" aria-labelledby="account-security-title">
-    <h2 id="account-security-title">Account security</h2>
+    <h2 id="account-security-title">{{ 'accountSecurity.accountSecurity' | t }}</h2>
     <p>
       <span class="security__badge">{{
-        profile.data()?.emailVerified ? 'Email verified' : 'Email not verified'
+        profile.data()?.emailVerified
+          ? ('accountSecurity.emailVerified' | t)
+          : ('accountSecurity.emailNotVerified' | t)
       }}</span>
     </p>
     @if (!profile.data()?.emailVerified) {
@@ -32,7 +36,7 @@ import { SessionService } from '../core/auth/session.service';
         [disabled]="pending()"
         (click)="requestVerification()"
       >
-        Send verification link
+        {{ 'accountSecurity.sendVerificationLink' | t }}
       </button>
     }
     @if (mode() === '') {
@@ -42,14 +46,14 @@ import { SessionService } from '../core/auth/session.service';
         [disabled]="pending()"
         (click)="mode.set('password')"
       >
-        Change password</button
+        {{ 'accountSecurity.changePassword' | t }}</button
       ><button
         class="dc-btn-outline"
         type="button"
         [disabled]="pending()"
         (click)="mode.set('email')"
       >
-        Change email
+        {{ 'accountSecurity.changeEmail' | t }}
       </button>
     }
     @if (mode() === 'password') {
@@ -71,27 +75,27 @@ import { SessionService } from '../core/auth/session.service';
             role="alert"
             aria-labelledby="password-errors-title"
           >
-            <p id="password-errors-title">Check these password fields:</p>
+            <p id="password-errors-title">{{ 'accountSecurity.checkThesePasswordFields' | t }}</p>
             <ul>
               <li>
                 <a
                   href="#security-current-password"
                   (click)="$event.preventDefault(); focusTarget('security-current-password')"
-                  >Enter your current password (at most 72 UTF-8 bytes).</a
+                  >{{ 'accountSecurity.enterYourCurrentPassword' | t }}</a
                 >
               </li>
               <li>
                 <a
                   href="#security-new-password"
                   (click)="$event.preventDefault(); focusTarget('security-new-password')"
-                  >Use a new password of at least 8 characters and at most 72 UTF-8 bytes.</a
+                  >{{ 'accountSecurity.useANewPassword' | t }}</a
                 >
               </li>
             </ul>
           </div>
         }
         <label
-          ><span class="dc-field-label">Current password</span
+          ><span class="dc-field-label">{{ 'common.currentPassword' | t }}</span
           ><input
             id="security-current-password"
             class="dc-field"
@@ -106,7 +110,7 @@ import { SessionService } from '../core/auth/session.service';
             aria-describedby="security-password-hint"
         /></label>
         <label
-          ><span class="dc-field-label">New password</span
+          ><span class="dc-field-label">{{ 'common.newPassword' | t }}</span
           ><input
             id="security-new-password"
             class="dc-field"
@@ -120,14 +124,13 @@ import { SessionService } from '../core/auth/session.service';
             aria-describedby="security-password-hint"
         /></label>
         <p id="security-password-hint">
-          Enter your current password. New passwords need at least 8 characters and at most 72 UTF-8
-          bytes.
+          {{ 'accountSecurity.enterYourCurrentPassword2' | t }}
         </p>
         <button class="dc-btn-accent" type="submit" [disabled]="pending()">
-          {{ pending() ? 'Saving…' : 'Save password' }}
+          {{ pending() ? ('profile.saving' | t) : ('accountSecurity.savePassword' | t) }}
         </button>
         <button class="dc-btn-outline" type="button" [disabled]="pending()" (click)="cancel()">
-          Cancel
+          {{ 'common.cancel' | t }}
         </button>
       </form>
     }
@@ -140,27 +143,27 @@ import { SessionService } from '../core/auth/session.service';
           emailForm.controls.email.invalid
         ) {
           <div id="email-errors" tabindex="-1" role="alert" aria-labelledby="email-errors-title">
-            <p id="email-errors-title">Check these email-change fields:</p>
+            <p id="email-errors-title">{{ 'accountSecurity.checkTheseEmailChange' | t }}</p>
             <ul>
               <li>
                 <a
                   href="#email-current-password"
                   (click)="$event.preventDefault(); focusTarget('email-current-password')"
-                  >Enter your current password (at most 72 UTF-8 bytes).</a
+                  >{{ 'accountSecurity.enterYourCurrentPassword' | t }}</a
                 >
               </li>
               <li>
                 <a
                   href="#security-new-email"
                   (click)="$event.preventDefault(); focusTarget('security-new-email')"
-                  >Enter a valid new email address of at most 254 characters.</a
+                  >{{ 'accountSecurity.enterAValidNew' | t }}</a
                 >
               </li>
             </ul>
           </div>
         }
         <label
-          ><span class="dc-field-label">Current password</span
+          ><span class="dc-field-label">{{ 'common.currentPassword' | t }}</span
           ><input
             id="email-current-password"
             class="dc-field"
@@ -175,7 +178,7 @@ import { SessionService } from '../core/auth/session.service';
             aria-describedby="email-change-hint"
         /></label>
         <label
-          ><span class="dc-field-label">New email</span
+          ><span class="dc-field-label">{{ 'accountSecurity.newEmail' | t }}</span
           ><input
             id="security-new-email"
             class="dc-field"
@@ -189,14 +192,17 @@ import { SessionService } from '../core/auth/session.service';
             aria-describedby="email-change-hint"
         /></label>
         <p id="email-change-hint">
-          Enter your current password (at most 72 UTF-8 bytes) and a valid new email. Your current
-          email remains your login until confirmation in the new mailbox.
+          {{ 'accountSecurity.enterYourCurrentPassword3' | t }}
         </p>
         <button class="dc-btn-accent" type="submit" [disabled]="pending()">
-          {{ pending() ? 'Requesting…' : 'Request email change' }}
+          {{
+            pending()
+              ? ('forgotPassword.requesting' | t)
+              : ('accountSecurity.requestEmailChange' | t)
+          }}
         </button>
         <button class="dc-btn-outline" type="button" [disabled]="pending()" (click)="cancel()">
-          Cancel
+          {{ 'common.cancel' | t }}
         </button>
       </form>
     }
@@ -305,11 +311,7 @@ export class AccountSecurityComponent {
           this.auth.clearSession();
           this.router.navigate(['/login'], { queryParams: { reason: 'password-changed' } });
         },
-        error: (err) =>
-          this.failure(
-            err,
-            'Password could not be changed. Check your current password and try again.',
-          ),
+        error: (err) => this.failure(err, translate('accountSecurity.passwordCouldNotBe')),
       });
   }
   changeEmail(): void {
@@ -339,15 +341,15 @@ export class AccountSecurityComponent {
           this.pending.set(false);
           this.cancel();
           this.message.set(
-            `A confirmation link may arrive at ${email.trim()}; your current email remains your login until confirmation. Retry or contact support if it does not arrive.`,
+            translate('accountSecurity.aConfirmationLinkMay', { trim: email.trim() }),
           );
         },
         error: (err) =>
           this.failure(
             err,
             err.status === 409
-              ? 'This email is already in use. Choose another email.'
-              : 'Email change could not be requested. Check your current password and try again.',
+              ? translate('accountSecurity.thisEmailIsAlready')
+              : translate('accountSecurity.emailChangeCouldNot'),
           ),
       });
   }
@@ -356,9 +358,9 @@ export class AccountSecurityComponent {
     this.pending.set(false);
     this.error.set(
       err.status === 429
-        ? 'Too many attempts. Please wait before trying again.'
+        ? translate('accountAction.tooManyAttemptsPlease')
         : err.status === 503
-          ? 'Email is temporarily unavailable. Please try again later.'
+          ? translate('forgotPassword.emailIsTemporarilyUnavailable')
           : fallback,
     );
   }
@@ -373,11 +375,9 @@ export class AccountSecurityComponent {
       .subscribe({
         next: () => {
           this.pending.set(false);
-          this.message.set(
-            'A verification link may arrive; retry or contact support if it does not.',
-          );
+          this.message.set(translate('accountSecurity.aVerificationLinkMay'));
         },
-        error: (err) => this.failure(err, 'Unable to request a verification link. Try again.'),
+        error: (err) => this.failure(err, translate('accountSecurity.unableToRequestA')),
       });
   }
 }

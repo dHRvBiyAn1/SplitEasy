@@ -1,19 +1,21 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Subscription, takeUntil } from 'rxjs';
 import { describeEvent } from '../activity/activity.models';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { NotificationItem, NotificationService } from './notification.service';
+import { LocaleDatePipe } from '../core/i18n/locale-date.pipe';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-notifications',
-  imports: [DatePipe, RouterLink],
+  imports: [TranslatePipe, LocaleDatePipe, RouterLink],
   template: `
     <section class="notes" aria-labelledby="notes-heading">
-      <h1 id="notes-heading">Notifications</h1>
+      <h1 id="notes-heading">{{ 'common.notifications' | t }}</h1>
       <div class="actions">
         <button
           class="dc-btn-outline"
@@ -21,40 +23,40 @@ import { NotificationItem, NotificationService } from './notification.service';
           [disabled]="!service.unread()"
           (click)="markAll()"
         >
-          Mark all as read
+          {{ 'notifications.markAllAsRead' | t }}
         </button>
-        <a routerLink="/activity">See all activity</a>
+        <a routerLink="/activity">{{ 'notifications.seeAllActivity' | t }}</a>
       </div>
       @if (actionError()) {
         <p role="alert">{{ actionError() }}</p>
       }
       @if (loading()) {
-        <p role="status">Loading notifications…</p>
+        <p role="status">{{ 'notifications.loadingNotifications' | t }}</p>
       } @else {
         @if (error()) {
           <div role="alert">
             <p>{{ error() }}</p>
             <button class="dc-btn" type="button" (click)="nextCursor() ? loadMore() : load()">
-              Try again
+              {{ 'common.tryAgain' | t }}
             </button>
           </div>
         }
         @if (!items().length && !error()) {
-          <p>You have no notifications.</p>
+          <p>{{ 'notifications.youHaveNoNotifications' | t }}</p>
         }
         <ul class="events">
           @for (n of items(); track n.id) {
             <li [class.unread]="!n.readAt">
               <p>{{ describe(n.event) }}</p>
               <p class="meta">
-                <time [attr.datetime]="n.createdAt">{{ n.createdAt | date: 'medium' }}</time>
+                <time [attr.datetime]="n.createdAt">{{ n.createdAt | ldate }}</time>
                 @if (!n.readAt) {
                   ·
                   <button class="dc-btn-ghost" type="button" (click)="markRead(n)">
-                    Mark as read
+                    {{ 'notifications.markAsRead' | t }}
                   </button>
                 } @else {
-                  · Read
+                  {{ 'notifications.read' | t }}
                 }
               </p>
             </li>
@@ -67,7 +69,7 @@ import { NotificationItem, NotificationService } from './notification.service';
             [disabled]="loadingMore()"
             (click)="loadMore()"
           >
-            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+            {{ loadingMore() ? ('history.loading' | t) : ('history.loadMore' | t) }}
           </button>
         }
       }
@@ -138,7 +140,7 @@ export class NotificationsComponent {
       this.nextCursor.set(null);
       this.loading.set(false);
       this.loadingMore.set(false);
-      this.error.set('Session changed. Try again to load notifications.');
+      this.error.set(translate('notifications.sessionChangedTryAgain'));
     });
     this.load();
   }
@@ -162,7 +164,7 @@ export class NotificationsComponent {
       },
       error: () => {
         this.loading.set(false);
-        this.error.set('Could not load notifications. Try again.');
+        this.error.set(translate('notifications.couldNotLoadNotifications'));
       },
     });
   }
@@ -180,7 +182,7 @@ export class NotificationsComponent {
       },
       error: () => {
         this.loadingMore.set(false);
-        this.error.set('Could not load more notifications. Try again.');
+        this.error.set(translate('notifications.couldNotLoadMore'));
       },
     });
   }
@@ -192,7 +194,7 @@ export class NotificationsComponent {
         this.items.update((rows) =>
           rows.map((r) => (r.id === n.id ? { ...r, readAt: new Date().toISOString() } : r)),
         ),
-      error: () => this.actionError.set('Could not mark that notification as read. Try again.'),
+      error: () => this.actionError.set(translate('notifications.couldNotMarkThat')),
     });
   }
 
@@ -203,7 +205,7 @@ export class NotificationsComponent {
         const now = new Date().toISOString();
         this.items.update((rows) => rows.map((r) => ({ ...r, readAt: r.readAt ?? now })));
       },
-      error: () => this.actionError.set('Could not mark notifications as read. Try again.'),
+      error: () => this.actionError.set(translate('notifications.couldNotMarkNotifications')),
     });
   }
 }

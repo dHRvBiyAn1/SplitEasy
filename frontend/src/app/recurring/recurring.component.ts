@@ -6,17 +6,25 @@ import { SessionService } from '../core/auth/session.service';
 import { Currency, amountToMinor, minorToDisplay } from '../shared/currency';
 import { Frequency, RecurringSchedule } from './recurring.models';
 import { RecurringService } from './recurring.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const FREQUENCY_LABEL: Record<Frequency, string> = {
-  DAILY: 'Every day',
-  WEEKLY: 'Every week',
-  MONTHLY: 'Every month',
+  get DAILY() {
+    return translate('recurring.everyDay');
+  },
+  get WEEKLY() {
+    return translate('recurring.everyWeek');
+  },
+  get MONTHLY() {
+    return translate('recurring.everyMonth');
+  },
 };
 
 /** A group's recurring expenses: change future occurrences, cancel, and see why one halted. */
 @Component({
   selector: 'app-recurring',
-  imports: [RouterLink],
+  imports: [TranslatePipe, RouterLink],
   templateUrl: './recurring.component.html',
   styleUrl: './recurring.component.scss',
 })
@@ -44,7 +52,7 @@ export class RecurringComponent {
       this.scope.next();
       this.schedules.set([]);
       this.editing.set(null);
-      this.error.set('Session changed. Reload to see recurring expenses.');
+      this.error.set(translate('recurring.sessionChangedReloadTo'));
     });
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       this.scope.next();
@@ -66,7 +74,7 @@ export class RecurringComponent {
           this.loading.set(false);
         },
         error: () => {
-          this.error.set('Could not load recurring expenses.');
+          this.error.set(translate('recurring.couldNotLoadRecurring'));
           this.loading.set(false);
         },
       });
@@ -100,7 +108,7 @@ export class RecurringComponent {
     if (this.canEditAmount(s)) {
       const minor = amountToMinor(this.amount, s.template.currency ?? 'USD', false);
       if (!Number.isSafeInteger(minor) || minor <= 0) {
-        this.error.set('Enter a valid positive amount.');
+        this.error.set(translate('recurring.enterAValidPositive'));
         return;
       }
       template.amountMinor = minor;
@@ -115,12 +123,12 @@ export class RecurringComponent {
         timeZone: s.timeZone,
         expectedVersion: s.version,
       }),
-      'Could not save. Reload and try again if it changed elsewhere.',
+      translate('recurring.couldNotSaveReload'),
     );
   }
 
   protected cancel(s: RecurringSchedule): void {
-    this.run(this.service.cancel(this.groupId, s.id), 'Could not cancel this schedule.');
+    this.run(this.service.cancel(this.groupId, s.id), translate('recurring.couldNotCancelThis'));
   }
 
   private run(call: Observable<RecurringSchedule>, failure: string): void {

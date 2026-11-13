@@ -16,7 +16,7 @@ import {
   PendingWrite,
   PendingWriteError,
   PendingWritesService,
-  UNCERTAIN_WRITE,
+  uncertainWrite,
 } from '../core/pending-writes.service';
 import {
   ContributionInput,
@@ -25,6 +25,8 @@ import {
   ExpenseSummary,
 } from '../expenses/expense.models';
 import { FriendService } from './friend.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /**
  * Non-group expenses with one saved friend (G02.2). Every entry belongs to the pair, never to a
@@ -32,7 +34,7 @@ import { FriendService } from './friend.service';
  */
 @Component({
   selector: 'app-personal-expenses',
-  imports: [MoneyComponent],
+  imports: [TranslatePipe, MoneyComponent],
   templateUrl: './personal-expenses.component.html',
   styleUrl: './personal-expenses.component.scss',
 })
@@ -118,7 +120,7 @@ export class PersonalExpensesComponent {
       this.deleting.set(null);
       this.needsReview.set(false);
       this.retryNotice.set(null);
-      this.error.set('Session changed. Reopen this friend for the current account.');
+      this.error.set(translate('personalExpenses.sessionChangedReopenThis'));
     });
   }
 
@@ -194,9 +196,7 @@ export class PersonalExpensesComponent {
         error: () => {
           this.loading.set(false);
           this.expenses.set([]);
-          this.error.set(
-            'Could not load personal expenses, so no total is shown. Try again to review them.',
-          );
+          this.error.set(translate('personalExpenses.couldNotLoadPersonal'));
         },
       });
   }
@@ -242,16 +242,14 @@ export class PersonalExpensesComponent {
           this.convertedFrom.set(
             e.splitType === 'EQUAL' || e.splitType === 'UNEQUAL'
               ? null
-              : { PERCENTAGE: 'percentages', WEIGHTS: 'weights', ADJUSTMENTS: 'adjustments' }[
-                  e.splitType
-                ],
+              : translate(`personalExpenses.splitBy.${e.splitType}`),
           );
           this.applyShares(e.splitType === 'UNEQUAL' ? e.splits : null, e.participants);
         },
         error: () => {
           if (this.editing !== id) return;
           this.resetForm();
-          this.error.set('Could not load this personal expense. Try again to review it.');
+          this.error.set(translate('personalExpenses.couldNotLoadThis'));
         },
       });
   }
@@ -354,16 +352,20 @@ export class PersonalExpensesComponent {
         this.saving.set(false);
         this.restored = null;
         this.retryNotice.set(null);
-        this.notice.set(this.editing ? 'Personal expense updated.' : 'Personal expense added.');
+        this.notice.set(
+          this.editing
+            ? translate('personalExpenses.personalExpenseUpdated')
+            : translate('personalExpenses.personalExpenseAdded'),
+        );
         this.resetForm();
         this.dashboard.refresh();
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.message ?? 'Could not save the personal expense.');
+        this.error.set(err?.error?.message ?? translate('personalExpenses.couldNotSaveThe'));
         if (!this.editing) {
           this.needsReview.set(true);
-          this.retryNotice.set(UNCERTAIN_WRITE);
+          this.retryNotice.set(uncertainWrite());
         }
       },
     });
@@ -381,19 +383,11 @@ export class PersonalExpensesComponent {
   }
 
   protected startSeparate(): void {
-    if (
-      this.saving() ||
-      !confirm(
-        'The previous expense may already have been saved. Check personal expenses first. Start a separate expense anyway?',
-      )
-    )
-      return;
+    if (this.saving() || !confirm(translate('personalExpenses.thePreviousExpenseMay'))) return;
     try {
       this.pendingWrites.abandon('expense');
     } catch {
-      this.error.set(
-        'Cannot clear the saved retry identity. Enable browser storage and try again.',
-      );
+      this.error.set(translate('personalExpenses.cannotClearTheSaved'));
       return;
     }
     this.restored = null;
@@ -429,9 +423,7 @@ export class PersonalExpensesComponent {
         error: () => {
           this.deletedEntries.set([]);
           this.deletedLoading.set(false);
-          this.deletedError.set(
-            'Could not load deleted personal expenses. Try again to review them.',
-          );
+          this.deletedError.set(translate('personalExpenses.couldNotLoadDeleted'));
         },
       });
   }
@@ -440,9 +432,7 @@ export class PersonalExpensesComponent {
     const version = entry.expense.version;
     if (this.restoring() || this.deletedLoading()) return;
     if (version === undefined || !Number.isSafeInteger(version)) {
-      this.deletedError.set(
-        'Reload deleted expenses before restoring, so it is not applied twice.',
-      );
+      this.deletedError.set(translate('personalExpenses.reloadDeletedExpensesBefore'));
       return;
     }
     this.restoring.set(entry.expense.id);
@@ -456,15 +446,15 @@ export class PersonalExpensesComponent {
           this.deletedEntries.update((rows) =>
             rows.filter((r) => r.expense.id !== entry.expense.id),
           );
-          this.notice.set('Personal expense restored.');
+          this.notice.set(translate('personalExpenses.personalExpenseRestored'));
           this.dashboard.refresh();
         },
         error: (err) => {
           this.restoring.set(null);
           this.deletedError.set(
             !err?.status || err.status >= 500
-              ? 'Could not confirm the restore. Reload deleted expenses and check entries before trying again.'
-              : (err?.error?.message ?? 'Could not restore this expense. Reload and review it.'),
+              ? translate('personalExpenses.couldNotConfirmThe')
+              : (err?.error?.message ?? translate('personalExpenses.couldNotRestoreThis')),
           );
         },
       });
@@ -473,7 +463,7 @@ export class PersonalExpensesComponent {
   protected remove(row: ExpenseSummary): void {
     if (this.saving() || this.deleting() || this.needsReview()) return;
     if (row.version === undefined || !Number.isSafeInteger(row.version)) {
-      this.error.set('Reload this friend before deleting, so the change is not applied twice.');
+      this.error.set(translate('personalExpenses.reloadThisFriendBefore'));
       return;
     }
     this.deleting.set(row.id);
@@ -484,15 +474,12 @@ export class PersonalExpensesComponent {
       .subscribe({
         next: () => {
           this.deleting.set(null);
-          this.notice.set('Personal expense deleted.');
+          this.notice.set(translate('personalExpenses.personalExpenseDeleted'));
           this.dashboard.refresh();
         },
         error: (err) => {
           this.deleting.set(null);
-          this.error.set(
-            err?.error?.message ??
-              'Could not delete this personal expense. Reload to review the current entry.',
-          );
+          this.error.set(err?.error?.message ?? translate('personalExpenses.couldNotDeleteThis'));
         },
       });
   }
@@ -506,7 +493,7 @@ export class PersonalExpensesComponent {
       this.retryNotice.set(
         err instanceof PendingWriteError
           ? err.message
-          : 'Cannot read the saved retry draft. Check entries before starting a separate one.',
+          : translate('personalExpenses.cannotReadTheSaved'),
       );
       return;
     }
@@ -523,6 +510,6 @@ export class PersonalExpensesComponent {
     this.mine.set('');
     this.theirs.set('');
     this.applyShares(request.splits, []);
-    this.retryNotice.set(UNCERTAIN_WRITE);
+    this.retryNotice.set(uncertainWrite());
   }
 }

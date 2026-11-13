@@ -8,11 +8,13 @@
     (submit)="$event.preventDefault(); save()"
   >
     @if (groupOptions().length === 0 && !groupId()) {
-      <p class="mform__lead">Create a group before adding an expense.</p>
-      <button type="button" class="dc-btn-outline" (click)="createGroup()">Create a group</button>
+      <p class="mform__lead">{{ 'newExpenseModal.createAGroupBefore' | t }}</p>
+      <button type="button" class="dc-btn-outline" (click)="createGroup()">
+        {{ 'newExpenseModal.createAGroup' | t }}
+      </button>
     } @else {
       <div class="mform__field">
-        <span class="dc-field-label">Group</span>
+        <span class="dc-field-label">{{ 'common.group' | t }}</span>
         <div class="chips">
           @for (g of groupOptions(); track g.id) {
             <button
@@ -30,18 +32,18 @@
       </div>
 
       <div class="mform__field">
-        <label class="dc-field-label" for="ne-desc">Description</label>
+        <label class="dc-field-label" for="ne-desc">{{ 'common.description' | t }}</label>
         <input
           id="ne-desc"
           class="dc-field"
           [formControl]="description"
-          placeholder="What was it for?"
+          [placeholder]="'newExpenseModal.whatWasItFor' | t"
           autocomplete="off"
         />
       </div>
 
       <div class="mform__field">
-        <label class="dc-field-label" for="ne-currency">Currency</label>
+        <label class="dc-field-label" for="ne-currency">{{ 'common.currency' | t }}</label>
         <select
           id="ne-currency"
           class="dc-field"
@@ -55,18 +57,21 @@
         </select>
         @if (editId) {
           <p class="mform__hint">
-            Currency is fixed for recorded expenses. Create a separate expense to use another
-            currency.
+            {{ 'newExpenseModal.currencyIsFixedFor' | t }}
           </p>
         }
         <p class="mform__hint">
-          {{ currency() }} uses {{ precision() }} decimal places. Enter an exact amount at this
-          precision.
+          {{
+            'newExpenseModal.currencyUsesPrecisionDecimal'
+              | t: { currency: currency(), precision: precision() }
+          }}
         </p>
       </div>
       <div class="mform__grid2">
         <div class="mform__field">
-          <label class="dc-field-label" for="ne-amt">Amount ({{ currency() }})</label>
+          <label class="dc-field-label" for="ne-amt">{{
+            'newExpenseModal.amountCurrency' | t: { currency: currency() }
+          }}</label>
           <input
             id="ne-amt"
             class="dc-field"
@@ -80,30 +85,40 @@
             [placeholder]="display(0)"
           />
           <p id="ne-amount-hint" class="mform__hint">
-            Use a dot for decimals, without grouping. Maximum {{ currency() }}
-            {{ display(maxAmountMinor) }}.
+            {{
+              'newExpenseModal.useADotFor'
+                | t: { currency: currency(), maxAmountMinor: display(maxAmountMinor) }
+            }}
           </p>
         </div>
         <div class="mform__field">
-          <label class="dc-field-label" for="ne-date">Date</label>
+          <label class="dc-field-label" for="ne-date">{{ 'common.date' | t }}</label>
           <input id="ne-date" class="dc-field" type="date" [formControl]="date" />
         </div>
       </div>
 
       @if (!editId) {
         <div class="mform__field">
-          <label class="dc-field-label" for="ne-repeat">Repeat</label>
+          <label class="dc-field-label" for="ne-repeat">{{ 'newExpenseModal.repeat' | t }}</label>
           <select id="ne-repeat" class="dc-field" (change)="repeat.set($any($event.target).value)">
-            <option value="NEVER" [selected]="repeat() === 'NEVER'">Never</option>
-            <option value="DAILY" [selected]="repeat() === 'DAILY'">Daily</option>
-            <option value="WEEKLY" [selected]="repeat() === 'WEEKLY'">Weekly</option>
-            <option value="MONTHLY" [selected]="repeat() === 'MONTHLY'">Monthly</option>
+            <option value="NEVER" [selected]="repeat() === 'NEVER'">
+              {{ 'newExpenseModal.never' | t }}
+            </option>
+            <option value="DAILY" [selected]="repeat() === 'DAILY'">
+              {{ 'newExpenseModal.daily' | t }}
+            </option>
+            <option value="WEEKLY" [selected]="repeat() === 'WEEKLY'">
+              {{ 'newExpenseModal.weekly' | t }}
+            </option>
+            <option value="MONTHLY" [selected]="repeat() === 'MONTHLY'">
+              {{ 'newExpenseModal.monthly' | t }}
+            </option>
           </select>
         </div>
       }
 
       <div class="mform__field">
-        <span class="dc-field-label">Category</span>
+        <span class="dc-field-label">{{ 'newExpenseModal.category' | t }}</span>
         <div class="chips">
           @for (c of categories; track c.value) {
             <button
@@ -120,7 +135,9 @@
       </div>
 
       <div class="mform__field">
-        <span class="dc-field-label">{{ multiPayer() ? 'Primary payer' : 'Paid by' }}</span>
+        <span class="dc-field-label">{{
+          multiPayer() ? ('newExpenseModal.primaryPayer' | t) : ('newExpenseModal.paidBy' | t)
+        }}</span>
         <div class="chips">
           @for (m of members(); track m.id) {
             <button
@@ -148,11 +165,11 @@
           [attr.aria-pressed]="multiPayer()"
           (click)="multiPayer.set(!multiPayer())"
         >
-          Multiple people paid
+          {{ 'newExpenseModal.multiplePeoplePaid' | t }}
         </button>
         @if (multiPayer()) {
           <p class="mform__hint">
-            Enter what each person paid. The person selected above covers any rounding.
+            {{ 'newExpenseModal.enterWhatEachPerson' | t }}
           </p>
           <div class="prows">
             @for (m of members(); track m.id) {
@@ -167,7 +184,10 @@
                   inputmode="decimal"
                   maxlength="32"
                   [attr.data-payer]="m.id"
-                  [attr.aria-label]="memberLabel(m) + ' paid in ' + currency()"
+                  [attr.aria-label]="
+                    'newExpenseModal.payerPaidIn'
+                      | t: { name: memberLabel(m), currency: currency() }
+                  "
                   [value]="payerValues()[m.id] || ''"
                   (input)="setPayerValue(m.id, $any($event.target).value)"
                   [placeholder]="currency()"
@@ -187,42 +207,42 @@
       </div>
 
       <div class="mform__field">
-        <span class="dc-field-label">Split</span>
-        <div class="seg" role="group" aria-label="Split type">
+        <span class="dc-field-label">{{ 'newExpenseModal.split' | t }}</span>
+        <div class="seg" role="group" [attr.aria-label]="'newExpenseModal.splitType' | t">
           <button
             type="button"
             [attr.aria-pressed]="splitType() === 'EQUAL'"
             (click)="splitType.set('EQUAL')"
           >
-            Equally
+            {{ 'newExpenseModal.equally' | t }}
           </button>
           <button
             type="button"
             [attr.aria-pressed]="splitType() === 'UNEQUAL'"
             (click)="splitType.set('UNEQUAL')"
           >
-            Unequal
+            {{ 'newExpenseModal.unequal' | t }}
           </button>
           <button
             type="button"
             [attr.aria-pressed]="splitType() === 'PERCENTAGE'"
             (click)="splitType.set('PERCENTAGE')"
           >
-            Percent
+            {{ 'newExpenseModal.percent' | t }}
           </button>
           <button
             type="button"
             [attr.aria-pressed]="splitType() === 'WEIGHTS'"
             (click)="splitType.set('WEIGHTS')"
           >
-            Weights
+            {{ 'newExpenseModal.weights' | t }}
           </button>
           <button
             type="button"
             [attr.aria-pressed]="splitType() === 'ADJUSTMENTS'"
             (click)="splitType.set('ADJUSTMENTS')"
           >
-            Adjustments
+            {{ 'newExpenseModal.adjustments' | t }}
           </button>
         </div>
 
@@ -235,7 +255,7 @@
               <span class="prow__name"
                 >{{ firstName(m) }}
                 @if (sameOwner(m)) {
-                  <small>Historical identity · same account; original split retained</small>
+                  <small>{{ 'newExpenseModal.historicalIdentitySameAccount' | t }}</small>
                 }
               </span>
               @if (splitType() === 'EQUAL') {
@@ -245,21 +265,21 @@
                     class="prow__check"
                     [checked]="included().has(m.id)"
                     (change)="toggle(m.id)"
-                    [attr.aria-label]="'Include ' + memberLabel(m)"
+                    [attr.aria-label]="'newExpenseModal.includeName' | t: { name: memberLabel(m) }"
                 /></label>
               } @else {
                 <input
                   class="prow__val"
                   aria-describedby="ne-split-precision"
                   [attr.aria-label]="
-                    memberLabel(m) +
                     (splitType() === 'ADJUSTMENTS'
-                      ? ' adjustment in signed ' + currency()
+                      ? 'newExpenseModal.adjustmentInSigned'
                       : splitType() === 'WEIGHTS'
-                        ? ' weight in whole units'
+                        ? 'newExpenseModal.weightInWholeUnits'
                         : splitType() === 'PERCENTAGE'
-                          ? ' share in percent'
-                          : ' exact amount in ' + currency())
+                          ? 'newExpenseModal.shareInPercent'
+                          : 'newExpenseModal.exactAmountIn'
+                    ) | t: { name: memberLabel(m), currency: currency() }
                   "
                   [type]="splitType() === 'WEIGHTS' ? 'number' : 'text'"
                   maxlength="32"
@@ -287,38 +307,35 @@
         @if (splitType() !== 'EQUAL') {
           <p class="mform__hint" id="ne-split-precision">
             {{
-              splitType() === 'ADJUSTMENTS'
-                ? 'Add signed ' +
-                  currency() +
-                  ' adjustments to equal shares over the entered participants. Adjustments must total zero; final shares cannot be negative. Blank excludes; enter 0 to include without adjustment. Each adjustment rounds to ' +
-                  precision() +
-                  ' decimal places.'
+              (splitType() === 'ADJUSTMENTS'
+                ? 'newExpenseModal.adjustmentsHint'
                 : splitType() === 'WEIGHTS'
-                  ? 'Use positive whole units, such as 1 and 2. Blank excludes a participant.'
-                  : 'Each share rounds to ' +
-                    (splitType() === 'PERCENTAGE' ? 2 : precision()) +
-                    ' decimal places. Blank excludes; 0 keeps a participant.'
+                  ? 'newExpenseModal.usePositiveWholeUnits'
+                  : 'newExpenseModal.shareHint'
+              )
+                | t
+                  : { currency: currency(), places: splitType() === 'PERCENTAGE' ? 2 : precision() }
             }}
           </p>
         }
       </div>
 
       @if (!ready() && !error()) {
-        <p role="status">Loading group members and expense…</p>
+        <p role="status">{{ 'newExpenseModal.loadingGroupMembersAnd' | t }}</p>
       }
       @if (loadFailed()) {
         <button type="button" class="dc-btn-outline" (click)="retryMembers()">
-          Retry members and expense
+          {{ 'newExpenseModal.retryMembersAndExpense' | t }}
         </button>
       }
       @if (retryNotice()) {
         <p role="status">{{ retryNotice() }}</p>
         @if (unmappedOriginalIds().length) {
           <p role="status">
-            Some original identities are absent from the current roster:
-            {{ unmappedOriginalIds().join(', ') }}. Their saved IDs, amounts and typed inputs are
-            retained. Only retry the original expense, or check history before starting a separate
-            entry.
+            {{
+              'newExpenseModal.someOriginalIdentitiesAre'
+                | t: { v1: unmappedOriginalIds().join(', ') }
+            }}
           </p>
         }
         <button
@@ -327,10 +344,10 @@
           [disabled]="saving() || !ready() || draftBlocked()"
           (click)="retryOriginal()"
         >
-          Retry original expense
+          {{ 'newExpenseModal.retryOriginalExpense' | t }}
         </button>
         <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
-          Start a separate expense
+          {{ 'newExpenseModal.startASeparateExpense' | t }}
         </button>
       }
       @if (error()) {
@@ -342,8 +359,12 @@
           {{ runningLabel() }}
         </p>
         <div class="mform__actions">
-          <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
-          <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">Save expense</button>
+          <button type="button" class="dc-btn-outline" (click)="close()">
+            {{ 'common.cancel' | t }}
+          </button>
+          <button type="submit" class="dc-btn-accent" [disabled]="!canSave()">
+            {{ 'newExpenseModal.saveExpense' | t }}
+          </button>
         </div>
       </div>
     }

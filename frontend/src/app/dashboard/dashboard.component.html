@@ -1,24 +1,33 @@
 <div class="dash">
   <header class="dash__head">
     <div>
-      <p>{{ greeting() }}, {{ firstNameOf() }}. Everyone’s here.</p>
-      <h1>Your circle.<br />All connected.</h1>
+      <p>
+        {{
+          'dashboard.greetingFirstnameofEveryoneS'
+            | t: { greeting: greeting(), firstNameOf: firstNameOf() }
+        }}
+      </p>
+      <h1>{{ 'dashboard.yourCircle' | t }}<br />{{ 'dashboard.allConnected' | t }}</h1>
     </div>
     <button type="button" class="dc-btn-accent dash__add" (click)="modal.openExpense()">
-      Add expense <app-icon name="plus" />
+      {{ 'common.addExpense' | t }} <app-icon name="plus" />
     </button>
   </header>
   @if (loading() && !data()) {
-    <div class="dc-loading" role="status" aria-label="Loading dashboard"></div>
+    <div
+      class="dc-loading"
+      role="status"
+      [attr.aria-label]="'dashboard.loadingDashboard' | t"
+    ></div>
   } @else if (data(); as d) {
     <div class="pocket-desk">
       <section class="group-collection" aria-labelledby="your-groups">
         <header class="section-heading">
-          <h2 id="your-groups">Your little worlds</h2>
+          <h2 id="your-groups">{{ 'dashboard.yourLittleWorlds' | t }}</h2>
           <button
             type="button"
             class="dc-btn-outline"
-            aria-label="New group"
+            [attr.aria-label]="'common.newGroup' | t"
             (click)="modal.openGroup()"
           >
             <app-icon name="plus" />
@@ -27,10 +36,10 @@
         @if (d.groups.length === 0) {
           <div class="empty-object dc-glass">
             <app-icon name="groups" />
-            <h3>A little world of your own.</h3>
-            <p>A trip, a home, a dinner club. Bring your people together.</p>
+            <h3>{{ 'dashboard.aLittleWorldOf' | t }}</h3>
+            <p>{{ 'dashboard.aTripAHome' | t }}</p>
             <button type="button" class="dc-btn-accent" (click)="modal.openGroup()">
-              Create your first group
+              {{ 'dashboard.createYourFirstGroup' | t }}
             </button>
           </div>
         } @else {
@@ -39,20 +48,23 @@
               <a
                 class="group-object dc-glass"
                 [routerLink]="['/groups', g.id]"
-                [attr.aria-label]="'Open ' + g.name"
+                [attr.aria-label]="'dashboard.openGroup' | t: { name: g.name }"
                 ><app-group-art [type]="g.type" /><span class="group-object__copy"
                   ><strong>{{ g.name }}</strong
-                  ><small>{{ g.memberCount }} members · {{ g.type.toLowerCase() }}</small
+                  ><small>{{
+                    'dashboard.memberCountType'
+                      | t: { count: g.memberCount, type: typeLabel(g.type) }
+                  }}</small
                   ><span class="group-object__balance">
                     @for (total of groupTotals(g); track total.currency) {
                       <span>{{
                         total.netMinor > 0
-                          ? 'You’re owed'
+                          ? ('dashboard.youReOwed' | t)
                           : total.netMinor < 0
-                            ? 'You owe'
+                            ? ('dashboard.youOwe' | t)
                             : total.youAreOwedMinor || total.youOweMinor
-                              ? 'Even overall'
-                              : 'All square'
+                              ? ('dashboard.evenOverall' | t)
+                              : ('dashboard.allSquare' | t)
                       }}</span>
                       <app-money
                         [minor]="total.netMinor"
@@ -66,10 +78,10 @@
           </div>
         }
         <p class="collection-note">
-          Every group has its own balance.<br />Nothing gets lost in the mix.
+          {{ 'dashboard.everyGroupHasIts' | t }}<br />{{ 'dashboard.nothingGetsLostIn' | t }}
         </p>
       </section>
-      <section class="balance-object" aria-label="Your overall balance">
+      <section class="balance-object" [attr.aria-label]="'dashboard.yourOverallBalance' | t">
         <div class="balance-sculpture" aria-hidden="true">
           <span class="sculpture-avatar">{{ viewerInitials() }}</span
           ><span class="sculpture-split"><i></i><i></i></span>
@@ -80,60 +92,57 @@
           }
         </div>
         <div class="balance-core">
-          <span>Your balances by currency</span>
+          <span>{{ 'dashboard.yourBalancesByCurrency' | t }}</span>
           @for (total of totals(d); track total.currency) {
             <app-money [minor]="total.totalNetMinor" [currency]="total.currency" [net]="true" />
             <p>
               {{
                 total.totalNetMinor > 0
-                  ? 'You’re owed overall'
+                  ? ('dashboard.youReOwedOverall' | t)
                   : total.totalNetMinor < 0
-                    ? 'You owe overall'
+                    ? ('dashboard.youOweOverall' | t)
                     : total.owedMinor || total.oweMinor
-                      ? 'Even overall · open balances below'
-                      : 'All square. A clear head.'
+                      ? ('dashboard.evenOverallOpenBalances' | t)
+                      : ('dashboard.allSquareAClear' | t)
               }}
             </p>
           }
           <button type="button" class="balance-settle" (click)="modal.openSettle()">
-            Let’s settle up <app-icon name="arrow" />
+            {{ 'dashboard.letSSettleUp' | t }} <app-icon name="arrow" />
           </button>
         </div>
         <div class="balance-pockets">
           @for (total of totals(d); track total.currency) {
             <div class="balance-pocket balance-pocket--owed">
-              <span>You’re owed</span
-              ><app-money [minor]="total.owedMinor" [currency]="total.currency" /><small
-                >From {{ total.owedPeopleCount }}
-                {{ total.owedPeopleCount === 1 ? 'person' : 'people' }}</small
-              >
+              <span>{{ 'dashboard.youReOwed' | t }}</span
+              ><app-money [minor]="total.owedMinor" [currency]="total.currency" /><small>{{
+                'dashboard.fromPeople' | t: { count: total.owedPeopleCount }
+              }}</small>
             </div>
             <div class="balance-pocket balance-pocket--owes">
-              <span>You owe</span
-              ><app-money [minor]="total.oweMinor" [currency]="total.currency" /><small
-                >To {{ total.owePeopleCount }}
-                {{ total.owePeopleCount === 1 ? 'person' : 'people' }}</small
-              >
+              <span>{{ 'dashboard.youOwe' | t }}</span
+              ><app-money [minor]="total.oweMinor" [currency]="total.currency" /><small>{{
+                'dashboard.toPeople' | t: { count: total.owePeopleCount }
+              }}</small>
             </div>
           }
         </div>
         <p class="collection-note">
-          Across {{ d.groupCount }} {{ d.groupCount === 1 ? 'group' : 'groups' }}. Amounts keep
-          their original currency.
+          {{ 'dashboard.acrossGroups' | t: { count: d.groupCount } }}
         </p>
       </section>
       <aside class="friends" aria-labelledby="people-heading">
         <header class="section-heading">
           <div>
-            <h2 id="people-heading">Good company.</h2>
-            <p>Small tabs, clear heads.</p>
-            <a routerLink="/friends">View saved friends</a>
+            <h2 id="people-heading">{{ 'common.goodCompany' | t }}</h2>
+            <p>{{ 'dashboard.smallTabsClearHeads' | t }}</p>
+            <a routerLink="/friends">{{ 'dashboard.viewSavedFriends' | t }}</a>
           </div>
         </header>
         @if (d.people.length === 0) {
           <div class="friend-object dc-glass">
-            <h3>Nothing between you.</h3>
-            <p>No open balances with anyone.</p>
+            <h3>{{ 'dashboard.nothingBetweenYou' | t }}</h3>
+            <p>{{ 'dashboard.noOpenBalancesWith' | t }}</p>
           </div>
         }
         @for (p of d.people; track p.user.id + (p.currency ?? 'USD')) {
@@ -142,13 +151,21 @@
               initials(p.user.displayName)
             }}</span>
             <h3>{{ p.user.displayName }}</h3>
-            <p>{{ p.netMinor > 0 ? 'Owes you' : p.netMinor < 0 ? 'You owe' : 'All square' }}</p>
+            <p>
+              {{
+                p.netMinor > 0
+                  ? ('dashboard.owesYou' | t)
+                  : p.netMinor < 0
+                    ? ('dashboard.youOwe' | t)
+                    : ('dashboard.allSquare' | t)
+              }}
+            </p>
             <app-money [minor]="p.netMinor" [currency]="p.currency ?? 'USD'" [net]="true" /><button
               type="button"
               class="dc-btn-link"
               (click)="modal.openSettle()"
             >
-              View balances ↗
+              {{ 'dashboard.viewBalances' | t }}
             </button>
           </div>
         }
@@ -156,12 +173,14 @@
     </div>
     <section class="activity-tray" aria-labelledby="activity-heading">
       <header>
-        <h2 id="activity-heading">Little things,<br />shared lately.</h2>
-        <p>Recent activity from your groups</p>
+        <h2 id="activity-heading">
+          {{ 'dashboard.littleThings' | t }}<br />{{ 'dashboard.sharedLately' | t }}
+        </h2>
+        <p>{{ 'dashboard.recentActivityFromYour' | t }}</p>
       </header>
       @if (d.activity.length === 0) {
         <p class="activity-empty">
-          No activity yet. Your shared story starts with the first expense.
+          {{ 'dashboard.noActivityYetYour' | t }}
         </p>
       } @else {
         <ul class="feed">
@@ -192,9 +211,11 @@
     </section>
   } @else {
     <div class="empty-object" role="alert">
-      <h2>A little pause.</h2>
-      <p>We couldn’t load your overview.</p>
-      <button type="button" class="dc-btn-outline" (click)="retry()">Try again</button>
+      <h2>{{ 'dashboard.aLittlePause' | t }}</h2>
+      <p>{{ 'dashboard.weCouldnTLoad' | t }}</p>
+      <button type="button" class="dc-btn-outline" (click)="retry()">
+        {{ 'common.tryAgain' | t }}
+      </button>
     </div>
   }
 </div>

@@ -2,29 +2,30 @@ import { Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-close-account',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink],
   template: `
     <section class="dc-card" aria-labelledby="close-account-title">
-      <h2 id="close-account-title">Close account</h2>
+      <h2 id="close-account-title">{{ 'closeAccount.closeAccount' | t }}</h2>
       <p>
-        Closing is permanent. You can only close once every balance is settled. Other members keep
-        the shared history, which shows you as “Closed account”; your email is released and your
-        sign-ins end on every device.
+        {{ 'closeAccount.closingIsPermanentYou' | t }}
       </p>
       <p>
-        Download your history first from each group's History page, starting in
-        <a routerLink="/dashboard">your groups</a>.
+        {{ 'closeAccount.downloadYourHistoryFirst' | t }}
+        <a routerLink="/dashboard">{{ 'closeAccount.yourGroups' | t }}</a
+        >.
       </p>
       @if (!opened()) {
         <button type="button" class="dc-btn-outline" (click)="opened.set(true)">
-          Close account…
+          {{ 'closeAccount.closeAccount2' | t }}
         </button>
       } @else {
         <form (submit)="$event.preventDefault(); close()">
-          <label for="close-account-password">Current password</label>
+          <label for="close-account-password">{{ 'common.currentPassword' | t }}</label>
           <input
             id="close-account-password"
             type="password"
@@ -33,9 +34,11 @@ import { AuthService } from '../core/auth/auth.service';
           />
           <label>
             <input type="checkbox" [formControl]="confirmed" />
-            I understand that closing my account cannot be undone.
+            {{ 'closeAccount.iUnderstandThatClosing' | t }}
           </label>
-          <button type="submit" class="dc-btn-outline" [disabled]="busy()">Close my account</button>
+          <button type="submit" class="dc-btn-outline" [disabled]="busy()">
+            {{ 'closeAccount.closeMyAccount' | t }}
+          </button>
         </form>
       }
       @if (error()) {
@@ -77,7 +80,7 @@ export class CloseAccountComponent {
 
   close(): void {
     if (this.busy() || this.password.invalid || this.confirmed.invalid) {
-      this.error.set('Enter your current password and confirm to close your account.');
+      this.error.set(translate('closeAccount.enterYourCurrentPassword'));
       return;
     }
     this.busy.set(true);
@@ -87,7 +90,7 @@ export class CloseAccountComponent {
         void this.router.navigate(['/login'], { queryParams: { reason: 'account-closed' } }),
       error: (err) => {
         this.busy.set(false);
-        this.error.set(err?.error?.message ?? 'Your account could not be closed. Try again.');
+        this.error.set(err?.error?.message ?? translate('closeAccount.yourAccountCouldNot'));
       },
     });
   }

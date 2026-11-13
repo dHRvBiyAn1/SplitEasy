@@ -5,24 +5,51 @@ import { Router } from '@angular/router';
 import { concatMap, from, of, takeUntil } from 'rxjs';
 import { catchError, map, toArray } from 'rxjs/operators';
 import { DashboardService } from '../dashboard/dashboard.service';
-import { PendingWritesService, UNCERTAIN_WRITE } from '../core/pending-writes.service';
+import { PendingWritesService, uncertainWrite } from '../core/pending-writes.service';
 import { SessionService } from '../core/auth/session.service';
 import { GroupType } from '../dashboard/dashboard.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const TYPES: { value: GroupType; label: string }[] = [
-  { value: 'HOME', label: 'Home' },
-  { value: 'TRIP', label: 'Trip' },
-  { value: 'DINING', label: 'Dining' },
-  { value: 'EVENT', label: 'Event' },
-  { value: 'OTHER', label: 'Other' },
+  {
+    value: 'HOME',
+    get label() {
+      return translate('groupSettings.home');
+    },
+  },
+  {
+    value: 'TRIP',
+    get label() {
+      return translate('groupSettings.trip');
+    },
+  },
+  {
+    value: 'DINING',
+    get label() {
+      return translate('groupSettings.dining');
+    },
+  },
+  {
+    value: 'EVENT',
+    get label() {
+      return translate('groupSettings.event');
+    },
+  },
+  {
+    value: 'OTHER',
+    get label() {
+      return translate('groupSettings.other');
+    },
+  },
 ];
 
 @Component({
   selector: 'app-new-group-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './new-group-modal.component.html',
   styleUrl: './modals.scss',
 })
@@ -62,12 +89,10 @@ export class NewGroupModalComponent {
         this.name.setValue(pending.request.name);
         this.type.set(pending.request.type);
         this.emails.set((pending.draft as { emails?: string[] })?.emails ?? []);
-        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.retryNotice.set(uncertainWrite());
       }
     } catch {
-      this.error.set(
-        'Cannot read the saved retry draft. Check history before starting a separate entry.',
-      );
+      this.error.set(translate('pendingWrites.cannotReadTheSaved'));
     }
 
     this.destroyRef.onDestroy(() => {
@@ -121,7 +146,7 @@ export class NewGroupModalComponent {
       );
     } catch (error) {
       this.error.set((error as Error).message);
-      this.retryNotice.set(UNCERTAIN_WRITE);
+      this.retryNotice.set(uncertainWrite());
       return;
     }
     this.saving.set(true);
@@ -139,8 +164,8 @@ export class NewGroupModalComponent {
           this.addMembers(group.id, emails);
         },
         error: (err) => {
-          this.error.set(err?.error?.message ?? 'Could not create the group.');
-          this.retryNotice.set(UNCERTAIN_WRITE);
+          this.error.set(err?.error?.message ?? translate('newGroupModal.couldNotCreateThe'));
+          this.retryNotice.set(uncertainWrite());
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
@@ -157,26 +182,19 @@ export class NewGroupModalComponent {
       this.emails.set((pending.draft as { emails?: string[] })?.emails ?? []);
       this.save();
     } catch {
-      this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
+      this.error.set(translate('newGroupModal.cannotReadTheSaved'));
     }
   }
 
   abandonRetry(): void {
     if (this.saving() || this.session.version !== this.sessionVersion) return;
-    if (
-      !confirm(
-        'The previous group may already have been saved. Check your groups first. Start a separate group anyway?',
-      )
-    )
-      return;
+    if (!confirm(translate('newGroupModal.thePreviousGroupMay'))) return;
     try {
       this.pendingWrites.abandon('group');
       this.retryNotice.set(null);
       this.error.set(null);
     } catch {
-      this.error.set(
-        'Cannot clear the saved retry identity. Enable browser storage and try again.',
-      );
+      this.error.set(translate('personalExpenses.cannotClearTheSaved'));
     }
   }
 
@@ -193,10 +211,10 @@ export class NewGroupModalComponent {
                 email,
                 reason:
                   err.status === 404
-                    ? 'No account found with this email.'
+                    ? translate('newGroupModal.noAccountFoundWith')
                     : err.status === 409
-                      ? 'Already a member of this group.'
-                      : 'Could not add this member. Please try again.',
+                      ? translate('newGroupModal.alreadyAMemberOf')
+                      : translate('newGroupModal.couldNotAddThis'),
               }),
             ),
           ),

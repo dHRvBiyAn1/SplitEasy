@@ -3,10 +3,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink, AuthHeroComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink, AuthHeroComponent],
   templateUrl: './login.component.html',
   styleUrl: './auth.scss',
 })
@@ -18,9 +20,9 @@ export class LoginComponent {
   private readonly reason = inject(ActivatedRoute).snapshot.queryParamMap.get('reason');
   protected readonly securityNotice =
     this.reason === 'password-changed'
-      ? 'Password changed. Log in with your new password.'
+      ? translate('login.passwordChangedLogIn')
       : this.reason === 'account-closed'
-        ? 'Your account has been closed.'
+        ? translate('login.yourAccountHasBeen')
         : '';
   protected readonly logoutWarning = this.auth.logoutWarning;
   protected readonly passwordVisible = signal(false);
@@ -47,8 +49,8 @@ export class LoginComponent {
       error: (err) => {
         this.error.set(
           err?.status === 429
-            ? 'Too many attempts. Please wait before trying again.'
-            : (err?.error?.message ?? 'Login failed. Please try again.'),
+            ? translate('accountAction.tooManyAttemptsPlease')
+            : (err?.error?.message ?? translate('login.loginFailedPleaseTry')),
         );
         this.submitting.set(false);
       },

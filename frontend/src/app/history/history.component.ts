@@ -7,17 +7,25 @@ import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { HistoryFilter, HistoryItem, HistoryType } from './history.models';
 import { HistoryService } from './history.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const TYPE_LABEL: Record<HistoryType, string> = {
-  EXPENSE: 'Expense',
-  PAYMENT: 'Settlement',
-  REFUND: 'Refund',
+  get EXPENSE() {
+    return translate('shell.expense');
+  },
+  get PAYMENT() {
+    return translate('history.settlement');
+  },
+  get REFUND() {
+    return translate('history.refund');
+  },
 };
 
 /** A group's financial history, newest first, a page at a time, with date filters and CSV export. */
 @Component({
   selector: 'app-history',
-  imports: [RouterLink, MoneyComponent],
+  imports: [TranslatePipe, RouterLink, MoneyComponent],
   templateUrl: './history.component.html',
   styleUrl: './history.component.scss',
 })
@@ -48,7 +56,7 @@ export class HistoryComponent {
   constructor() {
     this.session.changes.pipe(takeUntilDestroyed()).subscribe(() => {
       this.reset();
-      this.error.set('Session changed. Try again to load this history.');
+      this.error.set(translate('history.sessionChangedTryAgain'));
     });
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       this.scopeChanges.next();
@@ -75,7 +83,7 @@ export class HistoryComponent {
 
   protected applyFilter() {
     if (this.from && this.to && this.from > this.to) {
-      this.error.set('The start date must not be after the end date.');
+      this.error.set(translate('history.theStartDateMust'));
       return;
     }
     this.applied = { from: this.from || undefined, to: this.to || undefined };
@@ -109,7 +117,7 @@ export class HistoryComponent {
         },
         error: () => {
           this.loading.set(false);
-          this.error.set('Could not load history. Try again.');
+          this.error.set(translate('history.couldNotLoadHistory'));
         },
       });
   }
@@ -131,7 +139,7 @@ export class HistoryComponent {
         error: () => {
           // Rows already loaded stay; the cursor is kept so the same page can be retried.
           this.loadingMore.set(false);
-          this.error.set('Could not load more history. Try again.');
+          this.error.set(translate('history.couldNotLoadMore'));
         },
       });
   }
@@ -155,7 +163,7 @@ export class HistoryComponent {
         },
         error: () => {
           this.exportBusy.set(false);
-          this.exportError.set('Could not export history. Try again.');
+          this.exportError.set(translate('history.couldNotExportHistory'));
         },
       });
   }

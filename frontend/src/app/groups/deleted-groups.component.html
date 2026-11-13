@@ -1,23 +1,24 @@
 <div class="dc-page">
   <header class="dgroups__head">
-    <h1 class="dc-page-title">Recently deleted</h1>
-    <a class="dc-btn-ghost" routerLink="/dashboard">Back to overview</a>
+    <h1 class="dc-page-title">{{ 'common.recentlyDeleted' | t }}</h1>
+    <a class="dc-btn-ghost" routerLink="/dashboard">{{ 'deletedGroups.backToOverview' | t }}</a>
   </header>
 
   <p class="dc-body">
-    Deleting a group keeps its expenses, settlements and history. Restore one to put it back exactly
-    as it was.
+    {{ 'deletedGroups.deletingAGroupKeeps' | t }}
   </p>
 
   @if (error()) {
     <p class="dc-caption" role="alert">{{ error() }}</p>
-    <button type="button" class="dc-btn-outline" (click)="reload()">Reload</button>
+    <button type="button" class="dc-btn-outline" (click)="reload()">
+      {{ 'deletedGroups.reload' | t }}
+    </button>
   }
 
   @if (loading()) {
-    <p class="dc-caption">Loading your deleted groups…</p>
+    <p class="dc-caption">{{ 'deletedGroups.loadingYourDeletedGroups' | t }}</p>
   } @else if (!rows().length && !error()) {
-    <p class="dc-caption">Nothing deleted — every group you created is still active.</p>
+    <p class="dc-caption">{{ 'deletedGroups.nothingDeletedEveryGroup' | t }}</p>
   } @else {
     <ul class="dgroups">
       @for (row of rows(); track row.id) {
@@ -26,20 +27,20 @@
           <span class="dgroups__text">
             <span class="dc-body">{{ row.name }}</span>
             <span class="dc-caption">
-              {{ row.memberCount }} {{ row.memberCount === 1 ? 'member' : 'members' }}
+              {{ 'deletedGroups.memberCount' | t: { count: row.memberCount } }}
               @if (row.archivedAt) {
-                · was archived
+                {{ 'deletedGroups.wasArchived' | t }}
               }
             </span>
           </span>
           <button
             type="button"
             class="dc-btn-outline"
-            [attr.aria-label]="'Restore ' + row.name"
+            [attr.aria-label]="'deletedGroups.restoreName' | t: { name: row.name }"
             [disabled]="restoring() === row.id"
             (click)="restore(row)"
           >
-            {{ restoring() === row.id ? 'Restoring…' : 'Restore' }}
+            {{ restoring() === row.id ? ('deletedGroups.restoring' | t) : ('common.restore' | t) }}
           </button>
         </li>
       }

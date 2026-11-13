@@ -15,7 +15,7 @@ import { Settlement } from '../dashboard/dashboard.models';
 import {
   PendingWritesService,
   PendingWriteError,
-  UNCERTAIN_WRITE,
+  uncertainWrite,
 } from '../core/pending-writes.service';
 import { RecordPaymentRequest } from '../payments/payment.models';
 import { PaymentService } from '../payments/payment.service';
@@ -23,10 +23,12 @@ import { FriendService } from '../friends/friend.service';
 import { avatarTint } from '../core/avatar';
 import { ModalService, SettlePrefill } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-settle-up-modal',
-  imports: [ModalShellComponent, MoneyComponent],
+  imports: [TranslatePipe, ModalShellComponent, MoneyComponent],
   templateUrl: './settle-up-modal.component.html',
   styleUrl: './modals.scss',
 })
@@ -84,7 +86,7 @@ export class SettleUpModalComponent {
         this.amount.set(
           minorToDisplay(pending.request.amountMinor, pending.request.currency ?? 'USD'),
         );
-        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.retryNotice.set(uncertainWrite());
         return;
       }
     } catch (err) {
@@ -92,7 +94,7 @@ export class SettleUpModalComponent {
       this.retryNotice.set(
         err instanceof PendingWriteError
           ? err.message
-          : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
+          : translate('pendingWrites.cannotReadTheSaved'),
       );
     }
     const prefill = this.modal.settlePrefill();
@@ -116,14 +118,18 @@ export class SettleUpModalComponent {
 
   /** They owe me (net>0) → "Name owes you"; I owe them (net<0) → "You owe Name". */
   label(s: SettlePrefill): string {
-    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
-    return s.netMinor > 0 ? `${name} owes you` : `You owe ${name}`;
+    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' ' + translate('newExpenseModal.guest')}`;
+    return s.netMinor > 0
+      ? translate('groupDetail.nameOwesYou', { name })
+      : translate('settleUpModal.youOweName', { name });
   }
 
   /** Confirm-step lead: who is paying whom, mirroring the row's direction. */
   payingLabel(s: SettlePrefill): string {
-    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' (guest)'}`;
-    return s.netMinor > 0 ? `${name} is paying you` : `You are paying ${name}`;
+    const name = `${s.counterparty.displayName}${s.counterparty.email ? ` (${s.counterparty.email})` : ' ' + translate('newExpenseModal.guest')}`;
+    return s.netMinor > 0
+      ? translate('settleUpModal.nameIsPayingYou', { name })
+      : translate('settleUpModal.youArePayingName', { name });
   }
 
   select(s: Settlement): void {
@@ -163,9 +169,7 @@ export class SettleUpModalComponent {
     }
     const cents = this.enteredMinor();
     if (!Number.isSafeInteger(cents) || cents <= 0 || cents > 1_000_000_000_000) {
-      this.error.set(
-        'Enter an amount greater than zero within the selected currency precision and maximum.',
-      );
+      this.error.set(translate('settleUpModal.enterAnAmountGreater'));
       return;
     }
     const me = this.dashboard.data()?.viewerParticipantId ?? this.auth.user()?.id ?? '';
@@ -174,9 +178,7 @@ export class SettleUpModalComponent {
       s.counterparty.id === me ||
       this.dashboard.data()?.ownedParticipantIds?.includes(s.counterparty.id)
     ) {
-      this.error.set(
-        'These identities belong to the same account. Refresh obligations and review the payment.',
-      );
+      this.error.set(translate('settleUpModal.theseIdentitiesBelongTo'));
       return;
     }
     // net>0: they owe me → they pay me. net<0: I owe them → I pay them.
@@ -212,9 +214,9 @@ export class SettleUpModalComponent {
         this.error.set(
           err instanceof PendingWriteError
             ? err.message
-            : (err?.error?.message ?? 'Could not record the payment.'),
+            : (err?.error?.message ?? translate('settleUpModal.couldNotRecordThe')),
         );
-        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.retryNotice.set(uncertainWrite());
         this.saving.set(false);
         this.modal.setMutationPending(false);
       },
@@ -229,27 +231,20 @@ export class SettleUpModalComponent {
       // Original IDs and amount are immutable, even if aliases were subsequently claimed.
       this.dispatch(pending.draft as SettlePrefill, pending.request, pending.draft);
     } catch {
-      this.error.set('Cannot read the saved retry draft. Enable browser storage and try again.');
+      this.error.set(translate('newGroupModal.cannotReadTheSaved'));
     }
   }
 
   abandonRetry(): void {
     if (this.saving() || this.session.version !== this.sessionVersion) return;
-    if (
-      !window.confirm(
-        'The previous payment may already have been recorded. Check payment history first. Start a separate payment anyway?',
-      )
-    )
-      return;
+    if (!window.confirm(translate('settleUpModal.thePreviousPaymentMay'))) return;
     try {
       this.pendingWrites.abandon('payment');
       this.retryNotice.set(null);
       this.draftBlocked.set(false);
       this.error.set(null);
     } catch {
-      this.error.set(
-        'Cannot clear the saved retry identity. Enable browser storage and try again.',
-      );
+      this.error.set(translate('personalExpenses.cannotClearTheSaved'));
     }
   }
 }

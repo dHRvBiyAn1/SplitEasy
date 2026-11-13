@@ -7,10 +7,10 @@
       [disabled]="saving() || draftBlocked()"
       (click)="retryOriginal()"
     >
-      Retry original payment
+      {{ 'settleUpModal.retryOriginalPayment' | t }}
     </button>
     <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
-      Start a separate payment
+      {{ 'settleUpModal.startASeparatePayment' | t }}
     </button>
   }
   @if (selected(); as s) {
@@ -32,7 +32,9 @@
             [attr.step]="step()"
             aria-describedby="settle-precision"
             inputmode="decimal"
-            [attr.aria-label]="'Amount to settle (' + (s.currency ?? 'USD') + ')'"
+            [attr.aria-label]="
+              'settleUpModal.amountToSettle' | t: { currency: s.currency ?? 'USD' }
+            "
             [value]="amount()"
             (input)="onAmountInput($any($event.target).value)"
           />
@@ -42,7 +44,7 @@
           grouping. Maximum {{ maximum() }}.
         </p>
         <span class="settle-confirm__group">
-          Recorded in {{ s.groupName }} as a cash settlement. Settle less to pay part of it.
+          {{ 'settleUpModal.recordedInGroupnameAs' | t: { groupName: s.groupName } }}
         </span>
       </div>
       @if (error()) {
@@ -50,7 +52,7 @@
       }
       <div class="mform__actions">
         <button type="button" class="dc-btn-outline" (click)="cancel()" [disabled]="saving()">
-          Back
+          {{ 'settleUpModal.back' | t }}
         </button>
         <button
           type="button"
@@ -58,7 +60,7 @@
           (click)="confirm()"
           [disabled]="saving() || draftBlocked()"
         >
-          Record payment
+          {{ 'settleUpModal.recordPayment' | t }}
         </button>
       </div>
     </div>
@@ -66,27 +68,34 @@
     <div class="simplify-bar" [class.simplify-bar--on]="allSimplified()">
       <span class="simplify-bar__text">
         <span class="simplify-bar__title">
-          {{ allSimplified() ? 'Simplified obligations' : 'Current obligations' }}
+          {{
+            allSimplified()
+              ? ('friends.simplifiedObligations' | t)
+              : ('settleUpModal.currentObligations' | t)
+          }}
         </span>
         <span class="simplify-bar__sub">
           @if (allSimplified()) {
-            Net debtors pay net creditors · raw history stays unchanged
+            {{ 'settleUpModal.netDebtorsPayNet' | t }}
           } @else {
-            Direct mode keeps debts with each person, including offsetting amounts. A net-derived
-            preview may leave offsetting direct obligations.
+            {{ 'settleUpModal.directModeKeepsDebts' | t }}
           }
         </span>
       </span>
     </div>
 
     @if (loading()) {
-      <div class="dc-loading" role="status" aria-label="Loading current obligations"></div>
+      <div
+        class="dc-loading"
+        role="status"
+        [attr.aria-label]="'settleUpModal.loadingCurrentObligations' | t"
+      ></div>
     } @else if (loadFailed()) {
       <p class="mform__error" role="alert">
-        Current obligations are unavailable. Reload the dashboard.
+        {{ 'settleUpModal.currentObligationsAreUnavailable' | t }}
       </p>
     } @else if (settlements().length === 0) {
-      <p class="mempty">No current-mode obligations for you.</p>
+      <p class="mempty">{{ 'settleUpModal.noCurrentModeObligations' | t }}</p>
     } @else {
       <div class="slist">
         @for (s of settlements(); track s.groupId + s.counterparty.id + (s.currency ?? 'USD')) {

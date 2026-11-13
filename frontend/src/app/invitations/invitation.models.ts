@@ -1,5 +1,6 @@
 import { ParticipantSummary } from '../groups/participant.models';
 import { Currency } from '../shared/currency';
+import { intlLocale, translate } from '../core/i18n/i18n.service';
 export interface InvitationStatus {
   id: string;
   kind: 'EMAIL' | 'LINK';
@@ -43,6 +44,6 @@ export interface InvitationAccepted {
 export function invitationDate(value: string | null | undefined): string {
   const date = new Date(value ?? '');
   return Number.isFinite(date.getTime())
-    ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-    : 'Unavailable';
+    ? date.toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' })
+    : translate('invitation.unavailable');
 }

@@ -3,22 +3,42 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { takeUntil } from 'rxjs';
 import { SessionService } from '../core/auth/session.service';
 import { NotificationPreferences, NotificationService } from '../notification/notification.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
-  { key: 'expenses', label: 'Expenses added, edited, deleted or restored' },
-  { key: 'payments', label: 'Settlements and refunds' },
-  { key: 'groupChanges', label: 'Group changes and member updates' },
+  {
+    key: 'expenses',
+    get label() {
+      return translate('notificationPreferences.expensesAddedEditedDeleted');
+    },
+  },
+  {
+    key: 'payments',
+    get label() {
+      return translate('notificationPreferences.settlementsAndRefunds');
+    },
+  },
+  {
+    key: 'groupChanges',
+    get label() {
+      return translate('notificationPreferences.groupChangesAndMember');
+    },
+  },
 ];
 
 /** Server-owned in-app notification switches; email and push are not offered yet. */
 @Component({
   selector: 'app-notification-preferences',
+  imports: [TranslatePipe],
   template: `
     <details class="pcard" (toggle)="open($any($event.target).open)">
-      <summary>Notification settings</summary>
+      <summary>{{ 'notificationPreferences.notificationSettings' | t }}</summary>
       @if (loadError()) {
         <p role="alert">{{ loadError() }}</p>
-        <button class="dc-btn-outline" type="button" (click)="load()">Try again</button>
+        <button class="dc-btn-outline" type="button" (click)="load()">
+          {{ 'common.tryAgain' | t }}
+        </button>
       } @else if (prefs(); as p) {
         @for (s of switches; track s.key) {
           <label class="switch">
@@ -35,7 +55,7 @@ const SWITCHES: { key: keyof NotificationPreferences; label: string }[] = [
           <p role="alert">{{ saveError() }}</p>
         }
       } @else {
-        <p role="status">Loading notification settings…</p>
+        <p role="status">{{ 'notificationPreferences.loadingNotificationSettings' | t }}</p>
       }
     </details>
   `,
@@ -83,7 +103,7 @@ export class NotificationPreferencesComponent {
         next: (p) => this.prefs.set(p),
         error: () => {
           this.requested = false;
-          this.loadError.set('Could not load notification settings.');
+          this.loadError.set(translate('notificationPreferences.couldNotLoadNotification'));
         },
       });
   }
@@ -105,7 +125,7 @@ export class NotificationPreferencesComponent {
         error: () => {
           input.checked = !value; // the server kept the old value
           this.saving.set(false);
-          this.saveError.set('Could not save that setting. It was not changed.');
+          this.saveError.set(translate('notificationPreferences.couldNotSaveThat'));
         },
       });
   }

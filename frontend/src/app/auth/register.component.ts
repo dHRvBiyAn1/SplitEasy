@@ -3,10 +3,12 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@
 import { Router, RouterLink } from '@angular/router';
 import { AuthHeroComponent } from './auth-hero.component';
 import { AuthService } from '../core/auth/auth.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink, AuthHeroComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink, AuthHeroComponent],
   templateUrl: './register.component.html',
   styleUrl: './auth.scss',
 })
@@ -48,8 +50,8 @@ export class RegisterComponent {
       error: (err) => {
         this.error.set(
           err?.status === 429
-            ? 'Too many attempts. Please wait before trying again.'
-            : (err?.error?.message ?? 'Registration failed. Please try again.'),
+            ? translate('accountAction.tooManyAttemptsPlease')
+            : (err?.error?.message ?? translate('register.registrationFailedPleaseTry')),
         );
         this.submitting.set(false);
       },

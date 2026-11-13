@@ -7,6 +7,8 @@ import { SessionService } from '../core/auth/session.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { FriendBalance, SettlementPreview } from './friend.models';
 import { FriendService } from './friend.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /**
  * "Settle all in USD": previews every shared scope for one currency, then commits them in one
@@ -15,7 +17,7 @@ import { FriendService } from './friend.service';
  */
 @Component({
   selector: 'app-friend-settle-all',
-  imports: [MoneyComponent],
+  imports: [TranslatePipe, MoneyComponent],
   templateUrl: './friend-settle-all.component.html',
   styleUrl: './personal-expenses.component.scss',
 })
@@ -45,8 +47,8 @@ export class FriendSettleAllComponent {
 
   protected pays(payerId: string): string {
     return payerId === this.friendId()
-      ? `${this.friendName()} pays you`
-      : `You pay ${this.friendName()}`;
+      ? translate('friendSettleAll.friendnamePaysYou', { friendName: this.friendName() })
+      : translate('friendSettleAll.youPayFriendname', { friendName: this.friendName() });
   }
 
   protected start(currency: string, notice: string | null = null): void {
@@ -63,7 +65,7 @@ export class FriendSettleAllComponent {
         },
         error: () => {
           this.busy.set(false);
-          this.message.set('Could not load the settlement review. Try again.');
+          this.message.set(translate('friendSettleAll.couldNotLoadThe'));
         },
       });
   }
@@ -92,12 +94,10 @@ export class FriendSettleAllComponent {
           if (err.status === 409) {
             // Balances moved (or the id was reused): nothing was written, so review afresh.
             this.operationId = crypto.randomUUID();
-            this.start(preview.currency, 'Balances changed — review the settlement again.');
+            this.start(preview.currency, translate('friendSettleAll.balancesChangedReviewThe'));
           } else {
             this.busy.set(false);
-            this.message.set(
-              'Not confirmed. Confirm again to retry safely; it will not be recorded twice.',
-            );
+            this.message.set(translate('friendSettleAll.notConfirmedConfirmAgain'));
           }
         },
       });

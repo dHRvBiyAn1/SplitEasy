@@ -3493,6 +3493,7 @@ components:
       - phone
       - avatarColor
       - preferredCurrency
+      - locale
       - createdAt
       properties:
         id:
@@ -3522,6 +3523,11 @@ components:
           default: '#12A57E'
         preferredCurrency:
           $ref: '#/components/schemas/Currency'
+        locale:
+          type: string
+          enum: [en, hi, es, fr]
+          default: en
+          description: UI language; backend error messages stay English
         createdAt:
           type: string
           format: date-time
@@ -3559,6 +3565,11 @@ components:
           anyOf:
           - $ref: '#/components/schemas/Currency'
           - type: 'null'
+        locale:
+          type:
+          - string
+          - 'null'
+          enum: [en, hi, es, fr, null]
 
     UserSummary:
       type: object

@@ -1,26 +1,28 @@
 <section class="history-page" aria-labelledby="history-heading">
-  <a [routerLink]="['/groups', groupId]">Back to this group</a>
+  <a [routerLink]="['/groups', groupId]">{{ 'common.backToThisGroup' | t }}</a>
   <header class="page-heading">
     <div>
-      <p class="eyebrow">Ledger</p>
-      <h1 id="history-heading">History</h1>
+      <p class="eyebrow">{{ 'history.ledger' | t }}</p>
+      <h1 id="history-heading">{{ 'common.history' | t }}</h1>
     </div>
     <button class="dc-btn-outline" type="button" [disabled]="exportBusy()" (click)="download()">
-      {{ exportBusy() ? 'Preparing CSV…' : 'Download CSV' }}
+      {{ exportBusy() ? ('history.preparingCsv' | t) : ('history.downloadCsv' | t) }}
     </button>
   </header>
 
   <form class="filter" (submit)="$event.preventDefault(); applyFilter()">
     <label>
-      From
+      {{ 'history.from' | t }}
       <input type="date" name="from" [value]="from" (input)="from = $any($event.target).value" />
     </label>
     <label>
-      To
+      {{ 'history.to' | t }}
       <input type="date" name="to" [value]="to" (input)="to = $any($event.target).value" />
     </label>
-    <button class="dc-btn" type="submit">Apply</button>
-    <button class="dc-btn-outline" type="button" (click)="clearFilter()">Clear</button>
+    <button class="dc-btn" type="submit">{{ 'history.apply' | t }}</button>
+    <button class="dc-btn-outline" type="button" (click)="clearFilter()">
+      {{ 'history.clear' | t }}
+    </button>
   </form>
 
   @if (exportError()) {
@@ -28,18 +30,18 @@
   }
 
   @if (loading()) {
-    <p role="status">Loading history…</p>
+    <p role="status">{{ 'history.loadingHistory' | t }}</p>
   } @else {
     @if (error()) {
       <div class="retry" role="alert">
         <p>{{ error() }}</p>
         <button class="dc-btn" type="button" (click)="nextCursor() ? loadMore() : load()">
-          Try again
+          {{ 'common.tryAgain' | t }}
         </button>
       </div>
     }
     @if (!items().length && !error()) {
-      <p>No history in this range.</p>
+      <p>{{ 'history.noHistoryInThis' | t }}</p>
     }
     <ul class="ledger">
       @for (item of items(); track item.id) {
@@ -59,7 +61,7 @@
     </ul>
     @if (nextCursor() && !error()) {
       <button class="dc-btn-outline" type="button" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        {{ loadingMore() ? ('history.loading' | t) : ('history.loadMore' | t) }}
       </button>
     }
   }

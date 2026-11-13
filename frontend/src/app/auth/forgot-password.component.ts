@@ -4,19 +4,21 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { AuthHeroComponent } from './auth-hero.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-forgot-password',
-  imports: [ReactiveFormsModule, RouterLink, AuthHeroComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink, AuthHeroComponent],
   styleUrl: './auth.scss',
   template: `<div class="auth">
     <app-auth-hero class="auth__hero" />
     <div class="auth__panel">
       <div class="auth__form-wrap">
-        <h1 class="dc-display auth__title">Reset your password</h1>
+        <h1 class="dc-display auth__title">{{ 'forgotPassword.resetYourPassword' | t }}</h1>
         <form class="auth__form" (submit)="$event.preventDefault(); submit()" novalidate>
           <label class="auth__field"
-            ><span class="dc-field-label">Email</span
+            ><span class="dc-field-label">{{ 'common.email' | t }}</span
             ><input
               class="dc-field"
               type="email"
@@ -26,7 +28,9 @@ import { AuthHeroComponent } from './auth-hero.component';
               aria-describedby="recovery-email-hint"
           /></label>
           @if (email.touched && email.invalid) {
-            <p class="auth__field-error" id="recovery-email-hint">Enter a valid email address.</p>
+            <p class="auth__field-error" id="recovery-email-hint">
+              {{ 'common.enterAValidEmail' | t }}
+            </p>
           }
           @if (error()) {
             <p class="auth__error" role="alert">{{ error() }}</p>
@@ -35,10 +39,16 @@ import { AuthHeroComponent } from './auth-hero.component';
             <p role="status">{{ message() }}</p>
           }
           <button class="dc-btn-accent auth__submit" type="submit" [disabled]="pending()">
-            {{ pending() ? 'Requesting…' : 'Request reset link' }}
+            {{
+              pending()
+                ? ('forgotPassword.requesting' | t)
+                : ('forgotPassword.requestResetLink' | t)
+            }}
           </button>
         </form>
-        <p class="auth__switch"><a routerLink="/login">Back to log in</a></p>
+        <p class="auth__switch">
+          <a routerLink="/login">{{ 'forgotPassword.backToLogIn' | t }}</a>
+        </p>
       </div>
     </div>
   </div>`,
@@ -70,18 +80,16 @@ export class ForgotPasswordComponent {
       .subscribe({
         next: () => {
           this.pending.set(false);
-          this.message.set(
-            'If an account exists, a link may arrive; retry or contact support if it does not.',
-          );
+          this.message.set(translate('forgotPassword.ifAnAccountExists'));
         },
         error: (err) => {
           this.pending.set(false);
           this.error.set(
             err.status === 429
-              ? 'Too many attempts. Please wait before trying again.'
+              ? translate('accountAction.tooManyAttemptsPlease')
               : err.status === 503
-                ? 'Email is temporarily unavailable. Please try again later.'
-                : 'Unable to request a link. Please try again.',
+                ? translate('forgotPassword.emailIsTemporarilyUnavailable')
+                : translate('forgotPassword.unableToRequestA'),
           );
         },
       });

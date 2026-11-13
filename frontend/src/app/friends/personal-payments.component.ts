@@ -14,6 +14,8 @@ import {
 } from '../payments/payment.models';
 import { FriendBalance } from './friend.models';
 import { FriendService } from './friend.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /**
  * Settlements with one saved friend outside any group (G02.3): the personal balance with its
@@ -21,7 +23,7 @@ import { FriendService } from './friend.service';
  */
 @Component({
   selector: 'app-personal-payments',
-  imports: [MoneyComponent, RouterLink],
+  imports: [TranslatePipe, MoneyComponent, RouterLink],
   templateUrl: './personal-payments.component.html',
   styleUrl: './personal-expenses.component.scss',
 })
@@ -82,14 +84,14 @@ export class PersonalPaymentsComponent {
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.payments.set(rows),
-        error: () => this.error.set('Could not load personal payments. Try again.'),
+        error: () => this.error.set(translate('personalPayments.couldNotLoadPersonal')),
       });
   }
 
   protected settle(balance: FriendBalance): void {
     this.modal.openSettle({
       friendId: this.friendId(),
-      groupName: 'Personal',
+      groupName: translate('personalPayments.personal'),
       counterparty: { id: this.friendId(), displayName: this.friendName(), email: null },
       netMinor: balance.netMinor,
       currency: balance.currency,
@@ -118,7 +120,7 @@ export class PersonalPaymentsComponent {
       error: (err) => {
         this.busy.set(null);
         this.actionError.set(
-          err?.error?.message ?? 'Could not change this payment. Reload and try again.',
+          err?.error?.message ?? translate('personalPayments.couldNotChangeThis'),
         );
       },
     });
@@ -141,7 +143,7 @@ export class PersonalPaymentsComponent {
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.deleted.set(rows),
-        error: () => this.actionError.set('Could not load undone payments. Try again.'),
+        error: () => this.actionError.set(translate('personalPayments.couldNotLoadUndone')),
       });
   }
 
@@ -159,7 +161,7 @@ export class PersonalPaymentsComponent {
       .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.revisions.set(rows),
-        error: () => this.actionError.set('Could not load revisions. Try again.'),
+        error: () => this.actionError.set(translate('personalPayments.couldNotLoadRevisions')),
       });
   }
 }

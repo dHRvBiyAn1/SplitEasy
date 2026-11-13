@@ -9,10 +9,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-invitation',
-  imports: [RouterLink, MoneyComponent],
+  imports: [TranslatePipe, RouterLink, MoneyComponent],
   styleUrl: '../auth/auth.scss',
   styles: `
     :host {
@@ -47,61 +49,70 @@ import { SessionService } from '../core/auth/session.service';
   `,
   template: `<div class="auth__panel">
     <main class="auth__form-wrap">
-      <h1 class="dc-display auth__title">Group invitation</h1>
+      <h1 class="dc-display auth__title">{{ 'invitation.groupInvitation' | t }}</h1>
       @if (error()) {
         <p class="auth__error" role="alert">{{ error() }}</p>
       }
       @if (message()) {
         <p role="status">{{ message() }}</p>
-        <a [routerLink]="['/groups', acceptedGroup()]">Open group</a>
+        <a [routerLink]="['/groups', acceptedGroup()]">{{ 'invitation.openGroup' | t }}</a>
       }
       @if (!user()) {
         <p>
-          Sign in or register, verify your email if this is an email invitation, then reopen the
-          original invitation. The secret stays only on this page and is cleared when your session
-          changes.
+          {{ 'invitation.signInOrRegister' | t }}
         </p>
-        <p><a routerLink="/login">Sign in</a> · <a routerLink="/register">Register</a></p>
+        <p>
+          <a routerLink="/login">{{ 'invitation.signIn' | t }}</a> ·
+          <a routerLink="/register">{{ 'invitation.register' | t }}</a>
+        </p>
       } @else if (valid() && !message()) {
-        <p>Signed in as {{ user()!.displayName }} ({{ user()!.email }}).</p>
-        <p>Preview the invitation before choosing to join. Opening this page does not accept it.</p>
+        <p>
+          {{
+            'invitation.signedInAsDisplayname'
+              | t: { displayName: user()!.displayName, email: user()!.email }
+          }}
+        </p>
+        <p>{{ 'invitation.previewTheInvitationBefore' | t }}</p>
         <button
           type="button"
           class="dc-btn-accent"
           (click)="readPreview()"
           [disabled]="pending() || uncertain()"
         >
-          Preview invitation
+          {{ 'invitation.previewInvitation' | t }}
         </button>
         @if (preview(); as p) {
           <h2>{{ p.groupName }}</h2>
           <p>
-            Expires <time [attr.datetime]="p.expiresAt">{{ localDate(p.expiresAt) }}</time> (local
-            time). Balances can change; this is a review snapshot.
+            {{ 'invitation.expires' | t }}
+            <time [attr.datetime]="p.expiresAt">{{ localDate(p.expiresAt) }}</time>
+            {{ 'invitation.localTimeBalancesCan' | t }}
           </p>
           @if (needsOwnership()) {
             <p>
-              Accepting links {{ p.participant?.displayName }}'s existing financial entries to your
-              account. This cannot be undone here. Original entries and split identities stay in
-              history.
+              {{
+                'invitation.acceptingLinksDisplaynameS'
+                  | t: { displayName: p.participant?.displayName }
+              }}
             </p>
             <div
               class="invitation-balances"
               tabindex="0"
               role="region"
-              aria-label="Combined net balances by currency"
+              [attr.aria-label]="'invitation.combinedNetBalancesBy' | t"
             >
               <table>
                 <caption>
-                  Combined net position by currency. Positive means owed; negative means owing. Zero
-                  net can still have direct obligations.
+                  {{
+                    'invitation.combinedNetPositionBy' | t
+                  }}
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Currency</th>
-                    <th scope="col">Your current net</th>
-                    <th scope="col">Guest net</th>
-                    <th scope="col">Combined net</th>
+                    <th scope="col">{{ 'common.currency' | t }}</th>
+                    <th scope="col">{{ 'invitation.yourCurrentNet' | t }}</th>
+                    <th scope="col">{{ 'invitation.guestNet' | t }}</th>
+                    <th scope="col">{{ 'invitation.combinedNet' | t }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,11 +152,10 @@ import { SessionService } from '../core/auth/session.service';
                 [checked]="ownershipConfirmed()"
                 (change)="ownershipConfirmed.set($any($event.target).checked)"
               />
-              I accept irreversible ownership of this guest's financial entries, including their
-              obligations.</label
+              {{ 'invitation.iAcceptIrreversibleOwnership' | t }}</label
             >
           } @else {
-            <p>This joins the group using your own identity. It never claims a guest's entries.</p>
+            <p>{{ 'invitation.thisJoinsTheGroup' | t }}</p>
           }
           <button
             type="button"
@@ -153,13 +163,14 @@ import { SessionService } from '../core/auth/session.service';
             (click)="accept()"
             [disabled]="pending() || uncertain() || (needsOwnership() && !ownershipConfirmed())"
           >
-            {{ needsOwnership() ? 'Claim guest and join' : 'Join group' }}
+            {{
+              needsOwnership() ? ('invitation.claimGuestAndJoin' | t) : ('invitation.joinGroup' | t)
+            }}
           </button>
         }
         @if (uncertain()) {
           <p role="status">
-            Acceptance may already have succeeded. Another acceptance is blocked. Read current group
-            status to review the outcome.
+            {{ 'invitation.acceptanceMayAlreadyHave' | t }}
           </p>
           <button
             type="button"
@@ -167,14 +178,12 @@ import { SessionService } from '../core/auth/session.service';
             (click)="readCurrentStatus()"
             [disabled]="pending()"
           >
-            Read current group status
+            {{ 'invitation.readCurrentGroupStatus' | t }}
           </button>
         }
         <p>
-          <a routerLink="/profile">Account security and verification</a> ·
-          <a routerLink="/login"
-            >Sign in with another account, then reopen the original invitation</a
-          >
+          <a routerLink="/profile">{{ 'common.accountSecurityAndVerification' | t }}</a> ·
+          <a routerLink="/login">{{ 'invitation.signInWithAnother' | t }}</a>
         </p>
       }
     </main>
@@ -221,7 +230,7 @@ export class InvitationComponent {
       this.ownershipConfirmed.set(false);
       this.message.set('');
       this.acceptedGroup.set('');
-      this.error.set('Your session changed. Reopen the original invitation to continue.');
+      this.error.set(translate('invitation.yourSessionChangedReopen'));
     });
     this.destroyRef.onDestroy(() => {
       window.removeEventListener('hashchange', reopen);
@@ -234,9 +243,7 @@ export class InvitationComponent {
     const fragment = new URLSearchParams(location.hash.slice(1));
     history.replaceState(history.state, '', location.pathname + location.search);
     if (this.pending() || this.uncertain()) {
-      this.error.set(
-        'An invitation action is pending. Wait for its result before reopening a link.',
-      );
+      this.error.set(translate('invitation.anInvitationActionIs'));
       return;
     }
     this.token = '';
@@ -255,7 +262,7 @@ export class InvitationComponent {
     ) {
       this.token = token;
       this.valid.set(true);
-    } else this.error.set('Reopen the original invitation, or ask a group member for a new link.');
+    } else this.error.set(translate('invitation.reopenTheOriginalInvitation'));
   }
   readPreview(): void {
     const owner = this.user()?.id;
@@ -278,8 +285,8 @@ export class InvitationComponent {
           this.pending.set(false);
           this.error.set(
             err.status === 429
-              ? 'Too many attempts. Wait before previewing again.'
-              : 'Invitation unavailable. Use the verified matching account for an email invitation, then reopen the original link. It may also be expired, revoked or already used.',
+              ? translate('invitation.tooManyAttemptsWait')
+              : translate('invitation.invitationUnavailableUseThe'),
           );
         },
       });
@@ -317,17 +324,15 @@ export class InvitationComponent {
           this.acceptedGroup.set(result.groupId);
           this.message.set(
             result.claimed
-              ? 'Ownership accepted. Your account now owns the original guest entries.'
-              : 'You joined the group. No guest entries were claimed.',
+              ? translate('invitation.ownershipAcceptedYourAccount')
+              : translate('invitation.youJoinedTheGroup'),
           );
           this.dashboard.refresh();
         },
         error: () => {
           this.pending.set(false);
           this.uncertain.set(true);
-          this.error.set(
-            'Acceptance could not be confirmed. Read current group status; do not send another acceptance.',
-          );
+          this.error.set(translate('invitation.acceptanceCouldNotBe'));
         },
       });
   }
@@ -358,9 +363,7 @@ export class InvitationComponent {
           if (this.user()?.id !== owner || this.session.version !== version) return;
           this.pending.set(false);
           if (preview.participant && !group.ownedParticipantIds?.includes(preview.participant.id)) {
-            this.error.set(
-              'Your membership exists, but guest ownership is not confirmed. Acceptance remains blocked. Ask a group member to review invitation status, or reopen the original invitation after reviewing the outcome.',
-            );
+            this.error.set(translate('invitation.yourMembershipExistsBut'));
             return;
           }
           this.token = '';
@@ -371,16 +374,14 @@ export class InvitationComponent {
           this.acceptedGroup.set(group.id);
           this.message.set(
             preview.participant
-              ? 'Ownership confirmed by your current owned financial identities.'
-              : 'Current group access confirmed. No guest entries were claimed; invitation consumption was not confirmed by this read.',
+              ? translate('invitation.ownershipConfirmedByYour')
+              : translate('invitation.currentGroupAccessConfirmed'),
           );
           this.dashboard.refresh();
         },
         error: () => {
           this.pending.set(false);
-          this.error.set(
-            'Current membership and guest ownership could not be confirmed. No further acceptance will be sent here. Ask a group member to review invitation status before reopening the original invitation.',
-          );
+          this.error.set(translate('invitation.currentMembershipAndGuest'));
         },
       });
   }

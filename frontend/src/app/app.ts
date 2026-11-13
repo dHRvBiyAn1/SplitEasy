@@ -25,10 +25,12 @@ import { ModalShellComponent } from './modals/modal-shell.component';
 import { IconComponent } from './shared/icon.component';
 import { GroupArtComponent } from './shared/group-art.component';
 import { MoneyComponent } from './shared/money.component';
+import { TranslatePipe } from './core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-root',
   imports: [
+    TranslatePipe,
     RouterOutlet,
     RouterLink,
     ModalsComponent,

@@ -26,7 +26,7 @@ import {
   PendingWrite,
   PendingWriteError,
   PendingWritesService,
-  UNCERTAIN_WRITE,
+  uncertainWrite,
 } from '../core/pending-writes.service';
 import { ExpenseService } from '../expenses/expense.service';
 import {
@@ -38,21 +38,71 @@ import {
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
-  { value: 'FOOD_DRINK', label: 'Food & drink', ico: '☕' },
-  { value: 'GROCERIES', label: 'Groceries', ico: '🧺' },
-  { value: 'RENT_HOME', label: 'Rent & home', ico: '⌂' },
-  { value: 'UTILITIES', label: 'Utilities', ico: '⚡' },
-  { value: 'TRAVEL', label: 'Travel', ico: '✈' },
-  { value: 'TRANSPORT', label: 'Transport', ico: '🚕' },
-  { value: 'FUN', label: 'Fun', ico: '✦' },
-  { value: 'OTHER', label: 'Other', ico: '◆' },
+  {
+    value: 'FOOD_DRINK',
+    get label() {
+      return translate('newExpenseModal.foodDrink');
+    },
+    ico: '☕',
+  },
+  {
+    value: 'GROCERIES',
+    get label() {
+      return translate('newExpenseModal.groceries');
+    },
+    ico: '🧺',
+  },
+  {
+    value: 'RENT_HOME',
+    get label() {
+      return translate('newExpenseModal.rentHome');
+    },
+    ico: '⌂',
+  },
+  {
+    value: 'UTILITIES',
+    get label() {
+      return translate('newExpenseModal.utilities');
+    },
+    ico: '⚡',
+  },
+  {
+    value: 'TRAVEL',
+    get label() {
+      return translate('newExpenseModal.travel');
+    },
+    ico: '✈',
+  },
+  {
+    value: 'TRANSPORT',
+    get label() {
+      return translate('newExpenseModal.transport');
+    },
+    ico: '🚕',
+  },
+  {
+    value: 'FUN',
+    get label() {
+      return translate('newExpenseModal.fun');
+    },
+    ico: '✦',
+  },
+  {
+    value: 'OTHER',
+    get label() {
+      return translate('groupSettings.other');
+    },
+    ico: '◆',
+  },
 ];
 
 @Component({
   selector: 'app-new-expense-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './new-expense-modal.component.html',
   styleUrl: './modals.scss',
 })
@@ -194,7 +244,7 @@ export class NewExpenseModalComponent {
         this.retryNotice.set(
           err instanceof PendingWriteError
             ? err.message
-            : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
+            : translate('pendingWrites.cannotReadTheSaved'),
         );
       }
     }
@@ -208,7 +258,9 @@ export class NewExpenseModalComponent {
   }
 
   heading(): string {
-    return this.editId ? 'Edit expense' : 'New expense';
+    return this.editId
+      ? translate('newExpenseModal.editExpense')
+      : translate('newExpenseModal.newExpense');
   }
 
   private today(): string {
@@ -262,7 +314,7 @@ export class NewExpenseModalComponent {
             this.included.set(new Set(this.members().map((m) => m.id)));
             if (this.restored?.scope === id) {
               this.restoreDraft(this.restored.request);
-              this.retryNotice.set(UNCERTAIN_WRITE);
+              this.retryNotice.set(uncertainWrite());
             }
             this.ready.set(true);
           }
@@ -270,7 +322,7 @@ export class NewExpenseModalComponent {
         error: () => {
           if (version !== this.groupRequestVersion) return;
           this.loadFailed.set(true);
-          this.error.set('Could not load group members.');
+          this.error.set(translate('addMemberModal.couldNotLoadGroup'));
         },
       });
   }
@@ -285,7 +337,7 @@ export class NewExpenseModalComponent {
           if (version !== this.groupRequestVersion) return;
           if (!Number.isSafeInteger(e.version) || e.version! < 0) {
             this.loadFailed.set(true);
-            this.error.set('Reload or upgrade the app to edit this expense safely.');
+            this.error.set(translate('newExpenseModal.reloadOrUpgradeThe'));
             return;
           }
           // Keep original alias rows and payer IDs; canonical defaults must not erase history.
@@ -350,7 +402,7 @@ export class NewExpenseModalComponent {
         error: () => {
           if (version !== this.groupRequestVersion) return;
           this.loadFailed.set(true);
-          this.error.set('Could not load the expense.');
+          this.error.set(translate('newExpenseModal.couldNotLoadThe'));
         },
       });
   }
@@ -360,7 +412,9 @@ export class NewExpenseModalComponent {
   }
 
   firstName(u: ParticipantSummary): string {
-    return this.ownedIds.includes(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
+    return this.ownedIds.includes(u.id)
+      ? translate('dashboard.you')
+      : u.displayName.split(/\s+/)[0];
   }
 
   sameOwner(u: ParticipantSummary): boolean {
@@ -373,7 +427,8 @@ export class NewExpenseModalComponent {
   }
 
   memberLabel(u: ParticipantSummary): string {
-    return `${this.ownedIds.includes(u.id) ? 'You: ' : ''}${u.displayName}${u.email ? ` (${u.email})` : ' (guest)'}`;
+    const you = this.ownedIds.includes(u.id) ? translate('newExpenseModal.youLabel') + ' ' : '';
+    return `${you}${u.displayName}${u.email ? ` (${u.email})` : ' ' + translate('newExpenseModal.guest')}`;
   }
 
   initials(name: string): string {
@@ -409,11 +464,13 @@ export class NewExpenseModalComponent {
   payerRemainder(): string {
     this.tick();
     const rows = this.serializedContributions();
-    if (!rows) return 'Enter valid positive amounts';
+    if (!rows) return translate('newExpenseModal.enterValidPositiveAmounts');
     const diff = this.amountMinor() - rows.reduce((sum, r) => sum + r.amountMinor, 0);
-    if (!Number.isSafeInteger(diff)) return 'Enter the expense amount first';
-    if (diff === 0) return 'Payer amounts match the total';
-    return diff > 0 ? `${this.display(diff)} left to assign` : `${this.display(-diff)} over`;
+    if (!Number.isSafeInteger(diff)) return translate('newExpenseModal.enterTheExpenseAmount');
+    if (diff === 0) return translate('newExpenseModal.payerAmountsMatchThe');
+    return diff > 0
+      ? translate('newExpenseModal.diffLeftToAssign', { diff: this.display(diff) })
+      : translate('newExpenseModal.v1Over', { v1: this.display(-diff) });
   }
 
   /** Nonempty, positive and unique by construction; must include the primary payer and sum to the amount. */
@@ -443,21 +500,27 @@ export class NewExpenseModalComponent {
   runningLabel(): string {
     this.tick();
     if (this.splitType() === 'EQUAL') {
-      return `Split equally among ${this.included().size}`;
+      return translate('newExpenseModal.splitEquallyAmongSize', { size: this.included().size });
     }
     if (this.splitType() === 'ADJUSTMENTS') {
       return this.adjustmentsValid()
-        ? `Adjustments total ${formatMoney(0, false, this.currency())}; final shares nonnegative`
-        : `Adjustments must total ${formatMoney(0, false, this.currency())} and leave final shares nonnegative`;
+        ? translate('newExpenseModal.adjustmentsTotalCurrencyFinal', {
+            currency: formatMoney(0, false, this.currency()),
+          })
+        : translate('newExpenseModal.adjustmentsMustTotalCurrency', {
+            currency: formatMoney(0, false, this.currency()),
+          });
     }
     if (this.splitType() === 'WEIGHTS') {
       const splits = this.serializedSplits();
       return splits
-        ? `${splits.reduce((sum, s) => sum + BigInt(s.value), 0n)} weight units`
-        : 'Enter positive whole weight units';
+        ? translate('newExpenseModal.weightUnitsTotal', {
+            total: String(splits.reduce((sum, s) => sum + BigInt(s.value), 0n)),
+          })
+        : translate('newExpenseModal.enterPositiveWholeWeight');
     }
     const total = this.assignedTotal();
-    if (total === undefined) return 'Enter valid nonnegative shares';
+    if (total === undefined) return translate('newExpenseModal.enterValidNonnegativeShares');
     if (this.splitType() === 'PERCENTAGE') {
       return `${minorToDisplay(total, 'USD')}% / 100%`;
     }
@@ -569,7 +632,7 @@ export class NewExpenseModalComponent {
       try {
         pending = this.pendingWrites.prepare('recurring', gid, intent);
       } catch (error) {
-        if ((error as Error).message !== UNCERTAIN_WRITE) throw error;
+        if ((error as Error).message !== uncertainWrite()) throw error;
         this.pendingWrites.abandon('recurring'); // the draft changed: a new schedule, a new key
         pending = this.pendingWrites.prepare('recurring', gid, intent);
       }
@@ -590,7 +653,7 @@ export class NewExpenseModalComponent {
           this.modal.close();
         },
         error: (err) => {
-          this.error.set(err?.error?.message ?? 'Could not save the recurring expense.');
+          this.error.set(err?.error?.message ?? translate('newExpenseModal.couldNotSaveThe'));
           this.saving.set(false);
           this.modal.setMutationPending(false);
         },
@@ -605,7 +668,7 @@ export class NewExpenseModalComponent {
         this.restored = pending;
       } catch (error) {
         this.error.set((error as Error).message);
-        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.retryNotice.set(uncertainWrite());
         return;
       }
     }
@@ -622,8 +685,8 @@ export class NewExpenseModalComponent {
         this.modal.close();
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not save the expense.');
-        if (!this.editId) this.retryNotice.set(UNCERTAIN_WRITE);
+        this.error.set(err?.error?.message ?? translate('newExpenseModal.couldNotSaveThe2'));
+        if (!this.editId) this.retryNotice.set(uncertainWrite());
         this.saving.set(false);
         this.modal.setMutationPending(false);
       },
@@ -642,12 +705,7 @@ export class NewExpenseModalComponent {
 
   abandonRetry(): void {
     if (this.saving() || this.session.version !== this.sessionVersion) return;
-    if (
-      !confirm(
-        'The previous expense may already have been saved. Check expense history first. Start a separate expense anyway?',
-      )
-    )
-      return;
+    if (!confirm(translate('newExpenseModal.thePreviousExpenseMay'))) return;
     try {
       this.pendingWrites.abandon('expense');
       this.restored = null;
@@ -656,9 +714,7 @@ export class NewExpenseModalComponent {
       this.unmappedOriginalIds.set([]);
       this.error.set(null);
     } catch {
-      this.error.set(
-        'Cannot clear the saved retry identity. Enable browser storage and try again.',
-      );
+      this.error.set(translate('personalExpenses.cannotClearTheSaved'));
     }
   }
 

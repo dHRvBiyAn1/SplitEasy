@@ -1,13 +1,18 @@
 <div class="app-frame" [attr.inert]="blocked() ? '' : null">
-  <a href="#main-content" class="skip-link" (click)="skipToMain($event)">Skip to content</a>
+  <a href="#main-content" class="skip-link" (click)="skipToMain($event)">{{
+    'shell.skipToContent' | t
+  }}</a>
   @if (showShell()) {
     <header class="topbar dc-glass">
-      <a routerLink="/dashboard" class="brand" aria-label="SplitEasy overview"
-        ><span class="dc-split-mark" aria-hidden="true"></span><span>SplitEasy</span></a
+      <a routerLink="/dashboard" class="brand" [attr.aria-label]="'shell.spliteasyOverview' | t"
+        ><span class="dc-split-mark" aria-hidden="true"></span
+        ><span>{{ 'common.spliteasy' | t }}</span></a
       >
-      <nav class="desktop-nav" aria-label="Main navigation">
-        <a routerLink="/dashboard" [attr.aria-current]="activeNav() === 'overview' ? 'page' : null"
-          >Your overview</a
+      <nav class="desktop-nav" [attr.aria-label]="'shell.mainNavigation' | t">
+        <a
+          routerLink="/dashboard"
+          [attr.aria-current]="activeNav() === 'overview' ? 'page' : null"
+          >{{ 'shell.yourOverview' | t }}</a
         >
         <button
           type="button"
@@ -15,21 +20,23 @@
           [attr.aria-expanded]="groupsOpen()"
           [class.is-active]="activeNav() === 'groups'"
         >
-          Groups
+          {{ 'shell.groups' | t }}
         </button>
-        <a routerLink="/friends" [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
-          >Friends</a
+        <a routerLink="/friends" [attr.aria-current]="activeNav() === 'friends' ? 'page' : null">{{
+          'shell.friends' | t
+        }}</a>
+        <a
+          routerLink="/activity"
+          [attr.aria-current]="activeNav() === 'activity' ? 'page' : null"
+          >{{ 'common.activity' | t }}</a
         >
-        <a routerLink="/activity" [attr.aria-current]="activeNav() === 'activity' ? 'page' : null"
-          >Activity</a
-        >
-        <button type="button" (click)="modal.openSettle()">Settle up</button>
+        <button type="button" (click)="modal.openSettle()">{{ 'common.settleUp' | t }}</button>
       </nav>
       <a
         routerLink="/notifications"
         class="bell"
-        [attr.aria-label]="'Notifications, ' + unreadCount() + ' unread'"
-        >Notifications
+        [attr.aria-label]="'shell.notificationsUnread' | t: { count: unreadCount() }"
+        >{{ 'common.notifications' | t }}
         @if (unreadCount() > 0) {
           <span class="bell-count">{{ unreadCount() }}</span>
         }
@@ -37,16 +44,16 @@
       <button
         type="button"
         class="appearance-button"
-        aria-label="Appearance"
-        title="Appearance"
+        [attr.aria-label]="'shell.appearance' | t"
+        [attr.title]="'shell.appearance' | t"
         (click)="modal.openAppearance()"
       >
-        <app-icon name="appearance" /><span>Appearance</span>
+        <app-icon name="appearance" /><span>{{ 'shell.appearance' | t }}</span>
       </button>
       <a
         routerLink="/profile"
         class="account"
-        [attr.aria-label]="'Profile for ' + user()?.displayName"
+        [attr.aria-label]="'shell.profileFor' | t: { name: user()?.displayName }"
         ><span class="dc-avatar" [style]="avatarStyle()" aria-hidden="true">{{
           initials(user()?.displayName)
         }}</span
@@ -55,30 +62,32 @@
     </header>
     @if (staleOverview()) {
       <div class="refresh-notice" role="status">
-        <span>Balances couldn’t refresh. Showing the last loaded overview.</span
-        ><button type="button" class="dc-btn-ghost" (click)="retryOverview()">Try again</button>
+        <span>{{ 'shell.balancesCouldnTRefresh' | t }}</span
+        ><button type="button" class="dc-btn-ghost" (click)="retryOverview()">
+          {{ 'common.tryAgain' | t }}
+        </button>
       </div>
     }
   } @else {
     <button
       type="button"
       class="auth-appearance dc-btn-outline"
-      aria-label="Appearance"
+      [attr.aria-label]="'shell.appearance' | t"
       (click)="modal.openAppearance()"
     >
-      <app-icon name="appearance" /><span>Appearance</span>
+      <app-icon name="appearance" /><span>{{ 'shell.appearance' | t }}</span>
     </button>
   }
   <main id="main-content" [class]="showShell() ? 'shell__main' : 'app-content'" tabindex="-1">
     <router-outlet />
   </main>
   @if (showShell()) {
-    <nav class="mobile-nav dc-glass" aria-label="Mobile and tablet navigation">
+    <nav class="mobile-nav dc-glass" [attr.aria-label]="'shell.mobileAndTabletNavigation' | t">
       <a
         routerLink="/dashboard"
         data-nav="overview"
         [attr.aria-current]="activeNav() === 'overview' ? 'page' : null"
-        ><app-icon name="overview" /><span>Overview</span></a
+        ><app-icon name="overview" /><span>{{ 'shell.overview' | t }}</span></a
       >
       <button
         type="button"
@@ -86,13 +95,13 @@
         (click)="groupsOpen.set(true)"
         [attr.aria-current]="activeNav() === 'groups' ? 'page' : null"
       >
-        <app-icon name="groups" /><span>Groups</span>
+        <app-icon name="groups" /><span>{{ 'shell.groups' | t }}</span>
       </button>
       <a
         routerLink="/friends"
         data-nav="friends"
         [attr.aria-current]="activeNav() === 'friends' ? 'page' : null"
-        ><app-icon name="groups" /><span>Friends</span></a
+        ><app-icon name="groups" /><span>{{ 'shell.friends' | t }}</span></a
       >
       <button
         type="button"
@@ -100,13 +109,13 @@
         (click)="openExpense()"
         [attr.aria-current]="activeNav() === 'expense' ? 'page' : null"
       >
-        <app-icon name="expense" /><span>Expense</span>
+        <app-icon name="expense" /><span>{{ 'shell.expense' | t }}</span>
       </button>
       <a
         routerLink="/profile"
         data-nav="profile"
         [attr.aria-current]="activeNav() === 'profile' ? 'page' : null"
-        ><app-icon name="profile" /><span>Profile</span></a
+        ><app-icon name="profile" /><span>{{ 'common.profile' | t }}</span></a
       >
     </nav>
   }
@@ -121,7 +130,7 @@
           (click)="groupsOpen.set(false)"
           ><app-group-art [type]="g.type" /><span
             ><strong>{{ g.name }}</strong
-            ><small>{{ g.memberCount }} members</small>
+            ><small>{{ 'shell.membercountMembers' | t: { memberCount: g.memberCount } }}</small>
             @for (total of groupTotals(g); track total.currency) {
               <app-money [minor]="total.netMinor" [currency]="total.currency" [net]="true" />
             }</span
@@ -130,12 +139,14 @@
       }
       @if (groups().length === 0) {
         @if (overviewLoading()) {
-          <p role="status">Loading groups…</p>
+          <p role="status">{{ 'shell.loadingGroups' | t }}</p>
         } @else if (overviewUnavailable()) {
-          <p role="alert">Groups are unavailable. Try loading your overview again.</p>
-          <button type="button" class="dc-btn-outline" (click)="retryOverview()">Try again</button>
+          <p role="alert">{{ 'shell.groupsAreUnavailableTry' | t }}</p>
+          <button type="button" class="dc-btn-outline" (click)="retryOverview()">
+            {{ 'common.tryAgain' | t }}
+          </button>
         } @else {
-          <p class="tray-empty">A trip, a home, a dinner club. Start your first group.</p>
+          <p class="tray-empty">{{ 'shell.aTripAHome' | t }}</p>
         }
       }
       <button
@@ -143,7 +154,7 @@
         class="dc-btn-accent"
         (click)="groupsOpen.set(false); modal.openGroup()"
       >
-        <app-icon name="plus" />New group
+        <app-icon name="plus" />{{ 'common.newGroup' | t }}
       </button>
     </div>
   </app-modal-shell>

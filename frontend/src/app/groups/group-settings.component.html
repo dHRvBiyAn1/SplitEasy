@@ -13,19 +13,22 @@
     >
       <path d="M14.5 6l-6 6 6 6" />
     </svg>
-    Back to group
+    {{ 'groupSettings.backToGroup' | t }}
   </a>
 
   @if (loading()) {
-    <div class="dc-loading" role="status" aria-label="Loading settings"></div>
+    <div
+      class="dc-loading"
+      role="status"
+      [attr.aria-label]="'groupSettings.loadingSettings' | t"
+    ></div>
   } @else if (group(); as g) {
     <!-- Name -->
     <header class="gset__head">
       <app-group-art [type]="g.type" />
       @if (archived()) {
         <p class="gset__archived" role="status">
-          This group is archived — it stays readable, but new expenses, settlements and members are
-          turned off until it is re-opened.
+          {{ 'groupSettings.thisGroupIsArchived' | t }}
         </p>
       }
 
@@ -35,8 +38,8 @@
           type="button"
           class="gset__icon-btn"
           (click)="startRename()"
-          title="Rename group"
-          aria-label="Rename group"
+          [attr.title]="'groupSettings.renameGroup' | t"
+          [attr.aria-label]="'groupSettings.renameGroup' | t"
         >
           <svg
             viewBox="0 0 24 24"
@@ -57,7 +60,7 @@
         <input
           class="dc-field gset__name-input"
           [formControl]="nameControl"
-          aria-label="Group name"
+          [attr.aria-label]="'common.groupName' | t"
           autocomplete="off"
           (keydown.enter)="saveName()"
           (keydown.escape)="cancelRename()"
@@ -67,8 +70,8 @@
           class="gset__icon-btn gset__icon-btn--save"
           (click)="saveName()"
           [disabled]="savingName()"
-          title="Save name"
-          aria-label="Save name"
+          [attr.title]="'groupSettings.saveName' | t"
+          [attr.aria-label]="'groupSettings.saveName' | t"
         >
           <svg
             viewBox="0 0 24 24"
@@ -88,8 +91,8 @@
           type="button"
           class="gset__icon-btn"
           (click)="cancelRename()"
-          title="Cancel"
-          aria-label="Cancel rename"
+          [attr.title]="'common.cancel' | t"
+          [attr.aria-label]="'groupSettings.cancelRename' | t"
         >
           <svg
             viewBox="0 0 24 24"
@@ -109,18 +112,20 @@
 
     @if (error()) {
       <p class="gset__error" role="alert">{{ error() }}</p>
-      <button type="button" class="dc-btn-outline" (click)="retry()">Reload group</button>
+      <button type="button" class="dc-btn-outline" (click)="retry()">
+        {{ 'groupSettings.reloadGroup' | t }}
+      </button>
     }
 
     <!-- Members -->
     <section class="gcard">
-      <h2 class="gcard__title">Members</h2>
+      <h2 class="gcard__title">{{ 'groupSettings.members' | t }}</h2>
 
       <button
         type="button"
         class="mrow mrow--add"
         [disabled]="archived()"
-        [attr.title]="archived() ? 'Re-open the group to add members' : null"
+        [attr.title]="archived() ? ('groupSettings.reOpenTheGroup' | t) : null"
         (click)="addMember()"
       >
         <span class="mrow__plus" aria-hidden="true">
@@ -137,7 +142,9 @@
             <path d="M12 5.5v13M5.5 12h13" />
           </svg>
         </span>
-        <span class="mrow__text"><span class="mrow__name">Add member</span></span>
+        <span class="mrow__text"
+          ><span class="mrow__name">{{ 'groupSettings.addMember' | t }}</span></span
+        >
       </button>
 
       @for (m of g.members; track m.id) {
@@ -149,7 +156,7 @@
             <span class="mrow__name">
               {{ m.displayName }}
               @if (isMe(m.id)) {
-                <span class="mrow__you">you</span>
+                <span class="mrow__you">{{ 'groupSettings.you' | t }}</span>
               }
             </span>
             <span class="mrow__sub">{{ m.email }}</span>
@@ -157,7 +164,7 @@
 
           <span class="mrow__bal">
             @if (!financialsReady()) {
-              unavailable
+              {{ 'groupSettings.unavailable' | t }}
             } @else if (hasBalance(m.id)) {
               @for (balance of balancesOf(m.id); track balance.currency ?? 'USD') {
                 <span
@@ -168,9 +175,9 @@
                 >
               }
             } @else if (obligationsOf(m.id).length) {
-              even overall
+              {{ 'groupSettings.evenOverall' | t }}
             } @else {
-              settled
+              {{ 'groupSettings.settled' | t }}
             }
           </span>
 
@@ -179,8 +186,10 @@
             class="mrow__x"
             (click)="removeMember(m.id)"
             [disabled]="!!blockedReason(m.id) || busy()"
-            [title]="blockedReason(m.id) ?? 'Remove ' + m.displayName"
-            [attr.aria-label]="'Remove ' + m.displayName"
+            [title]="
+              blockedReason(m.id) ?? ('groupSettings.removeName' | t: { name: m.displayName })
+            "
+            [attr.aria-label]="'groupSettings.removeName' | t: { name: m.displayName }"
           >
             <svg
               viewBox="0 0 24 24"
@@ -197,15 +206,22 @@
           </button>
         </div>
         @if (blockedReason(m.id)) {
-          <p class="mrow__why">{{ blockedReason(m.id) }} — can't be removed yet</p>
+          <p class="mrow__why">{{ 'groupSettings.idCanTBe' | t: { id: blockedReason(m.id) } }}</p>
         }
         @for (debt of obligationsOf(m.id); track debt.user.id + (debt.currency ?? 'USD')) {
           <p class="mrow__why">
-            {{ debt.netMinor > 0 ? 'Is owed' : 'Owes' }}
-            {{ display(debt.netMinor < 0 ? -debt.netMinor : debt.netMinor, debt.currency) }}
-            {{ debt.netMinor > 0 ? 'by' : 'to' }} {{ debt.user.displayName }} ({{
-              debt.user.email || 'guest'
-            }})
+            {{
+              (debt.netMinor > 0 ? 'groupSettings.debtOwedBy' : 'groupSettings.debtOwesTo')
+                | t
+                  : {
+                      amount: display(
+                        debt.netMinor < 0 ? -debt.netMinor : debt.netMinor,
+                        debt.currency
+                      ),
+                      name: debt.user.displayName,
+                      contact: debt.user.email || ('groupSettings.guest' | t),
+                    }
+            }}
           </p>
         }
       }
@@ -213,25 +229,29 @@
 
     <!-- Advanced -->
     <section class="gcard">
-      <h2 class="gcard__title">Advanced settings</h2>
+      <h2 class="gcard__title">{{ 'groupSettings.advancedSettings' | t }}</h2>
       <p class="grow__sub">
-        {{ g.simplifyDebts ? 'Simplified obligations' : 'Direct obligations' }}
+        {{
+          g.simplifyDebts
+            ? ('friends.simplifiedObligations' | t)
+            : ('friends.directObligations' | t)
+        }}
         govern balances, settlement and who can leave. Raw expenses and payments stay unchanged.
       </p>
       <div class="grow grow--stack">
         <span class="grow__text">
-          <span class="grow__label">Group type</span>
+          <span class="grow__label">{{ 'groupSettings.groupType' | t }}</span>
           <span class="grow__sub">
-            Only changes the illustration and grouping — balances and history stay as they are.
+            {{ 'groupSettings.onlyChangesTheIllustration' | t }}
           </span>
         </span>
-        <span class="gtypes" role="group" aria-label="Group type">
+        <span class="gtypes" role="group" [attr.aria-label]="'groupSettings.groupType' | t">
           @for (option of groupTypes; track option.value) {
             <button
               type="button"
               class="gtype"
               [class.gtype--on]="g.type === option.value"
-              [attr.aria-label]="'Group type ' + option.label"
+              [attr.aria-label]="'groupSettings.groupTypeOption' | t: { type: option.label }"
               [attr.aria-pressed]="g.type === option.value"
               [disabled]="savingType()"
               (click)="setType(option.value)"
@@ -244,10 +264,11 @@
 
       <div class="grow">
         <span class="grow__text">
-          <span class="grow__label">{{ archived() ? 'Re-open group' : 'Archive group' }}</span>
+          <span class="grow__label">{{
+            archived() ? ('groupSettings.reOpenGroup' | t) : ('groupSettings.archiveGroup' | t)
+          }}</span>
           <span class="grow__sub">
-            Archiving keeps every expense, settlement and balance readable while turning off new
-            entries. Re-open it at any time; nothing is deleted either way.
+            {{ 'groupSettings.archivingKeepsEveryExpense' | t }}
           </span>
         </span>
         <button
@@ -256,25 +277,22 @@
           [disabled]="savingArchive()"
           (click)="toggleArchive()"
         >
-          {{ archived() ? 'Re-open group' : 'Archive group' }}
+          {{ archived() ? ('groupSettings.reOpenGroup' | t) : ('groupSettings.archiveGroup' | t) }}
         </button>
       </div>
 
       <div class="grow">
         <span class="grow__text">
-          <span class="grow__label">Simplify debts</span>
+          <span class="grow__label">{{ 'groupSettings.simplifyDebts' | t }}</span>
           <span class="grow__sub">
-            Simplified mode matches net debtors and creditors, so an even intermediary can leave.
-            Direct mode keeps each pair's debts, including offsetting amounts across people.
-            Changing modes never rewrites history; re-add former participants before a change that
-            exposes their obligations.
+            {{ 'groupSettings.simplifiedModeMatchesNet' | t }}
           </span>
         </span>
         <button
           type="button"
           class="simplify-toggle"
           role="switch"
-          aria-label="Simplify debts"
+          [attr.aria-label]="'groupSettings.simplifyDebts' | t"
           [attr.aria-checked]="g.simplifyDebts"
           [disabled]="savingSimplify()"
           (click)="toggleSimplify()"
@@ -288,22 +306,22 @@
 
     <!-- Danger zone -->
     <section class="gcard gcard--danger">
-      <h2 class="gcard__title">Danger zone</h2>
+      <h2 class="gcard__title">{{ 'groupSettings.dangerZone' | t }}</h2>
 
       <div class="grow">
         <span class="grow__text">
-          <span class="grow__label">Leave group</span>
+          <span class="grow__label">{{ 'groupSettings.leaveGroup' | t }}</span>
           <span class="grow__sub">
             @if (isCreator()) {
-              You created this group — delete it instead of leaving.
+              {{ 'groupSettings.youCreatedThisGroup' | t }}
             } @else if (!financialsReady()) {
-              Balances and obligations are unavailable. Reload settings before leaving.
+              {{ 'groupSettings.balancesAndObligationsAre' | t }}
             } @else if (obligationsOf(viewerAccountId()).length) {
-              Settle the obligations listed above in the current mode before leaving.
+              {{ 'groupSettings.settleTheObligationsListed' | t }}
             } @else if (hasMyBalance()) {
-              Settle every currency balance listed above before leaving this group.
+              {{ 'groupSettings.settleEveryCurrencyBalance' | t }}
             } @else {
-              You're settled up, so you can leave whenever you like.
+              {{ 'groupSettings.youReSettledUp' | t }}
             }
           </span>
         </span>
@@ -316,10 +334,10 @@
               (click)="leaveGroup()"
               [disabled]="busy() || !canLeave()"
             >
-              Yes, leave
+              {{ 'groupSettings.yesLeave' | t }}
             </button>
             <button type="button" class="dc-btn-ghost" (click)="ask(null)" [disabled]="busy()">
-              Cancel
+              {{ 'common.cancel' | t }}
             </button>
           </span>
         } @else {
@@ -329,7 +347,7 @@
             (click)="ask('leave')"
             [disabled]="!canLeave()"
           >
-            Leave group
+            {{ 'groupSettings.leaveGroup' | t }}
           </button>
         }
       </div>
@@ -337,12 +355,11 @@
       @if (isCreator()) {
         <div class="grow">
           <span class="grow__text">
-            <span class="grow__label">Delete group</span>
+            <span class="grow__label">{{ 'groupSettings.deleteGroup' | t }}</span>
             <span class="grow__sub">
-              Removes "{{ g.name }}" from everyone's overview. Its expenses, settlements and history
-              are kept, so it can be restored from
-              <a routerLink="/groups/deleted">Recently deleted</a>. The group has to be settled up
-              first.
+              {{ 'groupSettings.removesNameFromEveryone' | t: { name: g.name } }}
+              <a routerLink="/groups/deleted">{{ 'common.recentlyDeleted' | t }}</a
+              >{{ 'groupSettings.theGroupHasTo' | t }}
             </span>
           </span>
 
@@ -354,15 +371,15 @@
                 (click)="deleteGroup()"
                 [disabled]="busy()"
               >
-                Yes, delete
+                {{ 'groupSettings.yesDelete' | t }}
               </button>
               <button type="button" class="dc-btn-ghost" (click)="ask(null)" [disabled]="busy()">
-                Cancel
+                {{ 'common.cancel' | t }}
               </button>
             </span>
           } @else {
             <button type="button" class="dc-btn-outline" (click)="ask('delete')">
-              Delete group
+              {{ 'groupSettings.deleteGroup' | t }}
             </button>
           }
         </div>
@@ -370,6 +387,8 @@
     </section>
   } @else {
     <p class="gset__error" role="alert">{{ error() ?? "Couldn't load this group." }}</p>
-    <button type="button" class="dc-btn-outline" (click)="retry()">Reload group</button>
+    <button type="button" class="dc-btn-outline" (click)="retry()">
+      {{ 'groupSettings.reloadGroup' | t }}
+    </button>
   }
 </div>

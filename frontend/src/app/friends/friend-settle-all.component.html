@@ -1,9 +1,8 @@
 @if (open().length) {
   <section class="personal" aria-labelledby="settle-all-heading">
-    <h2 id="settle-all-heading">Settle everything</h2>
+    <h2 id="settle-all-heading">{{ 'friendSettleAll.settleEverything' | t }}</h2>
     <p>
-      Records one payment in each shared group and in Personal, in a single step. Each currency is
-      settled separately.
+      {{ 'friendSettleAll.recordsOnePaymentIn' | t }}
     </p>
     @if (!review()) {
       @for (balance of open(); track balance.currency) {
@@ -13,7 +12,7 @@
           [disabled]="busy()"
           (click)="start(balance.currency)"
         >
-          Settle all in {{ balance.currency }}
+          {{ 'friendSettleAll.settleAllInCurrency' | t: { currency: balance.currency } }}
         </button>
       }
     }
@@ -25,29 +24,29 @@
         <ul class="personal-list">
           @for (a of preview.allocations; track a.scopeId) {
             <li>
-              <strong>{{ a.groupName ?? 'Personal' }}</strong>
+              <strong>{{ a.groupName ?? ('personalPayments.personal' | t) }}</strong>
               <span>{{ pays(a.payerId) }}</span>
               <app-money [minor]="a.amountMinor" [currency]="preview.currency" />
             </li>
           }
         </ul>
         <p>
-          Net:
+          {{ 'friendSettleAll.net' | t }}
           <app-money [minor]="preview.netMinor" [currency]="preview.currency" [net]="true" />
         </p>
       } @else {
-        <p>Nothing to settle in {{ preview.currency }} right now.</p>
+        <p>{{ 'friendSettleAll.nothingToSettleIn' | t: { currency: preview.currency } }}</p>
       }
       @for (s of preview.skipped; track s.scopeId) {
-        <p>{{ s.groupName ?? 'Personal' }} was skipped: {{ s.reason }}.</p>
+        <p>{{ s.groupName ?? ('personalPayments.personal' | t) }} was skipped: {{ s.reason }}.</p>
       }
       @if (preview.allocations.length) {
         <button class="dc-btn" type="button" [disabled]="busy()" (click)="confirm(preview)">
-          Confirm
+          {{ 'friendSettleAll.confirm' | t }}
         </button>
       }
       <button class="dc-btn-ghost" type="button" [disabled]="busy()" (click)="cancel()">
-        Cancel
+        {{ 'common.cancel' | t }}
       </button>
     }
   </section>

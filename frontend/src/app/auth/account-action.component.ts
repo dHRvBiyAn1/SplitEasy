@@ -7,20 +7,22 @@ import { newPasswordValidators } from './password-validation';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
 import { ProfileService } from '../core/profile.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-account-action',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [TranslatePipe, ReactiveFormsModule, RouterLink],
   styleUrl: './auth.scss',
   template: `<div class="auth__panel">
     <main class="auth__form-wrap">
       <h1 class="dc-display auth__title">
         {{
           action() === 'password-reset'
-            ? 'Reset your password'
+            ? ('forgotPassword.resetYourPassword' | t)
             : action() === 'email-change'
-              ? 'Confirm email change'
-              : 'Verify email'
+              ? ('accountAction.confirmEmailChange' | t)
+              : ('accountAction.verifyEmail' | t)
         }}
       </h1>
       @if (message()) {
@@ -33,7 +35,7 @@ import { ProfileService } from '../core/profile.service';
         <form class="auth__form" (submit)="$event.preventDefault(); submit()" novalidate>
           @if (action() === 'password-reset') {
             <label class="auth__field"
-              ><span class="dc-field-label">New password</span
+              ><span class="dc-field-label">{{ 'common.newPassword' | t }}</span
               ><input
                 class="dc-field"
                 type="password"
@@ -42,25 +44,25 @@ import { ProfileService } from '../core/profile.service';
                 [attr.aria-invalid]="password.touched && password.invalid"
                 aria-describedby="reset-password-hint"
             /></label>
-            <p id="reset-password-hint">Use at least 8 characters and at most 72 UTF-8 bytes.</p>
+            <p id="reset-password-hint">{{ 'common.useAtLeast8' | t }}</p>
           }
           <button type="submit" class="dc-btn-accent" [disabled]="pending()">
             {{
               pending()
-                ? 'Saving…'
+                ? ('profile.saving' | t)
                 : action() === 'password-reset'
-                  ? 'Reset password'
+                  ? ('accountAction.resetPassword' | t)
                   : action() === 'email-change'
-                    ? 'Confirm email change'
-                    : 'Verify email'
+                    ? ('accountAction.confirmEmailChange' | t)
+                    : ('accountAction.verifyEmail' | t)
             }}
           </button>
         </form>
       }
       <p class="auth__switch">
-        <a routerLink="/login">Log in</a> ·
-        <a routerLink="/forgot-password">Request a new reset link</a> ·
-        <a routerLink="/profile">Account security and verification</a>
+        <a routerLink="/login">{{ 'common.logIn' | t }}</a> ·
+        <a routerLink="/forgot-password">{{ 'accountAction.requestANewReset' | t }}</a> ·
+        <a routerLink="/profile">{{ 'common.accountSecurityAndVerification' | t }}</a>
       </p>
     </main>
   </div>`,
@@ -96,8 +98,7 @@ export class AccountActionComponent {
       this.password.reset();
       this.valid.set(false);
       this.pending.set(false);
-      if (!this.message())
-        this.error.set('Your session changed. Reopen the link from your email to continue.');
+      if (!this.message()) this.error.set(translate('accountAction.yourSessionChangedReopen'));
     });
     this.destroyRef.onDestroy(() => {
       window.removeEventListener('hashchange', reopen);
@@ -109,9 +110,7 @@ export class AccountActionComponent {
     const fragment = new URLSearchParams(location.hash.slice(1));
     history.replaceState(history.state, '', location.pathname + location.search);
     if (this.pending()) {
-      this.error.set(
-        'An account action is already pending. Wait for it to finish, then reopen your email link.',
-      );
+      this.error.set(translate('accountAction.anAccountActionIs'));
       return;
     }
     this.token = '';
@@ -132,7 +131,7 @@ export class AccountActionComponent {
       this.token = token;
       this.action.set(fragment.get('action')!);
       this.valid.set(true);
-    } else this.error.set('Reopen the link from your email, or request a new link.');
+    } else this.error.set(translate('accountAction.reopenTheLinkFrom'));
   }
   submit(): void {
     if (!this.valid() || this.pending()) return;
@@ -161,10 +160,10 @@ export class AccountActionComponent {
           this.profile.refresh();
         this.message.set(
           reset
-            ? 'Password reset. Log in with your new password.'
+            ? translate('accountAction.passwordResetLogIn')
             : this.action() === 'email-change'
-              ? 'Email changed. Log in with your new email.'
-              : 'Email verified.',
+              ? translate('accountAction.emailChangedLogIn')
+              : translate('accountAction.emailVerified'),
         );
       },
       error: (err) => {
@@ -172,17 +171,15 @@ export class AccountActionComponent {
         if (this.action() === 'email-change' && err.status === 409) {
           this.token = '';
           this.valid.set(false);
-          this.error.set(
-            'This email address is already registered. Request a new email change with a different address in Account security and verification.',
-          );
+          this.error.set(translate('accountAction.thisEmailAddressIs'));
           return;
         }
         this.error.set(
           err.status === 429
-            ? 'Too many attempts. Please wait before trying again.'
+            ? translate('accountAction.tooManyAttemptsPlease')
             : err.status === 400
-              ? 'This link is invalid or expired. Request a new link.'
-              : 'Temporarily unavailable. Please try again later.',
+              ? translate('accountAction.thisLinkIsInvalid')
+              : translate('accountAction.temporarilyUnavailablePleaseTry'),
         );
       },
     });
