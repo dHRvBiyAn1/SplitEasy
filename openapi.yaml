@@ -3086,6 +3086,52 @@ paths:
   # --- h02 paths (insert below; parallel batch plan rule 3) ---
 
   # --- p07-p01 paths (insert below; parallel batch plan rule 3) ---
+  /api/search:
+    get:
+      operationId: searchLedger
+      tags: [History]
+      summary: Search the caller's expenses, settlements and refunds
+      description: Case-insensitive literal match (LIKE wildcards in q are escaped) over description, note,
+        category and the names of the people taking part. Same ordering, cursor and page bounds as history
+        (default 50, maximum 100). minAmount/maxAmount are minor units and are only accepted together with
+        currency; unlike currencies are never compared. Deleted entries and groups the caller left are never
+        returned. A groupId the caller is not in is 403; a personal ledger id is 404.
+      parameters:
+      - {name: q, in: query, schema: {type: string}}
+      - {name: groupId, in: query, schema: {type: string, format: uuid}}
+      - {name: friendId, in: query, description: A saved friend; narrows to entries both take part in., schema: {type: string, format: uuid}}
+      - {name: from, in: query, schema: {type: string, format: date}}
+      - {name: to, in: query, schema: {type: string, format: date}}
+      - {name: currency, in: query, schema: {type: string}}
+      - {name: minAmount, in: query, schema: {type: integer, format: int64}}
+      - {name: maxAmount, in: query, schema: {type: integer, format: int64}}
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: One page of matches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryPage'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/me/export:
+    get:
+      operationId: exportAccount
+      tags: [Profile]
+      summary: Stream the caller's data as a ZIP
+      description: profile.json, groups.json, personal-ledgers.json, groups/{id}.csv per accessible group and
+        personal/{id}.csv per personal ledger (history CSV format; deleted entries excluded). Only the
+        caller's own scopes, streamed and never buffered.
+      responses:
+        '200':
+          description: ZIP archive.
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
 
 components:
   schemas:
