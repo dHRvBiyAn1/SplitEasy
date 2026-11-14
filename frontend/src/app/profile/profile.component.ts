@@ -11,7 +11,13 @@ import { SessionService } from '../core/auth/session.service';
 import { AuthService } from '../core/auth/auth.service';
 import { ProfileService, Currency, CURRENCY_SYMBOL, AVATAR_COLORS } from '../core/profile.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { I18nService, SUPPORTED_LOCALES, intlLocale } from '../core/i18n/i18n.service';
+import {
+  BETA_LOCALES,
+  I18nService,
+  SUPPORTED_LOCALES,
+  intlLocale,
+  translate,
+} from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-profile',
@@ -97,7 +103,13 @@ export class ProfileComponent {
 
   /** Each language is named in itself, so it stays findable whatever the UI language is. */
   languageName(code: string): string {
-    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+    const name = new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+    const label = name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
+    return BETA_LOCALES.has(code) ? `${label} (${translate('profile.betaMarker')})` : label;
+  }
+
+  protected isBeta(code: string): boolean {
+    return BETA_LOCALES.has(code);
   }
 
   /** Switch the UI at once, then persist; the PATCH response re-applies the server value. */

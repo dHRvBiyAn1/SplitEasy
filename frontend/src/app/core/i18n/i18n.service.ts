@@ -5,6 +5,8 @@ import en from '../../../../public/i18n/en.json';
 
 /** The single list to extend: add a code here, ship public/i18n/<code>.json and allow it in the backend. */
 export const SUPPORTED_LOCALES = ['en', 'hi', 'es', 'fr'] as const;
+/** Machine-drafted catalogues shown as "Beta"; remove a code here once a native speaker has reviewed it. */
+export const BETA_LOCALES: ReadonlySet<string> = new Set(['hi', 'es', 'fr']);
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 export type Catalogue = Record<string, string>;
 export type Params = Record<string, string | number | null | undefined>;

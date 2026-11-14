@@ -189,6 +189,9 @@
         }
       </select></label
     >
+    @if (isBeta(locale())) {
+      <p class="dc-caption" id="language-beta-note">{{ 'profile.betaNote' | t }}</p>
+    }
     <p class="dc-caption">{{ 'profile.languageNote' | t }}</p>
   </section>
 

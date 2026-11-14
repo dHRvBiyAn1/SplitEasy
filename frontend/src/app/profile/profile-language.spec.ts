@@ -71,4 +71,33 @@ describe('profile language', () => {
     http.match('/api/me'); // the account reloads its profile after a session reset
     http.verify();
   });
+
+  describe('Beta labelling', () => {
+    const labels = () =>
+      [
+        ...(fixture.nativeElement.querySelector('select#language') as HTMLSelectElement).options,
+      ].map((o) => o.textContent!.trim());
+    const note = () =>
+      fixture.nativeElement.querySelector('#language-beta-note') as HTMLElement | null;
+
+    it('marks hi/es/fr as Beta, not English, and shows no note for English', () => {
+      http.expectOne('/api/me').flush(me('en'));
+      fixture.detectChanges();
+      expect(labels()).toEqual(['English', 'हिन्दी (Beta)', 'Español (Beta)', 'Français (Beta)']);
+      expect(note()).toBeNull();
+    });
+
+    it('shows a translated machine-draft note only while a Beta locale is active', () => {
+      http.expectOne('/api/me').flush(me('es'));
+      http.expectOne('/i18n/es.json').flush({
+        'profile.betaMarker': 'Beta',
+        'profile.betaNote': 'Traducción automática.',
+      });
+      fixture.detectChanges();
+      expect(note()?.textContent).toContain('Traducción automática.');
+      activeLocale.set('en');
+      fixture.detectChanges();
+      expect(note()).toBeNull();
+    });
+  });
 });
