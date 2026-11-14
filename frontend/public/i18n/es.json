@@ -813,6 +813,8 @@
   "profile.interfaceLanguage": "Idioma de la interfaz",
   "profile.keepServerPreferences": "Mantener las preferencias del servidor",
   "profile.language": "Idioma",
+  "profile.betaMarker": "Beta",
+  "profile.betaNote": "Las traducciones de este idioma son automáticas y pueden ser imperfectas.",
   "profile.languageNote": "Se aplica a menús, etiquetas y mensajes. Los nombres, notas y títulos de grupo se muestran tal como se escribieron; algunos mensajes de error del servidor siguen en inglés.",
   "profile.loadingProfile": "Cargando perfil…",
   "profile.makeItYours": "Hazlo tuyo.",
