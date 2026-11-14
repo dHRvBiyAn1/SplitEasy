@@ -84,8 +84,12 @@
             inputmode="decimal"
             [value]="amount()"
             [disabled]="saving()"
-            (input)="amount.set($any($event.target).value)"
+            [readOnly]="multiPayer()"
+            (input)="multiPayer() || amount.set($any($event.target).value)"
           />
+          @if (multiPayer()) {
+            <small>{{ 'personalExpenses.multiPayerAmountLocked' | t }}</small>
+          }
         </label>
         <label>
           <span class="dc-field-label">{{ 'common.currency' | t }}</span>

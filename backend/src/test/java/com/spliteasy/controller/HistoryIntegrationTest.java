@@ -417,6 +417,38 @@ class HistoryIntegrationTest extends AbstractIntegrationTest {
         .isEqualTo(1000);
   }
 
+  @Test
+  void csvKeepsTheRefundRecipientRowWhenThePayerIsNotInTheSplit() throws Exception {
+    var f = fixture("Treat");
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("description", "Treat");
+    body.put("amountMinor", 1000);
+    body.put("currency", "USD");
+    body.put("paidByUserId", f.alice().user().id());
+    body.put("splitType", "EQUAL");
+    body.put("participantUserIds", List.of(f.bob().user().id(), f.carol().user().id()));
+    body.put("spentOn", "2026-03-01");
+    String treat = created(f.alice(), "/api/groups/" + f.group() + "/expenses", body);
+    String back = refund(f.alice(), f.group(), treat, 400, "2026-03-02");
+
+    var rows =
+        csv(f.alice(), Map.of("groupId", f.group()), 200).stream()
+            .filter(r -> r.get("transaction_id").equals(back))
+            .toList();
+
+    assertThat(rows).hasSize(3);
+    var recipient =
+        rows.stream()
+            .filter(r -> r.get("participant_id").equals(f.alice().user().id().toString()))
+            .findFirst()
+            .get();
+    assertThat(recipient)
+        .containsEntry("paid_minor", "-400")
+        .containsEntry("owed_minor", "0")
+        .containsEntry("net_minor", "-400");
+    assertThat(rows.stream().mapToLong(r -> Long.parseLong(r.get("net_minor"))).sum()).isZero();
+  }
+
   /** Alice and Bob saved each other; one personal expense between them. Returns its id. */
   String personalExpense(AuthResponse alice, AuthResponse bob, String sharedGroup)
       throws Exception {

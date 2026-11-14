@@ -158,7 +158,14 @@ public class HistoryQuery {
              %3$s
       FROM expense_refunds r
       JOIN expenses re ON re.id=r.expense_id
-      JOIN expense_refund_participants rp ON rp.refund_id=r.id
+      CROSS JOIN LATERAL (
+        -- the recipient always gets a row, even when the split excluded them (owed 0)
+        SELECT participant_id,share_cents FROM expense_refund_participants WHERE refund_id=r.id
+        UNION ALL
+        SELECT r.received_by,0::bigint
+        WHERE NOT EXISTS (SELECT 1 FROM expense_refund_participants
+                          WHERE refund_id=r.id AND participant_id=r.received_by)
+      ) rp
       WHERE r.deleted_at IS NULL AND re.deleted_at IS NULL AND r.group_id IN (SELECT id FROM scope)
       """;
 

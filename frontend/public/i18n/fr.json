@@ -786,6 +786,7 @@
   "personalExpenses.startASeparateEntry": "Commencer une saisie distincte",
   "personalExpenses.thePreviousExpenseMay": "La dépense précédente a peut-être déjà été enregistrée. Consultez d’abord les dépenses personnelles. Commencer quand même une dépense distincte ?",
   "personalExpenses.theirShare": "Sa part",
+  "personalExpenses.multiPayerAmountLocked": "Plusieurs personnes ont payé cette dépense ; son montant ne peut pas être modifié ici.",
   "personalExpenses.thisExpenseWasSplit": "Cette dépense a été répartie par {convertedFrom}. Elle est affichée comme les montants exacts que chacun doit ; l’enregistrer conserve ces montants.",
   "personalExpenses.whoPaid": "Qui a payé ?",
   "personalExpenses.youPaid": "Vous avez payé",

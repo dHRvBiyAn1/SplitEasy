@@ -786,6 +786,7 @@
   "personalExpenses.startASeparateEntry": "Empezar una entrada aparte",
   "personalExpenses.thePreviousExpenseMay": "Puede que el gasto anterior ya se haya guardado. Revisa primero los gastos personales. ¿Empezar un gasto aparte de todos modos?",
   "personalExpenses.theirShare": "Su parte",
+  "personalExpenses.multiPayerAmountLocked": "Varias personas pagaron este gasto, así que su importe no se puede cambiar aquí.",
   "personalExpenses.thisExpenseWasSplit": "Este gasto se dividió por {convertedFrom}. Se muestra como los importes exactos que debe cada uno; al guardar se conservan esos importes.",
   "personalExpenses.whoPaid": "¿Quién pagó?",
   "personalExpenses.youPaid": "Pagaste tú",

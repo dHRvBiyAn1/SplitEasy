@@ -201,6 +201,33 @@ describe('personal expenses with one saved friend', () => {
     http.expectOne('/api/friends/pat/expenses').flush([entry]);
   });
 
+  it('keeps the amount read-only for a multi-payer entry so a save never contradicts its contributions', async () => {
+    await openFriend();
+    button('Edit').click();
+    const contributions = [
+      { user: me, amountMinor: 600, currency: 'USD' },
+      {
+        user: { id: 'pat', displayName: 'Pat', email: 'pat@test.com' },
+        amountMinor: 400,
+        currency: 'USD',
+      },
+    ];
+    http
+      .expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'GET' })
+      .flush({ ...entry, splitType: 'EQUAL', participants: [], contributions });
+    harness.detectChanges();
+    expect(input('Amount').readOnly).toBe(true);
+    expect(text()).toContain('Several people paid this expense');
+    type('Amount', '99');
+    button('Save changes').click();
+    const update = http.expectOne({ url: '/api/friends/pat/expenses/expense-1', method: 'PUT' });
+    expect(update.request.body.amountMinor).toBe(1000);
+    update.flush({ ...entry, version: 2 });
+    http.expectOne('/api/friends/pat').flush(friend);
+    harness.detectChanges();
+    http.expectOne('/api/friends/pat/expenses').flush([entry]);
+  });
+
   it('keeps an uncertain save for review instead of retrying it', async () => {
     await openFriend();
     button('Add personal expense').click();

@@ -786,6 +786,7 @@
   "personalExpenses.startASeparateEntry": "अलग प्रविष्टि शुरू करें",
   "personalExpenses.thePreviousExpenseMay": "पिछला खर्च पहले ही सहेजा जा चुका हो सकता है। पहले निजी खर्च जाँचें। फिर भी अलग खर्च शुरू करें?",
   "personalExpenses.theirShare": "उनका हिस्सा",
+  "personalExpenses.multiPayerAmountLocked": "इस खर्च का भुगतान कई लोगों ने किया है, इसलिए इसकी राशि यहाँ नहीं बदली जा सकती।",
   "personalExpenses.thisExpenseWasSplit": "यह खर्च {convertedFrom} के अनुसार बाँटा गया था। इसे उन सटीक राशियों के रूप में दिखाया गया है जो आप दोनों को देनी हैं; सहेजने पर वही राशियाँ रहती हैं।",
   "personalExpenses.whoPaid": "किसने चुकाया?",
   "personalExpenses.youPaid": "आपने चुकाया",

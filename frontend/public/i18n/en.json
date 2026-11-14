@@ -786,6 +786,7 @@
   "personalExpenses.startASeparateEntry": "Start a separate entry",
   "personalExpenses.thePreviousExpenseMay": "The previous expense may already have been saved. Check personal expenses first. Start a separate expense anyway?",
   "personalExpenses.theirShare": "Their share",
+  "personalExpenses.multiPayerAmountLocked": "Several people paid this expense, so its amount can't be changed here.",
   "personalExpenses.thisExpenseWasSplit": "This expense was split by {convertedFrom}. It is shown as the exact amounts each of you owes; saving keeps those amounts.",
   "personalExpenses.whoPaid": "Who paid?",
   "personalExpenses.youPaid": "You paid",
