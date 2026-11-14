@@ -44,6 +44,7 @@ export class ApiService {
       path === '/friends' ||
       path.startsWith('/friends/') ||
       path === '/groups' ||
+      path === '/me/closure' ||
       path.startsWith('/groups/') ||
       path.startsWith('/invitations/')
       ? { headers: { 'X-Ledger-Version': '2', 'X-Participant-Version': '1' } }
