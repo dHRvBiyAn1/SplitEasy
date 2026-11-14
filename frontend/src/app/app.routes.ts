@@ -44,11 +44,24 @@ export const routes: Routes = [
   },
   // The dashboard is the group list now — /groups only exists to keep old links working.
   { path: 'groups', pathMatch: 'full', redirectTo: 'dashboard' },
+  // Before groups/:id, so the literal path is never matched as a group id.
+  {
+    path: 'groups/deleted',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./groups/deleted-groups.component').then((m) => m.DeletedGroupsComponent),
+  },
   {
     path: 'groups/:id',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./groups/group-detail.component').then((m) => m.GroupDetailComponent),
+  },
+  {
+    path: 'groups/:id/payments',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./payments/payment-history.component').then((m) => m.PaymentHistoryComponent),
   },
   {
     path: 'groups/:id/settings',
@@ -61,5 +74,48 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./profile/profile.component').then((m) => m.ProfileComponent),
   },
+  // --- g02-2 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h05 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'groups/:id/history',
+    canActivate: [authGuard],
+    loadComponent: () => import('./history/history.component').then((m) => m.HistoryComponent),
+  },
+  // --- e03-b routes (insert below; parallel batch plan rule 3) ---
+
+  // --- g02-3 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h03 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'activity',
+    canActivate: [authGuard],
+    loadComponent: () => import('./activity/activity.component').then((m) => m.ActivityComponent),
+  },
+  {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./notification/notifications.component').then((m) => m.NotificationsComponent),
+  },
+
+  // --- b02 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- a04 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h04 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'groups/:id/recurring',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./recurring/recurring.component').then((m) => m.RecurringComponent),
+  },
+
+  // --- c02 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- h02 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- p07-p01 routes (insert below; parallel batch plan rule 3) ---
+
   { path: '**', redirectTo: 'dashboard' },
 ];

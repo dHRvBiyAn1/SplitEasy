@@ -393,8 +393,15 @@ class FriendIntegrationTest extends AbstractIntegrationTest {
         alice,
         jsonPost("/api/friends", Map.of("groupId", first, "participantId", bob.user().id())),
         409);
-    send(alice, delete("/api/groups/" + first), 204);
-    send(alice, delete("/api/groups/" + second), 204);
+    // Deleting a group now requires it to be settled (V19). These amounts are far above the
+    // per-entry payment cap, so the fixture clears them the ordinary way — a recoverable expense
+    // delete — rather than reaching for archive or any bypass.
+    for (String group : java.util.List.of(first, second)) {
+      for (var entry : send(alice, get("/api/groups/" + group + "/expenses"), 200)) {
+        send(alice, delete("/api/groups/" + group + "/expenses/" + entry.path("id").asText()), 204);
+      }
+      send(alice, delete("/api/groups/" + group), 204);
+    }
     assertThat(send(alice, get("/api/friends"), 200)).isEmpty();
   }
 

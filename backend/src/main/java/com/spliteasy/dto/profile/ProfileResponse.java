@@ -12,6 +12,7 @@ public record ProfileResponse(
     String phone,
     String avatarColor,
     String preferredCurrency,
+    String locale,
     Instant createdAt) {
   public static ProfileResponse from(User user) {
     return new ProfileResponse(
@@ -22,6 +23,7 @@ public record ProfileResponse(
         user.getPhone(),
         user.getAvatarColor(),
         user.getPreferredCurrency(),
+        user.getLocale(),
         user.getCreatedAt());
   }
 }

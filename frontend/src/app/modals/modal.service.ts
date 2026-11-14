@@ -3,6 +3,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SessionService } from '../core/auth/session.service';
 import { Settlement } from '../dashboard/dashboard.models';
 
+/**
+ * What the settle-up modal opens on: a dashboard Settlement in a group, or (G02.3) a personal
+ * settlement with a friend, which carries `friendId` and no group.
+ */
+export type SettlePrefill = Omit<Settlement, 'groupId'> & { groupId?: string; friendId?: string };
+
 export type ModalKind = 'group' | 'expense' | 'settle' | 'member' | 'appearance' | null;
 
 /**
@@ -29,7 +35,7 @@ export class ModalService {
   /** Expense being edited (null = creating a new one). */
   readonly editExpenseId = signal<string | null>(null);
   /** Prefill for the settle-up modal (from a dashboard settlement row). */
-  readonly settlePrefill = signal<Settlement | null>(null);
+  readonly settlePrefill = signal<SettlePrefill | null>(null);
   /** Scope the settle-up list to one group (null = all groups). */
   readonly settleGroupId = signal<string | null>(null);
   /** Group the add-member modal targets. */
@@ -55,7 +61,7 @@ export class ModalService {
     this.active.set('expense');
   }
 
-  openSettle(prefill?: Settlement, groupId?: string): void {
+  openSettle(prefill?: SettlePrefill, groupId?: string): void {
     this.settlePrefill.set(prefill ?? null);
     this.settleGroupId.set(groupId ?? null);
     this.active.set('settle');

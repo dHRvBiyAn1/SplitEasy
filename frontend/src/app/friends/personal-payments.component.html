@@ -1,0 +1,109 @@
+<section class="personal" aria-labelledby="payments-heading">
+  <div class="personal-head">
+    <div>
+      <h2 id="payments-heading">{{ 'personalPayments.balancesAndSettlingUp' | t }}</h2>
+      <p>
+        {{ 'personalPayments.groupDebtsAreSettled' | t: { friendName: friendName() } }}
+      </p>
+    </div>
+  </div>
+  <ul class="personal-list">
+    @for (group of groups(); track group.id) {
+      <li>
+        <a [routerLink]="['/groups', group.id]">{{ group.name }}</a>
+        @for (balance of group.balances; track balance.currency) {
+          <span
+            >{{ balance.currency }}
+            <app-money [minor]="balance.netMinor" [currency]="balance.currency" [net]="true"
+          /></span>
+        }
+      </li>
+    }
+    <li>
+      <strong>{{ 'personalPayments.personal' | t }}</strong>
+      @for (balance of balances(); track balance.currency) {
+        <span
+          >{{ balance.currency }}
+          <app-money [minor]="balance.netMinor" [currency]="balance.currency" [net]="true"
+        /></span>
+        @if (balance.netMinor !== 0) {
+          <button class="dc-btn-accent" type="button" (click)="settle(balance)">
+            {{ 'personalPayments.settleUpCurrency' | t: { currency: balance.currency } }}
+          </button>
+        }
+      } @empty {
+        <span>{{ 'personalPayments.noPersonalBalance' | t }}</span>
+      }
+    </li>
+  </ul>
+
+  <h3>{{ 'personalPayments.personalPayments' | t }}</h3>
+  @if (error()) {
+    <p role="alert">{{ error() }}</p>
+    <button class="dc-btn-outline" type="button" (click)="load()">
+      {{ 'common.tryAgain' | t }}
+    </button>
+  }
+  @if (actionError()) {
+    <p role="alert">{{ actionError() }}</p>
+  }
+  <ul class="personal-list">
+    @for (p of payments(); track p.id) {
+      <li>
+        <span>{{ p.paidOn }}</span>
+        <span>{{ methodText(p.method) }}</span>
+        <span>{{
+          'personalPayments.displaynamePaidDisplayname2'
+            | t: { displayName: p.payer.displayName, displayName2: p.payee.displayName }
+        }}</span>
+        <app-money [minor]="p.amountMinor" [currency]="p.currency ?? 'USD'" />
+        @if (p.note) {
+          <span>{{ p.note }}</span>
+        }
+        <span>{{
+          'personalPayments.recordedByV1' | t: { v1: p.recordedBy?.displayName ?? 'unknown' }
+        }}</span>
+        <button class="dc-btn-ghost" type="button" [disabled]="busy() === p.id" (click)="undo(p)">
+          {{ 'common.undo' | t }}
+        </button>
+        <button class="dc-btn-ghost" type="button" (click)="toggleRevisions(p)">
+          {{ 'personalPayments.revisions' | t }}
+        </button>
+        @if (revisionsOf() === p.id) {
+          <ul>
+            @for (r of revisions(); track r.version) {
+              <li>{{ r.action }} · {{ r.recordedAt }} · {{ r.actor?.displayName ?? 'unknown' }}</li>
+            }
+          </ul>
+        }
+      </li>
+    } @empty {
+      @if (!error()) {
+        <li>{{ 'personalPayments.noPersonalPaymentsYet' | t }}</li>
+      }
+    }
+  </ul>
+  <button class="dc-btn-outline" type="button" (click)="toggleDeleted()">
+    {{ 'personalPayments.recentlyUndone' | t }}
+  </button>
+  @if (deletedOpen()) {
+    <ul class="personal-list">
+      @for (d of deleted(); track d.payment.id) {
+        <li>
+          <span>{{ d.payment.paidOn }}</span>
+          <app-money [minor]="d.payment.amountMinor" [currency]="d.payment.currency ?? 'USD'" />
+          <button
+            class="dc-btn-outline"
+            type="button"
+            [disabled]="busy() === d.payment.id"
+            (click)="restore(d)"
+          >
+            {{ 'common.restore' | t }}
+          </button>
+        </li>
+      } @empty {
+        <li>{{ 'personalPayments.nothingRecentlyUndone' | t }}</li>
+      }
+    </ul>
+  }
+</section>

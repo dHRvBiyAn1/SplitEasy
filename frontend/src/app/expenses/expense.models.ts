@@ -28,7 +28,20 @@ export interface ExpenseResponse {
   participantUserIds?: string[] | null;
   /** Original typed inputs, distinct from final rounded shares. */
   splits?: SplitInput[] | null;
+  /** Who actually paid; absent on replayed pre-E03 create receipts. */
+  contributions?: Contribution[];
   createdAt: string;
+}
+
+export interface Contribution {
+  user: ParticipantSummary;
+  amountMinor: number;
+  currency?: Currency;
+}
+
+export interface ContributionInput {
+  userId: string;
+  amountMinor: number;
 }
 
 export interface ExpenseSummary {
@@ -39,6 +52,8 @@ export interface ExpenseSummary {
   currency?: Currency;
   paidBy: ParticipantSummary;
   participantCount: number;
+  /** Number of contributors; above 1 the expense had several payers. */
+  payerCount?: number;
   category: ExpenseCategory;
   spentOn: string;
   /** Viewer's net for this expense: +lent / −borrowed / 0 not-involved. */
@@ -58,6 +73,8 @@ export type CreateExpenseRequest = MoneyInput & {
   description: string;
   /** Compatibility field names retain immutable financial participant IDs. */
   paidByUserId: string;
+  /** Omitted = paidByUserId paid everything. Present lists must sum to amountMinor. */
+  contributions?: ContributionInput[];
   participantUserIds?: string[] | null;
   splitType?: SplitType;
   splits?: SplitInput[] | null;

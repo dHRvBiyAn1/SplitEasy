@@ -7,6 +7,7 @@ import com.spliteasy.dto.dashboard.ActivityItem;
 import com.spliteasy.dto.dashboard.DashboardGroup;
 import com.spliteasy.dto.dashboard.DashboardResponse;
 import com.spliteasy.dto.group.GroupSummary;
+import com.spliteasy.repository.ExpenseContributionRepository;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.ExpenseRepository.ActivityExpenseView;
@@ -50,7 +51,10 @@ public class DashboardService {
   private final PairwiseBalanceService pairwiseService;
   private final ExpenseRepository expenseRepository;
   private final ExpenseParticipantRepository participantRepository;
+  private final ExpenseContributionRepository contributionRepository;
   private final PaymentRepository paymentRepository;
+  private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
+  private final com.spliteasy.repository.PersonalLedgerRepository personalLedgers;
 
   // One snapshot for nested pairwise reads, group totals, expense shares and the activity feed.
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -68,11 +72,16 @@ public class DashboardService {
       financialParticipants.requireCompatible(g.id());
       List<PersonBalance> pairwise = pairwiseService.compute(userId, g.id());
       Map<com.spliteasy.entity.LedgerCurrency, Long> spent =
-          expenseRepository.sumAmountsByGroup(g.id()).stream()
-              .collect(
-                  Collectors.toMap(
-                      ExpenseRepository.CurrencyAmount::getCurrency,
-                      ExpenseRepository.CurrencyAmount::getTotalCents));
+          new LinkedHashMap<>(
+              expenseRepository.sumAmountsByGroup(g.id()).stream()
+                  .collect(
+                      Collectors.toMap(
+                          ExpenseRepository.CurrencyAmount::getCurrency,
+                          ExpenseRepository.CurrencyAmount::getTotalCents)));
+      // Refunded money was not spent, so a group's gross total nets it out per currency.
+      for (var refunded : refundRepository.sumAmountsByGroup(g.id())) {
+        spent.merge(refunded.getCurrency(), -refunded.getTotalCents(), Math::addExact);
+      }
       var currencies = new java.util.TreeSet<>(spent.keySet());
       currencies.addAll(paymentRepository.findCurrenciesByGroupId(g.id()));
       for (PersonBalance pb : pairwise) {
@@ -124,6 +133,18 @@ public class DashboardService {
               g.simplifyDebts(),
               totals));
     }
+    // Personal ledgers (V21) are not groups: no card, settle-up row or activity, but their money
+    // still belongs in People and the per-currency totals.
+    List<Settlement> ledgerRows = new ArrayList<>(settlements);
+    for (UUID ledger : personalLedgers.ledgersOf(userId)) {
+      for (PersonBalance pb : pairwiseService.compute(userId, ledger)) {
+        ledgerRows.add(new Settlement(ledger, null, pb.user(), pb.netMinor(), pb.currency()));
+        peopleNet.merge(
+            new PersonCurrency(pb.user().id(), pb.currency()), pb.netMinor(), Math::addExact);
+        peopleInfo.putIfAbsent(pb.user().id(), pb.user());
+        allCurrencies.add(pb.currency());
+      }
+    }
     List<PersonBalance> people =
         peopleNet.entrySet().stream()
             .filter(e -> e.getValue() != 0)
@@ -140,7 +161,7 @@ public class DashboardService {
         allCurrencies.stream()
             .map(
                 currency -> {
-                  var rows = settlements.stream().filter(s -> s.currency() == currency).toList();
+                  var rows = ledgerRows.stream().filter(s -> s.currency() == currency).toList();
                   long owed =
                       rows.stream()
                           .filter(s -> s.netMinor() > 0)
@@ -181,14 +202,14 @@ public class DashboardService {
                 Comparator.comparingLong((Settlement s) -> Math.abs(s.netMinor())).reversed()));
     int owedPeople =
         (int)
-            settlements.stream()
+            ledgerRows.stream()
                 .filter(s -> s.netMinor() > 0)
                 .map(s -> s.counterparty().id())
                 .distinct()
                 .count();
     int owePeople =
         (int)
-            settlements.stream()
+            ledgerRows.stream()
                 .filter(s -> s.netMinor() < 0)
                 .map(s -> s.counterparty().id())
                 .distinct()
@@ -220,6 +241,13 @@ public class DashboardService {
                 Collectors.toMap(
                     ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
                     ExpenseParticipantRepository.ExpenseShareView::getShareCents));
+    // What the viewer actually paid per expense (V23), so a multi-payer item shows the right delta.
+    Map<UUID, Long> myPaid =
+        contributionRepository.findPaidByUserAndGroups(userId, groupIds).stream()
+            .collect(
+                Collectors.toMap(
+                    ExpenseParticipantRepository.ExpenseShareView::getExpenseId,
+                    ExpenseParticipantRepository.ExpenseShareView::getShareCents));
 
     List<ActivityItem> items = new ArrayList<>();
     var expenseRows = expenseRepository.findRecentByGroupIds(groupIds, limit);
@@ -242,11 +270,7 @@ public class DashboardService {
               payer,
               null,
               e.getAmountCents(),
-              ExpenseService.viewerDelta(
-                  userId,
-                  payer.canonicalParticipantId(),
-                  e.getAmountCents(),
-                  myShare.getOrDefault(e.getId(), 0L)),
+              myPaid.getOrDefault(e.getId(), 0L) - myShare.getOrDefault(e.getId(), 0L),
               e.getCategory(),
               e.getSpentOn(),
               e.getCurrency()));

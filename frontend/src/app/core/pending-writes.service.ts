@@ -2,8 +2,9 @@ import { Currency, CURRENCIES, MAX_TRANSACTION_MINOR } from '../shared/currency'
 import { Injectable, inject } from '@angular/core';
 import { AuthService } from './auth/auth.service';
 import { SessionService } from './auth/session.service';
+import { translate } from './i18n/i18n.service';
 
-export type WriteKind = 'group' | 'expense' | 'payment';
+export type WriteKind = 'group' | 'expense' | 'payment' | 'refund' | 'recurring';
 export interface PendingWrite<T> {
   owner: string;
   scope: string;
@@ -24,8 +25,8 @@ function intentJson(value: unknown): string {
       : item,
   );
 }
-export const UNCERTAIN_WRITE =
-  'This request may already have been saved. Retry the original draft, or check history before starting a separate entry.';
+/** Compared by message, so it is read at the moment of use rather than frozen at load. */
+export const uncertainWrite = () => translate('pendingWrites.uncertainWrite');
 
 /** Reload durable, tab isolated retry identities. Never dispatches or automatically retries. */
 @Injectable({ providedIn: 'root' })
@@ -51,15 +52,12 @@ export class PendingWritesService {
     if (!raw) return null;
     const stored = JSON.parse(raw) as PendingWrite<T>;
     if (stored.owner !== owner || !stored.operationId || !stored.scope || !stored.request) {
-      throw new PendingWriteError(
-        'The saved retry draft is unreadable. Check history before starting a separate entry.',
-      );
+      throw new PendingWriteError(translate('pendingWrites.theSavedRetryDraft'));
     }
-    if (kind !== 'group') {
+    // Schedules nest their expense template, so the flat expense/payment checks do not apply.
+    if (kind !== 'group' && kind !== 'recurring') {
       if (stored.identityVersion !== undefined && stored.identityVersion !== 1)
-        throw new PendingWriteError(
-          'Upgrade the app to read this saved identity version. Check history before starting a separate entry.',
-        );
+        throw new PendingWriteError(translate('pendingWrites.upgradeTheAppTo'));
       const request = { ...stored.request } as Record<string, unknown>;
       const ids =
         kind === 'payment'
@@ -79,18 +77,14 @@ export class PendingWritesService {
                 !row || typeof row.userId !== 'string' || !row.userId,
             )))
       )
-        throw new PendingWriteError(
-          'Upgrade or check history: the saved financial identities cannot be mapped safely. The original draft has not been changed.',
-        );
+        throw new PendingWriteError(translate('pendingWrites.upgradeOrCheckHistory'));
       const currency = request['currency'] ?? 'USD';
       const legacy = request['amountCents'];
       if (
         !CURRENCIES.includes(currency as Currency) ||
         (legacy != null && (currency !== 'USD' || request['amountMinor'] != null))
       )
-        throw new PendingWriteError(
-          'The saved currency is unreadable. Check history before starting a separate entry.',
-        );
+        throw new PendingWriteError(translate('pendingWrites.theSavedCurrencyIs'));
       const amount = request['amountMinor'] ?? legacy;
       if (
         typeof amount !== 'number' ||
@@ -98,9 +92,7 @@ export class PendingWritesService {
         amount <= 0 ||
         amount > MAX_TRANSACTION_MINOR
       )
-        throw new PendingWriteError(
-          'The saved amount is unreadable. Check history before starting a separate entry.',
-        );
+        throw new PendingWriteError(translate('pendingWrites.theSavedAmountIs'));
       // A pre-C01 uncertain draft is USD regardless of the account's later preference.
       request['currency'] = currency;
       request['amountMinor'] = amount;
@@ -110,12 +102,12 @@ export class PendingWritesService {
         const draft = { ...stored.draft } as Record<string, unknown>;
         if (draft['netMinor'] == null && draft['netCents'] != null) {
           if (currency !== 'USD')
-            throw new PendingWriteError('The saved currency is unreadable. Check payment history.');
+            throw new PendingWriteError(translate('pendingWrites.theSavedCurrencyIs2'));
           draft['netMinor'] = draft['netCents'];
           delete draft['netCents'];
         }
         if (draft['currency'] != null && draft['currency'] !== currency)
-          throw new PendingWriteError('The saved currencies disagree. Check payment history.');
+          throw new PendingWriteError(translate('pendingWrites.theSavedCurrenciesDisagree'));
         draft['currency'] = currency;
         stored.draft = draft;
       }
@@ -125,20 +117,18 @@ export class PendingWritesService {
 
   prepare<T>(kind: WriteKind, scope: string, request: T, draft?: unknown): PendingWrite<T> {
     const owner = this.auth.user()?.id;
-    if (!owner) throw new PendingWriteError('Sign in again before saving.');
+    if (!owner) throw new PendingWriteError(translate('pendingWrites.signInAgainBefore'));
     let previous: PendingWrite<T> | null;
     try {
       previous = this.read<T>(kind);
     } catch {
-      throw new PendingWriteError(
-        'Cannot read the saved retry draft. Check history before starting a separate entry.',
-      );
+      throw new PendingWriteError(translate('pendingWrites.cannotReadTheSaved'));
     }
     if (
       previous &&
       (previous.scope !== scope || intentJson(previous.request) !== intentJson(request))
     ) {
-      throw new PendingWriteError(UNCERTAIN_WRITE);
+      throw new PendingWriteError(uncertainWrite());
     }
     const pending: PendingWrite<T> = {
       owner,
@@ -149,7 +139,7 @@ export class PendingWritesService {
         ? previous.identityVersion
           ? { identityVersion: previous.identityVersion }
           : {}
-        : kind !== 'group'
+        : kind !== 'group' && kind !== 'recurring'
           ? { identityVersion: 1 as const }
           : {}),
       draft,
@@ -158,9 +148,7 @@ export class PendingWritesService {
     try {
       sessionStorage.setItem(PREFIX + owner + '.' + kind, JSON.stringify(pending));
     } catch {
-      throw new PendingWriteError(
-        'Cannot safely save the retry identity in browser storage. Enable browser storage and try again.',
-      );
+      throw new PendingWriteError(translate('pendingWrites.cannotSafelySaveThe'));
     }
     return pending;
   }

@@ -15,6 +15,7 @@ import com.spliteasy.dto.group.CreateGroupRequest;
 import com.spliteasy.dto.group.UpdateGroupRequest;
 import com.spliteasy.entity.GroupType;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -268,14 +269,21 @@ class GroupSettingsIntegrationTest extends AbstractIntegrationTest {
   void onlyTheCreatorCanDeleteTheGroup() throws Exception {
     AuthResponse owner = register("gs-del-owner@example.com", "password123", "Owner");
     AuthResponse friend = register("gs-del-friend@example.com", "password123", "Friend");
+    AuthResponse outsider = register("gs-del-outsider@example.com", "password123", "Outsider");
     String groupId = createGroup(owner.accessToken(), "Doomed");
     addMember(owner.accessToken(), groupId, "gs-del-friend@example.com");
 
+    // Creator-only still holds on a live group: a member who did not create it cannot delete it.
     mockMvc
         .perform(
             delete("/api/groups/" + groupId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(friend.accessToken())))
         .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            get("/api/groups/" + groupId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(friend.accessToken())))
+        .andExpect(status().isOk()); // the refused delete changed nothing
 
     mockMvc
         .perform(
@@ -283,12 +291,35 @@ class GroupSettingsIntegrationTest extends AbstractIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
         .andExpect(status().isNoContent());
 
-    // Gone for everyone — a non-member gets 403 (membership is checked before existence).
+    // Recoverable deletion (V19): members read it as absent, and 403 still precedes 404 for an
+    // outsider, who never learns whether the group existed.
+    for (AuthResponse member : java.util.List.of(owner, friend)) {
+      mockMvc
+          .perform(
+              get("/api/groups/" + groupId)
+                  .header(HttpHeaders.AUTHORIZATION, bearer(member.accessToken())))
+          .andExpect(status().isNotFound());
+    }
     mockMvc
         .perform(
             get("/api/groups/" + groupId)
-                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+                .header(HttpHeaders.AUTHORIZATION, bearer(outsider.accessToken())))
         .andExpect(status().isForbidden());
+
+    // Only the creator sees it as recoverable; the other member is not offered someone else's.
+    mockMvc
+        .perform(
+            get("/api/groups/deleted")
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(1)))
+        .andExpect(jsonPath("$[0].id").value(groupId));
+    mockMvc
+        .perform(
+            get("/api/groups/deleted")
+                .header(HttpHeaders.AUTHORIZATION, bearer(friend.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(0)));
   }
 
   @Test
@@ -312,11 +343,38 @@ class GroupSettingsIntegrationTest extends AbstractIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
         .andExpect(status().isCreated());
 
-    // Succeeds only if the expense/participant rows cascade with the group.
+    // A settled solo expense no longer blocks deletion, and V19 retains it instead of cascading.
     mockMvc
         .perform(
             delete("/api/groups/" + groupId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
         .andExpect(status().isNoContent());
+
+    // Restoring brings the expense back untouched, which a destructive cascade could not do.
+    MvcResult recovery =
+        mockMvc
+            .perform(
+                get("/api/groups/deleted")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+            .andExpect(status().isOk())
+            .andReturn();
+    long version =
+        objectMapper
+            .readTree(recovery.getResponse().getContentAsString())
+            .get(0)
+            .get("lifecycleVersion")
+            .asLong();
+    mockMvc
+        .perform(
+            jsonPost("/api/groups/" + groupId + "/restore", Map.of("expectedVersion", version))
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            get("/api/groups/" + groupId + "/expenses")
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner.accessToken())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$", hasSize(1)))
+        .andExpect(jsonPath("$[0].amountMinor").value(500));
   }
 }

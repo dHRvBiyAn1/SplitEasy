@@ -11,6 +11,8 @@ Issues use [GitHub](docs/agents/issue-tracker.md); domain documentation uses [a 
 
 When changing participant identity, invitations, financial ownership or their wire contracts, read the [G01 subsystem design](docs/superpowers/plans/2026-10-26-alignment-g01.md) and [identity ADR](docs/adr/0001-immutable-financial-participants.md) before coding. G01 core merged as PR107; see its verification report. Saved-friend changes also follow the [G02.1 directory design](docs/superpowers/plans/2026-10-26-alignment-g02.md).
 
+Parallel work follows the [parallel batch plan](docs/superpowers/plans/2026-11-11-alignment-parallel-batches.md): one owner per file per wave, reserved migration numbers, and workers never edit `Agents.md` (the integrator applies each worker's delta after merge).
+
 ## Overview
 
 Expense-splitting web app: users create groups, add expenses split among members
@@ -71,12 +73,28 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET/DELETE | `/me/sessions`, `/me/sessions/{id}` | list owned devices / revoke one |
 | POST | `/auth/logout`, `/me/sessions/logout-all` | revoke captured device / all account devices |
 | GET | `/health` | liveness |
-| GET/PATCH | `/me` | current server-owned name/contact/default preferences; email read-only |
+| GET/PATCH | `/me` | current server-owned name/contact/default preferences and `locale` (en/hi/es/fr); email read-only |
+| GET | `/me/export` | stream my own data as a ZIP (profile, groups, personal ledgers, one CSV per authorized scope) |
+| GET | `/search` | keyset search over my accessible expenses/payments/refunds (literal text, dates; amount bounds need `currency`) |
 | GET/POST | `/friends` | private persistent saved friends / save a registered current group participant |
 | GET/DELETE | `/friends/{id}` | authorized current group breakdown / remove only my bookmark |
+| GET/POST | `/friends/{id}/expenses` | personal (non-group) expenses with that friend / create (needs `X-Participant-Version: 1`) |
+| GET/PUT/DELETE | `/friends/{id}/expenses/{e}` | personal expense detail / edit / recoverable delete; `.../expenses/deleted` and `.../{e}/restore` mirror group recovery |
+| GET/POST | `/friends/{id}/payments` | personal settlements in the pair ledger (payer/payee must be the pair) / record, keyed |
+| GET/PUT/DELETE | `/friends/{id}/payments/{p}` | detail / correct / undo; `.../payments/deleted`, `.../{p}/restore`, `.../{p}/history` mirror group payments |
+| GET/POST | `/friends/{id}/settlement-preview`, `/friends/{id}/settlements` | per-currency cross-scope settle-all preview / atomic keyed commit (one payment per scope) |
+| POST | `/me/closure` | close my account (current password; 409 while any balance is non-zero); irreversible |
+| GET/POST/GET/PUT | `/groups/{g}/recurring`, `/groups/{g}/recurring/{id}` | recurring expense schedules / create (keyed) / detail / change future occurrences at expectedVersion; `POST .../{id}/cancel` |
+| POST | `/groups/{g}/reminders` | creditor sends the debtor an in-app balance reminder (1 per pair+currency per 24h) |
+| GET | `/activity` | committed activity events, seq keyset (default 50, max 100), optional `groupId` (member first, personal ledger 404) |
+| GET/POST | `/notifications`, `/notifications/unread-count`, `/notifications/{id}/read`, `/notifications/read-all` | own in-app notifications / mark read |
+| GET/PUT | `/me/notification-preferences` | expenses / payments / group_changes switches (absent = all on) |
 | GET | `/dashboard` | one aggregated payload for the shell + landing page |
 | GET/POST | `/groups` | list mine / create |
-| GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / delete (**creator only**) |
+| GET/PATCH/DELETE | `/groups/{g}` | detail (members) / partial update / recoverable delete (**creator only**, settled groups only) |
+| POST | `/groups/{g}/archive`, `/groups/{g}/unarchive` | make read-only / re-open — any member, 409 on wrong state |
+| GET | `/groups/deleted` | my recoverable deleted groups with their lifecycle versions (creator only) |
+| POST | `/groups/{g}/restore` | restore a deleted group at its mandatory expected lifecycle version |
 | POST | `/groups/{g}/members` | add by email |
 | DELETE | `/groups/{g}/members/{m}` | remove a member — or leave, when `{m}` is you (409 if unsettled) |
 | GET/POST | `/groups/{g}/expenses` | list summaries / create |
@@ -86,8 +104,16 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 | GET | `/groups/{g}/balances`, `/groups/{g}/balances/mine` | net-per-member / pairwise to me |
 | GET | `/groups/{g}/balances/obligations` | raw bilateral debts for all financial participants (from owes to), independent of simplification |
 | GET | `/groups/{g}/balances/current-obligations` | canonical debts for the selected mode; settings departure eligibility |
-| GET/POST | `/groups/{g}/payments` | settle-up history / record |
+| GET/POST | `/groups/{g}/payments` | settle-up history (financial date order) / record with date, method, note |
+| GET/PUT/DELETE | `/groups/{g}/payments/{p}` | active detail / correction at expected version / recoverable undo (204) |
+| GET | `/groups/{g}/payments/deleted`, `/groups/{g}/payments/{p}/history` | member-only recovery list / attributable revisions |
+| POST | `/groups/{g}/payments/{p}/restore` | restore an undone settlement at its expected version |
+| GET/POST | `/groups/{g}/expenses/{e}/refunds` | money returned out of that expense / record one, keyed |
+| DELETE/GET | `/groups/{g}/expenses/{e}/refunds/{r}`, `.../refunds/{r}/history` | recoverable undo (204) / revisions |
+| GET/POST/DELETE | `/groups/{g}/expenses/{e}/comments`, `.../comments/{c}` | expense comments / add / soft-delete own; mirrored under `/friends/{id}/expenses/{e}/…` |
+| GET/POST/GET/DELETE | `/groups/{g}/expenses/{e}/attachments`, `.../attachments/{a}` | receipt metadata / upload (≤5 MB JPEG/PNG/WebP/PDF) / download / soft-delete own; mirrored under `/friends/{id}/expenses/{e}/…` |
 | GET | `/groups/{g}/debt-simplification` | greedy transfer suggestions |
+| GET | `/groups/history`, `/groups/history/export` | account-wide bounded keyset history (optional group/friend scope, date bounds, limit ≤100) / streamed CSV |
 
 ## Architecture
 
@@ -122,6 +148,20 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **403 before 404, uniformly**: every group-scoped op calls `requireMember` *before* loading by id,
   so a non-member gets 403 even for a nonexistent group (API never reveals existence). Followed by
   Group/Expense/Balance/Payment services.
+- **Group lifecycle** (V19): archive makes a group read-only — reads, balances, history and export
+  keep working while every new financial entry is refused 409 (expense create/replace/delete/restore,
+  payments, add member, invitations, guest participants). Leaving and settings edits (rename, type,
+  simplify-debts) stay available, because neither is a new entry; saving a private friend bookmark
+  does too. `GroupWriteGuard.lockForMember` enforces the archived rule for every entry path;
+  `lockForMemberAllowingArchived` is the deliberate exception list and `lockForLifecycle` is restore
+  only. Delete is a **recoverable creator-only marker** gated on a settled group: a canonical
+  obligation for the selected mode or any non-zero net in any currency returns 409 naming it.
+  `MembershipGuard.requireMember` turns a deleted group into 404 *after* the membership check, so a
+  member reads it as absent and a non-member still gets 403 before 404; the write guard repeats the
+  check under the row lock, because memberships survive deletion and a write that waited for the
+  deleting transaction must still fail closed. Restore requires the expected `lifecycleVersion`,
+  is creator-only, and leaves an archived group archived. A surviving E02 create claim cannot
+  resurrect a deleted group: its replay authorization reads the group as absent (404).
 - **Group authz is flat, with one exception**: any member can view, rename, change settings, add
   members, remove a settled member, and **edit/delete expenses subject to the historical-participant guard**. The
   exception is **deleting the group — creator only** (`groups.created_by` is the closest thing to an
@@ -134,7 +174,24 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 - **Financial membership and history**: balances/pairwise results include active members plus every referenced financial participant; former membership never grants access. Removal requires zero net in every currency and no incident canonical obligation for the selected mode. Direct mode retains offsetting pair debts; simplified mode allows zero-net intermediaries to leave. Expense PUT/DELETE requires the old persisted payer and every old share participant to be active; otherwise409 instructs re-adding them. Historical correction still requires explicit re-add; no history is silently rewritten.
 - **Group financial writes serialize**: `GroupWriteGuard` locks the database group row and checks requester membership before and after waiting (also when the row was deleted). Expense/payment/member mutations, non-null mode PATCHes and group delete use READ COMMITTED; keyed payment replays retain native ON CONFLICT behavior after reauthorization. Unrelated groups remain independent.
 - **Canonical obligations**: `ObligationProjectionService` selects direct pair netting or deterministic greedy net matching (`NetSettlementCalculator`, amount then UUID ties). Pairwise, dashboard/People/headlines/actions and departure checks share this projection. Net balances and recorded history are unchanged. Mode PATCH locks/reauthorizes with financial writes and rejects target obligations involving former participants with 409 re-add/repair guidance. Net-derived `/debt-simplification` remains a preview with an explicit nullable direct-mode warning; an empty preview does not establish direct settlement. Settlement UI uses canonical dashboard rows without a second preview fetch.
-- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns original 201, changed payer/payee/currency/minor amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and account-owned, tab-isolated reload retry limits: `docs/api/payment-retries.md`.
+- **Payment retries**: optional UUID `operationId` is unique per authenticated requester/group (V9). Authorize membership before replay lookup; identical payload returns the original 201 receipt (first `ledger_revisions` snapshot, so a later correction doesn't change it), changed payer/payee/currency/minor amount 409. Keyed writes use native PostgreSQL `ON CONFLICT DO NOTHING` plus a READ COMMITTED lookup, never catch uniqueness and query an aborted transaction. Missing/null IDs preserve additive legacy POSTs. Contract and account-owned, tab-isolated reload retry limits: `docs/api/payment-retries.md`.
+- **Payment detail, corrections and refunds** (V20): a settlement records a user-chosen `paid_on`
+  (distinct from `created_at`, and the list's sort key), a `method` enum, a `note` and the real
+  recorder, plus an opaque `version` and a recoverable `deleted_at`. Correct/undo/restore always
+  require `expectedVersion` — payments never had versions, so there is no legacy writer and no
+  cutoff; stale is 409 before mutation, which is what stops a retry reversing twice. Currency is
+  immutable (409). Every payment aggregate excludes deleted rows. A **refund** is a separate entry
+  with a positive amount and a reference to the expense it refunds — no existing positive-amount
+  CHECK is relaxed. It takes no split input: the server allocates pro rata over the expense's stored
+  shares (`BigInteger`, payer absorbs the remainder) and **stores** the allocation, so a later
+  expense correction cannot restate it. Readers subtract refunds per currency from paid, owed, pair
+  obligations and group gross spend; balances still sum to zero. Refund retries use the V12 claim;
+  there is no refund edit or restore. Revisions for both live in one `ledger_revisions` table
+  through `LedgerHistory`, the same mechanism `ExpenseHistory` gives expenses. A settlement and a refund have **no viewer-scoped field** — any member reads the document the
+  recorder received, `recordedBy` included — and `createdAt` is truncated to microseconds before the
+  write, so a create receipt is byte-identical to a later read (PostgreSQL rounds, so an unrounded
+  `Instant.now()` drifts a receipt off its own row). Contract:
+  [payment corrections and refunds](docs/api/payment-corrections-and-refunds.md).
 - **Money = explicit currency + integer minor units** (`long`/`BIGINT`). Catalogue: USD/EUR/GBP/INR exponent2, JPY0, KWD3. New clients send `X-Ledger-Version:2`, `currency` and positive `amountMinor` ≤1e12; floats/ambiguous inputs fail400. Legacy `amountCents` is USD-only; response cents/scalar aliases are null for non-USD/mixed scopes. Every aggregate/pair/settlement/leave check partitions by currency; dashboard/group `totals[]` are authoritative. Expense currency is immutable; preferences never relabel history or retry drafts. Outputs beyond JavaScript's exact integer range fail409. V15 follows V14; drain all old servers before non-USD writes and use a forward fix afterwards. Read [the ledger contract](docs/api/multi-currency-ledger.md) before money/rollout changes.
 - **Splits use the Strategy pattern** (`service.split`): `Equal`/`Unequal`/`Percentage`/`Weights`/`AdjustmentsSplitStrategy`
   `@Component`s selected via `Map<SplitType, SplitStrategy>` in `ExpenseService` — **no switch on type**.
@@ -193,11 +250,36 @@ Group-scoped routes are member-only (**403 before 404** — see Conventions).
 
 Saved friends keep a private authorized display-label snapshot and canonical registered target; they never grant group access or expose account contact fields. Detail derives only current requester-accessible group obligations, preserving currency/mode/claimed-identity rules. A no-shared-data state is distinct from settlement. Contract: [saved friends](docs/api/friends.md).
 
+Personal expenses (G02.2, V21) live in a hidden pair ledger: a `groups` row with `kind='PERSONAL'` keyed by `personal_ledgers`, so every expense rule, lock, version, history and currency path is reused. `PersonalLedgerRouteGuard` makes every `/api/groups/{groupId}` route return 404 to the ledger's own members (others still get 403 first); history refuses a personal-ledger `groupId` the same way. `/groups` and dashboard cards exclude ledgers while totals, People and friend detail (`personalBalances`) include them. A saved-friend bookmark authorizes opening the ledger; removing it never revokes jointly owned money. New `/api/groups/{groupId}` routes must keep binding the variable as `groupId` or the guard misses them.
+
+Contributions (E03-A, V23) are the paid side of the ledger: net = contributions − shares + payments − refunds. Every expense has ≥1 contribution row (single payer = one row for the whole amount); `paid_by` stays the primary payer and rounding recipient. Direct obligations net single-payer expenses in SQL and multi-payer ones through `ContributionAttribution` (proportional floor, residuals primary-payer-first by debtor UUID). PUT without `contributions` on a multi-payer expense is 409; keyed create intents include sorted contributions. Dashboard activity deltas and CSV `paid_minor` read contributions. Contract: [multi-payer contributions](docs/api/multi-payer-contributions.md); history: [history](docs/api/history.md).
+
+Personal payments (G02.3) are ordinary `Payment` rows in the pair ledger, reached through `/friends/{id}/payments`, which wraps `PaymentService` via `PersonalLedgerService` authorization (no schema change). Cross-group netting stays B02.
+
+Activity events (H03, V25) are written only through `ActivityRecorder`, inside the financial or group transaction: `ExpenseHistory.record`, `LedgerHistory.record` and `GroupService` lifecycle/member methods call it, so a rolled-back write leaves no event or notification and keyed replays write none. Kinds are `EXPENSE_|PAYMENT_|REFUND_` + revision action (`CREATED/REPLACED/DELETED/RESTORED`), `GROUP_*`, `MEMBER_*`. Recipients are current members except the actor, filtered by `notification_preferences`, inserted `ON CONFLICT DO NOTHING`. In-app only (SMTP deferred); invitation joins and group creation emit no event; the dashboard feed still reads rows, not events.
+
+Cross-group settlement (B02, V26) settles one currency across every shared non-archived group and the personal ledger in one transaction: preview and commit both derive allocations from `FriendService.detail` (so they match the friend page), lock scopes in ascending UUID order through `GroupWriteGuard`, require an exact match (else 409, nothing written) and record one ordinary payment per scope through `PaymentService`. Batches replay by `(actor, operationId)`. Never nets currencies; no partial cross-group settlement.
+
+Account closure (A04, V27; owner decisions 2026-11-12): blocked while any net or direct pair obligation is non-zero; closure locks all the user's groups/ledgers in UUID order before checking, passes created groups to the longest-standing member (lone groups soft-deleted), removes memberships, scrubs the account to "Closed account" with a freed tombstone email `closed+<id>@closed.invalid` (registration/email change reject `@closed.invalid`), revokes all sessions and anonymises stored revisions/events/receipts without changing amounts or IDs. `AccountClosureService` owns all closure SQL; `PersonalLedgerService` writes refuse a closed friend with 403 while bookmarks remain. Irreversible; no purge until retention requirements are stated.
+
+Recurrence (H04, V28): the runner (every 15 min, injected `Clock`) creates each due occurrence through `ExpenseService` as the schedule creator, one transaction per occurrence keyed `(schedule, date)`; lock the group row before the schedule row, never the reverse. Local dates in the schedule's IANA zone; monthly anchored and clamped to month end; 30-day catch-up, older dates SKIPPED (≤400 per run); any failure halts the schedule `NEEDS_REVIEW` until edited. Templates are validated by a rolled-back dry-run create; schedule create is keyed by optional `operationId`. Reminders go only to the debtor through `ActivityRecorder.reminder` (`BALANCE_REMINDER`, `payments` preference).
+
+Comments and attachments (H02-A, V29): attachments are stored in PostgreSQL (owner decision 2026-11-12) as bytea, max 5 MB and 10 live per expense, type verified by magic bytes and stored as detected; file names are display-only; downloads send `Content-Disposition: attachment`, `nosniff` and `private, no-store`. `AttachmentConfig` caps multipart at 5 MB file / 6 MB request. Writes go through `GroupWriteGuard.lockForMember` (archived 409); only the author/uploader can soft-delete. `COMMENT_CREATED` events follow the `expenses` preference. Backend only so far (UI is H02-B).
+
+Export and search (P07-A + P01-A): both reuse H05's scope authorization and keyset paging. `service/HistoryCsvExport` is the public door to the package-private CSV writer and does no authorization itself — callers pass only scopes the viewer belongs to. Jackson `writeValue(Writer)` closes the writer, so write JSON as strings when streaming several ZIP entries. Search escapes `%`, `_`, `\` and never compares amounts across currencies. Backend only so far.
+
 ## Frontend Conventions
 
 - **Refresh ownership**: use DashboardService.revalidate() for navigation/visible-focus reads; it shares pending work per read owner. Existing mutation callers use refresh() to invalidate older reads. Active groups consume refresh notifications independently of overview HTTP success; force mutation refresh collapses and invalidates receipts, foreground refresh retains selected detail and actionable errors. Session resets cancel reads and clear loaded group/settings state.
 - **Create retry identity**: group/expense POST use optional scoped UUID operation IDs (V12), native transactional conflict arbitration and immutable original-response snapshots. Authorize every replay; deleted groups cannot be recreated. Browser uncertain group/expense/payment drafts persist in account-owned, tab-isolated sessionStorage before dispatch; reload never sends automatically. Changed intent requires explicit acknowledgement, storage failure blocks dispatch, and session reset cancels/clears pending writes. Eager bootstrap initialization installs cleanup before any dialog opens. See `docs/api/retry-safe-writes.md`.
 
+- **Payment history screen**: `groups/:id/payments` is the settlement ledger — financial date,
+  method, note, amount via `app-money`, recorder, and per-row correct / undo / restore / revisions.
+  Both reads land together so a half-loaded ledger never looks settled. A 409 keeps the form open
+  with the user's values and says to reload; mutations call `dashboard.refresh()` and the screen
+  reloads once through `refreshes`, never twice. An expense receipt carries the **Record refund**
+  entry point, which guards the unrefunded remainder before dispatch and keeps its keyed retry draft
+  (`PendingWritesService` kind `refund`). Settle up keeps only its record-a-payment job.
 - **Member departure controls**: settings require both net balances and canonical `/balances/current-obligations` to load before enabling removal/leave; zero net with direct obligations is “even overall”, while simplified zero-net intermediaries can depart. `/balances/obligations` retains its raw contract. Refresh failures disable removal/leave even when the old group is retained.
 - **Profile identity/preferences are server-owned**: GET/PATCH `/api/me` edits name, unverified phone, avatar and default currency. Email stays read-only. Fresh responses update shell/profile display name without replacing ID/email/token. Currency preference never changes recorded money.
 - **Pending modal writes keep their feedback visible**: all user close routes use `ModalService.requestClose()` and remain blocked while `mutationPending()` is true. Session reset and successful writes use forced `close()`; success/error/destruction release pending state. Preserve payment operation IDs through uncertain failure/reopen.
@@ -238,6 +320,10 @@ Saved friends keep a private authorized display-label snapshot and canonical reg
   numeric split labels name dollars, percent, whole weight units or signed adjustment dollars, and selection buttons expose `aria-pressed`.
 
 - **Payment operation ownership**: `PaymentService` retains one in-memory pending group/payer/payee/amount + UUID across uncertain errors and modal reopen. Reuse only for identical intent; success, a different submitted intent, or `SessionService.reset()` clears/replaces it. Old-session observables cannot post under a new account. Owned uncertain drafts survive cookie-backed reload without automatic dispatch; account/device replacement clears them. Consult history after an uncertain response.
+- **Multi-payer editor** (E03-B): single-payer requests omit `contributions`; any PUT of an expense that loaded with >1 contribution sends them (one row when collapsed to a single payer), including the friend page's personal-expense edit — otherwise 409. Retry drafts carry contributions.
+- **Friend settle-up** reuses the settle-up modal with an optional `friendId` on `SettlePrefill`; `groupId` only ever holds a real group id. Pending-write scope key `friend:<friendId>`.
+- **Notifications**: `NotificationService.unread` owns the shell bell, revalidated on navigation/visible focus (no polling), cleared on session change; mark-read/mark-all cancel in-flight count requests. Specs that render `App` stub it.
+- **Languages (C02, V30)**: UI text goes through `'key' | t` in templates or `translate('key')` in TS — never hardcoded English, and never label maps evaluated at module load (use getters so they follow the active locale). English is bundled; `public/i18n/{hi,es,fr}.json` load lazily and fall back to English per key. Adding a language = `public/i18n/xx.json` + `SUPPORTED_LOCALES` + the backend allow-list in `UpdateProfileRequest`; the completeness spec enforces keys and placeholders. Plurals use `key_one/key_other` via `Intl.PluralRules`; money/dates use `Intl` with the active locale. Specs must not dynamically import app modules (it breaks shared module evaluation order in full runs). hi/es/fr catalogues are machine-drafted and need native review before release; backend error messages stay English.
 - Angular 21 standalone + signals; **no `@angular/animations`** (Material uses CSS animations — don't add
   `provideAnimations*`). Motion, where added, is CSS + tokens.
 - New-group member additions retain the created group ID and per-email outcomes; failed-only retries reuse that group. Keep session cancellation after the entire sequential aggregation.
@@ -290,17 +376,39 @@ Auth routes remain full-bleed with a named Appearance control.
 
 UUID PKs throughout. Migrations in `backend/src/main/resources/db/migration`.
 
-- **friends** (V18) — private directed `(owner_id, friend_account_id)` account pair, saved authorized display label and creation time. Survives settlement/group access loss/deletion; changes no financial facts or reciprocal directory. Target must be a registered active group financial participant when saved. Personal ledgers remain a later G02 slice.
+- **friends** (V18) — private directed `(owner_id, friend_account_id)` account pair, saved authorized display label and creation time. Survives settlement/group access loss/deletion; changes no financial facts or reciprocal directory. Target must be a registered active group financial participant when saved. Personal ledgers shipped in G02.2 (below).
+- **groups.kind / personal_ledgers** (V21) — `groups.kind` `GROUP`/`PERSONAL` (default GROUP, immutable); `personal_ledgers(account_low, account_high, group_id UNIQUE→groups CASCADE, created_at)`, PK on the ordered pair with `CHECK(account_low<account_high)` (PostgreSQL unsigned uuid order = lowercase hex order). Concurrent first writes arbitrate with `ON CONFLICT DO NOTHING`.
 
 - **users** (V2) — `id`, `email` (unique), `password_hash`, `display_name`, `created_at`; V10 adds `phone` (unverified contact, max50, default empty), `avatar_color` (five fixed swatches, default green), `preferred_currency` (USD/EUR/GBP/INR/JPY/KWD, defaultUSD; V15 extends the catalogue). Original `created_at` remains authoritative. `@DynamicUpdate` preserves omitted PATCH columns.
-- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection).
+- **groups** (V2) — `id`, `name`, `created_by`→users, `created_at`; +`type` (V6: `HOME/TRIP/DINING/EVENT/OTHER`, default OTHER); +`simplify_debts` (V8, default true, selects current obligation projection); V19 adds nullable `archived_at` (read-only state), nullable `deleted_at` (recoverable deletion) and `lifecycle_version` BIGINT (≥0, default 0, opaque restore precondition). Partial `(created_by, deleted_at DESC, id)` index serves the creator's recovery list. Memberships, expenses, payments and revisions are retained on deletion; only an explicit purge would cascade.
 - **group_memberships** (V2) — `id`, `group_id`→groups (CASCADE), `user_id`→users, `joined_at`. Unique `(group_id,user_id)`; indexed both.
 - **expenses** (V3) — `id`, `group_id`→groups (CASCADE), `description`, `amount_cents` BIGINT (>0, minor-unit storage), V15 `currency` (defaultUSD, immutable), `paid_by`→users,
   `version` BIGINT (V12, opaque nonnegative optimistic precondition); V16 nullable `deleted_at` retains recoverable rows and shares; partial `(group_id,deleted_at DESC,id)` index serves recovery reads; `split_type` (V4; V11: `EQUAL/UNEQUAL/PERCENTAGE/WEIGHTS/ADJUSTMENTS`, default EQUAL), `created_at`; +`category` (V6, 8-value enum) +`spent_on` DATE (V6, user-chosen date ≠ created_at). Composite index `(group_id, spent_on DESC, created_at DESC)` (V7, serves the ordered list + feed); `paid_by` indexed.
 - **expense_participants** (V3) — `id`, `expense_id`→expenses (CASCADE), `user_id`→users, `share_cents` BIGINT (≥0); V11 nullable `split_value` BIGINT for original typed input (EQUAL1, exact minor units, basis points, weight units, signed adjustment minor units). Unique `(expense_id,user_id)`.
-- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0, minor-unit storage), V15 `currency` (defaultUSD), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately.
+- **settlement_batches / settlement_allocations** (V26) — `settlement_batches(id, actor_id→users, friend_account_id→users, currency, operation_id, intent jsonb, response jsonb, created_at)` unique `(actor_id, operation_id)`; `settlement_allocations(batch_id→batches CASCADE, payment_id→payments CASCADE, group_id→groups CASCADE, amount_cents)`.
+- **expense_comments / attachments** (V29) — comments `(id, expense_id→expenses CASCADE, author_id, body ≤2000, created_at, deleted_at)`; attachments `(id, expense_id→expenses CASCADE, uploaded_by, file_name, content_type, size_bytes, sha256, content bytea, created_at, deleted_at)`. V29/V30 were swapped from the plan so H02-A could merge before C02.
+- **users.locale** (V30) — varchar(8) default 'en', allow-list en/hi/es/fr. V31 (search indexes) unused.
+- **users.closed_at** (V27) — non-null marks a closed account (name "Closed account", tombstone email).
+- **recurring_schedules / recurring_occurrences** (V28) — schedule `template` jsonb (a CreateExpenseRequest), frequency DAILY/WEEKLY/MONTHLY, `anchor_date`, IANA `time_zone`, `next_date`, `version`, status ACTIVE/NEEDS_REVIEW/CANCELLED, `review_reason`, optional `operation_id` (partial unique per creator+group); occurrence PK `(schedule_id, occurrence_date)`, nullable `expense_id` (SET NULL), status CREATED/SKIPPED/FAILED.
+- **activity_events / notifications / notification_preferences** (V25) — `activity_events(id, seq identity unique, group_id→groups CASCADE, kind, subject_id, actor jsonb, summary jsonb, occurred_at)`, index `(group_id, seq DESC)`; `notifications(id, recipient_id→users CASCADE, event_id→activity_events CASCADE, read_at, created_at)`, unique `(event_id, recipient_id)`, index `(recipient_id, read_at, created_at DESC)`; `notification_preferences(user_id PK, expenses, payments, group_changes)` default true. No backfill: events start at V25. V24 (G02.3) unused.
+- **expense_contributions** (V23) — `id`, `expense_id`→expenses (CASCADE), `participant_id`→participants, `amount_cents` BIGINT (>0, expense currency). Unique `(expense_id, participant_id)`, `participant_id` indexed. Sum exactly to the expense amount; backfilled one row per existing expense from `paid_by`. V22 was reserved for H05 and left unused (gap accepted by Flyway).
+- **payments** (V5) — `id`, `group_id`→groups (CASCADE), `payer_id`/`payee_id`→users, `amount_cents` (>0, minor-unit storage), V15 `currency` (defaultUSD), `created_at`. `CHECK(payer≠payee)`. Composite index `(group_id, created_at DESC)` (V7, serves the ordered history + feed); `payer_id`/`payee_id` indexed. A settle-up is a **direct transfer**, a separate entity from Expense. V9 adds nullable `recorded_by`→users and `operation_id` UUID, paired-null check and unique `(group_id,recorded_by,operation_id)`; legacy rows remain null, requester FK indexed separately. V20 adds `paid_on` DATE (user-chosen financial date, backfilled from `created_at` at UTC), `method` (8-value-style enum CASH/BANK_TRANSFER/CARD/ONLINE/OTHER, default OTHER), `note` (max 280), `version` BIGINT (opaque nonnegative precondition) and nullable `deleted_at`; composite `(group_id, paid_on DESC, created_at DESC)` serves the ordered history and a partial `(group_id, deleted_at DESC, id)` the recovery read. V20 also relaxes V9's paired-null operation check to `operation_id IS NULL OR recorded_by IS NOT NULL`, so an unkeyed payment still names its recorder.
 
 - **expense_revisions** (V16) — primary key `(expense_id,version)`, FK to expenses (CASCADE), action, nullable captured actor JSONB, server `recorded_at`, optional operation UUID, nullable before and required after ExpenseResponse JSONB. Imported baseline has null actor and original financial dates in its snapshot. History survives expense deletion markers; explicit group deletion cascades it.
+
+- **expense_refunds / expense_refund_participants** (V20) — money returned out of one expense:
+  positive `amount_cents`, immutable `currency` matching the expense, `received_by`→participants (the
+  expense's payer at the time), `refunded_on`, `note`, `recorded_by`, `created_at`, `version`,
+  nullable `deleted_at`; child rows hold the stored pro-rata allocation (`share_cents` ≥ 0, unique
+  per `(refund_id, participant_id)`), summing exactly to the amount. Both cascade from their expense
+  and group. Retry identity lives in V12 `create_operations`, not a column here.
+
+- **ledger_revisions** (V20) — attributable revisions for settlements and refunds in one table:
+  exactly one of `payment_id`/`refund_id` set (CHECK), both cascading, with `version` unique per
+  subject, action (IMPORTED/CREATED/CORRECTED/DELETED/RESTORED), nullable captured actor JSONB,
+  server `recorded_at`, optional operation UUID, nullable before and required after JSONB snapshots.
+  Pre-B01 payments get one IMPORTED baseline with a null actor — their recorder is unknown, never
+  invented.
 
 - **create_operations** (V12) — primary key `(actor_id,kind,scope_id,operation_id)`, normalized submitted `intent` and original `response` snapshots. Actor references users (CASCADE); scope intentionally has no group FK so expense/group response identities survive resource deletion. Claims and resource writes commit together; no automatic expiry.
 
@@ -573,3 +681,37 @@ Batch3 integration preparation (2026-10-24): user authorized merging PRs #101–
 - [x] PR108 typography correction (2026-10-27) — central page-heading/body/caption/balance roles replace Friends-local typography literals. Full frontend369/52, formatting and production build pass again; backend203-file source/artifact remains unchanged. Updated native acceptance and independent follow-ups gate publication of this fix.
 
 - [x] PR108 corrected-source acceptance (2026-10-27) — full frontend369/52/format/build552.70kB and updated native146HTTP+70browserAPI1280/390 pass, zero errors/overflow/cleanup. Shared typography correction accepted by Standards0/Spec0 follow-ups at6b3c356; unchanged backend347/source203 retained. Final manifests163frontend42dist match verified artifacts; exact updated-head PR CI/review is next.
+
+- [x] Alignment M0/M1 + H01/G01/G02.1 production release (2026-11-10) — PR110 promoted dev `ebd10a2` to main `9316f6e`, carrying 102 commits, 13 work packages and migrations V10→V18. Pre-merge gate: backend 347 (Spotless/verify), frontend 369/52, Prettier, production build 552.70kB, deployment14, ShellCheck and actionlint clean. Rehearsed V1–V9 baseline plus seeded legacy data then V10→V18 on disposable PostgreSQL16: money totals/row counts unchanged, USD backfilled, legacy PERCENTAGE converted to UNEQUAL exact shares, EQUAL `split_value=1`, explicit zero participant retained, three imported revision baselines with null actor, participants/links 1:1 with users, zero orphan FKs, per-currency zero-sum. Run42797481252 succeeded on all four jobs with backend/tunnel activation before Pages publication. Live verification: `/api/health` UP, protected route 401, non-API path 404, Angular root and deep links 200; deployed backend fingerprinted by A02 `password-reset-requests` 400 and A03 `refresh` 403 against a 404 control, and the served `main-K3LBEH7E.js` contains friends/invitation/sessions/currencies/account-action/restore. Old binaries are not blocked by Flyway (future applied migrations are tolerated) and an old-shaped write records no revision row; single-container recreate in `deploy.sh` leaves no overlap window, so never hand-start a second backend during delivery. Rollback past V15 is forward-fix only. Production SMTP remains unconfigured, so A02 recovery and G01 email invitations are present but inert. Released as tag `v0.2.0` on `9316f6e`. Remaining sequencing: `docs/superpowers/plans/2026-11-10-alignment-remaining-delivery.md`.
+
+- [x] Alignment G03 group lifecycle (2026-11-10) — V19 adds archived/deleted markers and an opaque
+  `lifecycle_version`. Archive makes a group read-only while preserving every read; delete becomes a
+  recoverable creator-only state gated on a settled group, replacing the destructive cascade, and
+  restore requires the expected version. Deleted groups read as 404 for members (403 still precedes
+  404 for outsiders) and vanish from `/groups` and `/dashboard`; the creator recovers them from
+  `GET /groups/deleted`. The write guard repeats the deleted check under the row lock, so a financial
+  write that waited for the deleting transaction fails closed, and a surviving E02 create claim cannot
+  resurrect a deleted group. Frontend gains archive/re-open, a five-way group-type selector on the
+  existing PATCH path, disabled entry actions while archived and a `groups/deleted` recovery route.
+  Regression-first: 11 new HTTP lifecycle cases plus 8 rendered cases; four existing tests updated to
+  the new contract (hard-delete 403→404 read, two fixtures settled before deleting, and the deletion
+  race re-pointed at the lock the soft delete actually takes). Backend 358 (347 before this work), frontend 377/53 (369 before), Spotless,
+  full-source Prettier, production build 553.49kB and OpenAPI (48 paths, 58 operations, no missing
+  refs) pass. Drain old backends before V19: they ignore the markers and would write into an archived
+  or deleted group; rollback keeps the schema and needs a forward fix. No purge, no payment/expense
+  lifecycle change. Merged to dev as PR #111 (with an invitation-acceptance archived/deleted refusal); unreleased.
+
+- [x] Alignment B01 payment detail, corrections and refunds (2026-11-10) — V20 adds a user-chosen payment date, method, note, opaque version and recoverable delete, with correction/undo/restore always requiring the version they saw and writing one attributable revision through the shared `ledger_revisions` mechanism; every payment aggregate now excludes undone settlements. Refunds are a separately modelled positive entry referencing their expense, allocated pro rata over its stored shares with the payer absorbing the remainder and the allocation stored, subtracted per currency from balances, obligations and group totals; retries reuse the V12 claim. New `groups/:id/payments` screen plus a Record refund entry point on an expense receipt. Merged with G03 on dev: V19 and V20 coexist and apply in sequence. Backend 377 (`spotless:check verify`; 358 before this work), frontend 386/55 (377 before), Prettier and production build 554.90kB pass; OpenAPI 3.1 valid with 491 refs. Drain old backends before V20 writes; rollback keeps the schema and needs a forward fix. Merged to dev as PR #112 after two Codex review fixes: group refund aggregates skip refunds of a deleted expense (restore brings them back), and a keyed payment retry replays the original CREATED receipt from ledger history instead of the corrected row. Backend 379; unreleased.
+
+- [x] Alignment G02.2 personal expenses (2026-11-11) — hidden pair ledger (V21) with friend-scoped expense CRUD, recovery and UI on the friend page; group routes, `/groups` and dashboard cards refuse/hide ledgers while totals/People include them. Codex fixes: edit of PERCENTAGE/WEIGHTS/ADJUSTMENTS opens as exact stored shares (never silently re-splits); Recently deleted + Restore at expected version. Backend 384, frontend 394/56. Merged as PR #115. Evidence: `docs/reviews/2026-11-11-alignment/g02-2-personal-ledger.md`.
+- [x] Alignment H05 bounded history/export (2026-11-11) — `GET /api/groups/history` keyset `(financialDate DESC, id DESC)`, limit 50/max 100, date and updated bounds, group/friend scope with member check first, personal-ledger groupId 404, personal entries with null group name; streamed RFC 4180 CSV with per-participant paid/owed/settlement/net minor units and formula neutralisation after leading whitespace. Angular `groups/:id/history` with paging, filters, retry, download. No migration (V22 unused). Backend 395, frontend 399/57. Merged as PR #116.
+- [x] Alignment E03-A multi-payer contributions (2026-11-11) — subsystem plan `docs/superpowers/plans/2026-11-11-alignment-e03.md`; V23 `expense_contributions` with single-payer backfill, optional `contributions` on create, 409 on contribution-less PUT of a multi-payer expense, contribution-based nets, deterministic pairwise attribution, dashboard activity delta and CSV paid column from contributions; multi-payer personal expenses reconcile. Backend 405, frontend 399/57 (no frontend change; editor is E03-B). Drain old backends before V23; rollback after a multi-payer write is a forward fix. Merged as PR #114. Wave 6 complete on dev; unreleased (V19–V23 pending R2).
+- [x] Alignment E03-B multi-payer editor (2026-11-12) — "Multiple people paid" toggle with labelled per-payer amounts, live remainder and a save gate on serialized contributions; multi-payer edits always PUT contributions; retry drafts carry them; "Ann and 2 others paid" summaries and per-contributor receipt lines. Frontend only. Frontend 410/59. Merged as PR #118.
+- [x] Alignment H03 activity + in-app notifications (2026-11-12) — V25 events/notifications/preferences written by `ActivityRecorder` in the writer's transaction (no financial service edited); `/api/activity`, notifications list/unread-count/read/read-all, `/api/me/notification-preferences`; shell bell, `/activity`, `/notifications`, Profile switches. Codex fix: mark-all cancels a stale in-flight unread count. Backend 411, frontend 416/61. Drain old backends before V25; forward fix only. Merged as PR #119.
+- [x] Alignment G02.3 friend debts and personal payments (2026-11-12) — `/friends/{id}/payments` wraps `PaymentService` through the pair ledger; friend page balance breakdown (per group + Personal), personal settle-up via the shared modal with a real `friendId`, payment history with undo/restore/revisions; personal-expense edit keeps multi-payer contributions. No migration (V24 unused). Backend 415, frontend 426/63 after merging H03. Merged as PR #120. Wave 7 complete on dev; unreleased (V19–V25 pending R2).
+- [x] Alignment B02 cross-group friend settlement (2026-11-12) — preview + atomic keyed commit across shared groups and the personal ledger in one currency, allocations from the friend-detail projection, UUID-ordered locks, exact-match 409, one payment per scope; Codex fix: allocations over the 1e12 cap 409 before any write. Backend 422. Merged as PR #123.
+- [x] Alignment A04 account closure (2026-11-12) — owner decisions applied (block while unsettled, "Closed account", freed email); UUID-ordered locks before the balance check, creator transfer, membership removal, session revocation, history anonymisation, closed-friend write 403. Codex fixes: direct-mode offsetting debts block closure, `@closed.invalid` cannot be registered, email-only receipts scrubbed. Backend 429, frontend 432. Merged as PR #125.
+- [x] Alignment H04 recurring expenses + balance reminders (2026-11-12) — V28 schedules/occurrences, concurrent-safe runner, anchored month-end, 30-day catch-up, NEEDS_REVIEW halts, keyed schedule create, dry-run template validation, debtor-only 24h-deduplicated reminders with readable feed text; closed-account schedules halt. Backend 443, frontend 443/68. Merged as PR #124. Wave 8 complete on dev; unreleased (V19–V28 pending R2).
+- [x] Alignment H02-A comments + attachments backend (2026-11-13) — V29, PostgreSQL-stored receipts with magic-byte type checks and safe download headers, member-only writes under the group lock, personal-ledger mirrors, `COMMENT_CREATED` events. Backend 451. Merged as PR #128.
+- [x] Alignment P07-A + P01-A export and search backend (2026-11-13) — streamed own-data ZIP and authorized keyset search with escaped literal matching and currency-bound amount filters; no migration. Backend 451. Merged as PR #129.
+- [x] Alignment C02 languages (2026-11-13) — Hindi, Spanish and French (machine-drafted, native review pending) over 890 keys, runtime catalogues, locale-aware money/dates, Profile language select saved to `/api/me`, `COMMENT_CREATED` text. Codex fix: label maps follow the active locale; flaky locale spec made deterministic. Backend 460, frontend 455/70, build 621kB (budget warning). Merged as PR #130. Wave 9 complete on dev; unreleased (V19–V30 pending R2).

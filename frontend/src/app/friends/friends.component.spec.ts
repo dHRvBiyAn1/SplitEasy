@@ -14,6 +14,7 @@ const friend = {
   sharedGroupCount: 1,
   hasOpenObligations: false,
   balances: [{ currency: 'USD', netMinor: 0 }],
+  personalBalances: [],
 };
 const sourceGroup = {
   id: 'trip',
@@ -65,9 +66,15 @@ describe('saved friends through rendered routes and HTTP', () => {
     harness = await RouterTestingHarness.create();
   });
   afterEach(() => {
+    http.match((r) => r.url.endsWith('/payments')); // G02.3 history is covered in its own spec
     http.verify({ ignoreCancelled: true });
     TestBed.resetTestingModule();
   });
+  /** A loaded friend detail also opens the pair's personal-expense list. */
+  const personal = (detail = '/api/friends/pat') => {
+    http.expectOne(detail + '/expenses').flush([]);
+    harness.detectChanges();
+  };
   const root = () => harness.routeNativeElement!;
   const text = () => root().textContent!;
   const button = (label: string) =>
@@ -139,6 +146,7 @@ describe('saved friends through rendered routes and HTTP', () => {
       ],
     });
     harness.detectChanges();
+    personal();
     expect(text()).toContain('Pat saved');
     expect(text()).toContain('Even overall');
     expect(text()).toContain('open group obligations');
@@ -295,6 +303,7 @@ describe('saved friends through rendered routes and HTTP', () => {
     expect(firstB.cancelled).toBe(true);
     http.expectOne('/api/friends/pat').flush({ ...friend, sharedGroups: [] });
     harness.detectChanges();
+    personal();
     expect(text()).toContain('Pat saved');
     expect(text()).not.toContain('other');
     await harness.navigateByUrl('/friends/absent');
@@ -373,6 +382,7 @@ describe('saved friends through rendered routes and HTTP', () => {
       ],
     });
     harness.detectChanges();
+    personal();
     expect(text()).toContain('Private trip');
     window.dispatchEvent(new Event('focus'));
     const refresh = http.expectOne('/api/friends/pat');
@@ -387,6 +397,7 @@ describe('saved friends through rendered routes and HTTP', () => {
       .expectOne('/api/friends/pat')
       .flush({ ...friend, sharedGroupCount: 0, balances: [], sharedGroups: [] });
     harness.detectChanges();
+    personal();
     expect(text()).toContain('Pat saved');
     expect(text()).toContain('No current shared group data');
     expect(root().querySelector('a[href="/groups/private"]')).toBeNull();
@@ -403,6 +414,7 @@ describe('saved friends through rendered routes and HTTP', () => {
     await harness.navigateByUrl('/friends/pat');
     http.expectOne('/api/friends/pat').flush({ ...friend, sharedGroups: [] });
     harness.detectChanges();
+    personal();
     button('Remove friend').click();
     harness.detectChanges();
     button('Remove saved friend').click();
@@ -421,6 +433,7 @@ describe('saved friends through rendered routes and HTTP', () => {
     await harness.navigateByUrl('/friends/pat');
     http.expectOne('/api/friends/pat').flush({ ...friend, sharedGroups: [] });
     harness.detectChanges();
+    personal();
     button('Remove friend').click();
     harness.detectChanges();
     button('Remove saved friend').click();

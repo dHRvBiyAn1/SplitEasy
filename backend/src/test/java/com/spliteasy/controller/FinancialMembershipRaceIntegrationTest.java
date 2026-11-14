@@ -408,7 +408,12 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
     CountDownLatch deleting = new CountDownLatch(1);
     CountDownLatch finishDelete = new CountDownLatch(1);
     AtomicInteger blocker = new AtomicInteger();
-    doAnswer(holdAfterQuery(deleting, finishDelete, blocker)).when(groupRepository).delete(any());
+    // Recoverable deletion (V19) never removes the row, so hold the deleting transaction on the
+    // group write lock it actually takes. Only the first caller holds; the racing write then
+    // blocks on PostgreSQL, not on this probe.
+    doAnswer(holdAfterQuery(deleting, finishDelete, blocker))
+        .when(groupRepository)
+        .findByIdForUpdate(any());
     try (var requests = Executors.newFixedThreadPool(2)) {
       var deletion =
           requests.submit(() -> mockMvc.perform(auth(delete(path(f, "")), f.a())).andReturn());
@@ -422,12 +427,25 @@ class FinancialMembershipRaceIntegrationTest extends AbstractIntegrationTest {
         finishDelete.countDown();
       }
       assertThat(deletion.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(204);
-      assertThat(write.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(403);
+      // Memberships survive a recoverable deletion, so the membership recheck alone would now let
+      // this write through. The deleted state is what refuses it, and it fails closed as absent.
+      assertThat(write.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(404);
     }
     for (String suffix : List.of("", "/balances", "/expenses", "/payments")) {
-      mockMvc.perform(auth(get(path(f, suffix)), f.a())).andExpect(status().isForbidden());
+      mockMvc.perform(auth(get(path(f, suffix)), f.a())).andExpect(status().isNotFound());
     }
     assertThat(body(auth(get("/api/groups"), f.a()), 200, Object[].class)).isEmpty();
+
+    // The racing write left nothing behind: restoring the group shows an empty ledger.
+    var recoverable = body(auth(get("/api/groups/deleted"), f.a()), 200, Object[].class);
+    assertThat(recoverable).hasSize(1);
+    long version = ((Number) ((Map<?, ?>) recoverable[0]).get("lifecycleVersion")).longValue();
+    body(
+        auth(jsonPost(path(f, "/restore"), Map.of("expectedVersion", version)), f.a()),
+        200,
+        GroupResponse.class);
+    assertThat(read(f, "/expenses", Object[].class)).isEmpty();
+    assertThat(read(f, "/balances/current-obligations", Object[].class)).isEmpty();
   }
 
   private MockHttpServletRequestBuilder financial(Fixture f, boolean payment) throws Exception {

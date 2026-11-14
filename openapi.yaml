@@ -154,7 +154,7 @@ paths:
     get:
       operationId: getSavedFriend
       summary: Read a saved friend's current authorized group breakdown
-      description: Unknown or another owner's saved target returns404. A saved friend never grants history access. Each group uses its selected direct/simplified mode and current claimed identities; stored financial records stay unchanged. Follow group links for existing expense history. No personal expenses or friend-level settlement are implemented here.
+      description: Unknown or another owner's saved target returns404. A saved friend never grants history access. Each group uses its selected direct/simplified mode and current claimed identities; stored financial records stay unchanged. Follow group links for existing expense history. Non-group personal expenses appear only in `personalBalances`; friend-level settlement is not implemented.
       tags: [Friends]
       responses:
         '200':
@@ -746,20 +746,151 @@ paths:
           description: Target debt mode exposes former-participant obligations; re-add and repair first
     delete:
       operationId: deleteGroup
-      summary: Delete a group
+      summary: Delete a group (recoverable)
       description: |
-        Permanently deletes the group and its expenses/payments (cascade). Creator
-        only — any other member (including the creator's only member, if any) gets 403.
+        Marks the group deleted (migration V19). Nothing financial is destroyed: expenses,
+        payments, shares, split intent and revisions are retained, and the creator can restore
+        the group at its lifecycle version. Every ordinary read then treats the group as absent,
+        so a member gets 404 and a non-member still gets 403 before 404.
+
+        Creator only — any other member gets 403, checked after membership. The group must be
+        settled: a canonical obligation for the selected mode, or any non-zero net in any
+        currency, returns 409 naming the outstanding obligation.
       tags: [Groups]
       responses:
         '409':
           $ref: '#/components/responses/Conflict'
+          description: Group is not settled; settle the named obligations before deleting
         "204":
-          description: Group deleted
+          description: Group marked deleted and recoverable
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/groups/{groupId}/archive:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    post:
+      operationId: archiveGroup
+      summary: Make a group read-only
+      description: |
+        Archives the group: reads, balances, history and export keep working while every new
+        financial entry is refused with 409 — expense create/replace/delete/restore, payments,
+        adding members, invitations and guest participants. Leaving the group and settings edits
+        (rename, type, simplify-debts) stay available, because neither is a new entry.
+
+        Any member may archive, matching the flat settings authorization. Archiving an already
+        archived group returns 409. Advances the lifecycle version.
+      tags: [Groups]
+      responses:
+        '200':
+          description: Archived group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: Group is already archived
+
+  /api/groups/{groupId}/unarchive:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    post:
+      operationId: unarchiveGroup
+      summary: Re-open an archived group
+      description: |
+        Clears the archived marker so new entries are accepted again. Any member, mirroring
+        archive. Re-opening a group that is not archived returns 409. Advances the lifecycle
+        version; no financial data changes either way.
+      tags: [Groups]
+      responses:
+        '200':
+          description: Re-opened group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: Group is not archived
+
+  /api/groups/deleted:
+    get:
+      operationId: listDeletedGroups
+      summary: List my recoverable deleted groups
+      description: |
+        The authenticated creator's own deleted groups, newest first, each carrying the
+        lifecycleVersion a restore must quote back. Only groups this account created are
+        listed: another member of a deleted group sees an empty list, never its existence.
+      tags: [Groups]
+      responses:
+        '200':
+          description: Deleted groups this account created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/groups/{groupId}/restore:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    post:
+      operationId: restoreGroup
+      summary: Restore a deleted group at its expected version
+      description: |
+        Clears the deletion marker under the group write lock, returning the group exactly as it
+        was: members, expenses, payments and history are unchanged, and an archived group stays
+        archived. expectedVersion is mandatory, so a stale recovery screen cannot resurrect a
+        group whose state moved on; a mismatch, or a group that is not deleted, returns 409
+        without any change. Creator only, checked after membership, so a non-member gets 403.
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreGroupRequest'
+      responses:
+        '200':
+          description: Restored group at its new lifecycle version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+          description: Stale expectedVersion, or the group is not deleted
 
   /api/groups/{groupId}/members:
     parameters:
@@ -1414,6 +1545,371 @@ paths:
           $ref: '#/components/responses/Conflict'
           description: Operation ID was previously used for a different payment
 
+  /api/groups/{groupId}/payments/deleted:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedPayments
+      summary: List the group's recoverable settlements
+      description: Member-only. Undone settlements, most recently undone first. They count towards no balance,
+        obligation or feed, and each carries the version a restore must state.
+      tags: [Payments]
+      responses:
+        '200':
+          description: Recoverable settlements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeletedPayment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/payments/{paymentId}:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getPayment
+      summary: One active settlement with its version
+      description: Member-only, 403 before 404, so a non-member gets 403 even for a payment id that does not exist.
+      tags: [Payments]
+      responses:
+        '200':
+          description: The active settlement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    put:
+      operationId: correctPayment
+      summary: Correct a recorded settlement at its expected version
+      description: Full replacement of the correctable facts, namely payer, payee, amount, financial date, method and note.
+        expectedVersion is always required; a stale version is 409 before any mutation. The currency is immutable and
+        a changed one is 409. Payer and payee must differ and both must be active financial participants, otherwise
+        409 instructs explicit re-add. Serializes with other financial writes on the group row. One accepted
+        correction advances the version once and writes exactly one CORRECTED revision holding both snapshots; the
+        original is retained, never rewritten. On an uncertain response reload and review — never retry automatically.
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrectPaymentRequest'
+      responses:
+        '200':
+          description: The corrected settlement at its new version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deletePayment
+      summary: Undo a recorded settlement, recoverably
+      description: Marks the settlement deleted at the stated expectedVersion, which is always required. The row and
+        its revisions are retained and it is excluded from every balance, obligation and feed. A stale version is 409,
+        so a retried undo never reverses twice.
+      tags: [Payments]
+      parameters:
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: operationId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Undone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/payments/{paymentId}/restore:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: restorePayment
+      summary: Restore an undone settlement at its expected version
+      description: Always requires expectedVersion. Both parties must be active financial participants, otherwise 409
+        instructs explicit re-add. Restores the unchanged amount, currency, date, method and note, advances the
+        version once and writes one RESTORED revision. An already-active or stale command is 409 without another
+        revision or financial change, so a repeated restore never counts twice.
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestorePaymentRequest'
+      responses:
+        '200':
+          description: The restored settlement at its new version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/payments/{paymentId}/history:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getPaymentHistory
+      summary: One settlement's attributable revisions
+      description: Member-only, oldest version first, covering active and undone settlements. An imported baseline
+        has a null actor, because the recorder of a payment made before B01 is genuinely unknown and is never invented.
+      tags: [Payments]
+      responses:
+        '200':
+          description: The settlement's revisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentRevision'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/refunds:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: listRefunds
+      summary: Money returned out of one expense
+      description: Member-only, 403 before 404. Live refunds on the expense, newest financial date first.
+      tags: [Expenses]
+      responses:
+        '200':
+          description: The expense's refunds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RefundResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    post:
+      operationId: recordRefund
+      summary: Record money returned out of this expense
+      description: A refund reverses this expense's own allocation, so it carries no split input of its own. The
+        amount is positive, stated in the expense's immutable currency, and at most what is left unrefunded,
+        otherwise 400 with the remainder, and the ledger is unchanged. The expense must be active and every
+        participant currently active, otherwise 409 instructs explicit re-add. The allocation is computed pro rata
+        over the stored shares, with the receiving payer absorbing the remainder, and is stored, so a later expense
+        correction cannot restate a refund that already happened. Optional operationId is a keyed retry — an identical
+        repeat returns the original 201 without reversing twice; a changed intent is 409. Recording a refund moves no
+        real money.
+      tags: [Expenses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordRefundRequest'
+            example:
+              amountMinor: 3000
+              currency: USD
+              refundedOn: '2026-03-06'
+              note: Restaurant returned part of the bill
+              operationId: 550e8400-e29b-41d4-a716-446655440009
+      responses:
+        '201':
+          description: The recorded refund with its stored allocation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/refunds/{refundId}:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: refundId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      operationId: deleteRefund
+      summary: Undo a recorded refund, recoverably
+      description: Marks the refund deleted at the stated expectedVersion, which is always required. The pre-refund
+        balances return exactly once; the row, its allocation and its revisions are retained. A stale version is 409.
+        B01 has no refund edit or restore route — correct a wrong refund by undoing it and recording a new one.
+      tags: [Expenses]
+      parameters:
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '204':
+          description: Undone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/groups/{groupId}/expenses/{expenseId}/refunds/{refundId}/history:
+    parameters:
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: refundId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getRefundHistory
+      summary: One refund's attributable revisions
+      description: Member-only, oldest version first, covering live and undone refunds.
+      tags: [Expenses]
+      responses:
+        '200':
+          description: The refund's revisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RefundRevision'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /api/groups/{groupId}/debt-simplification:
     parameters:
     - $ref: '#/components/parameters/ParticipantVersion'
@@ -1742,6 +2238,1167 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  # --- g02-2 paths (insert below; parallel batch plan rule 3) ---
+  /api/friends/{friendId}/expenses:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listPersonalExpenses
+      summary: List non-group expenses shared with one saved friend
+      description: Personal expenses live in a hidden pair ledger, never a group. Any member reads
+        the same spent-date-ordered list, including after either account removes the bookmark, because
+        the money is jointly owned. No ledger exists yet returns an empty list; an unsaved target is
+        403 and an outsider never learns whether a ledger exists.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: Expense summaries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    post:
+      operationId: createPersonalExpense
+      summary: Create a non-group expense with one saved friend
+      description: Creates the pair ledger on demand. Same body, split strategies, keyed `operationId`
+        replay, currency rules and 201 receipt as the group create route. The payer and every split
+        participant must be one of the two accounts, otherwise 400 before any write. The friend bookmark
+        authorizes creating the ledger only.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '201':
+          description: The created personal expense, byte-identical to a later read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/friends/{friendId}/expenses/deleted:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedPersonalExpenses
+      summary: List this pair's recoverable deleted expenses
+      description: Member-only recovery read with the same retained rows, versions and revision
+        history as the group recovery list. No ledger returns an empty list.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: Deleted expenses with their lifecycle versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeletedExpense'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/friends/{friendId}/expenses/{expenseId}:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - name: expenseId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: getPersonalExpense
+      summary: Read one personal expense
+      description: Member-only detail with the recorded split intent; an expense from another ledger
+        is 404 so no scope leaks.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: Expense detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    put:
+      operationId: replacePersonalExpense
+      summary: Full-replace a personal expense
+      description: Identical to the group replace path, including `expectedVersion` (stale is 409
+        before mutation), re-derived shares and retained revision history. Currency is immutable.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '200':
+          description: The replaced personal expense
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      operationId: deletePersonalExpense
+      summary: Recoverably delete a personal expense
+      description: Marks the entry deleted at the expected version and moves the pair's balances
+        once; financial reads everywhere exclude it until an explicit restore.
+      tags:
+      - Friends
+      parameters:
+        - name: expectedVersion
+          in: query
+          required: false
+          schema: {type: integer, format: int64, minimum: 0}
+        - name: operationId
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/friends/{friendId}/expenses/{expenseId}/restore:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+        schema: {type: string, format: uuid}
+      - name: expenseId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - $ref: '#/components/parameters/ParticipantVersion'
+      - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: restorePersonalExpense
+      summary: Restore a retained personal expense
+      description: Requires the version the reader saw; a repeated or stale restore is 409 without
+        counting twice. Both accounts must still be participants.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreExpenseRequest'
+      responses:
+        '200':
+          description: Restored expense with its advanced version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # --- h05 paths (insert below; parallel batch plan rule 3) ---
+  /api/groups/history:
+    get:
+      operationId: listHistory
+      tags: [History]
+      summary: Bounded keyset history of the caller's groups
+      description: Active expenses, settlements and refunds in (financialDate DESC, id DESC) order. Default
+        limit 50, maximum 100; pass nextCursor back unchanged. Only current non-deleted groups of the caller
+        are read; a groupId the caller is not in is 403 before anything else. from/to are inclusive
+        calendar dates; updatedAfter (inclusive) and updatedBefore (exclusive) use revision time.
+      parameters:
+      - name: groupId
+        in: query
+        schema: {type: string, format: uuid}
+      - name: friendId
+        in: query
+        description: A saved friend; narrows to entries both people take part in.
+        schema: {type: string, format: uuid}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      - name: updatedAfter
+        in: query
+        schema: {type: string, format: date-time}
+      - name: updatedBefore
+        in: query
+        schema: {type: string, format: date-time}
+      - name: cursor
+        in: query
+        schema: {type: string}
+      - name: limit
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/groups/history/export:
+    get:
+      operationId: exportHistoryCsv
+      tags: [History]
+      summary: Stream the filtered history as CSV
+      description: One row per participant per entry, streamed and never buffered. Columns are transaction_id,
+        type, financial_date, group_name, description, currency, amount_minor, amount, participant_id,
+        participant_name, paid_minor, owed_minor, settlement_minor, net_minor, net, last_changed_by. Text cells
+        beginning with = + - @ tab or CR are prefixed with an apostrophe. Net minor units sum to zero per
+        currency; count each transaction_id's amount_minor once.
+      parameters:
+      - name: groupId
+        in: query
+        schema: {type: string, format: uuid}
+      - name: friendId
+        in: query
+        description: A saved friend; narrows to entries both people take part in.
+        schema: {type: string, format: uuid}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      - name: updatedAfter
+        in: query
+        schema: {type: string, format: date-time}
+      - name: updatedBefore
+        in: query
+        schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: CSV attachment.
+          content:
+            text/csv:
+              schema: {type: string}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # --- e03 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- e03-b paths (insert below; parallel batch plan rule 3) ---
+
+  # --- g02-3 paths (insert below; parallel batch plan rule 3) ---
+  /api/friends/{friendId}/payments:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listPersonalPayments
+      summary: List settlements between you and one saved friend
+      description: Personal payments live in the pair's hidden ledger, never a group. No ledger yet returns an empty list; a target that is neither a ledger partner nor a saved friend is 403.
+      tags: [Friends]
+      responses:
+        '200':
+          description: Payments, financial-date order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: recordPersonalPayment
+      summary: Record a settlement between you and one saved friend
+      description: Same body, keyed `operationId` replay, currency, date, method and note rules as a group payment. Payer and payee must be exactly you and the friend, in either direction, otherwise 400 before any write. May open the pair ledger like a personal expense create.
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecordPaymentRequest'}
+      responses:
+        '201':
+          description: The recorded payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/payments/deleted:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listDeletedPersonalPayments
+      summary: Recently undone personal payments
+      tags: [Friends]
+      responses:
+        '200':
+          description: Undone payments with the version to restore at
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/DeletedPayment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/friends/{friendId}/payments/{paymentId}:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    get:
+      operationId: getPersonalPayment
+      summary: Personal payment detail
+      tags: [Friends]
+      responses:
+        '200':
+          description: The active payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: correctPersonalPayment
+      summary: Correct a personal payment at its expected version
+      description: Same rules as a group correction; payer and payee must remain exactly the pair (400 otherwise). Stale version is 409 before mutation.
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CorrectPaymentRequest'}
+      responses:
+        '200':
+          description: The corrected payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: undoPersonalPayment
+      summary: Undo (recoverable delete) a personal payment
+      tags: [Friends]
+      parameters:
+      - name: expectedVersion
+        in: query
+        required: true
+        schema: {type: integer, format: int64}
+      - name: operationId
+        in: query
+        schema: {type: string, format: uuid}
+      responses:
+        '204': {description: Undone}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/payments/{paymentId}/restore:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    post:
+      operationId: restorePersonalPayment
+      summary: Restore an undone personal payment at its expected version
+      tags: [Friends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RestorePaymentRequest'}
+      responses:
+        '200':
+          description: The restored payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/payments/{paymentId}/history:
+    parameters:
+    - name: friendId
+      in: path
+      required: true
+      description: The other account's canonical participant ID; the pair ledger is resolved from the two account IDs
+      schema: {type: string, format: uuid}
+    - $ref: '#/components/parameters/ParticipantVersion'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - name: paymentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    get:
+      operationId: personalPaymentHistory
+      summary: Attributable revisions of a personal payment
+      tags: [Friends]
+      responses:
+        '200':
+          description: Revisions oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PaymentRevision'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+
+  # --- h03 paths (insert below; parallel batch plan rule 3) ---
+  /api/activity:
+    get:
+      operationId: listActivity
+      tags: [Activity]
+      summary: Durable activity events, newest first
+      description: Committed events written with each financial or lifecycle change (starting at V25, no
+        backfill). Keyset on seq descending; default limit 50, maximum 100. Without groupId, every
+        non-deleted group the caller currently belongs to, personal ledgers included with a null groupName.
+        With groupId, membership is checked first (403 before 404); a deleted group or a personal-ledger
+        groupId is 404.
+      parameters:
+      - {name: groupId, in: query, schema: {type: string, format: uuid}}
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ActivityPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/notifications:
+    get:
+      operationId: listNotifications
+      tags: [Activity]
+      summary: The caller's own notifications, newest first
+      description: Recipients are current group members except the actor, filtered by preferences. Former
+        members keep past notifications but receive no new ones.
+      parameters:
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: unreadOnly, in: query, schema: {type: boolean, default: false}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /api/notifications/unread-count:
+    get:
+      operationId: unreadNotificationCount
+      tags: [Activity]
+      summary: Number of unread notifications
+      responses:
+        '200':
+          description: The count.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count: {type: integer, format: int64}
+  /api/notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [Activity]
+      summary: Mark one of the caller's notifications read
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204': {description: Marked read (idempotent).}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [Activity]
+      summary: Mark every unread notification read
+      responses:
+        '204': {description: Done.}
+  /api/me/notification-preferences:
+    get:
+      operationId: getNotificationPreferences
+      tags: [Activity]
+      summary: In-app notification preferences (all true when never saved)
+      responses:
+        '200':
+          description: Preferences.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPreferences'}
+    put:
+      operationId: putNotificationPreferences
+      tags: [Activity]
+      summary: Replace the three notification switches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationPreferences'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPreferences'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+
+  # --- b02 paths (insert below; parallel batch plan rule 3) ---
+  /api/friends/{friendId}/settlement-preview:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        description: The saved friend's account ID
+        schema: {type: string, format: uuid}
+      - name: currency
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Currency'
+    get:
+      operationId: previewFriendSettlement
+      summary: Preview settling everything with one friend in one currency
+      description: One allocation per non-deleted, non-archived scope (shared group or the personal
+        ledger) with a non-zero canonical obligation in the currency. Archived scopes are listed in
+        `skipped`. Currencies are never combined. A target that is not a saved friend is 403.
+      tags:
+      - Friends
+      responses:
+        '200':
+          description: The allocations a commit must repeat exactly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/friends/{friendId}/settlements:
+    parameters:
+      - name: friendId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: commitFriendSettlement
+      summary: Settle every previewed scope atomically
+      description: Locks every shared scope in ascending UUID order, recomputes the allocations and
+        requires an exact match with the request; any difference is 409 with nothing written. Then
+        records one ordinary payment per allocation in the direction of that scope's obligation,
+        in the same transaction. `operationId` is required and unique per requester; an exact replay
+        returns the stored 201 body, a changed request with the same ID is 409.
+      tags:
+      - Friends
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitSettlementRequest'
+      responses:
+        '201':
+          description: The batch with the payment created in each scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # --- a04 paths (insert below; parallel batch plan rule 3) ---
+  /api/me/closure:
+    post:
+      summary: Permanently close the current account
+      description: >-
+        Requires the current password. Refused with 409 (naming the groups and friends) while any
+        balance is non-zero. Ends all sessions, frees the email, removes memberships and shows the
+        account as "Closed account" in retained history. Irreversible.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseAccountRequest'
+      responses:
+        '204':
+          description: Account closed
+        '400':
+          description: Wrong password
+        '409':
+          description: Unsettled balances; nothing changed
+        '429':
+          description: Sensitive-command rate limit
+
+  # --- h04 paths (insert below; parallel batch plan rule 3) ---
+  /api/groups/{groupId}/recurring:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    get:
+      operationId: listRecurringExpenses
+      summary: List the group's recurring expense schedules
+      tags: [Recurring]
+      responses:
+        '200':
+          description: Schedules, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/RecurringSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createRecurringExpense
+      summary: Create a recurring expense schedule
+      description: Occurrence dates are local dates in `timeZone`; monthly keeps the anchor day clamped to the month's last day. A runner creates each due expense as the schedule creator; occurrences missed for more than 30 days are recorded SKIPPED. Refused 409 on an archived group. The template is validated like a new expense (payer, contributors and split participants must be active participants, split must be valid) and rejected 400 otherwise; the same check runs on PUT.
+      tags: [Recurring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecurringScheduleRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/recurring/{scheduleId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - {name: scheduleId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: getRecurringExpense
+      summary: Get one schedule
+      tags: [Recurring]
+      responses:
+        '200':
+          description: The schedule.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: updateRecurringExpense
+      summary: Change future occurrences
+      description: Requires `expectedVersion`; a stale version or a cancelled schedule is 409. Already generated expenses are untouched. Resets NEEDS_REVIEW to ACTIVE.
+      tags: [Recurring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RecurringScheduleRequest'}
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/recurring/{scheduleId}/cancel:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    - {name: scheduleId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: cancelRecurringExpense
+      summary: Cancel a schedule
+      description: Prevents future occurrences and deletes nothing. Repeating it is a no-op returning the cancelled schedule. Allowed on an archived group.
+      tags: [Recurring]
+      responses:
+        '200':
+          description: Cancelled.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecurringSchedule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/groups/{groupId}/reminders:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - $ref: '#/components/parameters/LedgerVersion'
+    post:
+      operationId: sendBalanceReminder
+      summary: Remind a debtor in this group
+      description: Caller must be owed money by `debtorId` in `currency` under the canonical projection (else 409). At most one reminder per group, creditor, debtor and currency per 24 hours (409). Delivered in-app to the debtor only, subject to their payments notification preference (event kind BALANCE_REMINDER). No email.
+      tags: [Recurring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReminderRequest'}
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReminderResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  # --- c02 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- h02 paths (insert below; parallel batch plan rule 3) ---
+  /api/groups/{groupId}/expenses/{expenseId}/comments:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listGroupComments
+      summary: List live comments (metadata only, oldest first)
+      tags: [Comments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Comment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addGroupComment
+      summary: Comment on an expense
+      description: Any member. 409 on an archived group. Raises one COMMENT_CREATED event for the other members, subject to their expenses notification preference.
+      tags: [Comments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/expenses/{expenseId}/comments/{itemId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      operationId: deleteGroupComment
+      summary: Remove your own comment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Comments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/expenses/{expenseId}/attachments:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listGroupAttachments
+      summary: List live attachments (metadata only, oldest first)
+      tags: [Attachments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Attachment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addGroupAttachment
+      summary: Attach a file to an expense
+      description: multipart/form-data with one `file` part, at most 5 MB, at most 10 live attachments per expense (409). The type is taken from the file's magic bytes (JPEG, PNG, WebP, PDF); the client Content-Type is ignored and anything else is 400. 413 over 5 MB. The file name is sanitized for display only. 409 on an archived group.
+      tags: [Attachments]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Created (metadata only).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Attachment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {description: File larger than 5 MB}
+  /api/groups/{groupId}/expenses/{expenseId}/attachments/{itemId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: downloadGroupAttachment
+      summary: Download the stored bytes
+      description: 'Streams the stored content type with Content-Disposition attachment, X-Content-Type-Options nosniff and Cache-Control private, no-store.'
+      tags: [Attachments]
+      responses:
+        '200':
+          description: The file.
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+            application/pdf: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: deleteGroupAttachment
+      summary: Remove your own attachment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Attachments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/expenses/{expenseId}/comments:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listPersonalComments
+      summary: List live comments (metadata only, oldest first)
+      tags: [Comments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Comment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addPersonalComment
+      summary: Comment on an expense
+      description: Any member. 409 on an archived group. Raises one COMMENT_CREATED event for the other members, subject to their expenses notification preference.
+      tags: [Comments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CommentRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/expenses/{expenseId}/comments/{itemId}:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      operationId: deletePersonalComment
+      summary: Remove your own comment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Comments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/friends/{friendId}/expenses/{expenseId}/attachments:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listPersonalAttachments
+      summary: List live attachments (metadata only, oldest first)
+      tags: [Attachments]
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Attachment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addPersonalAttachment
+      summary: Attach a file to an expense
+      description: multipart/form-data with one `file` part, at most 5 MB, at most 10 live attachments per expense (409). The type is taken from the file's magic bytes (JPEG, PNG, WebP, PDF); the client Content-Type is ignored and anything else is 400. 413 over 5 MB. The file name is sanitized for display only. 409 on an archived group.
+      tags: [Attachments]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Created (metadata only).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Attachment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {description: File larger than 5 MB}
+  /api/friends/{friendId}/expenses/{expenseId}/attachments/{itemId}:
+    parameters:
+    - {name: friendId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: expenseId, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: downloadPersonalAttachment
+      summary: Download the stored bytes
+      description: 'Streams the stored content type with Content-Disposition attachment, X-Content-Type-Options nosniff and Cache-Control private, no-store.'
+      tags: [Attachments]
+      responses:
+        '200':
+          description: The file.
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+            application/pdf: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: deletePersonalAttachment
+      summary: Remove your own attachment (soft delete)
+      description: Author or uploader only (403 for anyone else). 409 on an archived group.
+      tags: [Attachments]
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  # --- p07-p01 paths (insert below; parallel batch plan rule 3) ---
+  /api/search:
+    get:
+      operationId: searchLedger
+      tags: [History]
+      summary: Search the caller's expenses, settlements and refunds
+      description: Case-insensitive literal match (LIKE wildcards in q are escaped) over description, note,
+        category and the names of the people taking part. Same ordering, cursor and page bounds as history
+        (default 50, maximum 100). minAmount/maxAmount are minor units and are only accepted together with
+        currency; unlike currencies are never compared. Deleted entries and groups the caller left are never
+        returned. A groupId the caller is not in is 403; a personal ledger id is 404.
+      parameters:
+      - {name: q, in: query, schema: {type: string}}
+      - {name: groupId, in: query, schema: {type: string, format: uuid}}
+      - {name: friendId, in: query, description: A saved friend; narrows to entries both take part in., schema: {type: string, format: uuid}}
+      - {name: from, in: query, schema: {type: string, format: date}}
+      - {name: to, in: query, schema: {type: string, format: date}}
+      - {name: currency, in: query, schema: {type: string}}
+      - {name: minAmount, in: query, schema: {type: integer, format: int64}}
+      - {name: maxAmount, in: query, schema: {type: integer, format: int64}}
+      - {name: cursor, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: One page of matches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryPage'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/me/export:
+    get:
+      operationId: exportAccount
+      tags: [Profile]
+      summary: Stream the caller's data as a ZIP
+      description: profile.json, groups.json, personal-ledgers.json, groups/{id}.csv per accessible group and
+        personal/{id}.csv per personal ledger (history CSV format; deleted entries excluded). Only the
+        caller's own scopes, streamed and never buffered.
+      responses:
+        '200':
+          description: ZIP archive.
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+
 components:
   schemas:
     SaveFriendRequest:
@@ -1798,12 +3455,18 @@ components:
       allOf:
         - $ref: '#/components/schemas/FriendSummary'
         - type: object
-          required: [sharedGroups]
+          required: [sharedGroups, personalBalances]
           properties:
             sharedGroups:
               type: array
               items:
                 $ref: '#/components/schemas/FriendGroup'
+            personalBalances:
+              type: array
+              description: Non-group personal expense totals by currency, kept separate from
+                group scopes so neither is implied to belong to the other. `balances` is their sum.
+              items:
+                $ref: '#/components/schemas/FriendBalance'
 
     GroupType:
       type: string
@@ -1830,6 +3493,7 @@ components:
       - phone
       - avatarColor
       - preferredCurrency
+      - locale
       - createdAt
       properties:
         id:
@@ -1859,6 +3523,11 @@ components:
           default: '#12A57E'
         preferredCurrency:
           $ref: '#/components/schemas/Currency'
+        locale:
+          type: string
+          enum: [en, hi, es, fr]
+          default: en
+          description: UI language; backend error messages stay English
         createdAt:
           type: string
           format: date-time
@@ -1896,6 +3565,11 @@ components:
           anyOf:
           - $ref: '#/components/schemas/Currency'
           - type: 'null'
+        locale:
+          type:
+          - string
+          - 'null'
+          enum: [en, hi, es, fr, null]
 
     UserSummary:
       type: object
@@ -2132,6 +3806,19 @@ components:
           - type: 'null'
           description: Retained scoped unclaimed inactive identities. Explicitly reactivate the same ID for historical
             correction/recovery; old snapshots may omit this current metadata.
+        archivedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Set while the group is read-only; null when it is open. Old immutable create receipts can
+            omit this current metadata.
+        lifecycleVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque precondition advanced by archive, unarchive, delete and restore. Quote it back on
+            restore. Old immutable create receipts can omit it, which reads as the initial version.
 
     GroupSummary:
       type: object
@@ -2149,6 +3836,29 @@ components:
           format: int64
         simplifyDebts:
           type: boolean
+        archivedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Set while the group is read-only; null when it is open. Deleted groups are absent from
+            the ordinary list entirely.
+        lifecycleVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque lifecycle precondition; the recovery list carries the value a restore must quote back.
+
+    RestoreGroupRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The lifecycleVersion the client last read. Mandatory; a mismatch returns 409 and changes
+            nothing.
 
     SplitInput:
       type: object
@@ -2258,6 +3968,33 @@ components:
           - $ref: '#/components/schemas/Currency'
           - type: 'null'
           description: Required with amountMinor. Expense PUT cannot change the recorded currency.
+        contributions:
+          anyOf:
+          - type: array
+            items:
+              $ref: '#/components/schemas/ContributionInput'
+            minItems: 1
+          - type: 'null'
+          description: Who paid what. Null/omitted keeps the single-payer contract (paidByUserId paid
+            everything). A present list must include paidByUserId, sum exactly to the amount and name
+            unique active financial participants. A full-replace PUT without contributions on an
+            expense with several payers returns409.
+        paidOn:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: The user-chosen financial date. Omitted means the server's recording date at UTC.
+        method:
+          oneOf:
+          - $ref: '#/components/schemas/PaymentMethod'
+          - type: 'null'
+          description: Omitted means OTHER.
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
       oneOf:
       - required:
         - currency
@@ -2465,6 +4202,13 @@ components:
           minimum: 1
           maximum: 9007199254740991
           description: Integer minor units in the explicit currency.
+        contributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contribution'
+          description: Who paid what, ordered by display name. Always present on current reads; a
+            replayed pre-E03 create receipt may omit it (that expense has one payer). paidBy stays the
+            primary payer.
 
     ExpenseSummary:
       type: object
@@ -2474,6 +4218,7 @@ components:
       - amountCents
       - paidBy
       - participantCount
+      - payerCount
       - category
       - spentOn
       - viewerDeltaCents
@@ -2508,6 +4253,10 @@ components:
         participantCount:
           type: integer
           format: int64
+        payerCount:
+          type: integer
+          format: int64
+          description: Number of contributors; 1 for a single-payer expense.
         category:
           $ref: '#/components/schemas/ExpenseCategory'
         spentOn:
@@ -2541,7 +4290,7 @@ components:
           maximum: 9007199254740991
           description: 'The requesting member''s net for this expense: positive = they lent
 
-            (paid more than their share), negative = they borrowed, 0 = not involved
+            (contributed more than their share), negative = they borrowed, 0 = not involved
 
             '
 
@@ -2852,6 +4601,279 @@ components:
           minimum: 1
           maximum: 9007199254740991
           description: Integer minor units in the explicit currency.
+        paidOn:
+          type: string
+          format: date
+          description: The user-chosen financial date, distinct from createdAt. Backfilled from createdAt at UTC for
+            payments recorded before B01.
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
+        recordedBy:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+          description: Who recorded the settlement, independent of who paid. Null for a payment recorded before the
+            recorder was captured; never inferred.
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Opaque optimistic precondition. Send it as expectedVersion when correcting, deleting or
+            restoring this payment.
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Set when the settlement has been undone. A deleted payment is excluded from every balance,
+            obligation and feed, and keeps its revisions.
+
+    PaymentMethod:
+      type: string
+      enum: [CASH, BANK_TRANSFER, CARD, ONLINE, OTHER]
+      description: How the people involved moved the money themselves. Descriptive metadata only. SplitEasy records
+        a settlement and never transfers funds.
+
+    CorrectPaymentRequest:
+      type: object
+      required: [payerUserId, payeeUserId, amountMinor, paidOn, expectedVersion]
+      properties:
+        payerUserId:
+          type: string
+          format: uuid
+        payeeUserId:
+          type: string
+          format: uuid
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+        currency:
+          oneOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          description: Optional and immutable. Omit it, or send the payment's own currency; any other value is 409.
+        paidOn:
+          type: string
+          format: date
+        method:
+          oneOf:
+          - $ref: '#/components/schemas/PaymentMethod'
+          - type: 'null'
+          description: Omitted means OTHER.
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Recorded on the revision for attribution. It is not a replay contract, because expectedVersion already
+            makes a repeated correction 409 rather than applying twice.
+
+    RestorePaymentRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+
+    DeletedPayment:
+      type: object
+      required: [payment, deletedAt]
+      properties:
+        payment:
+          $ref: '#/components/schemas/PaymentResponse'
+        deletedAt:
+          type: string
+          format: date-time
+
+    PaymentRevision:
+      type: object
+      required: [action, recordedAt, version, after]
+      properties:
+        action:
+          type: string
+          enum: [IMPORTED, CREATED, CORRECTED, DELETED, RESTORED]
+        actor:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+          description: Null for an imported baseline, whose recorder is genuinely unknown.
+        recordedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        before:
+          oneOf:
+          - $ref: '#/components/schemas/PaymentResponse'
+          - type: 'null'
+        after:
+          $ref: '#/components/schemas/PaymentResponse'
+
+    RecordRefundRequest:
+      type: object
+      required: [amountMinor, currency, refundedOn]
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+          description: Positive minor units, at most what is left unrefunded on the expense.
+        currency:
+          $ref: '#/components/schemas/Currency'
+          description: Must equal the expense's immutable currency; any other value is 400.
+        refundedOn:
+          type: string
+          format: date
+        note:
+          type:
+          - string
+          - 'null'
+          maxLength: 280
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Keyed retry. An identical repeat returns the original 201, while a changed intent is 409.
+
+    RefundShare:
+      type: object
+      required: [user, shareMinor, currency]
+      properties:
+        user:
+          $ref: '#/components/schemas/ParticipantSummary'
+        shareMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How much this participant's expense debt falls because of the refund.
+        shareCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+
+    RefundResponse:
+      type: object
+      required: [id, expenseId, amountMinor, currency, receivedBy, refundedOn, createdAt, version, participants]
+      properties:
+        id:
+          type: string
+          format: uuid
+        expenseId:
+          type: string
+          format: uuid
+          description: The expense this refund reverses.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        amountCents:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          deprecated: true
+          description: USD-only compatibility alias; null for non-USD values.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        receivedBy:
+          $ref: '#/components/schemas/ParticipantSummary'
+          description: Who got the money back, the expense's payer at the moment of the refund, stored explicitly.
+        refundedOn:
+          type: string
+          format: date
+        note:
+          type:
+          - string
+          - 'null'
+        recordedBy:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        participants:
+          type: array
+          description: The stored allocation, pro rata by the expense's own shares with the receiving payer absorbing
+            the remainder. The shares sum exactly to amountMinor.
+          items:
+            $ref: '#/components/schemas/RefundShare'
+
+    RefundRevision:
+      type: object
+      required: [action, recordedAt, version, after]
+      properties:
+        action:
+          type: string
+          enum: [IMPORTED, CREATED, CORRECTED, DELETED, RESTORED]
+        actor:
+          oneOf:
+          - $ref: '#/components/schemas/UserSummary'
+          - type: 'null'
+        recordedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        operationId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        before:
+          oneOf:
+          - $ref: '#/components/schemas/RefundResponse'
+          - type: 'null'
+        after:
+          $ref: '#/components/schemas/RefundResponse'
 
     DashboardGroup:
       type: object
@@ -3509,6 +5531,267 @@ components:
       - claimed
       description: Atomic membership/roster plus optional immutable verified ownership link. Original money, IDs,
         split inputs, revisions and operation receipts do not change.
+
+    # --- g02-2 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h05 schemas (insert below; parallel batch plan rule 3) ---
+    HistoryItem:
+      type: object
+      required: [type, id, groupId, groupName, financialDate, description, currency, amountMinor, updatedAt]
+      properties:
+        type: {type: string, enum: [EXPENSE, PAYMENT, REFUND]}
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        groupName:
+          type: [string, 'null']
+          description: Null for a personal-ledger entry, which is not a group.
+        financialDate: {type: string, format: date}
+        description: {type: string}
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amountMinor: {type: integer, format: int64}
+        updatedAt: {type: string, format: date-time}
+    HistoryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+        nextCursor:
+          type: [string, 'null']
+
+    # --- e03 schemas (insert below; parallel batch plan rule 3) ---
+    Contribution:
+      type: object
+      required: [user, amountMinor, currency]
+      properties:
+        user:
+          $ref: '#/components/schemas/ParticipantSummary'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9007199254740991
+          description: Minor units this participant actually paid towards the expense.
+        currency:
+          $ref: '#/components/schemas/Currency'
+      description: Money one financial participant paid, as stored. Contributions sum exactly to the
+        expense amount; paidBy stays the primary payer and rounding recipient.
+    ContributionInput:
+      type: object
+      required: [userId, amountMinor]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Active financial participant who paid.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 1000000000000
+      description: Optional per-payer input. A present list is nonempty, duplicate-free, includes
+        paidByUserId, names only active financial participants, and sums exactly to amountMinor.
+
+    # --- e03-b schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- g02-3 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h03 schemas (insert below; parallel batch plan rule 3) ---
+    ActivityItem:
+      type: object
+      required: [id, seq, groupId, groupName, kind, subjectId, actor, summary, occurredAt]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer, format: int64}
+        groupId: {type: string, format: uuid}
+        groupName:
+          type: [string, 'null']
+          description: Null for a personal-ledger event.
+        kind:
+          type: string
+          description: EXPENSE_/PAYMENT_/REFUND_ + CREATED, REPLACED, DELETED or RESTORED; GROUP_ARCHIVED,
+            GROUP_UNARCHIVED, GROUP_DELETED, GROUP_RESTORED; MEMBER_ADDED, MEMBER_REMOVED, MEMBER_LEFT.
+        subjectId: {type: [string, 'null'], format: uuid}
+        actor:
+          type: [object, 'null']
+          description: The recorder (UserSummary), distinct from the payer.
+        summary:
+          type: object
+          description: Small snapshot, for example description, amountMinor, currency, payer, payee, version.
+        occurredAt: {type: string, format: date-time}
+    ActivityPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ActivityItem'}
+        nextCursor: {type: [string, 'null']}
+    NotificationItem:
+      type: object
+      required: [id, readAt, createdAt, event]
+      properties:
+        id: {type: string, format: uuid}
+        readAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+        event: {$ref: '#/components/schemas/ActivityItem'}
+    NotificationPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/NotificationItem'}
+        nextCursor: {type: [string, 'null']}
+    NotificationPreferences:
+      type: object
+      required: [expenses, payments, groupChanges]
+      properties:
+        expenses: {type: boolean}
+        payments: {type: boolean, description: Settlements and refunds.}
+        groupChanges: {type: boolean}
+
+    # --- b02 schemas (insert below; parallel batch plan rule 3) ---
+    SettlementAllocation:
+      type: object
+      required: [scopeId, payerId, payeeId, amountMinor]
+      properties:
+        scopeId: {type: string, format: uuid, description: Group ID, or the personal ledger's ID}
+        groupName: {type: [string, 'null'], description: Null for the personal ledger}
+        payerId: {type: string, format: uuid}
+        payeeId: {type: string, format: uuid}
+        amountMinor: {type: integer, format: int64, minimum: 1}
+        paymentId: {type: [string, 'null'], format: uuid, description: Set on commit responses only}
+    SettlementPreview:
+      type: object
+      required: [currency, allocations, skipped, netMinor]
+      properties:
+        currency: {$ref: '#/components/schemas/Currency'}
+        allocations:
+          type: array
+          items: {$ref: '#/components/schemas/SettlementAllocation'}
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [scopeId, reason]
+            properties:
+              scopeId: {type: string, format: uuid}
+              groupName: {type: [string, 'null']}
+              reason: {type: string}
+        netMinor: {type: integer, format: int64, description: Positive when the friend owes the requester}
+    CommitSettlementRequest:
+      type: object
+      required: [currency, allocations, operationId]
+      properties:
+        currency: {$ref: '#/components/schemas/Currency'}
+        allocations:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/SettlementAllocation'}
+        operationId: {type: string, format: uuid}
+        paidOn: {type: [string, 'null'], format: date}
+        method: {$ref: '#/components/schemas/PaymentMethod'}
+        note: {type: [string, 'null'], maxLength: 280}
+    SettlementResponse:
+      type: object
+      required: [id, currency, allocations, netMinor]
+      properties:
+        id: {type: string, format: uuid}
+        currency: {$ref: '#/components/schemas/Currency'}
+        allocations:
+          type: array
+          items: {$ref: '#/components/schemas/SettlementAllocation'}
+        netMinor: {type: integer, format: int64}
+
+    # --- a04 schemas (insert below; parallel batch plan rule 3) ---
+    CloseAccountRequest:
+      type: object
+      required: [currentPassword]
+      properties:
+        currentPassword:
+          type: string
+
+    # --- h04 schemas (insert below; parallel batch plan rule 3) ---
+    RecurringScheduleRequest:
+      type: object
+      required: [template, frequency, anchorDate, timeZone]
+      properties:
+        template:
+          description: The expense each occurrence creates; its date and operationId are ignored.
+          $ref: '#/components/schemas/CreateExpenseRequest'
+        frequency: {type: string, enum: [DAILY, WEEKLY, MONTHLY]}
+        anchorDate: {type: string, format: date, description: First occurrence, a local date in timeZone.}
+        timeZone: {type: string, description: IANA zone, for example Australia/Sydney.}
+        expectedVersion: {type: integer, format: int64, minimum: 0, description: Required on PUT.}
+        operationId: {type: string, format: uuid, description: Optional create retry key unique per requester and group. The same key with identical intent returns the original schedule; a changed intent is 409.}
+    RecurringSchedule:
+      type: object
+      required: [id, groupId, createdBy, template, frequency, anchorDate, timeZone, nextDate, version, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        createdBy: {type: string, format: uuid}
+        template: {$ref: '#/components/schemas/CreateExpenseRequest'}
+        frequency: {type: string, enum: [DAILY, WEEKLY, MONTHLY]}
+        anchorDate: {type: string, format: date}
+        timeZone: {type: string}
+        nextDate: {type: string, format: date}
+        version: {type: integer, format: int64}
+        status: {type: string, enum: [ACTIVE, NEEDS_REVIEW, CANCELLED]}
+        reviewReason: {type: [string, 'null']}
+        createdAt: {type: string, format: date-time}
+        cancelledAt: {type: [string, 'null'], format: date-time}
+    ReminderRequest:
+      type: object
+      required: [debtorId, currency]
+      properties:
+        debtorId: {type: string, format: uuid, description: The debtor's account ID.}
+        currency: {type: string, enum: [USD, EUR, GBP, INR, JPY, KWD]}
+    ReminderResponse:
+      type: object
+      required: [debtorId, currency, amountMinor]
+      properties:
+        debtorId: {type: string, format: uuid}
+        currency: {type: string, enum: [USD, EUR, GBP, INR, JPY, KWD]}
+        amountMinor: {type: integer, format: int64}
+
+    # --- c02 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h02 schemas (insert below; parallel batch plan rule 3) ---
+    CommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body: {type: string, minLength: 1, maxLength: 2000}
+    Comment:
+      type: object
+      required: [id, expenseId, author, body, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        expenseId: {type: string, format: uuid}
+        author: {$ref: '#/components/schemas/UserSummary'}
+        body: {type: string}
+        createdAt: {type: string, format: date-time}
+    Attachment:
+      type: object
+      description: Metadata only; bytes come from the download route.
+      required: [id, expenseId, uploadedBy, fileName, contentType, sizeBytes, sha256, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        expenseId: {type: string, format: uuid}
+        uploadedBy: {$ref: '#/components/schemas/UserSummary'}
+        fileName: {type: string, maxLength: 255}
+        contentType: {type: string, enum: [image/jpeg, image/png, image/webp, application/pdf]}
+        sizeBytes: {type: integer, format: int64, minimum: 1, maximum: 5242880}
+        sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        createdAt: {type: string, format: date-time}
+
+    # --- p07-p01 schemas (insert below; parallel batch plan rule 3) ---
 
   parameters:
     ParticipantVersion:

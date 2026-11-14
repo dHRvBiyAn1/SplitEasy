@@ -35,12 +35,13 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
   @Query(
       """
             select g.id as id, g.name as name, g.type as type, count(m2.id) as memberCount,
-                   g.simplifyDebts as simplifyDebts
+                   g.simplifyDebts as simplifyDebts, g.archivedAt as archivedAt,
+                   g.lifecycleVersion as lifecycleVersion
             from GroupMembership m1
             join m1.group g
             join GroupMembership m2 on m2.group = g
-            where m1.user.id = :userId
-            group by g.id, g.name, g.type, g.simplifyDebts, g.createdAt
+            where m1.user.id = :userId and g.deletedAt is null
+            group by g.id, g.name, g.type, g.simplifyDebts, g.archivedAt, g.lifecycleVersion, g.createdAt
             order by g.createdAt desc
             """)
   List<GroupSummaryView> findGroupSummariesForUser(@Param("userId") UUID userId);
@@ -56,5 +57,10 @@ public interface GroupMembershipRepository extends JpaRepository<GroupMembership
     long getMemberCount();
 
     boolean getSimplifyDebts();
+
+    /** Null while the group is open; set once it is archived and read-only (migration V19). */
+    java.time.Instant getArchivedAt();
+
+    long getLifecycleVersion();
   }
 }

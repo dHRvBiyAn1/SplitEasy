@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { NotificationService } from './notification/notification.service';
 import { storeTestSession } from './core/auth/auth-test-fixture';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -41,6 +43,11 @@ describe('overview read retry controls', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        // The bell's own read is covered in notification specs; shell specs verify other requests.
+        {
+          provide: NotificationService,
+          useValue: { unread: signal(0), revalidate: () => undefined },
+        },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'a' })) } },
       ],

@@ -1,0 +1,86 @@
+:host {
+  display: block;
+  margin-top: var(--space-5, 1.5rem);
+}
+.personal {
+  border: 1px dashed var(--line, #cfd8d6);
+  border-radius: var(--radius-lg, 1.25rem);
+  padding: var(--space-4, 1rem);
+  background: var(--surface-2, transparent);
+}
+.personal-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 0.75rem);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.personal h2,
+.personal h3 {
+  margin: 0 0 var(--space-1, 0.25rem);
+  font-size: 1.05rem;
+}
+.personal p {
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+.personal-form {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  margin: var(--space-3, 0.75rem) 0;
+}
+.personal-form label {
+  display: grid;
+  gap: var(--space-1, 0.25rem);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 0.75rem);
+}
+.row > label {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+legend {
+  padding: 0;
+  margin-bottom: var(--space-1, 0.25rem);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+.personal-list {
+  list-style: none;
+  margin: var(--space-3, 0.75rem) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+.personal-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) 0;
+  border-top: 1px solid var(--line, #cfd8d6);
+}
+.personal-list li > div:first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.empty {
+  color: var(--muted, #55605e);
+}
+button[aria-pressed='true'] {
+  border-color: var(--accent, currentColor);
+}

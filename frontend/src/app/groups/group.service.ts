@@ -62,8 +62,28 @@ export class GroupService {
     return this.api.delete<void>(`/groups/${groupId}/members/${memberId}`);
   }
 
-  /** Creator only; takes the group's expenses and payments with it. */
+  /** Creator only, recoverable: the group must be settled, and nothing financial is destroyed. */
   deleteGroup(groupId: string): Observable<void> {
     return this.api.delete<void>(`/groups/${groupId}`);
+  }
+
+  /** Makes the group read-only — reads and history stay, new entries stop. Any member. */
+  archiveGroup(groupId: string): Observable<GroupResponse> {
+    return this.api.post<GroupResponse>(`/groups/${groupId}/archive`, {});
+  }
+
+  /** Re-opens an archived group for new entries. Any member. */
+  unarchiveGroup(groupId: string): Observable<GroupResponse> {
+    return this.api.post<GroupResponse>(`/groups/${groupId}/unarchive`, {});
+  }
+
+  /** The creator's own recovery list of deleted groups. */
+  listDeletedGroups(): Observable<GroupSummary[]> {
+    return this.api.get<GroupSummary[]>('/groups/deleted');
+  }
+
+  /** Creator only; the expected version keeps a stale recovery screen from resurrecting a group. */
+  restoreGroup(groupId: string, expectedVersion: number): Observable<GroupResponse> {
+    return this.api.post<GroupResponse>(`/groups/${groupId}/restore`, { expectedVersion });
   }
 }

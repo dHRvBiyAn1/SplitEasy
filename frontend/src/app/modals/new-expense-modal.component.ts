@@ -1,3 +1,5 @@
+import { Frequency } from '../recurring/recurring.models';
+import { RecurringService } from '../recurring/recurring.service';
 import { formatMoney } from '../shared/money.component';
 import { ProfileService } from '../core/profile.service';
 import {
@@ -24,28 +26,83 @@ import {
   PendingWrite,
   PendingWriteError,
   PendingWritesService,
-  UNCERTAIN_WRITE,
+  uncertainWrite,
 } from '../core/pending-writes.service';
 import { ExpenseService } from '../expenses/expense.service';
-import { CreateExpenseRequest, SplitInput, SplitType } from '../expenses/expense.models';
+import {
+  ContributionInput,
+  CreateExpenseRequest,
+  SplitInput,
+  SplitType,
+} from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; ico: string }[] = [
-  { value: 'FOOD_DRINK', label: 'Food & drink', ico: '☕' },
-  { value: 'GROCERIES', label: 'Groceries', ico: '🧺' },
-  { value: 'RENT_HOME', label: 'Rent & home', ico: '⌂' },
-  { value: 'UTILITIES', label: 'Utilities', ico: '⚡' },
-  { value: 'TRAVEL', label: 'Travel', ico: '✈' },
-  { value: 'TRANSPORT', label: 'Transport', ico: '🚕' },
-  { value: 'FUN', label: 'Fun', ico: '✦' },
-  { value: 'OTHER', label: 'Other', ico: '◆' },
+  {
+    value: 'FOOD_DRINK',
+    get label() {
+      return translate('newExpenseModal.foodDrink');
+    },
+    ico: '☕',
+  },
+  {
+    value: 'GROCERIES',
+    get label() {
+      return translate('newExpenseModal.groceries');
+    },
+    ico: '🧺',
+  },
+  {
+    value: 'RENT_HOME',
+    get label() {
+      return translate('newExpenseModal.rentHome');
+    },
+    ico: '⌂',
+  },
+  {
+    value: 'UTILITIES',
+    get label() {
+      return translate('newExpenseModal.utilities');
+    },
+    ico: '⚡',
+  },
+  {
+    value: 'TRAVEL',
+    get label() {
+      return translate('newExpenseModal.travel');
+    },
+    ico: '✈',
+  },
+  {
+    value: 'TRANSPORT',
+    get label() {
+      return translate('newExpenseModal.transport');
+    },
+    ico: '🚕',
+  },
+  {
+    value: 'FUN',
+    get label() {
+      return translate('newExpenseModal.fun');
+    },
+    ico: '✦',
+  },
+  {
+    value: 'OTHER',
+    get label() {
+      return translate('groupSettings.other');
+    },
+    ico: '◆',
+  },
 ];
 
 @Component({
   selector: 'app-new-expense-modal',
-  imports: [ReactiveFormsModule, ModalShellComponent],
+  imports: [TranslatePipe, ReactiveFormsModule, ModalShellComponent],
   templateUrl: './new-expense-modal.component.html',
   styleUrl: './modals.scss',
 })
@@ -79,6 +136,7 @@ export class NewExpenseModalComponent {
   protected readonly retryNotice = signal<string | null>(null);
   private restored: PendingWrite<CreateExpenseRequest> | null = null;
   private readonly expenses = inject(ExpenseService);
+  private readonly recurring = inject(RecurringService);
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
@@ -101,9 +159,29 @@ export class NewExpenseModalComponent {
   });
   protected readonly amount = new FormControl<string | number | null>(null);
   protected readonly date = new FormControl(this.today(), { nonNullable: true });
+  /** New group expenses only: anything but NEVER creates a schedule instead of one expense. */
+  protected readonly repeat = signal<Frequency | 'NEVER'>('NEVER');
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
   protected readonly paidBy = signal<string>('');
   protected readonly splitType = signal<SplitType>('EQUAL');
+
+  /** Multi-payer mode: raw per-member amounts; blank excludes. paidBy stays the primary payer. */
+  protected readonly multiPayer = signal(false);
+  protected readonly payerValues = signal<Record<string, string>>({});
+  /** The loaded expense had several payers, so its PUT must always carry contributions. */
+  private hadMultiPayer = false;
+  private readonly serializedContributions = computed<ContributionInput[] | null>(() => {
+    const values = this.payerValues();
+    const rows: ContributionInput[] = [];
+    for (const member of this.members()) {
+      const raw = values[member.id]?.trim() ?? '';
+      if (raw === '') continue;
+      const amountMinor = amountToMinor(raw, this.currency(), false);
+      if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
+      rows.push({ userId: member.id, amountMinor });
+    }
+    return rows;
+  });
 
   /** EQUAL: member ids included. Custom modes: raw per-member input strings; blank excludes. */
   protected readonly included = signal<Set<string>>(new Set());
@@ -166,7 +244,7 @@ export class NewExpenseModalComponent {
         this.retryNotice.set(
           err instanceof PendingWriteError
             ? err.message
-            : 'Cannot read the saved retry draft. Check history before starting a separate entry.',
+            : translate('pendingWrites.cannotReadTheSaved'),
         );
       }
     }
@@ -180,7 +258,9 @@ export class NewExpenseModalComponent {
   }
 
   heading(): string {
-    return this.editId ? 'Edit expense' : 'New expense';
+    return this.editId
+      ? translate('newExpenseModal.editExpense')
+      : translate('newExpenseModal.newExpense');
   }
 
   private today(): string {
@@ -213,6 +293,8 @@ export class NewExpenseModalComponent {
     this.paidBy.set('');
     this.included.set(new Set());
     this.values.set({});
+    this.multiPayer.set(false);
+    this.payerValues.set({});
     if (!id) {
       return;
     }
@@ -232,7 +314,7 @@ export class NewExpenseModalComponent {
             this.included.set(new Set(this.members().map((m) => m.id)));
             if (this.restored?.scope === id) {
               this.restoreDraft(this.restored.request);
-              this.retryNotice.set(UNCERTAIN_WRITE);
+              this.retryNotice.set(uncertainWrite());
             }
             this.ready.set(true);
           }
@@ -240,7 +322,7 @@ export class NewExpenseModalComponent {
         error: () => {
           if (version !== this.groupRequestVersion) return;
           this.loadFailed.set(true);
-          this.error.set('Could not load group members.');
+          this.error.set(translate('addMemberModal.couldNotLoadGroup'));
         },
       });
   }
@@ -255,12 +337,16 @@ export class NewExpenseModalComponent {
           if (version !== this.groupRequestVersion) return;
           if (!Number.isSafeInteger(e.version) || e.version! < 0) {
             this.loadFailed.set(true);
-            this.error.set('Reload or upgrade the app to edit this expense safely.');
+            this.error.set(translate('newExpenseModal.reloadOrUpgradeThe'));
             return;
           }
           // Keep original alias rows and payer IDs; canonical defaults must not erase history.
           this.members.update((roster) => {
-            const originals = [e.paidBy, ...e.participants.map((p) => p.user)];
+            const originals = [
+              e.paidBy,
+              ...e.participants.map((p) => p.user),
+              ...(e.contributions ?? []).map((c) => c.user),
+            ];
             return [
               ...roster,
               ...originals.filter(
@@ -278,6 +364,18 @@ export class NewExpenseModalComponent {
           if (!this.date.dirty) this.date.setValue(e.spentOn);
           this.category.set(e.category);
           this.paidBy.set(e.paidBy.id);
+          if ((e.contributions?.length ?? 0) > 1) {
+            this.hadMultiPayer = true;
+            this.multiPayer.set(true);
+            this.payerValues.set(
+              Object.fromEntries(
+                e.contributions!.map((c) => [
+                  c.user.id,
+                  minorToDisplay(c.amountMinor, this.currency()),
+                ]),
+              ),
+            );
+          }
           this.included.set(new Set(e.participantUserIds ?? e.participants.map((p) => p.user.id)));
           if (e.splitType === 'EQUAL') {
             this.splitType.set('EQUAL');
@@ -304,7 +402,7 @@ export class NewExpenseModalComponent {
         error: () => {
           if (version !== this.groupRequestVersion) return;
           this.loadFailed.set(true);
-          this.error.set('Could not load the expense.');
+          this.error.set(translate('newExpenseModal.couldNotLoadThe'));
         },
       });
   }
@@ -314,7 +412,9 @@ export class NewExpenseModalComponent {
   }
 
   firstName(u: ParticipantSummary): string {
-    return this.ownedIds.includes(u.id) ? 'You' : u.displayName.split(/\s+/)[0];
+    return this.ownedIds.includes(u.id)
+      ? translate('dashboard.you')
+      : u.displayName.split(/\s+/)[0];
   }
 
   sameOwner(u: ParticipantSummary): boolean {
@@ -327,7 +427,8 @@ export class NewExpenseModalComponent {
   }
 
   memberLabel(u: ParticipantSummary): string {
-    return `${this.ownedIds.includes(u.id) ? 'You: ' : ''}${u.displayName}${u.email ? ` (${u.email})` : ' (guest)'}`;
+    const you = this.ownedIds.includes(u.id) ? translate('newExpenseModal.youLabel') + ' ' : '';
+    return `${you}${u.displayName}${u.email ? ` (${u.email})` : ' ' + translate('newExpenseModal.guest')}`;
   }
 
   initials(name: string): string {
@@ -355,6 +456,43 @@ export class NewExpenseModalComponent {
     this.tick.update((n) => n + 1);
   }
 
+  setPayerValue(id: string, v: string): void {
+    this.payerValues.update((m) => ({ ...m, [id]: v }));
+  }
+
+  /** Live remainder between the expense amount and what the payers have been given. */
+  payerRemainder(): string {
+    this.tick();
+    const rows = this.serializedContributions();
+    if (!rows) return translate('newExpenseModal.enterValidPositiveAmounts');
+    const diff = this.amountMinor() - rows.reduce((sum, r) => sum + r.amountMinor, 0);
+    if (!Number.isSafeInteger(diff)) return translate('newExpenseModal.enterTheExpenseAmount');
+    if (diff === 0) return translate('newExpenseModal.payerAmountsMatchThe');
+    return diff > 0
+      ? translate('newExpenseModal.diffLeftToAssign', { diff: this.display(diff) })
+      : translate('newExpenseModal.v1Over', { v1: this.display(-diff) });
+  }
+
+  /** Nonempty, positive and unique by construction; must include the primary payer and sum to the amount. */
+  payersValid(): boolean {
+    this.tick();
+    if (!this.multiPayer()) return true;
+    const rows = this.serializedContributions();
+    return (
+      !!rows?.length &&
+      rows.some((r) => r.userId === this.paidBy()) &&
+      rows.reduce((sum, r) => sum + r.amountMinor, 0) === this.amountMinor()
+    );
+  }
+
+  /** Undefined keeps the single-payer wire shape; a former multi-payer edit never omits it. */
+  private contributionsForRequest(): ContributionInput[] | undefined {
+    if (this.multiPayer()) return this.serializedContributions()!;
+    return this.hadMultiPayer
+      ? [{ userId: this.paidBy(), amountMinor: this.amountMinor() }]
+      : undefined;
+  }
+
   private amountMinor(): number {
     return amountToMinor(this.amount.value ?? '0', this.currency(), false);
   }
@@ -362,21 +500,27 @@ export class NewExpenseModalComponent {
   runningLabel(): string {
     this.tick();
     if (this.splitType() === 'EQUAL') {
-      return `Split equally among ${this.included().size}`;
+      return translate('newExpenseModal.splitEquallyAmongSize', { size: this.included().size });
     }
     if (this.splitType() === 'ADJUSTMENTS') {
       return this.adjustmentsValid()
-        ? `Adjustments total ${formatMoney(0, false, this.currency())}; final shares nonnegative`
-        : `Adjustments must total ${formatMoney(0, false, this.currency())} and leave final shares nonnegative`;
+        ? translate('newExpenseModal.adjustmentsTotalCurrencyFinal', {
+            currency: formatMoney(0, false, this.currency()),
+          })
+        : translate('newExpenseModal.adjustmentsMustTotalCurrency', {
+            currency: formatMoney(0, false, this.currency()),
+          });
     }
     if (this.splitType() === 'WEIGHTS') {
       const splits = this.serializedSplits();
       return splits
-        ? `${splits.reduce((sum, s) => sum + BigInt(s.value), 0n)} weight units`
-        : 'Enter positive whole weight units';
+        ? translate('newExpenseModal.weightUnitsTotal', {
+            total: String(splits.reduce((sum, s) => sum + BigInt(s.value), 0n)),
+          })
+        : translate('newExpenseModal.enterPositiveWholeWeight');
     }
     const total = this.assignedTotal();
-    if (total === undefined) return 'Enter valid nonnegative shares';
+    if (total === undefined) return translate('newExpenseModal.enterValidNonnegativeShares');
     if (this.splitType() === 'PERCENTAGE') {
       return `${minorToDisplay(total, 'USD')}% / 100%`;
     }
@@ -435,6 +579,7 @@ export class NewExpenseModalComponent {
       this.amountMinor() <= 1_000_000_000_000 &&
       !!this.paidBy() &&
       this.splitValid() &&
+      this.payersValid() &&
       !this.saving()
     );
   }
@@ -458,13 +603,61 @@ export class NewExpenseModalComponent {
       category: this.category(),
       spentOn: this.date.value,
     };
+    const contributions = this.contributionsForRequest();
+    const paid = contributions ? { ...base, contributions } : base;
     let req: CreateExpenseRequest;
     if (this.splitType() === 'EQUAL') {
-      req = { ...base, participantUserIds: [...this.included()] };
+      req = { ...paid, participantUserIds: [...this.included()] };
     } else {
-      req = { ...base, splitType: this.splitType(), splits: this.serializedSplits()! };
+      req = { ...paid, splitType: this.splitType(), splits: this.serializedSplits()! };
+    }
+    const frequency = this.repeat();
+    if (!this.editId && frequency !== 'NEVER') {
+      this.saveSchedule(gid, req, frequency);
+      return;
     }
     this.dispatch(gid, this.editId ? { ...req, expectedVersion: this.expectedVersion } : req);
+  }
+
+  private saveSchedule(gid: string, template: CreateExpenseRequest, frequency: Frequency): void {
+    const intent = {
+      template,
+      frequency,
+      anchorDate: this.date.value,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+    // One operationId per identical uncertain draft, so a retry cannot add a second schedule.
+    let pending: PendingWrite<typeof intent>;
+    try {
+      try {
+        pending = this.pendingWrites.prepare('recurring', gid, intent);
+      } catch (error) {
+        if ((error as Error).message !== uncertainWrite()) throw error;
+        this.pendingWrites.abandon('recurring'); // the draft changed: a new schedule, a new key
+        pending = this.pendingWrites.prepare('recurring', gid, intent);
+      }
+    } catch (error) {
+      this.error.set((error as Error).message);
+      return;
+    }
+    this.saving.set(true);
+    this.modal.setMutationPending(true);
+    this.error.set(null);
+    this.recurring
+      .create(gid, { ...intent, operationId: pending.operationId })
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.pendingWrites.complete('recurring', pending);
+          this.dashboard.refresh();
+          this.modal.close();
+        },
+        error: (err) => {
+          this.error.set(err?.error?.message ?? translate('newExpenseModal.couldNotSaveThe'));
+          this.saving.set(false);
+          this.modal.setMutationPending(false);
+        },
+      });
   }
 
   private dispatch(gid: string, req: CreateExpenseRequest): void {
@@ -475,7 +668,7 @@ export class NewExpenseModalComponent {
         this.restored = pending;
       } catch (error) {
         this.error.set((error as Error).message);
-        this.retryNotice.set(UNCERTAIN_WRITE);
+        this.retryNotice.set(uncertainWrite());
         return;
       }
     }
@@ -492,8 +685,8 @@ export class NewExpenseModalComponent {
         this.modal.close();
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not save the expense.');
-        if (!this.editId) this.retryNotice.set(UNCERTAIN_WRITE);
+        this.error.set(err?.error?.message ?? translate('newExpenseModal.couldNotSaveThe2'));
+        if (!this.editId) this.retryNotice.set(uncertainWrite());
         this.saving.set(false);
         this.modal.setMutationPending(false);
       },
@@ -512,12 +705,7 @@ export class NewExpenseModalComponent {
 
   abandonRetry(): void {
     if (this.saving() || this.session.version !== this.sessionVersion) return;
-    if (
-      !confirm(
-        'The previous expense may already have been saved. Check expense history first. Start a separate expense anyway?',
-      )
-    )
-      return;
+    if (!confirm(translate('newExpenseModal.thePreviousExpenseMay'))) return;
     try {
       this.pendingWrites.abandon('expense');
       this.restored = null;
@@ -526,15 +714,14 @@ export class NewExpenseModalComponent {
       this.unmappedOriginalIds.set([]);
       this.error.set(null);
     } catch {
-      this.error.set(
-        'Cannot clear the saved retry identity. Enable browser storage and try again.',
-      );
+      this.error.set(translate('personalExpenses.cannotClearTheSaved'));
     }
   }
 
   private restoreDraft(request: CreateExpenseRequest): void {
     const originalIds = [
       request.paidByUserId,
+      ...(request.contributions ?? []).map((c) => c.userId),
       ...(request.participantUserIds ?? []),
       ...(request.splits ?? []).map((s) => s.userId),
     ];
@@ -549,6 +736,17 @@ export class NewExpenseModalComponent {
     this.date.setValue(request.spentOn ?? this.today());
     this.category.set(request.category ?? 'OTHER');
     this.paidBy.set(request.paidByUserId);
+    if (request.contributions) {
+      this.multiPayer.set(true);
+      this.payerValues.set(
+        Object.fromEntries(
+          request.contributions.map((c) => [
+            c.userId,
+            minorToDisplay(c.amountMinor, this.currency()),
+          ]),
+        ),
+      );
+    }
     this.splitType.set(request.splitType ?? 'EQUAL');
     this.included.set(new Set(request.participantUserIds ?? []));
     this.values.set(

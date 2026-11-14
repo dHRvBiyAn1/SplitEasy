@@ -1,0 +1,53 @@
+@if (open().length) {
+  <section class="personal" aria-labelledby="settle-all-heading">
+    <h2 id="settle-all-heading">{{ 'friendSettleAll.settleEverything' | t }}</h2>
+    <p>
+      {{ 'friendSettleAll.recordsOnePaymentIn' | t }}
+    </p>
+    @if (!review()) {
+      @for (balance of open(); track balance.currency) {
+        <button
+          class="dc-btn-ghost"
+          type="button"
+          [disabled]="busy()"
+          (click)="start(balance.currency)"
+        >
+          {{ 'friendSettleAll.settleAllInCurrency' | t: { currency: balance.currency } }}
+        </button>
+      }
+    }
+    @if (message(); as text) {
+      <p role="alert">{{ text }}</p>
+    }
+    @if (review(); as preview) {
+      @if (preview.allocations.length) {
+        <ul class="personal-list">
+          @for (a of preview.allocations; track a.scopeId) {
+            <li>
+              <strong>{{ a.groupName ?? ('personalPayments.personal' | t) }}</strong>
+              <span>{{ pays(a.payerId) }}</span>
+              <app-money [minor]="a.amountMinor" [currency]="preview.currency" />
+            </li>
+          }
+        </ul>
+        <p>
+          {{ 'friendSettleAll.net' | t }}
+          <app-money [minor]="preview.netMinor" [currency]="preview.currency" [net]="true" />
+        </p>
+      } @else {
+        <p>{{ 'friendSettleAll.nothingToSettleIn' | t: { currency: preview.currency } }}</p>
+      }
+      @for (s of preview.skipped; track s.scopeId) {
+        <p>{{ s.groupName ?? ('personalPayments.personal' | t) }} was skipped: {{ s.reason }}.</p>
+      }
+      @if (preview.allocations.length) {
+        <button class="dc-btn" type="button" [disabled]="busy()" (click)="confirm(preview)">
+          {{ 'friendSettleAll.confirm' | t }}
+        </button>
+      }
+      <button class="dc-btn-ghost" type="button" [disabled]="busy()" (click)="cancel()">
+        {{ 'common.cancel' | t }}
+      </button>
+    }
+  </section>
+}

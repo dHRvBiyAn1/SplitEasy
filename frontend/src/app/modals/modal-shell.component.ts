@@ -10,13 +10,14 @@ import {
   output,
   viewChild,
 } from '@angular/core';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 
 let nextDialogId = 0;
 
 /** One named, scroll-contained, keyboard-trapped surface for every application modal. */
 @Component({
   selector: 'app-modal-shell',
-  imports: [CdkTrapFocus],
+  imports: [TranslatePipe, CdkTrapFocus],
   templateUrl: './modal-shell.component.html',
   styleUrl: './modal-shell.component.scss',
 })

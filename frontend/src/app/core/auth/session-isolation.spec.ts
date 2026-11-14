@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { NotificationService } from '../../notification/notification.service';
 import { testJwt } from './auth-test-fixture';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -85,6 +87,11 @@ describe('account session isolation', () => {
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
+        // The bell's own read is covered in notification specs; shell specs verify other requests.
+        {
+          provide: NotificationService,
+          useValue: { unread: signal(0), revalidate: () => undefined },
+        },
         provideRouter([]),
       ],
     });

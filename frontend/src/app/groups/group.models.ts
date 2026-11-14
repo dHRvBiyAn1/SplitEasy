@@ -7,6 +7,10 @@ export interface GroupSummary {
   name: string;
   type: GroupType;
   memberCount: number;
+  /** Set while the group is read-only; null or absent when it is open (migration V19). */
+  archivedAt?: string | null;
+  /** Restore precondition, carried by the creator's recovery list. */
+  lifecycleVersion?: number;
 }
 
 export interface GroupResponse {
@@ -22,6 +26,10 @@ export interface GroupResponse {
   /** Group-wide: settle-up uses suggested netted transfers for this group. */
   simplifyDebts: boolean;
   createdAt: string;
+  /** Set while the group is read-only: reads keep working, new entries do not. */
+  archivedAt?: string | null;
+  /** Opaque precondition a restore must quote back. */
+  lifecycleVersion?: number;
 }
 
 /** Partial update from the settings page — omitted fields are left untouched. */

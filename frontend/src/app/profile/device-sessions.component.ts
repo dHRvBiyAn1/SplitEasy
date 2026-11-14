@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
@@ -6,19 +5,24 @@ import { takeUntil } from 'rxjs';
 import { DeviceSession } from '../core/auth/auth.models';
 import { AuthService } from '../core/auth/auth.service';
 import { SessionService } from '../core/auth/session.service';
+import { LocaleDatePipe } from '../core/i18n/locale-date.pipe';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 @Component({
   selector: 'app-device-sessions',
-  imports: [DatePipe],
+  imports: [TranslatePipe, LocaleDatePipe],
   template: `
     <section class="dc-card" aria-labelledby="device-sessions-title">
-      <h2 id="device-sessions-title">Devices and sessions</h2>
-      <p>Tabs in the same browser share a sign-in. Sign out any device you no longer use.</p>
+      <h2 id="device-sessions-title">{{ 'deviceSessions.devicesAndSessions' | t }}</h2>
+      <p>{{ 'deviceSessions.tabsInTheSame' | t }}</p>
       <button type="button" class="dc-btn-outline" [disabled]="busy()" (click)="load()">
-        {{ opened() ? 'Refresh sessions' : 'Manage sessions' }}
+        {{
+          opened() ? ('deviceSessions.refreshSessions' | t) : ('deviceSessions.manageSessions' | t)
+        }}
       </button>
       @if (busy()) {
-        <p role="status">Updating sessions…</p>
+        <p role="status">{{ 'deviceSessions.updatingSessions' | t }}</p>
       }
       @if (error()) {
         <p role="alert">{{ error() }}</p>
@@ -33,12 +37,18 @@ import { SessionService } from '../core/auth/session.service';
               <div>
                 <strong>{{ device.deviceLabel }}</strong>
                 @if (device.current) {
-                  <span> — This device</span>
+                  <span> {{ 'deviceSessions.thisDevice' | t }}</span>
                 }
                 <p [id]="'session-details-' + device.id">
-                  Created {{ device.createdAt | date: 'medium' }}. Last renewed
-                  {{ device.refreshedAt | date: 'medium' }}. Expires
-                  {{ device.expiresAt | date: 'medium' }}.
+                  {{
+                    'deviceSessions.createdV1LastRenewed'
+                      | t
+                        : {
+                            v1: (device.createdAt | ldate),
+                            v2: (device.refreshedAt | ldate),
+                            v3: (device.expiresAt | ldate),
+                          }
+                  }}
                 </p>
               </div>
               <button
@@ -46,18 +56,24 @@ import { SessionService } from '../core/auth/session.service';
                 class="dc-btn-outline"
                 [disabled]="busy()"
                 [attr.aria-label]="
-                  device.current ? 'Sign out this device' : 'Sign out ' + device.deviceLabel
+                  device.current
+                    ? ('deviceSessions.signOutThisDevice' | t)
+                    : ('deviceSessions.signOutName' | t: { name: device.deviceLabel })
                 "
                 [attr.aria-describedby]="'session-details-' + device.id"
                 (click)="revoke(device)"
               >
-                {{ device.current ? 'Sign out this device' : 'Sign out device' }}
+                {{
+                  device.current
+                    ? ('deviceSessions.signOutThisDevice' | t)
+                    : ('deviceSessions.signOutDevice' | t)
+                }}
               </button>
             </li>
           }
         </ul>
         <button type="button" class="dc-btn-outline" [disabled]="busy()" (click)="logoutAll()">
-          Sign out all devices
+          {{ 'deviceSessions.signOutAllDevices' | t }}
         </button>
       }
     </section>
@@ -134,7 +150,7 @@ export class DeviceSessionsComponent {
         },
         error: () => {
           this.busy.set(false);
-          this.error.set('Unable to load sessions. Refresh sessions to try again.');
+          this.error.set(translate('deviceSessions.unableToLoadSessions'));
         },
       });
   }
@@ -164,11 +180,11 @@ export class DeviceSessionsComponent {
             devices.filter((candidate) => candidate.id !== device.id),
           );
           this.busy.set(false);
-          this.message.set('Device signed out.');
+          this.message.set(translate('deviceSessions.deviceSignedOut'));
         },
         error: () => {
           this.busy.set(false);
-          this.error.set('Device sign-out could not be confirmed. Try again or refresh sessions.');
+          this.error.set(translate('deviceSessions.deviceSignOutCould'));
         },
       });
   }

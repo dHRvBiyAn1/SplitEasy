@@ -28,6 +28,7 @@ public class FriendService {
   private final GroupWriteGuard writes;
   private final BalanceService balances;
   private final PairwiseBalanceService pairwise;
+  private final com.spliteasy.repository.PersonalLedgerRepository personalLedgers;
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<FriendSummary> list(UUID owner) {
@@ -55,10 +56,12 @@ public class FriendService {
         summary.hasOpenObligations(),
         summary.balances(),
         shared.stream()
+            .filter(g -> !g.personal())
             .map(
                 g ->
                     new FriendDetail.SharedGroup(g.id(), g.name(), g.simplifyDebts(), g.balances()))
-            .toList());
+            .toList(),
+        shared.stream().filter(SharedScope::personal).flatMap(g -> g.balances().stream()).toList());
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -69,7 +72,10 @@ public class FriendService {
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public FriendSummary save(UUID owner, SaveFriendRequest request) {
-    writes.lockForMember(request.groupId(), owner);
+    // A private bookmark is not a group entry, so an archived group can still be saved from.
+    // A personal ledger is not addressable as a group, even by its two members.
+    if (writes.lockForMemberAllowingArchived(request.groupId(), owner).isPersonal())
+      throw new NotFoundException("Group not found");
     ParticipantContract.requireEnabled();
     var original = participants.originals(request.groupId()).get(request.participantId());
     if (original == null
@@ -96,12 +102,18 @@ public class FriendService {
     return summary(saved, shared);
   }
 
+  /** A real shared group, or the pair's personal ledger when {@code personal}. */
   private record SharedScope(
-      UUID id, String name, boolean simplifyDebts, List<FriendBalance> balances) {}
+      UUID id,
+      String name,
+      boolean simplifyDebts,
+      List<FriendBalance> balances,
+      boolean personal) {}
 
   private Map<UUID, List<SharedScope>> scopes(UUID owner, Set<UUID> targets) {
     Map<UUID, List<SharedScope>> result = new HashMap<>();
     if (targets.isEmpty()) return result;
+    var personal = personalLedgers.ledgersOf(owner);
     // ponytail: one pass over the owner's groups; batch aggregates if group counts warrant it.
     for (var group : memberships.findGroupSummariesForUser(owner)) {
       var present =
@@ -126,7 +138,13 @@ public class FriendService {
                 .toList();
         result
             .computeIfAbsent(target, ignored -> new ArrayList<>())
-            .add(new SharedScope(group.getId(), group.getName(), group.getSimplifyDebts(), rows));
+            .add(
+                new SharedScope(
+                    group.getId(),
+                    group.getName(),
+                    group.getSimplifyDebts(),
+                    rows,
+                    personal.contains(group.getId())));
       }
     }
     return result;
@@ -140,7 +158,7 @@ public class FriendService {
         saved.friendAccountId(),
         saved.displayNameSnapshot(),
         saved.createdAt(),
-        scopes.size(),
+        (int) scopes.stream().filter(g -> !g.personal()).count(),
         scopes.stream().flatMap(g -> g.balances().stream()).anyMatch(b -> b.netMinor() != 0),
         totals.entrySet().stream().map(e -> new FriendBalance(e.getKey(), e.getValue())).toList());
   }

@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { AuthService } from '../core/auth/auth.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { DashboardResponse } from '../dashboard/dashboard.models';
+import { FriendService } from '../friends/friend.service';
 import { PaymentService } from '../payments/payment.service';
 import { ModalService } from './modal.service';
 import { SettleUpModalComponent } from './settle-up-modal.component';
@@ -45,6 +46,7 @@ describe('SettleUpModalComponent', () => {
   let fixture: ComponentFixture<SettleUpModalComponent>;
   let modal: ModalService;
   let recordPayment: ReturnType<typeof vi.fn>;
+  let recordPersonalPayment: ReturnType<typeof vi.fn>;
   let data: ReturnType<typeof signal<DashboardResponse>>;
 
   function rows(): HTMLElement[] {
@@ -60,6 +62,7 @@ describe('SettleUpModalComponent', () => {
 
   beforeEach(() => {
     recordPayment = vi.fn().mockReturnValue(of({}));
+    recordPersonalPayment = vi.fn().mockReturnValue(of({}));
     data = signal(dashboardData);
 
     TestBed.configureTestingModule({
@@ -70,6 +73,7 @@ describe('SettleUpModalComponent', () => {
           useValue: { data, refresh: vi.fn(), loading: signal(false), error: signal(false) },
         },
         { provide: PaymentService, useValue: { recordPayment } },
+        { provide: FriendService, useValue: { recordPersonalPayment } },
         { provide: AuthService, useValue: { user: signal(me) } },
       ],
     });
@@ -156,6 +160,26 @@ describe('SettleUpModalComponent', () => {
       'g1',
       { payerUserId: priya.id, payeeUserId: me.id, amountMinor: 1250, currency: 'USD' },
       { groupId: 'g1', groupName: 'Maple St. House', counterparty: priya, netMinor: 3000 },
+    );
+  });
+
+  it('records a personal settlement through the friend ledger, not a group', async () => {
+    const prefill = {
+      friendId: 'pat',
+      groupName: 'Personal',
+      counterparty: { id: 'pat', displayName: 'Pat', email: null },
+      netMinor: -500,
+      currency: 'USD' as const,
+    };
+    modal.openSettle(prefill);
+    await render();
+    fixture.nativeElement.querySelector('.dc-btn-accent').click();
+
+    expect(recordPayment).not.toHaveBeenCalled();
+    expect(recordPersonalPayment).toHaveBeenCalledWith(
+      'pat',
+      { payerUserId: me.id, payeeUserId: 'pat', amountMinor: 500, currency: 'USD' },
+      prefill,
     );
   });
 

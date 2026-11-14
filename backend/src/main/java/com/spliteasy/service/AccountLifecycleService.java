@@ -89,6 +89,7 @@ public class AccountLifecycleService {
   @Transactional
   public void requestEmailChange(UUID userId, EmailChange request) {
     mail.requireConfigured();
+    AccountClosureService.requireNotReserved(request.email());
     User user = lock(userId);
     requireCurrentPassword(user, request.currentPassword());
     if (user.getEmail().equals(request.email()))

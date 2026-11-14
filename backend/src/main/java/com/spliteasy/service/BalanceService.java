@@ -2,6 +2,7 @@ package com.spliteasy.service;
 
 import com.spliteasy.dto.balance.GroupBalancesResponse;
 import com.spliteasy.dto.balance.MemberBalance;
+import com.spliteasy.repository.ExpenseContributionRepository;
 import com.spliteasy.repository.ExpenseParticipantRepository;
 import com.spliteasy.repository.ExpenseRepository;
 import com.spliteasy.repository.PaymentRepository;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,9 +41,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class BalanceService {
 
   private final ExpenseRepository expenseRepository;
+  private final ExpenseContributionRepository contributionRepository;
   private final ExpenseParticipantRepository participantRepository;
   private final FinancialParticipantService financialParticipants;
   private final PaymentRepository paymentRepository;
+  private final com.spliteasy.repository.ExpenseRefundRepository refundRepository;
   private final MembershipGuard membershipGuard;
 
   // Public reads share one snapshot; guarded writes join their stable, group-locked ledger.
@@ -56,15 +60,29 @@ public class BalanceService {
 
   // Invitation preview owns a verified capability; other callers first authorize membership.
   GroupBalancesResponse snapshot(UUID groupId) {
-    Map<CurrencyUser, Long> paid = toMap(groupId, expenseRepository.sumPaidByGroup(groupId));
+    Map<CurrencyUser, Long> paid =
+        toMap(
+            groupId,
+            Stream.concat(
+                    expenseRepository.sumPaidByGroup(groupId).stream(),
+                    contributionRepository.sumPaidMultiByGroup(groupId).stream())
+                .toList());
     Map<CurrencyUser, Long> owed = toMap(groupId, participantRepository.sumOwedByGroup(groupId));
     Map<CurrencyUser, Long> settledOut = toMap(groupId, paymentRepository.sumPaidByGroup(groupId));
     Map<CurrencyUser, Long> settledIn =
         toMap(groupId, paymentRepository.sumReceivedByGroup(groupId));
+    // A refund reverses expense economics: the receiving payer paid less, and each participant
+    // owes less by their stored allocation. Both sums cancel, so balances still sum to zero.
+    Map<CurrencyUser, Long> refundReceived =
+        toMap(groupId, refundRepository.sumReceivedByGroup(groupId));
+    Map<CurrencyUser, Long> refundAllocated =
+        toMap(groupId, refundRepository.sumAllocatedByGroup(groupId));
     Set<CurrencyUser> keys = new HashSet<>(paid.keySet());
     keys.addAll(owed.keySet());
     keys.addAll(settledOut.keySet());
     keys.addAll(settledIn.keySet());
+    keys.addAll(refundReceived.keySet());
+    keys.addAll(refundAllocated.keySet());
     Set<UUID> ledgerIds = keys.stream().map(CurrencyUser::userId).collect(Collectors.toSet());
     var people = financialParticipants.resolve(groupId, ledgerIds);
     var currencies = keys.stream().map(CurrencyUser::currency).collect(Collectors.toSet());
@@ -81,10 +99,14 @@ public class BalanceService {
                               long net =
                                   Math.subtractExact(
                                       Math.addExact(
-                                          paid.getOrDefault(key, 0L),
+                                          Math.subtractExact(
+                                              paid.getOrDefault(key, 0L),
+                                              refundReceived.getOrDefault(key, 0L)),
                                           settledOut.getOrDefault(key, 0L)),
                                       Math.addExact(
-                                          owed.getOrDefault(key, 0L),
+                                          Math.subtractExact(
+                                              owed.getOrDefault(key, 0L),
+                                              refundAllocated.getOrDefault(key, 0L)),
                                           settledIn.getOrDefault(key, 0L)));
                               return new MemberBalance(user, net, currency);
                             }))

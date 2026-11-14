@@ -234,3 +234,44 @@
     flex-basis: 160px;
   }
 }
+
+// Archived notice and the group-type selector — tokens only, no literals.
+.gset__archived {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-card);
+  background: var(--surface2);
+  color: var(--ink2);
+  font-size: 13px;
+}
+
+.grow--stack {
+  flex-wrap: wrap;
+}
+
+.gtypes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+
+.gtype {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink2);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  &--on {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+}

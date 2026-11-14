@@ -2,18 +2,18 @@
   <form class="mform" (submit)="$event.preventDefault(); save()">
     @if (!createdGroupId()) {
       <div class="mform__field">
-        <label class="dc-field-label" for="ng-name">Group name</label>
+        <label class="dc-field-label" for="ng-name">{{ 'common.groupName' | t }}</label>
         <input
           id="ng-name"
           class="dc-field"
           [formControl]="name"
-          placeholder="e.g. Ski weekend"
+          [placeholder]="'newGroupModal.eGSkiWeekend' | t"
           autocomplete="off"
         />
       </div>
 
       <div class="mform__field">
-        <span class="dc-field-label">Type</span>
+        <span class="dc-field-label">{{ 'newGroupModal.type' | t }}</span>
         <div class="chips">
           @for (t of types; track t.value) {
             <button
@@ -30,7 +30,7 @@
       </div>
 
       <div class="mform__field">
-        <span class="dc-field-label">Members (by email)</span>
+        <span class="dc-field-label">{{ 'newGroupModal.membersByEmail' | t }}</span>
         @if (emails().length) {
           <div class="chips">
             @for (e of emails(); track e) {
@@ -40,7 +40,7 @@
                   type="button"
                   class="chip__x"
                   (click)="removeEmail(e)"
-                  [attr.aria-label]="'Remove ' + e"
+                  [attr.aria-label]="'groupSettings.removeName' | t: { name: e }"
                 >
                   ✕
                 </button>
@@ -53,30 +53,32 @@
             class="dc-field"
             [formControl]="emailInput"
             type="email"
-            aria-label="Member email"
-            placeholder="friend@example.com"
+            [attr.aria-label]="'newGroupModal.memberEmail' | t"
+            [placeholder]="'common.friendExampleCom' | t"
             (keydown.enter)="$event.preventDefault(); addEmail()"
           />
-          <button type="button" class="dc-btn-outline" (click)="addEmail()">Add</button>
+          <button type="button" class="dc-btn-outline" (click)="addEmail()">
+            {{ 'common.add' | t }}
+          </button>
         </div>
       </div>
     } @else {
       <div role="status" aria-live="polite">
-        <p>Group created. Your group and added members have been kept.</p>
+        <p>{{ 'newGroupModal.groupCreatedYourGroup' | t }}</p>
         @if (saving()) {
-          <p>Adding members…</p>
+          <p>{{ 'newGroupModal.addingMembers' | t }}</p>
         } @else {
           <p>
             {{
               failedEmails().length
-                ? 'Some members could not be added.'
-                : 'All requested members were added.'
+                ? ('newGroupModal.someMembersCouldNot' | t)
+                : ('newGroupModal.allRequestedMembersWere' | t)
             }}
           </p>
         }
         <ul>
           @for (result of results(); track result.email) {
-            <li>{{ result.email }} — {{ result.reason ?? 'Added' }}</li>
+            <li>{{ result.email }} — {{ result.reason ?? ('newGroupModal.added' | t) }}</li>
           }
         </ul>
       </div>
@@ -85,10 +87,10 @@
     @if (retryNotice() && !createdGroupId()) {
       <p role="status">{{ retryNotice() }}</p>
       <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="retryOriginal()">
-        Retry original group
+        {{ 'newGroupModal.retryOriginalGroup' | t }}
       </button>
       <button type="button" class="dc-btn-outline" [disabled]="saving()" (click)="abandonRetry()">
-        Start a separate group
+        {{ 'newGroupModal.startASeparateGroup' | t }}
       </button>
     }
     @if (error()) {
@@ -99,16 +101,18 @@
       @if (createdGroupId()) {
         @if (failedEmails().length) {
           <button type="submit" class="dc-btn-outline" [disabled]="saving()">
-            Retry failed additions
+            {{ 'newGroupModal.retryFailedAdditions' | t }}
           </button>
         }
         <button type="button" class="dc-btn-accent" [disabled]="saving()" (click)="viewGroup()">
-          View group
+          {{ 'newGroupModal.viewGroup' | t }}
         </button>
       } @else {
-        <button type="button" class="dc-btn-outline" (click)="close()">Cancel</button>
+        <button type="button" class="dc-btn-outline" (click)="close()">
+          {{ 'common.cancel' | t }}
+        </button>
         <button type="submit" class="dc-btn-accent" [disabled]="name.invalid || saving()">
-          Create group
+          {{ 'newGroupModal.createGroup' | t }}
         </button>
       }
     </div>

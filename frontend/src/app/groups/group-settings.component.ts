@@ -15,6 +15,9 @@ import { formatMoney } from '../shared/money.component';
 import { ModalService } from '../modals/modal.service';
 import { GroupService } from './group.service';
 import { GroupResponse } from './group.models';
+import { GroupType } from '../dashboard/dashboard.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { translate } from '../core/i18n/i18n.service';
 
 /** Which destructive action is showing its inline "Yes, …/Cancel" confirm. */
 type Confirming = 'leave' | 'delete' | null;
@@ -26,7 +29,7 @@ type Confirming = 'leave' | 'delete' | null;
  */
 @Component({
   selector: 'app-group-settings',
-  imports: [RouterLink, ReactiveFormsModule, GroupArtComponent],
+  imports: [TranslatePipe, RouterLink, ReactiveFormsModule, GroupArtComponent],
   templateUrl: './group-settings.component.html',
   styleUrl: './group-settings.component.scss',
 })
@@ -69,6 +72,44 @@ export class GroupSettingsComponent implements OnInit {
   protected readonly savingName = signal(false);
 
   protected readonly savingSimplify = signal(false);
+  protected readonly savingType = signal(false);
+  protected readonly savingArchive = signal(false);
+
+  /** Archived groups are read-only: history stays readable, new entries are refused. */
+  protected readonly archived = computed(() => !!this.group()?.archivedAt);
+
+  protected readonly groupTypes: { value: GroupType; label: string }[] = [
+    {
+      value: 'HOME',
+      get label() {
+        return translate('groupSettings.home');
+      },
+    },
+    {
+      value: 'TRIP',
+      get label() {
+        return translate('groupSettings.trip');
+      },
+    },
+    {
+      value: 'DINING',
+      get label() {
+        return translate('groupSettings.dining');
+      },
+    },
+    {
+      value: 'EVENT',
+      get label() {
+        return translate('groupSettings.event');
+      },
+    },
+    {
+      value: 'OTHER',
+      get label() {
+        return translate('groupSettings.other');
+      },
+    },
+  ];
   protected readonly confirming = signal<Confirming>(null);
   protected readonly busy = signal(false);
 
@@ -92,6 +133,8 @@ export class GroupSettingsComponent implements OnInit {
       this.nameControl.reset('');
       this.savingName.set(false);
       this.savingSimplify.set(false);
+      this.savingType.set(false);
+      this.savingArchive.set(false);
       this.confirming.set(null);
       this.busy.set(false);
       this.error.set(null);
@@ -112,6 +155,8 @@ export class GroupSettingsComponent implements OnInit {
       this.group.set(null);
       this.savingName.set(false);
       this.savingSimplify.set(false);
+      this.savingType.set(false);
+      this.savingArchive.set(false);
       this.busy.set(false);
       this.groupId = id;
       this.loading.set(true);
@@ -148,8 +193,8 @@ export class GroupSettingsComponent implements OnInit {
         if (err?.status === 403 || err?.status === 404) this.group.set(null);
         this.error.set(
           err?.status === 403
-            ? 'You are not a member of this group.'
-            : 'Could not load this group, its balances and obligations.',
+            ? translate('groupDetail.youAreNotA')
+            : translate('groupSettings.couldNotLoadThis'),
         );
         this.loading.set(false);
       },
@@ -201,23 +246,27 @@ export class GroupSettingsComponent implements OnInit {
   /** Why this member can't be removed, or null when they can be. */
   blockedReason(userId: string): string | null {
     if (!this.financialsReady()) {
-      return 'Balances and obligations are unavailable';
+      return translate('groupSettings.balancesAndObligationsAre2');
     }
     if (this.group()?.createdBy.id === userId) {
-      return 'Created this group';
+      return translate('groupSettings.createdThisGroup');
     }
     const balances = this.balancesOf(userId).filter((b) => b.netMinor !== 0);
     if (balances.length > 1)
-      return (
-        'Outstanding balances: ' +
-        balances.map((b) => this.display(b.netMinor, b.currency, true)).join('; ')
-      );
+      return translate('groupSettings.outstandingBalances', {
+        list: balances.map((b) => this.display(b.netMinor, b.currency, true)).join('; '),
+      });
     if (balances.length === 1) {
       const balance = balances[0];
-      return `${balance.netMinor > 0 ? 'Is owed' : 'Owes'} ${this.display(Math.abs(balance.netMinor), balance.currency)}`;
+      return translate(
+        balance.netMinor > 0 ? 'groupSettings.isOwedAmount' : 'groupSettings.owesAmount',
+        {
+          amount: this.display(Math.abs(balance.netMinor), balance.currency),
+        },
+      );
     }
     if (this.obligationsOf(userId).length) {
-      return 'Has outstanding obligations';
+      return translate('groupSettings.hasOutstandingObligations');
     }
     return null;
   }
@@ -236,7 +285,7 @@ export class GroupSettingsComponent implements OnInit {
   saveName(): void {
     const name = this.nameControl.value.trim();
     if (!name || this.savingName()) {
-      this.error.set('Group name cannot be blank.');
+      this.error.set(translate('groupSettings.groupNameCannotBe'));
       return;
     }
     if (name === this.group()?.name) {
@@ -252,7 +301,7 @@ export class GroupSettingsComponent implements OnInit {
         this.dashboard.refresh(); // the sidebar and cards show the name too
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not rename the group.');
+        this.error.set(err?.error?.message ?? translate('groupSettings.couldNotRenameThe'));
         this.savingName.set(false);
       },
     });
@@ -260,6 +309,7 @@ export class GroupSettingsComponent implements OnInit {
 
   // ── Members ───────────────────────────────────────────────────────────────
   addMember(): void {
+    if (this.archived()) return; // A new participant is a new entry.
     this.modal.openAddMember(this.groupId);
   }
 
@@ -274,7 +324,7 @@ export class GroupSettingsComponent implements OnInit {
         this.dashboard.refresh(); // also re-reads this group
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not remove that member.');
+        this.error.set(err?.error?.message ?? translate('groupSettings.couldNotRemoveThat'));
         this.busy.set(false);
       },
     });
@@ -296,8 +346,57 @@ export class GroupSettingsComponent implements OnInit {
         this.dashboard.refresh(); // also rechecks group eligibility independently
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not change that setting.');
+        this.error.set(err?.error?.message ?? translate('groupSettings.couldNotChangeThat'));
         this.savingSimplify.set(false);
+      },
+    });
+  }
+
+  /** Group type uses the same partial PATCH path as rename and simplify-debts. */
+  setType(type: GroupType): void {
+    const g = this.group();
+    if (!g || this.savingType() || g.type === type) {
+      return;
+    }
+    this.savingType.set(true);
+    this.scoped(this.groups.updateGroup(this.groupId, { type })).subscribe({
+      next: (updated) => {
+        this.group.set(updated);
+        this.savingType.set(false);
+        this.dashboard.refresh(); // the sidebar and cards carry the glyph
+      },
+      error: (err) => {
+        this.error.set(err?.error?.message ?? translate('groupSettings.couldNotChangeThe'));
+        this.savingType.set(false);
+      },
+    });
+  }
+
+  /** Archiving stops new entries; re-opening restores them. Any member, like other settings. */
+  toggleArchive(): void {
+    if (this.savingArchive() || !this.group()) {
+      return;
+    }
+    const wasArchived = this.archived();
+    this.savingArchive.set(true);
+    this.error.set(null);
+    const request = wasArchived
+      ? this.groups.unarchiveGroup(this.groupId)
+      : this.groups.archiveGroup(this.groupId);
+    this.scoped(request).subscribe({
+      next: (updated) => {
+        this.group.set(updated);
+        this.savingArchive.set(false);
+        this.dashboard.refresh(); // cards and the tray show the archived state
+      },
+      error: (err) => {
+        this.error.set(
+          err?.error?.message ??
+            (wasArchived
+              ? translate('groupSettings.couldNotReOpen')
+              : translate('groupSettings.couldNotArchiveThe')),
+        );
+        this.savingArchive.set(false);
       },
     });
   }
@@ -319,7 +418,7 @@ export class GroupSettingsComponent implements OnInit {
         this.router.navigate(['/dashboard']);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not leave the group.');
+        this.error.set(err?.error?.message ?? translate('groupSettings.couldNotLeaveThe'));
         this.busy.set(false);
         this.confirming.set(null);
       },
@@ -334,10 +433,11 @@ export class GroupSettingsComponent implements OnInit {
     this.scoped(this.groups.deleteGroup(this.groupId)).subscribe({
       next: () => {
         this.dashboard.refresh();
-        this.router.navigate(['/dashboard']);
+        // Land on the recovery list: deletion is reversible, and this is where to reverse it.
+        this.router.navigate(['/groups/deleted']);
       },
       error: (err) => {
-        this.error.set(err?.error?.message ?? 'Could not delete the group.');
+        this.error.set(err?.error?.message ?? translate('groupSettings.couldNotDeleteThe'));
         this.busy.set(false);
         this.confirming.set(null);
       },

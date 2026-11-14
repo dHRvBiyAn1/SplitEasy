@@ -5,6 +5,7 @@ import { PersonBalance } from '../dashboard/dashboard.models';
 import { Currency } from '../shared/currency';
 import { formatMoney } from '../shared/money.component';
 import { DirectObligation, GroupBalancesResponse } from './balance.models';
+import { translate } from '../core/i18n/i18n.service';
 
 @Injectable({ providedIn: 'root' })
 export class BalanceService {
@@ -32,8 +33,10 @@ export class BalanceService {
 /** A human sentence for a member's net position, e.g. "is owed $12.50" / "owes $8.00" / "is settled up". */
 export function describeBalance(netMinor: number, currency: Currency = 'USD'): string {
   if (netMinor === 0) {
-    return 'is settled up';
+    return translate('balance.isSettledUp');
   }
   const amount = formatMoney(Math.abs(netMinor), false, currency);
-  return netMinor > 0 ? `is owed ${amount}` : `owes ${amount}`;
+  return netMinor > 0
+    ? translate('balance.isOwedAmount', { amount })
+    : translate('balance.owesAmount', { amount });
 }
