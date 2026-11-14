@@ -36,7 +36,7 @@
         routerLink="/notifications"
         class="bell"
         [attr.aria-label]="'shell.notificationsUnread' | t: { count: unreadCount() }"
-        >{{ 'common.notifications' | t }}
+        ><app-icon name="bell" /><span class="bell-label">{{ 'common.notifications' | t }}</span>
         @if (unreadCount() > 0) {
           <span class="bell-count">{{ unreadCount() }}</span>
         }

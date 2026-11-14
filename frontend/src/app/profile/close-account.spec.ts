@@ -64,6 +64,9 @@ describe('rendered account closure', () => {
     submit();
     const req = http.expectOne('/api/me/closure');
     expect(req.request.body).toEqual({ currentPassword: 'password123' });
+    // Without the contract headers the backend answers 409 "Reload or upgrade the app" instead.
+    expect(req.request.headers.get('X-Participant-Version')).toBe('1');
+    expect(req.request.headers.get('X-Ledger-Version')).toBe('2');
     req.flush(
       { message: 'Settle your balances before closing your account: Trip to Rome.' },
       { status: 409, statusText: 'Conflict' },
