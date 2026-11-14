@@ -73,6 +73,7 @@ export class PersonalExpensesComponent {
   private expectedVersion: number | undefined;
   // Multi-payer entries (API-created) keep their stored contributions; this form can't edit them.
   private contributions: ContributionInput[] | null = null;
+  protected readonly multiPayer = signal(false);
   protected restored: PendingWrite<CreateExpenseRequest> | null = null;
 
   protected readonly description = signal('');
@@ -169,6 +170,7 @@ export class PersonalExpensesComponent {
     this.editing = null;
     this.expectedVersion = undefined;
     this.contributions = null;
+    this.multiPayer.set(false);
     this.description.set('');
     this.amount.set('');
     this.date.set(this.today());
@@ -236,6 +238,7 @@ export class PersonalExpensesComponent {
             stored && stored.length > 1
               ? stored.map((c) => ({ userId: c.user.id, amountMinor: c.amountMinor }))
               : null;
+          this.multiPayer.set(this.contributions !== null);
           // Only equal and exact are editable here; every other type opens as its stored exact
           // shares so saving never silently resets what was agreed.
           this.split.set(e.splitType === 'EQUAL' ? 'EQUAL' : 'UNEQUAL');
