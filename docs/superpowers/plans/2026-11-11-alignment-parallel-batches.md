@@ -104,7 +104,7 @@ C02 rewrites strings in almost every template, so this wave's other slots are ba
 
 Then **R2**: the release gate for M2 + M3 (same checklist as R1, migrations V20 to V30).
 
-## Wave 10 — after R2
+## Wave 10 — next (R2 released as v0.3.0 on 2026-11-15)
 
 | Package | Owns |
 | --- | --- |
