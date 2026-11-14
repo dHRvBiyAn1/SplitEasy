@@ -90,7 +90,7 @@ Design, owner decisions and final ownership: [Wave 8 package plans](2026-11-12-a
 | **A04** account closure | `AuthService`, `AuthSessionService`, `AccountLifecycleService`, `SecurityConfig`, `User` entity, `ProfileService`, frontend `profile/*`, `auth/*` | Settlement, recurrence |
 | **H04** recurrence + reminders | New `recurrence/*` (scheduler, occurrence identity, calls `ExpenseService`), reminder sender via H03 outbox, frontend new `recurring/*` plus a repeat control in `modals/new-expense-modal.*` | Profile, settlement |
 
-## Wave 9 — locale wave (now)
+## Wave 9 — done (PRs #128, #129, #130 merged to dev 2026-11-13; V29/V30 swapped: H02-A V29, C02 V30; V31 unused)
 
 Design, owner decisions (Hindi + Spanish + French, extensible; attachments in PostgreSQL) and final ownership: [Wave 9 package plans](2026-11-12-alignment-wave9.md).
 
