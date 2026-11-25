@@ -48,7 +48,8 @@ TDD/verification workflow and migration policy still apply in full.
 | V29 | C02 | server-owned locale |
 | V30 | H02 | comments and attachment metadata |
 | V31 | P07-A/P01-A | search indexes, only if needed |
-| V32+ | M4/M5 | assigned when their wave is planned |
+| V32 | P05 | saved split rules |
+| V33+ | later | assigned when their wave is planned |
 
 An unused reservation leaves a gap, which Flyway accepts.
 
@@ -104,7 +105,9 @@ C02 rewrites strings in almost every template, so this wave's other slots are ba
 
 Then **R2**: the release gate for M2 + M3 (same checklist as R1, migrations V20 to V30).
 
-## Wave 10 — next (R2 released as v0.3.0 on 2026-11-15)
+## Wave 10 — now
+
+Design, owner decision (`@angular/service-worker`) and final ownership: [Wave 10 package plans](2026-11-25-alignment-wave10.md).
 
 | Package | Owns |
 | --- | --- |

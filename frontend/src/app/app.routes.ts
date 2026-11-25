@@ -117,5 +117,11 @@ export const routes: Routes = [
 
   // --- p07-p01 routes (insert below; parallel batch plan rule 3) ---
 
+  // --- h07 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- ui10 routes (insert below; parallel batch plan rule 3) ---
+
+  // --- p04-p05 routes (insert below; parallel batch plan rule 3) ---
+
   { path: '**', redirectTo: 'dashboard' },
 ];
