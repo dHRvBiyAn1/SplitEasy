@@ -1,0 +1,99 @@
+<section class="analytics-page" aria-labelledby="analytics-heading">
+  @if (groupId) {
+    <a [routerLink]="['/groups', groupId]">{{ 'common.backToThisGroup' | t }}</a>
+  }
+  <header>
+    <p class="eyebrow">{{ 'analytics.eyebrow' | t }}</p>
+    <h1 id="analytics-heading">{{ 'analytics.title' | t }}</h1>
+    <p class="note">{{ (groupId ? 'analytics.oneGroup' : 'analytics.allGroups') | t }}</p>
+  </header>
+
+  <form class="filter" (submit)="$event.preventDefault(); load()">
+    <label>
+      {{ 'analytics.from' | t }}
+      <input type="date" name="from" [value]="from" (input)="from = $any($event.target).value" />
+    </label>
+    <label>
+      {{ 'analytics.to' | t }}
+      <input type="date" name="to" [value]="to" (input)="to = $any($event.target).value" />
+    </label>
+    <label>
+      {{ 'analytics.groupBy' | t }}
+      <select name="groupBy" (change)="groupBy = $any($event.target).value">
+        @for (by of ['category', 'month', 'person']; track by) {
+          <option [value]="by" [selected]="groupBy === by">{{ byLabel($any(by)) }}</option>
+        }
+      </select>
+    </label>
+    <button class="dc-btn" type="submit">{{ 'analytics.apply' | t }}</button>
+  </form>
+
+  @if (loading()) {
+    <p role="status">{{ 'analytics.loading' | t }}</p>
+  } @else if (error()) {
+    <div class="retry" role="alert">
+      <p>{{ error() }}</p>
+      <button class="dc-btn" type="button" (click)="load()">{{ 'common.tryAgain' | t }}</button>
+    </div>
+  } @else if (!sections().length) {
+    <p>{{ 'analytics.empty' | t }}</p>
+  } @else {
+    <p class="note">{{ 'analytics.refundNote' | t }}</p>
+    @for (section of sections(); track section.currency) {
+      <section class="currency" [attr.aria-labelledby]="'cur-' + section.currency">
+        <h2 [id]="'cur-' + section.currency">
+          {{ 'analytics.currencyHeading' | t: { currency: section.currency } }}
+        </h2>
+        <!-- The bars are decoration; the table below carries every number. -->
+        <ul class="bars" aria-hidden="true">
+          @for (row of section.rows; track row.key) {
+            <li>
+              <span class="bar__name">{{ rowLabel(row) }}</span>
+              <span class="bar">
+                <span
+                  class="bar__fill"
+                  [class.bar__fill--negative]="row.groupTotalMinor < 0"
+                  [style.width.%]="row.percent"
+                ></span>
+              </span>
+            </li>
+          }
+        </ul>
+        <div class="table-scroll">
+          <table>
+            <caption>
+              {{
+                'analytics.caption'
+                  | t: { currency: section.currency, by: byLabel(shownBy()).toLowerCase() }
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">{{ byLabel(shownBy()) }}</th>
+                <th scope="col">{{ 'analytics.groupTotal' | t }}</th>
+                <th scope="col">{{ 'analytics.myShare' | t }}</th>
+                <th scope="col">{{ 'analytics.myPaid' | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of section.rows; track row.key) {
+                <tr>
+                  <th scope="row">{{ rowLabel(row) }}</th>
+                  <td>
+                    <app-money [minor]="row.groupTotalMinor" [currency]="section.currency" />
+                  </td>
+                  <td>
+                    <app-money [minor]="row.myShareMinor" [currency]="section.currency" />
+                  </td>
+                  <td>
+                    <app-money [minor]="row.myPaidMinor" [currency]="section.currency" />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</section>

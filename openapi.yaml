@@ -3404,6 +3404,105 @@ paths:
   # --- ui10 paths (insert below; parallel batch plan rule 3) ---
 
   # --- p04-p05 paths (insert below; parallel batch plan rule 3) ---
+  /api/analytics:
+    get:
+      operationId: getSpendingAnalytics
+      summary: Spending totals by category, month or payer, one row set per currency
+      description: Over the caller's accessible, non-deleted expenses, with refunds subtracted per currency on their own refund date and "paid" read from contributions. Without `groupId`, every current group plus personal ledgers. Never sums across currencies. Totals reconcile with the CSV from `/api/groups/history/export` for the same group and date filter. `groupId` is checked for membership first (403) and a personal ledger reads as absent (404).
+      tags: [Analytics]
+      parameters:
+      - {name: from, in: query, required: false, schema: {type: string, format: date}}
+      - {name: to, in: query, required: false, schema: {type: string, format: date}}
+      - {name: groupId, in: query, required: false, schema: {type: string, format: uuid}}
+      - name: groupBy
+        in: query
+        required: false
+        schema: {type: string, enum: [category, month, person], default: category}
+      responses:
+        '200':
+          description: Rows ordered by currency then key.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AnalyticsResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/groups/{groupId}/split-rules:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    get:
+      operationId: listSplitRules
+      summary: The caller's own saved split rules for the group
+      description: Rules are private to their owner; other members never see them.
+      tags: [Split rules]
+      responses:
+        '200':
+          description: Rules by name.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/SplitRule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createSplitRule
+      summary: Save a ratio split under a name
+      description: EQUAL (participant set), PERCENTAGE (basis points summing to 10000) and WEIGHTS only; EXACT/ADJUSTMENTS are 400. Names are unique per owner and group, ignoring case (409). Refused 409 on an archived group. A rule only prefills an expense draft.
+      tags: [Split rules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SplitRuleRequest'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SplitRule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/groups/{groupId}/split-rules/{ruleId}:
+    parameters:
+    - $ref: '#/components/parameters/GroupIdParam'
+    - {name: ruleId, in: path, required: true, schema: {type: string, format: uuid}}
+    put:
+      operationId: updateSplitRule
+      summary: Replace a saved split rule at its expected version
+      description: Stale `expectedVersion` is 409 before any change. Existing expenses are never touched. Another owner's rule is 404.
+      tags: [Split rules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SplitRuleRequest'}
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SplitRule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteSplitRule
+      summary: Delete a saved split rule at its expected version
+      tags: [Split rules]
+      parameters:
+      - {name: expectedVersion, in: query, required: true, schema: {type: integer, format: int64, minimum: 0}}
+      responses:
+        '204': {description: Deleted. Existing expenses are unchanged.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
 
 components:
   schemas:
@@ -5804,6 +5903,49 @@ components:
     # --- ui10 schemas (insert below; parallel batch plan rule 3) ---
 
     # --- p04-p05 schemas (insert below; parallel batch plan rule 3) ---
+    AnalyticsRow:
+      type: object
+      required: [currency, key, label, groupTotalMinor, myShareMinor, myPaidMinor]
+      properties:
+        currency: {type: string, enum: [USD, EUR, GBP, INR, JPY, KWD]}
+        key: {type: string, description: 'Category enum value, YYYY-MM month, or the payer participant ID.'}
+        label: {type: string}
+        groupTotalMinor: {type: integer, format: int64, description: Expenses minus refunds in minor units; can be negative.}
+        myShareMinor: {type: integer, format: int64, description: The caller's owed shares minus refund allocations.}
+        myPaidMinor: {type: integer, format: int64, description: The caller's contributions minus refunds received.}
+    AnalyticsResponse:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/AnalyticsRow'}
+    SplitRuleRequest:
+      type: object
+      required: [name, splitType, inputs]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        splitType: {type: string, enum: [EQUAL, PERCENTAGE, WEIGHTS]}
+        inputs:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {$ref: '#/components/schemas/SplitInput'}
+        expectedVersion: {type: integer, format: int64, minimum: 0, description: Required on PUT only.}
+    SplitRule:
+      type: object
+      required: [id, groupId, name, splitType, inputs, version, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        groupId: {type: string, format: uuid}
+        name: {type: string}
+        splitType: {type: string, enum: [EQUAL, PERCENTAGE, WEIGHTS]}
+        inputs:
+          type: array
+          items: {$ref: '#/components/schemas/SplitInput'}
+        version: {type: integer, format: int64}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
 
   parameters:
     ParticipantVersion:

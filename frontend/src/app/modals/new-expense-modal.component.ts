@@ -36,6 +36,8 @@ import {
   SplitType,
 } from '../expenses/expense.models';
 import { GroupService } from '../groups/group.service';
+import { SavableSplitType, SplitRule } from '../split-rules/split-rule.models';
+import { SplitRuleService } from '../split-rules/split-rule.service';
 import { ModalService } from './modal.service';
 import { ModalShellComponent } from './modal-shell.component';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
@@ -137,6 +139,7 @@ export class NewExpenseModalComponent {
   private restored: PendingWrite<CreateExpenseRequest> | null = null;
   private readonly expenses = inject(ExpenseService);
   private readonly recurring = inject(RecurringService);
+  private readonly splitRules = inject(SplitRuleService);
   private readonly dashboard = inject(DashboardService);
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
@@ -164,6 +167,15 @@ export class NewExpenseModalComponent {
   protected readonly category = signal<ExpenseCategory>('FOOD_DRINK');
   protected readonly paidBy = signal<string>('');
   protected readonly splitType = signal<SplitType>('EQUAL');
+
+  /** Saved split rules: fetched on first open, applied to the draft only, never posted. */
+  protected readonly rulesOpen = signal(false);
+  protected readonly rules = signal<SplitRule[] | null>(null);
+  protected readonly ruleStatus = signal<string | null>(null);
+  protected readonly ruleError = signal<string | null>(null);
+  protected readonly ruleReview = signal<string | null>(null);
+  protected readonly ruleSaving = signal(false);
+  protected readonly ruleName = new FormControl('', { nonNullable: true });
 
   /** Multi-payer mode: raw per-member amounts; blank excludes. paidBy stays the primary payer. */
   protected readonly multiPayer = signal(false);
@@ -295,6 +307,11 @@ export class NewExpenseModalComponent {
     this.values.set({});
     this.multiPayer.set(false);
     this.payerValues.set({});
+    this.rulesOpen.set(false);
+    this.rules.set(null);
+    this.ruleStatus.set(null);
+    this.ruleError.set(null);
+    this.ruleReview.set(null);
     if (!id) {
       return;
     }
@@ -403,6 +420,94 @@ export class NewExpenseModalComponent {
           if (version !== this.groupRequestVersion) return;
           this.loadFailed.set(true);
           this.error.set(translate('newExpenseModal.couldNotLoadThe'));
+        },
+      });
+  }
+
+  toggleRules(): void {
+    const open = !this.rulesOpen();
+    this.rulesOpen.set(open);
+    const gid = this.groupId();
+    if (!open || !gid || this.rules()) return;
+    this.ruleError.set(null);
+    this.splitRules
+      .list(gid)
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rules) => {
+          if (gid === this.groupId()) this.rules.set(rules);
+        },
+        error: () => {
+          if (gid === this.groupId()) this.ruleError.set(translate('splitRules.loadFailed'));
+        },
+      });
+  }
+
+  /** Prefills the draft from a rule; a rule naming someone no longer here is never half-applied. */
+  applyRule(id: string): void {
+    const rule = this.rules()?.find((r) => r.id === id);
+    this.ruleStatus.set(null);
+    this.ruleReview.set(null);
+    if (!rule) return;
+    if (rule.inputs.some((i) => !this.members().some((m) => m.id === i.userId))) {
+      this.ruleReview.set(translate('splitRules.review', { name: rule.name }));
+      return;
+    }
+    this.splitType.set(rule.splitType);
+    if (rule.splitType === 'EQUAL') {
+      this.included.set(new Set(rule.inputs.map((i) => i.userId)));
+      this.values.set({});
+    } else {
+      this.values.set(
+        Object.fromEntries(
+          rule.inputs.map((i) => [
+            i.userId,
+            rule.splitType === 'PERCENTAGE' ? minorToDisplay(i.value, 'USD') : String(i.value),
+          ]),
+        ),
+      );
+    }
+    this.tick.update((n) => n + 1);
+    this.ruleStatus.set(translate('splitRules.applied', { name: rule.name }));
+  }
+
+  canSaveRule(): boolean {
+    this.tick();
+    return (
+      !this.ruleSaving() &&
+      !!this.groupId() &&
+      ['EQUAL', 'PERCENTAGE', 'WEIGHTS'].includes(this.splitType()) &&
+      this.splitValid() &&
+      this.ruleName.value.trim() !== ''
+    );
+  }
+
+  saveRule(): void {
+    const gid = this.groupId();
+    if (!gid || !this.canSaveRule()) return;
+    const splitType = this.splitType() as SavableSplitType;
+    const inputs =
+      splitType === 'EQUAL'
+        ? [...this.included()].map((userId) => ({ userId, value: 1 }))
+        : this.serializedSplits()!;
+    this.ruleSaving.set(true);
+    this.ruleError.set(null);
+    this.ruleStatus.set(null);
+    const name = this.ruleName.value.trim();
+    this.splitRules
+      .create(gid, { name, splitType, inputs })
+      .pipe(takeUntil(this.session.changes), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rule) => {
+          this.ruleSaving.set(false);
+          if (gid !== this.groupId()) return;
+          this.rules.update((rules) => [...(rules ?? []), rule]);
+          this.ruleName.setValue('');
+          this.ruleStatus.set(translate('splitRules.savedNotice', { name }));
+        },
+        error: (err) => {
+          this.ruleSaving.set(false);
+          this.ruleError.set(err?.error?.message ?? translate('splitRules.saveFailed'));
         },
       });
   }
