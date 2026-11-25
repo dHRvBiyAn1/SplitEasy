@@ -3399,6 +3399,12 @@ paths:
               schema: {type: string, format: binary}
         '401': {$ref: '#/components/responses/Unauthorized'}
 
+  # --- h07 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- ui10 paths (insert below; parallel batch plan rule 3) ---
+
+  # --- p04-p05 paths (insert below; parallel batch plan rule 3) ---
+
 components:
   schemas:
     SaveFriendRequest:
@@ -5792,6 +5798,12 @@ components:
         createdAt: {type: string, format: date-time}
 
     # --- p07-p01 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- h07 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- ui10 schemas (insert below; parallel batch plan rule 3) ---
+
+    # --- p04-p05 schemas (insert below; parallel batch plan rule 3) ---
 
   parameters:
     ParticipantVersion:
