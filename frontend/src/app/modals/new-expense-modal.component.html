@@ -246,6 +246,56 @@
           </button>
         </div>
 
+        <button
+          type="button"
+          class="dc-btn-ghost"
+          data-split-rules-toggle
+          [attr.aria-expanded]="rulesOpen()"
+          (click)="toggleRules()"
+        >
+          {{ 'splitRules.toggle' | t }}
+        </button>
+        @if (rulesOpen()) {
+          <div class="split-rules">
+            @if (ruleError()) {
+              <p class="mform__error" role="alert">{{ ruleError() }}</p>
+            }
+            @if (rules(); as saved) {
+              @if (saved.length) {
+                <label class="dc-field-label" for="ne-rule">{{ 'splitRules.apply' | t }}</label>
+                <select id="ne-rule" (change)="applyRule($any($event.target).value)">
+                  <option value="">{{ 'splitRules.choose' | t }}</option>
+                  @for (r of saved; track r.id) {
+                    <option [value]="r.id">{{ r.name }}</option>
+                  }
+                </select>
+              } @else {
+                <p class="mform__hint">{{ 'splitRules.empty' | t }}</p>
+              }
+            } @else if (!ruleError()) {
+              <p role="status">{{ 'splitRules.loading' | t }}</p>
+            }
+            @if (ruleReview()) {
+              <p class="mform__error rule-review" role="alert">{{ ruleReview() }}</p>
+            }
+            @if (ruleStatus()) {
+              <p class="mform__hint" role="status">{{ ruleStatus() }}</p>
+            }
+            <label class="dc-field-label" for="ne-rule-name">{{ 'splitRules.saveAs' | t }}</label>
+            <input id="ne-rule-name" maxlength="80" [formControl]="ruleName" />
+            <button
+              type="button"
+              class="dc-btn-outline"
+              data-save-rule
+              [disabled]="!canSaveRule()"
+              (click)="saveRule()"
+            >
+              {{ 'splitRules.save' | t }}
+            </button>
+            <p class="mform__hint">{{ 'splitRules.onlyRatios' | t }}</p>
+          </div>
+        }
+
         <div class="prows">
           @for (m of members(); track m.id) {
             <div class="prow">

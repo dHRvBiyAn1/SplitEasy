@@ -122,6 +122,12 @@ export const routes: Routes = [
   // --- ui10 routes (insert below; parallel batch plan rule 3) ---
 
   // --- p04-p05 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'analytics',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./analytics/analytics.component').then((m) => m.AnalyticsComponent),
+  },
 
   { path: '**', redirectTo: 'dashboard' },
 ];
