@@ -264,6 +264,18 @@
           @if (deleting() === row.id) {
             <p role="status">{{ 'personalExpenses.deleting' | t }}</p>
           }
+          <button
+            class="dc-btn-ghost"
+            type="button"
+            [attr.aria-expanded]="notesFor() === row.id"
+            (click)="notesFor.set(notesFor() === row.id ? null : row.id)"
+          >
+            {{ 'personalExpenses.commentsAndFiles' | t }}
+          </button>
+          @if (notesFor() === row.id) {
+            <app-expense-comments [base]="'/friends/' + friendId() + '/expenses/' + row.id" />
+            <app-expense-attachments [base]="'/friends/' + friendId() + '/expenses/' + row.id" />
+          }
         </li>
       }
     </ul>

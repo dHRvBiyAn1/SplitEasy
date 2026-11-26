@@ -1,0 +1,113 @@
+<section class="search-page" aria-labelledby="search-heading">
+  <header>
+    <h1 id="search-heading">{{ 'search.title' | t }}</h1>
+  </header>
+
+  <form class="filter" (submit)="$event.preventDefault(); submit()">
+    <label>
+      <span class="dc-field-label">{{ 'search.text' | t }}</span>
+      <input class="dc-field" type="search" name="q" (input)="q = $any($event.target).value" />
+    </label>
+    <label>
+      <span class="dc-field-label">{{ 'common.group' | t }}</span>
+      <select class="dc-field" name="groupId" (change)="groupId = $any($event.target).value">
+        <option value="">{{ 'search.anyGroup' | t }}</option>
+        @for (g of groups(); track g.id) {
+          <option [value]="g.id">{{ g.name }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span class="dc-field-label">{{ 'history.from' | t }}</span>
+      <input class="dc-field" type="date" name="from" (input)="from = $any($event.target).value" />
+    </label>
+    <label>
+      <span class="dc-field-label">{{ 'history.to' | t }}</span>
+      <input class="dc-field" type="date" name="to" (input)="to = $any($event.target).value" />
+    </label>
+    <label>
+      <span class="dc-field-label">{{ 'common.currency' | t }}</span>
+      <select class="dc-field" name="currency" (change)="currency.set($any($event.target).value)">
+        <option value="">{{ 'search.anyCurrency' | t }}</option>
+        @for (code of currencies; track code) {
+          <option [value]="code">{{ code }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span class="dc-field-label">{{ 'search.minAmount' | t }}</span>
+      <input
+        class="dc-field"
+        name="minAmount"
+        inputmode="decimal"
+        [disabled]="!currency()"
+        (input)="minAmount = $any($event.target).value"
+      />
+    </label>
+    <label>
+      <span class="dc-field-label">{{ 'search.maxAmount' | t }}</span>
+      <input
+        class="dc-field"
+        name="maxAmount"
+        inputmode="decimal"
+        [disabled]="!currency()"
+        (input)="maxAmount = $any($event.target).value"
+      />
+    </label>
+    <button class="dc-btn" type="submit">{{ 'search.submit' | t }}</button>
+  </form>
+  @if (!currency()) {
+    <p class="dc-caption">{{ 'search.amountNeedsCurrency' | t }}</p>
+  }
+  @if (formError()) {
+    <p role="alert">{{ formError() }}</p>
+  }
+
+  @if (loading()) {
+    <p role="status">{{ 'search.searching' | t }}</p>
+  } @else if (searched()) {
+    @if (error()) {
+      <div class="retry" role="alert">
+        <p>{{ error() }}</p>
+        <button
+          class="dc-btn"
+          type="button"
+          data-test="retry"
+          (click)="nextCursor() ? loadMore() : load()"
+        >
+          {{ 'common.tryAgain' | t }}
+        </button>
+      </div>
+    }
+    @if (!items().length && !error()) {
+      <p data-test="empty">{{ 'search.noResults' | t }}</p>
+    }
+    <ul class="results">
+      @for (item of items(); track item.type + item.id) {
+        <li>
+          <div class="main">
+            <a [routerLink]="item.groupName ? ['/groups', item.groupId] : ['/friends']">
+              <strong>{{ item.description }}</strong>
+            </a>
+            <app-money [minor]="item.amountMinor" [currency]="item.currency"></app-money>
+          </div>
+          <p class="meta">
+            <time [attr.datetime]="item.financialDate">{{ item.financialDate }}</time>
+            · {{ typeLabel[item.type] }} · {{ item.groupName ?? ('search.personal' | t) }}
+          </p>
+        </li>
+      }
+    </ul>
+    @if (nextCursor() && !error()) {
+      <button
+        class="dc-btn-outline"
+        type="button"
+        data-test="load-more"
+        [disabled]="loadingMore()"
+        (click)="loadMore()"
+      >
+        {{ loadingMore() ? ('history.loading' | t) : ('history.loadMore' | t) }}
+      </button>
+    }
+  }
+</section>

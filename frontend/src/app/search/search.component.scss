@@ -1,0 +1,33 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.search-page {
+  max-width: 1000px;
+  margin: auto;
+  padding: var(--sp-7) var(--sp-6) var(--sp-8);
+  display: grid;
+  gap: var(--sp-5);
+  overflow-wrap: anywhere;
+}
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: flex-end;
+}
+.results {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-3);
+}
+.main {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.meta {
+  color: var(--ink-soft);
+}

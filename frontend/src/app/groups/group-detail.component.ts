@@ -1,3 +1,5 @@
+import { ExpenseCommentsComponent } from '../comments/expense-comments.component';
+import { ExpenseAttachmentsComponent } from '../attachments/expense-attachments.component';
 import { RecurringService } from '../recurring/recurring.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, Subscription, forkJoin, takeUntil } from 'rxjs';
@@ -47,7 +49,13 @@ interface MonthGroup {
 
 @Component({
   selector: 'app-group-detail',
-  imports: [TranslatePipe, RouterLink, GroupArtComponent],
+  imports: [
+    ExpenseCommentsComponent,
+    ExpenseAttachmentsComponent,
+    TranslatePipe,
+    RouterLink,
+    GroupArtComponent,
+  ],
   templateUrl: './group-detail.component.html',
   styleUrl: './group-detail.component.scss',
 })
@@ -86,6 +94,7 @@ export class GroupDetailComponent implements OnInit {
 
   /** The expense whose detail row is expanded, plus its fetched full breakdown. */
   protected readonly expandedId = signal<string | null>(null);
+  protected readonly notesFor = signal<string | null>(null);
   protected readonly detail = signal<ExpenseResponse | null>(null);
   protected readonly detailLoading = signal(false);
   protected readonly detailError = signal<string | null>(null);
