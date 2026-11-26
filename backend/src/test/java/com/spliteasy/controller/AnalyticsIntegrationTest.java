@@ -194,4 +194,47 @@ class AnalyticsIntegrationTest extends AbstractIntegrationTest {
     analytics(mallory, Map.of("groupId", g, "groupBy", "category"), 403);
     analytics(alice, Map.of("groupId", g, "groupBy", "colour"), 400);
   }
+
+  /** Lock-in: a personal ledger reads as absent to its own members and forbidden to others. */
+  @Test
+  void personalLedgerGroupIdIs404ForItsMembersAnd403ForOthers() throws Exception {
+    var alice = user("Alice");
+    var bob = user("Bob");
+    var outsider = user("Outsider");
+    String g = group(alice, bob);
+    for (var pair : List.of(List.of(alice, bob), List.of(bob, alice))) {
+      mockMvc
+          .perform(
+              jsonPost(
+                      "/api/friends",
+                      Map.of("groupId", g, "participantId", pair.get(1).user().id()))
+                  .header(HttpHeaders.AUTHORIZATION, bearer(pair.get(0).accessToken()))
+                  .header("X-Ledger-Version", "2")
+                  .header("X-Participant-Version", "1"))
+          .andReturn();
+    }
+    Map<String, Object> expense = new LinkedHashMap<>();
+    expense.put("description", "Coffee");
+    expense.put("currency", "USD");
+    expense.put("amountMinor", 500);
+    expense.put("paidByUserId", alice.user().id());
+    expense.put("participantUserIds", List.of(alice.user().id(), bob.user().id()));
+    MvcResult created =
+        mockMvc
+            .perform(
+                jsonPost("/api/friends/" + bob.user().id() + "/expenses", expense)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(alice.accessToken()))
+                    .header("X-Ledger-Version", "2")
+                    .header("X-Participant-Version", "1"))
+            .andReturn();
+    assertThat(created.getResponse().getStatus())
+        .as(created.getResponse().getContentAsString())
+        .isEqualTo(201);
+    String ledger =
+        objectMapper.readTree(created.getResponse().getContentAsString()).get("groupId").asText();
+
+    analytics(alice, Map.of("groupId", ledger), 404);
+    analytics(bob, Map.of("groupId", ledger), 404);
+    analytics(outsider, Map.of("groupId", ledger), 403);
+  }
 }
