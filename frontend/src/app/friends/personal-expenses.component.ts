@@ -1,3 +1,5 @@
+import { ExpenseCommentsComponent } from '../comments/expense-comments.component';
+import { ExpenseAttachmentsComponent } from '../attachments/expense-attachments.component';
 import { Component, DestroyRef, effect, inject, input, signal, computed } from '@angular/core';
 import { Subscription, takeUntil } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -34,7 +36,7 @@ import { translate } from '../core/i18n/i18n.service';
  */
 @Component({
   selector: 'app-personal-expenses',
-  imports: [TranslatePipe, MoneyComponent],
+  imports: [TranslatePipe, MoneyComponent, ExpenseCommentsComponent, ExpenseAttachmentsComponent],
   templateUrl: './personal-expenses.component.html',
   styleUrl: './personal-expenses.component.scss',
 })
@@ -57,6 +59,7 @@ export class PersonalExpensesComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
   protected readonly deleting = signal<string | null>(null);
+  protected readonly notesFor = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly needsReview = signal(false);
   protected readonly draftBlocked = signal(false);

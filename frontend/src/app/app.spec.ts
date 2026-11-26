@@ -59,6 +59,18 @@ describe('App', () => {
     expect(compiled.querySelector('.topbar')).toBeNull();
   });
 
+  it('offers Search and Analytics entries in the header', () => {
+    signIn();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const hrefs = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.topbar a'),
+    ).map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('/search');
+    expect(hrefs).toContain('/analytics');
+    httpTesting.match(() => true); // shell reads are not under test here
+  });
+
   it('shows navigation and loads the dashboard when authenticated', () => {
     signIn();
     const fixture = TestBed.createComponent(App);

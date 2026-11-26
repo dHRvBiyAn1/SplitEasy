@@ -1,3 +1,4 @@
+import { DownloadMyDataComponent } from '../backup/download-my-data.component';
 import { NotificationPreferencesComponent } from './notification-preferences.component';
 import { CloseAccountComponent } from './close-account.component';
 import { DeviceSessionsComponent } from './device-sessions.component';
@@ -22,6 +23,7 @@ import {
 @Component({
   selector: 'app-profile',
   imports: [
+    DownloadMyDataComponent,
     TranslatePipe,
     ReactiveFormsModule,
     AppearancePanelComponent,

@@ -120,6 +120,11 @@ export const routes: Routes = [
   // --- h07 routes (insert below; parallel batch plan rule 3) ---
 
   // --- ui10 routes (insert below; parallel batch plan rule 3) ---
+  {
+    path: 'search',
+    canActivate: [authGuard],
+    loadComponent: () => import('./search/search.component').then((m) => m.SearchComponent),
+  },
 
   // --- p04-p05 routes (insert below; parallel batch plan rule 3) ---
 

@@ -307,6 +307,24 @@
                           <span aria-hidden="true">🗑</span> {{ 'groupDetail.deleteExpense' | t }}
                         </button>
                       </div>
+                      <button
+                        type="button"
+                        class="dc-btn-outline"
+                        [attr.aria-expanded]="notesFor() === d.id"
+                        (click)="notesFor.set(notesFor() === d.id ? null : d.id)"
+                      >
+                        {{ 'personalExpenses.commentsAndFiles' | t }}
+                      </button>
+                      @if (notesFor() === d.id) {
+                        <app-expense-comments
+                          [base]="'/groups/' + groupId + '/expenses/' + d.id"
+                          [readOnly]="archived()"
+                        />
+                        <app-expense-attachments
+                          [base]="'/groups/' + groupId + '/expenses/' + d.id"
+                          [readOnly]="archived()"
+                        />
+                      }
                       @if (refunds().length) {
                         <ul class="xrefunds">
                           @for (refund of refunds(); track refund.id) {
